@@ -1,0 +1,28 @@
+{
+  "lanes": [
+    { "id": "projets", "name": "Projets", "nature": "Compliqué" },
+    { "id": "petits", "name": "Petits Projets", "nature": "Clair" },
+    { "id": "complexes", "name": "Projets Complexes", "nature": "Complexe" }
+  ],
+  "columns": [
+    { "id": "demandes", "name": "Demandes", "wipLimit": null },
+    { "id": "qualification", "name": "Qualification / RDO", "wipLimit": null },
+    { "id": "etudes", "name": "Etudes", "wipLimit": null },
+    { "id": "prets", "name": "Prets", "wipLimit": null },
+    { "id": "actifs", "name": "Actifs", "wipLimit": null },
+    { "id": "done", "name": "Done", "wipLimit": null },
+    { "id": "exploitation", "name": "En Exploitation", "wipLimit": null }
+  ],
+  "domains": ["Ingenierie", "Soutien", "Industrie", "Corporate", "ERP",
+              "PLM", "Infra", "Archi & Dev", "Cyber"],
+  "types": [
+    { "id": "achat", "name": "Achat", "short": "ACH" },
+    { "id": "etude", "name": "Étude", "short": "ETU" },
+    { "id": "evolution_tma", "name": "Evolution - TMA", "short": "EVO" },
+    { "id": "obsolescence", "name": "Gestion d’obsolescence", "short": "OBS" },
+    { "id": "mise_en_oeuvre", "name": "Mise en œuvre", "short": "MEP" },
+    { "id": "tma_corrective", "name": "TMA Corrective", "short": "TMA" }
+  ],
+  "agingStepsDays": [7, 21, 45, 90],
+  "andonThresholdDays": 5
+}

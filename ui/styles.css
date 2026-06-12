@@ -1,0 +1,166 @@
+/* Portefeuille DSI — portfolio instrument. "Industrial control panel"
+   style: dense, sober, no decoration. No animation except the blocked
+   pulse. System fonts only (zero remote asset). */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: #d6dbe3;
+  color: #0f172a;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+:focus-visible { outline: 2px solid #1d4ed8; outline-offset: 1px; border-radius: 2px; }
+
+.app {
+  /* Light low-saturation neutrals. Lightness rises page < cell < card. */
+  --bg-page: #e0e5ec; --bg-cell: #edf0f5; --bg-cell-2: #e3e9f2; --bg-card: #ffffff;
+  --bd: #c4cdda; --bd-sub: #d4dbe5;
+  --tx-1: #0f172a; --tx-2: #334155; --tx-3: #475569; --tx-4: #64748b;
+  --danger: #dc2626; --danger-strong: #b91c1c; --warn: #b45309; --accent: #1d4ed8;
+  --lane-w: 46px;
+  /* Darkening per aging step (agingStepsDays). Text never changes. */
+  --age-0: #ffffff; --age-1: #f6f5f2; --age-2: #edeae4; --age-3: #e2ded5; --age-4: #d7d2c5;
+  display: grid;
+  /* The sidebar column width is driven inline from state (0 or 216px). */
+  grid-template-columns: 0 1fr;
+  grid-template-rows: var(--header-h) 1fr var(--footer-h);
+  grid-template-areas: "header header" "sidebar board" "footer footer";
+  height: 100vh; width: 100vw;
+  background: var(--bg-page);
+}
+
+/* ---------- Header ---------- */
+.header { grid-area: header; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 0 12px; border-bottom: 1px solid var(--bd); }
+.icon-btn { background: #fff; border: 1px solid var(--bd); color: var(--tx-2); width: 27px; height: 24px; border-radius: 4px; cursor: pointer; font-size: 13px; line-height: 1; }
+.icon-btn:hover { color: var(--tx-1); border-color: #97a3b4; }
+.filter-chip { font-size: 9px; background: #fff; border: 1px solid var(--bd); color: var(--tx-2); border-radius: 11px; padding: 3px 9px; cursor: pointer; font-weight: 600; font-family: inherit; }
+.filter-chip:hover { border-color: #97a3b4; color: var(--tx-1); }
+.hd-left { display: flex; align-items: center; gap: 14px; }
+.hd-title { font-size: 16px; font-weight: 700; letter-spacing: .01em; }
+.mode-switch { display: flex; border: 1px solid var(--bd); border-radius: 5px; overflow: hidden; background: #fff; }
+.mode-btn { font-size: 11px; font-weight: 600; color: var(--tx-3); background: none; border: none; padding: 5px 11px; cursor: pointer; font-family: inherit; }
+.mode-btn + .mode-btn { border-left: 1px solid var(--bd-sub); }
+.mode-btn:hover { color: var(--tx-1); }
+.mode-btn.on { background: var(--accent); color: #fff; }
+.hd-right { display: flex; align-items: center; gap: 14px; }
+.hd-stat { font-size: 10px; color: var(--tx-2); white-space: nowrap; }
+.hd-stat b { color: var(--tx-1); font-size: 12px; }
+.hd-stat.alert b { color: var(--danger-strong); }
+.blk-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--danger); vertical-align: middle; }
+.hd-legend { display: flex; gap: 7px; flex-wrap: wrap; max-width: 480px; }
+.lg { display: flex; align-items: center; gap: 3px; font-size: 8px; color: var(--tx-3); }
+.lg-dot { width: 7px; height: 7px; border-radius: 2px; }
+
+/* ---------- Footer (keyboard hints) ---------- */
+.footer { grid-area: footer; display: flex; align-items: center; gap: 22px; padding: 0 12px; border-top: 1px solid var(--bd); font-size: 9px; color: var(--tx-3); white-space: nowrap; overflow: hidden; }
+kbd { font-family: inherit; font-size: 8px; font-weight: 700; color: var(--tx-2); background: #fff; border: 1px solid var(--bd); border-bottom-width: 2px; border-radius: 3px; padding: 1px 4px; min-width: 13px; text-align: center; display: inline-block; }
+
+/* ---------- Grid ---------- */
+.board-area { grid-area: board; position: relative; overflow: hidden; }
+.board { height: 100%; width: 100%; display: grid; gap: 1px; background: var(--bd); }
+.corner { background: var(--bg-page); }
+
+.col-head { background: var(--bg-page); padding: 4px 9px; display: flex; flex-direction: column; gap: 1px; justify-content: center; overflow: hidden; height: var(--colhead-h); }
+.col-head.focused { background: var(--bg-cell-2); box-shadow: inset 0 -2px 0 var(--accent); }
+.col-name { font-size: 11px; font-weight: 600; color: var(--tx-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.col-wip { font-size: 8px; color: var(--tx-4); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.col-head.over { background: #fbe4e4; }
+.col-head.over .col-name, .col-head.over .col-wip { color: var(--danger-strong); font-weight: 700; }
+
+.lane-label { background: var(--bg-page); border-right: 1px solid var(--bd); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; writing-mode: vertical-rl; transform: rotate(180deg); padding: 8px 0; overflow: hidden; }
+.lane-label:hover { background: #e7ebf2; }
+.lane-label.collapsed { writing-mode: horizontal-tb; transform: none; justify-content: flex-start; padding: 0 6px; gap: 5px; }
+.lane-name { font-size: 11px; font-weight: 600; color: var(--tx-2); letter-spacing: .03em; white-space: nowrap; }
+.lane-nature { font-size: 8px; color: var(--tx-4); text-transform: uppercase; letter-spacing: .1em; }
+.lane-label.collapsed .lane-name { font-size: 9px; }
+.caret { font-size: 9px; color: var(--tx-4); }
+
+.cell { position: relative; background: var(--bg-cell); overflow: hidden; display: flex; flex-direction: column; padding: 2px; min-width: 0; }
+.cell.focused { background: var(--bg-cell-2); box-shadow: inset 0 0 0 1px var(--accent); }
+.cell.dimmed { opacity: .3; }
+.cell.dragover { background: #d7e2f8; outline: 1px dashed var(--accent); outline-offset: -2px; }
+.cell-head { display: flex; align-items: center; justify-content: flex-end; gap: 5px; height: 14px; padding: 0 3px; flex: 0 0 auto; }
+.cell-count { font-size: 8px; color: var(--tx-4); font-variant-numeric: tabular-nums; }
+.cell-blocked { font-size: 8px; font-weight: 700; color: #fff; background: var(--danger); border-radius: 7px; padding: 0 4px; line-height: 1.45; }
+.cell-cards { flex: 1; display: flex; flex-direction: column; gap: var(--bar-gap); overflow: hidden; min-height: 0; }
+.cell.mode-normal .cell-cards { overflow-y: auto; gap: 3px; }
+.cell.mode-normal .cell-cards::-webkit-scrollbar { width: 6px; }
+.cell.mode-normal .cell-cards::-webkit-scrollbar-thumb { background: #b6bfcd; border-radius: 3px; }
+
+/* Collapsed lane: one summary strip per cell. */
+.ccell { background: var(--bg-cell); display: flex; align-items: center; justify-content: center; gap: 6px; overflow: hidden; }
+.ccount { font-size: 11px; font-weight: 600; color: var(--tx-2); font-variant-numeric: tabular-nums; }
+.cblk { font-size: 8px; font-weight: 700; color: #fff; background: var(--danger); border-radius: 7px; padding: 0 4px; }
+.cstale { width: 6px; height: 6px; border-radius: 50%; background: var(--warn); }
+
+/* ---------- Cards ---------- */
+.card { position: relative; background: var(--bg-card); cursor: grab; overflow: hidden; flex: 0 0 auto; border-radius: 2px; box-shadow: 0 1px 1.5px rgba(15, 23, 42, .06); }
+.card:hover { box-shadow: 0 1px 4px rgba(15, 23, 42, .16); }
+.card:active { cursor: grabbing; }
+.accent { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
+
+/* Progressive darkening: the background ages, the text does not move. */
+.card.age-step-0 { background: var(--age-0); }
+.card.age-step-1 { background: var(--age-1); }
+.card.age-step-2 { background: var(--age-2); }
+.card.age-step-3 { background: var(--age-3); }
+.card.age-step-4 { background: var(--age-4); }
+
+/* Blocked: pulsing red border — the instrument's only animation. */
+.card.blocked { animation: blocked-pulse 1.6s ease-in-out infinite; }
+@keyframes blocked-pulse {
+  0%, 100% { box-shadow: inset 0 0 0 1px var(--danger), 0 0 0 0 rgba(220, 38, 38, .35); }
+  50% { box-shadow: inset 0 0 0 2px var(--danger-strong), 0 0 0 3px rgba(220, 38, 38, 0); }
+}
+
+/* Static escalation marker (andon). */
+.andon { color: var(--danger-strong); font-size: 8px; flex: 0 0 auto; line-height: 1; }
+
+/* Filtered out: dimmed, never removed — the structure stays truthful. */
+.card.dimmed { opacity: .16; }
+
+/* Criticality: top = gold star, major = slate pip. */
+.crit-star { color: #a16207; flex: 0 0 auto; line-height: 1; }
+.crit-pip { flex: 0 0 auto; background: #475569; transform: rotate(45deg); border-radius: 1px; }
+
+/* Project-type tag — deliberately more prominent than the domain bar. */
+.type-tag { font-size: 8px; font-weight: 700; color: #fff; padding: 0 4px; border-radius: 3px; line-height: 1.55; letter-spacing: .03em; flex: 0 0 auto; white-space: nowrap; }
+.type-tag.big { font-size: 9px; padding: 1px 7px; border-radius: 4px; line-height: 1.5; }
+
+/* Code projet (shown via the sidebar toggle, searchable when hidden). */
+.mini-code { font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; font-size: 8px; color: var(--tx-4); flex: 0 0 auto; }
+
+/* Consumed/budget mini-bar on normal cards. */
+.ec-row { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+.ec-label { font-size: 8px; color: var(--tx-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ec-track { flex: 1; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden; }
+.ec-fill { display: block; height: 100%; border-radius: 2px; }
+
+/* Radiator bar. */
+.card.bar { height: var(--bar-h); display: flex; align-items: center; gap: 5px; padding: 0 6px 0 9px; }
+.bar-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 9px; font-weight: 500; color: var(--tx-1); }
+.age { font-size: 8px; color: var(--tx-3); flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+.age.hot { color: var(--danger-strong); font-weight: 700; }
+
+/* Blocked reason on focus (keyboard or click): replaces the title while
+   the bar holds focus (the hover path uses the native tooltip). */
+.bar-reason { display: none; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 8px; font-weight: 600; color: var(--danger-strong); }
+.card.bar.blocked:focus .bar-title { display: none; }
+.card.bar.blocked:focus .bar-reason { display: block; }
+
+/* Normal card. */
+.card.full { display: flex; flex-direction: column; gap: 3px; padding: 6px 8px 6px 12px; min-height: 52px; }
+.full-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.full-line.meta { flex-wrap: wrap; }
+.full-title { flex: 1; min-width: 0; font-size: 11px; font-weight: 600; color: var(--tx-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dom-pill { font-size: 8px; font-weight: 700; letter-spacing: .05em; padding: 1px 5px; border: 1px solid; border-radius: 3px; background: #fff; }
+.owner { color: var(--tx-3); font-size: 9px; white-space: nowrap; }
+.tag { font-size: 8px; color: var(--tx-2); background: #e8ecf3; border-radius: 3px; padding: 1px 5px; white-space: nowrap; }
+.blocked-reason { font-size: 9px; color: var(--danger-strong); font-weight: 500; }
+
+/* ---------- Configuration error screen ---------- */
+.config-error { padding: 40px; max-width: 560px; }
+.config-error h1 { font-size: 18px; margin-bottom: 10px; }
+.config-error p { font-size: 13px; color: var(--tx-2, #334155); line-height: 1.5; }
