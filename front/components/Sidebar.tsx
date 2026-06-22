@@ -23,7 +23,7 @@ export interface SidebarProps extends SectionProps {
   showCodes: boolean;
   onToggleCodes: () => void;
   /** Focused by the "/" shortcut. */
-  searchRef: RefObject<HTMLInputElement | null>;
+  searchRef: RefObject<HTMLInputElement>;
 }
 
 function SearchBox({ filters, searchRef }: { filters: Filters; searchRef: SidebarProps["searchRef"] }) {

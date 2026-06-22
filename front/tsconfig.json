@@ -5,6 +5,7 @@
     "moduleResolution": "bundler",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
+    "types": [],
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "noFallthroughCasesInSwitch": true,
@@ -17,8 +18,7 @@
     "verbatimModuleSyntax": true,
     "erasableSyntaxOnly": true,
     "isolatedModules": true,
-    "skipLibCheck": true,
-    "types": ["node"]
+    "skipLibCheck": true
   },
-  "include": ["core", "adapters", "fixtures", "scripts", "sync"]
+  "include": ["**/*.ts", "**/*.tsx"]
 }

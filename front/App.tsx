@@ -53,7 +53,7 @@ interface AppContext {
   sidebar: Toggle;
   codes: Toggle;
   metrics: Toggle;
-  searchRef: React.RefObject<HTMLInputElement | null>;
+  searchRef: React.RefObject<HTMLInputElement>;
 }
 
 function Board({ app }: { app: AppContext }) {
@@ -179,7 +179,7 @@ export function App({ config }: { config: BoardConfig }) {
   const sidebar = useToggle(false);
   const codes = useToggle(false);
   const metrics = useToggle(false);
-  const searchRef = useRef<HTMLInputElement | null>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const dimmed = useMemo(
     () => dimmedCardIds(store.cards, filters.state, config, now),
     [store.cards, filters.state, config, now],

@@ -1,4 +1,4 @@
-// Domain types shared by core/, adapters/ and ui/.
+// Domain types shared by core/, adapters/, middle/ and front/.
 // Mirrors the SQLite data model of CLAUDE.md section 4 (camelCase in TS).
 
 /** Where a card's data originally came from. */

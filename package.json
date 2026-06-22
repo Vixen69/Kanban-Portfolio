@@ -6,33 +6,26 @@
   "description": "Instrument kanban de portefeuille — re-plateformage vers la plateforme conteneurisée du client (ADR 011)",
   "workspaces": [
     "core",
-    "middle"
+    "middle",
+    "front"
   ],
   "engines": {
     "node": ">=22.18"
   },
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
+    "dev": "npm run -w @portfolio-kanban/front dev",
+    "build": "npm run -w @portfolio-kanban/front build",
+    "preview": "npm run -w @portfolio-kanban/front preview",
     "serve": "node middle/main.ts",
     "seed": "node scripts/seed.ts",
-    "typecheck": "tsc --noEmit && tsc -p middle/tsconfig.json",
-    "test": "node --test \"core/**/*.test.ts\" \"adapters/**/*.test.ts\" \"middle/**/*.test.ts\" \"ui/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit && tsc -p middle/tsconfig.json && tsc -p front/tsconfig.json",
+    "test": "node --test \"core/**/*.test.ts\" \"adapters/**/*.test.ts\" \"middle/**/*.test.ts\" \"front/**/*.test.ts\"",
     "conventions": "node scripts/check-conventions.ts",
     "sbom": "node scripts/sbom.ts",
     "vendor": "node scripts/vendor.ts"
   },
-  "dependencies": {
-    "react": "19.2.7",
-    "react-dom": "19.2.7"
-  },
   "devDependencies": {
-    "@types/node": "25.9.3",
-    "@types/react": "19.2.17",
-    "@types/react-dom": "19.2.3",
-    "@vitejs/plugin-react": "6.0.2",
-    "typescript": "6.0.3",
-    "vite": "8.0.16"
+    "@types/node": "^24.3.0",
+    "typescript": "~5.9.2"
   }
 }

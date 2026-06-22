@@ -1,0 +1,26 @@
+{
+  "name": "@portfolio-kanban/front",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Front — React 18 + Vite, thin view over core/ (ADR 011). Hand-written CSS now; Tailwind/Radix later.",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.6.0",
+    "typescript": "~5.9.2",
+    "vite": "^7.0.6"
+  }
+}

@@ -1,7 +1,7 @@
 // Sidebar filters (Sprint 2): search, domain, type, nature, criticality,
 // owner, blocked, age — plus the counts the sidebar displays. Filters DIM
 // cards, they never remove them: the spatial structure of the board is
-// always the truth. Pure logic, rendered by ui/components/Sidebar*.tsx.
+// always the truth. Pure logic, rendered by front/components/Sidebar*.tsx.
 
 import type { BoardConfig, CardState, Criticality } from "./types.ts";
 import { daysInColumn, isStale } from "./aging.ts";

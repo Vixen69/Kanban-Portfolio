@@ -123,9 +123,29 @@ de son ADR.
   une boucle de rechargement HMR après le changement de lockfile — pas le
   code (le build de prod est propre).
 
+### 2026-06-22 — RP2 : front sur React 18 *(réalisé, non commité)*
+- **`ui/` migré en `front/`** (workspace npm), au-dessus de `core/` inchangé.
+  Descente aux versions autorisées du SBOM : **React 19→18.3**, **Vite
+  8→7**, `@vitejs/plugin-react` 6→4, **TypeScript 6→5.9** (racine, middle et
+  front alignés sur 5.9). CSS écrit à la main conservé ; Tailwind/Radix
+  plus tard.
+- Aucune API React-19 utilisée (vérifié) ; seul ajustement de code : les
+  types de `ref` d'input (`RefObject<HTMLInputElement | null>` →
+  `RefObject<HTMLInputElement>`), React 18 étant plus strict.
+- `vite.config.ts` déplacé dans `front/` (build vers `front/dist`, proxy
+  `/api` → middle 8787 en dev et en preview). Racine devenue gestionnaire de
+  workspace : `dev`/`build`/`preview` délèguent au workspace `front` ; pas de
+  React/Vite à la racine. `.nvmrc` → 22 (cible plateforme).
+- **Vérifié bout-en-bout** : 130 tests verts ; build front sous **TS 5.9 +
+  Vite 7** (52 modules, bundle 191 Ko vs 240 Ko en React 19) ; et via
+  `vite preview` + proxy, le front React 18 rend les 113 cartes servies par
+  le middle Express, un POST y aboutit (acteur « anonymous »), zéro erreur
+  console.
+
 ### À venir
-- **RP2** : front React 18 + Vite (descente 19→18, Vite 8→7), `ui/` → `front/`,
-  au-dessus de `core/` inchangé ; design system Tailwind/Radix ensuite.
-- RP3 auth JWT ; RP4 csv-import/sciforma + sync ; RP5 métriques ; RP6
-  conteneurisation + CI plateforme (build TS→JS du middle, nginx du front).
-  Chaque phase : une entrée datée ici.
+- **RP3** : auth JWT-en-cookie (login, rôles viewer/editor/admin, acteur =
+  utilisateur authentifié à la place de « anonymous ») ; CLI de comptes ;
+  durcissement d'audit. `scrypt` (node:crypto) pour les mots de passe.
+- RP4 csv-import/sciforma + sync ; RP5 métriques ; RP6 conteneurisation + CI
+  plateforme (build TS→JS du middle, nginx du front, adaptateur `pg` une fois
+  autorisé). Chaque phase : une entrée datée ici.

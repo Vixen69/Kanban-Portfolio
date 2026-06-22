@@ -7,7 +7,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
 const ROOT = new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
-const SCANNED_DIRS = ["core", "adapters", "fixtures", "ui", "scripts", "middle", "sync"];
+const SCANNED_DIRS = ["core", "adapters", "fixtures", "front", "scripts", "middle", "sync"];
 const EXTENSIONS = [".ts", ".tsx", ".mjs"];
 const MAX_FILE_LINES = 300;
 const MAX_FUNCTION_LINES = 40;
