@@ -21,8 +21,7 @@
     "typecheck": "tsc --noEmit && tsc -p middle/tsconfig.json && tsc -p front/tsconfig.json",
     "test": "node --test \"core/**/*.test.ts\" \"adapters/**/*.test.ts\" \"middle/**/*.test.ts\" \"front/**/*.test.ts\" \"scripts/**/*.test.ts\"",
     "conventions": "node scripts/check-conventions.ts",
-    "sbom": "node scripts/sbom.ts",
-    "vendor": "node scripts/vendor.ts"
+    "sbom": "node scripts/sbom.ts"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",

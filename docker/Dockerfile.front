@@ -1,6 +1,6 @@
-# Front (React 18 + Vite) — build static assets, serve via nginx. SKELETON for
-# RP2: front/ does not exist yet, so this image is not buildable until RP2.
-# The nginx conf that proxies /api -> middle (same-origin) is added in RP2/RP6.
+# Front (React 18 + Vite) — build static assets, serve via nginx. front/ exists
+# (RP2) and `npm run -w front build` is real; the remaining gap is the nginx
+# conf proxying /api -> middle (same-origin), added at RP6.
 FROM node:22-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./

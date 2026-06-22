@@ -23,6 +23,11 @@ de son ADR.
   front **React 18 / Vite**, middle **Node / Express**, back **PostgreSQL**,
   Docker. Authentification **JWT en cookie httpOnly** + **scrypt**.
   Dépendances bornées au **plafond SBOM** autorisé par le client.
+- **État live** : monorepo `core/` + `middle/` (Express, pilote JSONL — `pg`
+  différé) + `front/` (React 18) ; **135 tests** `node:test` (dont les
+  frontières d'architecture). Lancement dev : `npm run serve` (middle :8787)
+  + `npm run dev` (front :5173, proxy `/api`) ; données via
+  `KANBAN_ALLOW_SEED=1 npm run seed`. Cf. README « Démarrer ».
 
 ## Journal des changements
 
@@ -160,10 +165,29 @@ de son ADR.
   localisé dans des unités courtes et lisibles. Vérifié : 135 tests,
   build, rendu + bascule de mode au clavier via preview.
 
+### 2026-06-22 — Documentation de continuité (hors phase RP)
+- Audit « session vierge » des docs. Le savoir (CLAUDE.md, ADR 001-011,
+  ce journal + mémoire) était exact ; le **runbook** était cassé/périmé.
+  Corrigé : `verify.sh` (cible `front/dist/index.html`, plus de vendoring
+  hors-ligne) ; **README** réécrit (lancement deux-processus serve+dev,
+  Node 22, seed `KANBAN_ALLOW_SEED`, variables d'env du middle, dépannage
+  tableau vide) ; **vendoring retiré** (`scripts/vendor.ts`, `vendor/`, script
+  npm — livraison par image conteneur, ADR 011) ; en-têtes Docker corrigés
+  (front/ et middle/ existent ; middle pas encore constructible — pas de
+  script `build`, RP6).
+
 ### À venir
 - **RP3** : auth JWT-en-cookie (login, rôles viewer/editor/admin, acteur =
   utilisateur authentifié à la place de « anonymous ») ; CLI de comptes ;
   durcissement d'audit. `scrypt` (node:crypto) pour les mots de passe.
+  Décidé/documenté ; **rien encore implémenté**. Présent à câbler :
+  `jsonwebtoken` + `cookie-parser` (dans le plafond SBOM, **pas installés** ;
+  middle n'a qu'express + @types/express) ; **aucune table `users`** (schéma
+  dans CLAUDE.md §4, non implémenté) ; pas de CLI de comptes, pas de
+  middleware d'auth. **Couture acteur** : constante `SERVER_ACTOR =
+  "anonymous"` dans `middle/api.ts`, passée à chaque constructeur d'évènement ;
+  `postEvent` ne prend pas d'identité — RP3 doit faire transiter l'identité
+  authentifiée requête → route `app.ts` → `postEvent` → builders.
 - RP4 csv-import/sciforma + sync ; RP5 métriques ; RP6 conteneurisation + CI
   plateforme (build TS→JS du middle, nginx du front, adaptateur `pg` une fois
   autorisé). Chaque phase : une entrée datée ici.

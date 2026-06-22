@@ -1,9 +1,11 @@
-# Dev stack for the re-platformed app (RP0 skeleton).
-#   docker compose up db            -> starts a dev PostgreSQL now (RP1 uses it)
-#   docker compose --profile app up -> front + middle, once RP1/RP2 build them
-# The front/middle services are scaffolds; their Dockerfiles reference
-# middle/ and front/ which do not exist until RP1/RP2. Untested here (no Docker
-# in the authoring environment); finalized and verified in RP1/RP2/RP6.
+# Dev stack for the re-platformed app.
+#   docker compose up db            -> dev PostgreSQL. NB: the middle uses the
+#                                      JSONL driver for now; this is the future
+#                                      pg target (pending pg authorization).
+#   docker compose --profile app up -> front + middle, finalized/verified at RP6
+#                                      (middle build script + nginx /api proxy).
+# front/ and middle/ now exist (RP1/RP2 done). Untested here (no Docker in the
+# authoring environment).
 name: portfolio-kanban
 services:
   db:
