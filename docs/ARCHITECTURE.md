@@ -142,6 +142,24 @@ de son ADR.
   le middle Express, un POST y aboutit (acteur « anonymous »), zéro erreur
   console.
 
+### 2026-06-22 — Évolutivité & vérifiabilité (hors phase RP)
+- **Test de frontières d'architecture** (`scripts/architecture.test.ts`, dans
+  `npm test`) : 5 règles qui *suivent* les frontières et échouent si un import
+  les franchit — `core/` pur (imports `./` uniquement, ni React/Node/
+  framework) ; egress réseau confiné à `front/api.ts` ; le front ne touche
+  jamais `middle/`/`adapters/`/`storage` (uniquement par HTTP) ; `middle/`
+  sans React ni `front/` ; `pg` importé nulle part (différé, ADR 011). Rend
+  la couche présentation librement modifiable *en sécurité* (une frontière
+  franchie par erreur casse le test) et l'architecture vérifiable en une
+  commande par le référent technique.
+- **`front/interactions.ts` scindé** en `front/interactions/` par
+  préoccupation — `view.ts` (modes + raccourcis), `cells.ts` (focus, repli,
+  survol, détail), `movement.ts` (déplacement + navigation clavier),
+  `state.ts` (horloge, bascules) + un baril `index.ts`. Comportement
+  inchangé ; « comment ça s'ouvre/se déplace/s'affiche » est désormais
+  localisé dans des unités courtes et lisibles. Vérifié : 135 tests,
+  build, rendu + bascule de mode au clavier via preview.
+
 ### À venir
 - **RP3** : auth JWT-en-cookie (login, rôles viewer/editor/admin, acteur =
   utilisateur authentifié à la place de « anonymous ») ; CLI de comptes ;

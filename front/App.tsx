@@ -19,7 +19,7 @@ import {
   useNow,
   useToggle,
   useViewMode,
-} from "./interactions.ts";
+} from "./interactions/index.ts";
 import { BoardGrid } from "./components/BoardGrid.tsx";
 import { CardDetail } from "./components/CardDetail.tsx";
 import { Footer, Header } from "./components/Chrome.tsx";

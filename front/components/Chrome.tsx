@@ -3,7 +3,7 @@
 
 import type { BoardConfig } from "../../core/types.ts";
 import { domainColor, domainShort } from "../domains.ts";
-import type { ViewMode } from "../interactions.ts";
+import type { ViewMode } from "../interactions/index.ts";
 
 export interface HeaderProps {
   config: BoardConfig;
