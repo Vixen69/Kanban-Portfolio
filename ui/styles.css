@@ -164,3 +164,10 @@ kbd { font-family: inherit; font-size: 8px; font-weight: 700; color: var(--tx-2)
 .config-error { padding: 40px; max-width: 560px; }
 .config-error h1 { font-size: 18px; margin-bottom: 10px; }
 .config-error p { font-size: 13px; color: var(--tx-2, #334155); line-height: 1.5; }
+
+/* ---------- Board load / error screen ---------- */
+.app-status {
+  display: flex; align-items: center; justify-content: center;
+  height: 100%; padding: 40px; font-size: 14px; color: #334155;
+}
+.app-status--error { color: #b91c1c; }

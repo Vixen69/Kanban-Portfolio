@@ -3,3 +3,16 @@ dist/
 .npm-offline/
 *.tsbuildinfo
 sbom.json
+data/
+# Belt-and-suspenders: never commit a real-data store, whatever path it is
+# configured to (CLAUDE.md §7 — no client data crosses here). Covers the
+# SQLite database + WAL sidecars and the JSONL fallback file.
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.db
+*.db-wal
+*.db-shm
+*.jsonl
+# Local Docker dev env (credentials) — only the .example is committed.
+docker/.env

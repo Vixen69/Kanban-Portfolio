@@ -1,0 +1,19 @@
+# Middle (Express API) — Node 22. SKELETON for RP1: middle/ does not exist yet,
+# so this image is not buildable until RP1 creates it. Shape only.
+# Multi-stage: install the workspace + build TS, then a slim runtime image.
+FROM node:22-alpine AS build
+WORKDIR /app
+COPY package.json package-lock.json ./
+COPY core ./core
+COPY middle ./middle
+RUN npm ci
+RUN npm run --workspace middle build
+
+FROM node:22-alpine AS run
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/core ./core
+COPY --from=build /app/middle/dist ./middle/dist
+EXPOSE 8787
+CMD ["node", "middle/dist/main.js"]

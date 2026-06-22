@@ -1,0 +1,51 @@
+# Dev stack for the re-platformed app (RP0 skeleton).
+#   docker compose up db            -> starts a dev PostgreSQL now (RP1 uses it)
+#   docker compose --profile app up -> front + middle, once RP1/RP2 build them
+# The front/middle services are scaffolds; their Dockerfiles reference
+# middle/ and front/ which do not exist until RP1/RP2. Untested here (no Docker
+# in the authoring environment); finalized and verified in RP1/RP2/RP6.
+name: portfolio-kanban
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-kanban}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kanban}
+      POSTGRES_DB: ${POSTGRES_DB:-kanban}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kanban}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  middle:
+    profiles: ["app"]
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.middle
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-kanban}:${POSTGRES_PASSWORD:-kanban}@db:5432/${POSTGRES_DB:-kanban}
+      KANBAN_HOST: 0.0.0.0
+      KANBAN_PORT: "8787"
+    ports:
+      - "8787:8787"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  front:
+    profiles: ["app"]
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.front
+    ports:
+      - "8080:80"
+    depends_on:
+      - middle
+
+volumes:
+  db-data:

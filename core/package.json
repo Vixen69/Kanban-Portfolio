@@ -1,0 +1,10 @@
+{
+  "name": "@portfolio-kanban/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Domain core — pure TypeScript, no React, no Node APIs, no framework. Shared by front/ and middle/ (ADR 011).",
+  "scripts": {
+    "test": "node --test \"**/*.test.ts\""
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "@portfolio-kanban/middle",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Middle — Express API over core/, behind the BoardStorage port (ADR 010/011). Node 22 target.",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "dependencies": {
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.3"
+  }
+}

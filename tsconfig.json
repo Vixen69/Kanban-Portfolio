@@ -20,5 +20,5 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["core", "adapters", "fixtures", "ui", "scripts", "vite.config.ts"]
+  "include": ["core", "adapters", "fixtures", "ui", "scripts", "sync", "vite.config.ts"]
 }

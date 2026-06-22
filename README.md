@@ -87,17 +87,23 @@ développement et sur la machine côté client.
 ## Disposition du dépôt
 
 ```
-core/        logique métier, TS pur, sans React ni APIs Node
+core/        logique métier, TS pur, sans React ni APIs Node (workspace partagé)
 adapters/    fixtures (csv-import, sciforma, planisware à venir)
-server/      (Sprint 3) API node:http + statique
-sync/        (Sprint 5) processus CLI de synchronisation
-ui/          application React (couche de vue mince sur core/)
+middle/      API Express + TS, derrière le port BoardStorage (ex-server/, RP1)
+ui/          application React (couche de vue mince sur core/) — devient front/ (RP2)
+sync/        (RP4) processus CLI de synchronisation
 config/      board.json (topologie versionnée)
 fixtures/    jeux de données synthétiques
+docker/      Dockerfiles + compose (Postgres de dev) — squelette RP0
 docs/adr/    décisions d'architecture (français)
 design/      maquette de référence (prototype Sprint 0)
-vendor/      tarballs vendorisés pour l'installation hors-ligne
 ```
+
+> Note : ce README décrit encore en partie la pile minimaliste initiale
+> (Sprints 1-3). Le re-plateformage vers la pile conteneurisée du client
+> (React 18 / Express / PostgreSQL — ADR 011) est en cours ; voir
+> `docs/ARCHITECTURE.md` pour l'état à jour. Rafraîchissement complet du
+> README à prévoir.
 
 ## Documents
 

@@ -1,98 +1,139 @@
-// React bridge over the core store: fixtures in, events out, fold on read.
-// The UI never mutates cards — every change is an appended event.
+// React bridge over the HTTP API: fetch the board once, fold on read, and
+// turn every UI action into a POSTed intent. The server is authoritative for
+// event id/ts/actor; this layer never mutates cards — it appends the event
+// the server returns and re-folds (ADR 002, ADR 010).
 
-import { useCallback, useMemo, useRef, useSyncExternalStore } from "react";
-import type { BoardConfig, Card, CardEvent, CardPatch, CardState } from "../core/types.ts";
-import { InMemoryEventStore, lifecycleEvent, movedEvent } from "../core/events.ts";
-import { foldEvents, toCard } from "../core/state.ts";
-import { createFixtures } from "../adapters/fixtures/index.ts";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { Card, CardEvent, CardPatch, CardState } from "../core/types.ts";
+import { foldEvents } from "../core/state.ts";
+import { ApiError, fetchBoard, postBlock, postEdit, postMove, postUnblock } from "./api.ts";
 
-/** Actor recorded on events produced by this (not yet authenticated) UI. */
-export const LOCAL_ACTOR = "local";
+/** Lifecycle of the initial board fetch. */
+export type BoardStatus = "loading" | "ready" | "error";
 
-/** What the view layer gets: derived states, the log, the write actions. */
+/** What the view layer gets: load state, derived cards, the log, the actions. */
 export interface BoardStore {
+  status: BoardStatus;
+  /** Human-readable French message when status is "error". */
+  error: string | null;
   cards: CardState[];
-  /** The full event log snapshot (history rendering, Sprint 6 metrics). */
   events: CardEvent[];
-  /** Appends a "moved" event; no-op when the card is already in the cell. */
   moveCard(cardId: string, to: { laneId: string; columnId: string }): void;
-  /** Appends a "blocked" event with the reason. */
   blockCard(cardId: string, reason: string): void;
-  /** Appends an "unblocked" event. */
   unblockCard(cardId: string): void;
-  /** Appends an "edited" event carrying the whitelisted field patch. */
   editCard(cardId: string, patch: CardPatch): void;
 }
 
 interface Backbone {
   baseCards: Card[];
-  events: InMemoryEventStore;
+  events: CardEvent[];
 }
 
-function buildBackbone(config: BoardConfig, now: Date): Backbone {
-  const { dataSource, seedEvents } = createFixtures(config, now);
-  const events = new InMemoryEventStore();
-  for (const input of seedEvents) events.append(input);
-  const baseCards = dataSource
-    .listSubjects()
-    .map((subject) => toCard(subject, dataSource.getFinancials(subject.id)));
-  return { baseCards, events };
+const NO_EVENTS: CardEvent[] = [];
+
+function messageOf(cause: unknown): string {
+  if (cause instanceof ApiError) return cause.message;
+  if (cause instanceof Error && cause.message) return cause.message;
+  return "Erreur inconnue.";
+}
+
+// The four write actions: POST the intent, append the server's event, re-fold.
+// A failed write simply did not happen (no optimistic state to roll back).
+// Writes are not serialized client-side; the server is authoritative and
+// rejects redundant moves, so a fast double-action cannot corrupt the log.
+function useWriters(
+  ref: React.RefObject<Backbone | null>,
+  apply: (event: CardEvent) => void,
+  onError: (cause: unknown) => void,
+): Pick<BoardStore, "moveCard" | "blockCard" | "unblockCard" | "editCard"> {
+  const moveCard = useCallback(
+    (cardId: string, to: { laneId: string; columnId: string }) => {
+      const current = ref.current;
+      if (!current) return;
+      const card = foldEvents(current.baseCards, current.events).find((c) => c.id === cardId);
+      if (!card || (card.laneId === to.laneId && card.columnId === to.columnId)) return;
+      postMove(cardId, to).then(apply).catch(onError);
+    },
+    [ref, apply, onError],
+  );
+  const blockCard = useCallback(
+    (cardId: string, reason: string) => void postBlock(cardId, reason).then(apply).catch(onError),
+    [apply, onError],
+  );
+  const unblockCard = useCallback(
+    (cardId: string) => void postUnblock(cardId).then(apply).catch(onError),
+    [apply, onError],
+  );
+  const editCard = useCallback(
+    (cardId: string, patch: CardPatch) => void postEdit(cardId, patch).then(apply).catch(onError),
+    [apply, onError],
+  );
+  return { moveCard, blockCard, unblockCard, editCard };
+}
+
+interface Loaded {
+  backbone: Backbone | null;
+  setBackbone: React.Dispatch<React.SetStateAction<Backbone | null>>;
+  status: BoardStatus;
+  error: string | null;
+}
+
+// Fetches the board once on mount (the `active` flag absorbs StrictMode's
+// double-invoke and any unmount before the fetch resolves).
+function useBoardLoad(): Loaded {
+  const [backbone, setBackbone] = useState<Backbone | null>(null);
+  const [status, setStatus] = useState<BoardStatus>("loading");
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    fetchBoard()
+      .then((data) => {
+        if (!active) return;
+        setBackbone({ baseCards: data.cards, events: data.events });
+        setStatus("ready");
+      })
+      .catch((cause: unknown) => {
+        if (!active) return;
+        setError(messageOf(cause));
+        setStatus("error");
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+  return { backbone, setBackbone, status, error };
 }
 
 /**
- * Creates (once) the fixtures-backed board store and exposes the folded
- * card states plus the event log, re-derived after every appended event.
- * Inputs: the validated board config, the session's "now".
- * Output: a BoardStore. Failure: none for a valid config.
+ * Loads the board from the API and exposes the folded cards, the event log
+ * and the write actions.
+ * Output: a BoardStore; status is "loading" until the first fetch resolves,
+ * then "ready", or "error" with a French message on failure.
+ * Failure: load failures surface via status/error; write failures are logged
+ * and leave the board unchanged (the action simply did not persist).
  */
-export function useBoardStore(config: BoardConfig, now: Date): BoardStore {
-  const backboneRef = useRef<Backbone | null>(null);
-  backboneRef.current ??= buildBackbone(config, now);
-  const { baseCards, events } = backboneRef.current;
+export function useBoardStore(): BoardStore {
+  const { backbone, setBackbone, status, error } = useBoardLoad();
 
-  const subscribe = useCallback((onChange: () => void) => events.subscribe(onChange), [events]);
-  const version = useSyncExternalStore(subscribe, () => events.size());
+  // Mirror the latest committed backbone for the write callbacks, which read
+  // it only in async handlers (after commit) — so an effect, not a render-time
+  // assignment, keeps the ref in step with committed state.
+  const ref = useRef<Backbone | null>(null);
+  useEffect(() => {
+    ref.current = backbone;
+  }, [backbone]);
 
-  const eventList = useMemo(
-    () => events.list(),
-    // version is the change signal for the otherwise-stable event store.
-    [events, version],
+  const cards = useMemo(
+    () => (backbone ? foldEvents(backbone.baseCards, backbone.events) : []),
+    [backbone],
   );
-  const cards = useMemo(() => foldEvents(baseCards, eventList), [baseCards, eventList]);
+  const apply = useCallback((stored: CardEvent) => {
+    setBackbone((b) => (b ? { ...b, events: [...b.events, stored] } : b));
+  }, [setBackbone]);
+  const onError = useCallback((cause: unknown) => {
+    console.error("écriture refusée:", messageOf(cause));
+  }, []);
 
-  const moveCard = useCallback(
-    (cardId: string, to: { laneId: string; columnId: string }) => {
-      const card = foldEvents(baseCards, events.list()).find((state) => state.id === cardId);
-      if (!card || (card.laneId === to.laneId && card.columnId === to.columnId)) return;
-      const from = { laneId: card.laneId, columnId: card.columnId };
-      events.append(movedEvent(cardId, from, to, LOCAL_ACTOR, new Date().toISOString()));
-    },
-    [baseCards, events],
-  );
-
-  const lifecycle = useLifecycleWriters(events);
-  return { cards, events: eventList, moveCard, ...lifecycle };
-}
-
-function useLifecycleWriters(events: InMemoryEventStore) {
-  const blockCard = useCallback(
-    (cardId: string, reason: string) => {
-      events.append(lifecycleEvent("blocked", cardId, LOCAL_ACTOR, new Date().toISOString(), { reason }));
-    },
-    [events],
-  );
-  const unblockCard = useCallback(
-    (cardId: string) => {
-      events.append(lifecycleEvent("unblocked", cardId, LOCAL_ACTOR, new Date().toISOString()));
-    },
-    [events],
-  );
-  const editCard = useCallback(
-    (cardId: string, patch: CardPatch) => {
-      events.append(lifecycleEvent("edited", cardId, LOCAL_ACTOR, new Date().toISOString(), { patch }));
-    },
-    [events],
-  );
-  return { blockCard, unblockCard, editCard };
+  const writers = useWriters(ref, apply, onError);
+  return { status, error, cards, events: backbone?.events ?? NO_EVENTS, ...writers };
 }

@@ -1,15 +1,26 @@
 # CLAUDE.md : Portfolio Kanban Engine
 
-This file is the working contract between the human author and Claude Code.
-Read it fully before any session. If a request conflicts with a rule here,
-surface the conflict instead of silently resolving it. When information is
-listed under "Open decisions", ask rather than assume.
+This file is the working contract between the human author (Pierre-Yves) and
+Claude Code. Read it fully before any session. If a request conflicts with a
+rule here, surface the conflict instead of silently resolving it. When
+information is listed under "Open decisions", ask rather than assume.
+
+> **2026-06-19 — Re-platform in progress.** The tool is the author's, built
+> for the PMO team and deployed on the client's containerized platform. The
+> client's tech lead governs only the **SBOM ceiling** — which open-source
+> components/versions may run on that platform (Docker; **React 18 / TS /
+> Vite** front, **Node / Express / TS** middle, **PostgreSQL** back). Within
+> that ceiling, every internal design decision is the author's. This
+> **supersedes the original minimalist build constraints** (node:http /
+> SQLite / 12-dep budget / hand-written-CSS-only / no framework). The product
+> opinion (§1), the hexagonal architecture and the event-sourced model (§4)
+> carry over intact; the runtime edges are re-platformed.
 
 ## 1. What this project is
 
 An opinionated portfolio kanban instrument: a single-page board that makes a
-project portfolio's real state legible (flow, aging, blockages, WIP), designed
-for sovereign on-premise deployment in high-constraint environments, with
+project portfolio's real state legible (flow, aging, blockages, WIP), deployed
+into the client's on-premise containerized platform for the PMO team, with
 read-only connectivity to enterprise PPM tools (Sciforma first, Planisware
 later) through an adapter layer.
 
@@ -26,236 +37,292 @@ topology only: lane names, column names, their count and order, domain list,
 threshold values. Topology lives in a versioned config file. There is no
 settings UI.
 
-## 2. Hard constraints (permanent, never revisit)
+## 2. Constraints
 
-- No cloud. No SaaS. No external runtime services of any kind.
-- Zero egress from the web application. It never makes an outbound connection.
-- No telemetry, no analytics, no CDN, no external fonts, no remote assets.
+### Permanent product / security constraints (never revisit)
+
+- On-premise only. No cloud, no SaaS, no external runtime services. The app
+  runs inside the client's platform.
+- Zero egress from the web application at runtime. No telemetry, no analytics,
+  no CDN, no external fonts, no remote assets — everything is bundled into the
+  container image.
 - No Monte Carlo or probabilistic forecasting features. Ever.
 - No LDAP group-based permissions. Local accounts, hard-coded roles only.
 - No procurement/purchasing-tool integration.
-- Runtime dependency budget: 1 maximum. Direct dependency budget (including
-  devDependencies): 12 maximum. Any addition requires a justified line in
-  DEPENDENCIES.md and an ADR.
-- No UI component library. All CSS is hand-written.
-- No ORM, no Express/Fastify/Koa, no state-management library.
+
+### Platform constraint (the one hard external boundary)
+
+- Dependencies must stay **within the client's authorized SBOM** (their
+  front/middle `package.json` versions). The SBOM is a **ceiling, not a
+  mandate**: use the minimum needed; we need not adopt Tailwind/Radix/axios
+  just because they are listed. Anything *beyond* the ceiling (a new runtime
+  component on their platform) requires the tech lead's approval, a line in
+  DEPENDENCIES.md, and an ADR.
+
+The original radical-minimalism rules (1 runtime / 12 total dependency budget,
+no web framework, no ORM, no UI component library, Node built-ins only) are
+**retired** — their goal (a small auditable surface for sovereign deployment)
+is now served by the client's SBOM governance and the container model.
 
 ## 3. Stack
 
-- Language: TypeScript everywhere. Strict mode.
-- Frontend: React, functional components and hooks only, built with Vite.
-  React is a thin view layer: all domain logic lives in plain TS modules under
-  `core/` with zero React imports, so the view layer is replaceable.
-- Backend: Node.js LTS, built-ins only (`node:http`, `node:crypto`,
-  `node:fs`, `node:path`, global `fetch`). No web framework.
-- Storage: SQLite. Prefer `node:sqlite` if stable on the target Node LTS;
-  otherwise `better-sqlite3` as the single permitted runtime dependency.
-- Password hashing (Sprint 4): `scrypt` from `node:crypto`. No native
-  hashing dependency.
-- Sync: a separate CLI process (`sync/`), never part of the web server.
-  Only the sync process ever talks to a PPM, read-only.
+- Language: **TypeScript everywhere. Strict mode.**
+- **Front** (`front/`): **React 18**, functional components and hooks only,
+  built with **Vite**. Routing via react-router-dom. HTTP via the existing
+  `fetch` wrapper (axios is available but not required — ceiling, not
+  mandate). Styling: the existing hand-written CSS is kept now and will be
+  adapted to the platform's **Tailwind + Radix** (both authorized) shortly.
+  React stays a thin view layer over `core/` (zero React in core).
+- **Middle** (`middle/`): **Node / Express / TypeScript**. Express is chosen
+  because the SBOM's `cors`/`cookie-parser` are Express middleware and pair
+  with JWT-in-cookie auth; the existing node:http API *logic* (validation,
+  fold, event-building) ports into Express routes unchanged. Express only
+  wraps transport, validation and auth; all domain logic stays in `core/`.
+- **Back**: **PostgreSQL**, accessed behind the `BoardStorage` port (§4) via
+  **`pg` (node-postgres)** — the standard, reviewable client. `pg` is not in
+  the reference SBOM yet, so it is the one runtime addition to clear with the
+  tech lead (§12). No ORM; thin, parameterized SQL.
+- Runtime: **Node `>=22.18 <24`** (the platform pin), containerized.
+- Auth (sessions): **JWT** (`jsonwebtoken`) in an httpOnly cookie (§6).
+  Password hashing with **`scrypt` from `node:crypto`** — a Node builtin, so
+  no added dependency and within any ceiling (preferred over bcrypt/argon2,
+  which are unlisted and need native builds).
+- Sync: a separate process (`sync/`), never part of the web middle. Only the
+  sync process ever talks to a PPM, read-only.
 
-## 4. Architecture
+## 4. Architecture (carries over — the reason the re-platform is tractable)
 
-Ports and adapters. One port:
+Ports and adapters. The domain core is pure and portable; only adapters and
+transports change with the platform.
 
 ```
-PortfolioDataSource
+PortfolioDataSource           (read-only PPM access — adapters/)
   listSubjects(): Subject[]
   getFinancials(subjectId): { budget, consumed, remaining } | null
+
+BoardStorage                  (persistence — Postgres adapter behind it)
+  importCards / appendEvent / listEvents / listBaseCards / close
 ```
 
-Adapters, in order of implementation:
+`PortfolioDataSource` adapters, in order: `fixtures` (synthetic, ~80-120
+cards — the ONLY adapter on the author's machine), `csv-import` (manual PPM
+export, first real-data path, client side only), `sciforma` (REST, read-only,
+least-privilege; stub until the security dossier is approved), `planisware`
+(stub).
 
-1. `fixtures` : synthetic dataset (~80-120 realistic cards). Used for all
-   development, demos and tests. The ONLY adapter ever used on the author's
-   personal machine.
-2. `csv-import` : manual file import of a PPM export. First real-data path.
-   Runs only on the client-side machine.
-3. `sciforma` : REST, read-only, least-privilege service account, credentials
-   from a permission-restricted file outside the repo, never in code or env
-   committed anywhere. Stub until the security dossier is approved.
-4. `planisware` : interface-compatible stub. Implementation later.
+Processes / containers:
 
-Processes:
+- `middle/` : Express API; serves or is fronted alongside the built front.
+  Zero egress.
+- `sync/` : pulls from the active adapter, writes to PostgreSQL, exits.
 
-- `server/` : serves the API and the built static frontend. Zero egress.
-- `sync/` : pulls from the active adapter, writes to SQLite, exits. Cron or
-  manual trigger.
+Data model (**PostgreSQL** tables; same shape as before, jsonb for json
+fields, append-only enforced by table grants/triggers):
 
-Data model (SQLite):
-
-- `cards` : id, title, domain, lane_id, column_id, owner, tags (json),
-  dependencies (json), blocked (0/1), blocked_reason, blocked_since,
-  budget, consumed, remaining, created_at, source (fixtures/csv/sciforma).
-- `card_events` : append-only. id, ts, actor, card_id, type
+- `cards` : id, title, domain, lane_id, column_id, owner, criticality
+  (top/major/normal), type_id, codename, tags (jsonb), dependencies (jsonb),
+  blocked, blocked_reason, blocked_since, budget, consumed, remaining,
+  created_at, source (fixtures/csv/sciforma). lane_id/column_id/blocked/
+  blocked_reason/blocked_since hold the import-time snapshot only; live values
+  are derived by folding `card_events` on read, never written back
+  (ADR 002). criticality/type_id/codename added by ADR 006.
+- `card_events` : append-only. seq (bigint sequence, ordering), id
+  (evt-<seq>), ts, actor, card_id, type
   (created/moved/blocked/unblocked/edited/imported), from_column, to_column,
-  payload (json). Never updated, never deleted.
-- `users` (Sprint 4): id, login, scrypt_hash, role (viewer/editor/admin),
-  created_at, disabled.
+  payload (jsonb). Never updated, never deleted.
+- `users`: id, login, scrypt_hash, role (viewer/editor/admin), created_at,
+  disabled.
 
-The `card_events` table serves two masters at once: it is the audit trail
-required for security review AND the single source for all flow metrics
-(cycle time, throughput, time-in-column, aging). Do not create a separate
-metrics store. Metrics are queries on events.
+`card_events` is both the audit trail and the single source for all flow
+metrics. Do not create a separate metrics store. Metrics are queries on
+events. The event-sourced model (append-only log + fold-on-read) is retained —
+it is the product's core (§1) and maps to a plain Postgres append-only table;
+to the platform the middle is a standard Express+Postgres service doing
+INSERT/SELECT. Courtesy heads-up to the tech lead: the schema is append-only
+(no UPDATE/DELETE), in case their DB tooling assumes mutable rows.
 
-Config (`config/board.json`, versioned in git):
+Config (`config/board.json`, versioned in git): unchanged — lanes, columns
+(with `wipLimit`), domains, `agingStepsDays`, `andonThresholdDays`.
+`wipLimit: null` renders "non defini" and enforces nothing; a set WIP shows
+count/limit and reddens the header when exceeded (warns, never hard-blocks).
+Diacritics in display names come from the config as-is.
 
-```json
-{
-  "lanes": [
-    { "id": "projets", "name": "Projets" },
-    { "id": "petits", "name": "Petits Projets" },
-    { "id": "complexes", "name": "Projets Complexes" }
-  ],
-  "columns": [
-    { "id": "demandes", "name": "Demandes", "wipLimit": null },
-    { "id": "qualification", "name": "Qualification / RDO", "wipLimit": null },
-    { "id": "etudes", "name": "Etudes", "wipLimit": null },
-    { "id": "prets", "name": "Prets", "wipLimit": null },
-    { "id": "actifs", "name": "Actifs", "wipLimit": null },
-    { "id": "done", "name": "Done", "wipLimit": null },
-    { "id": "exploitation", "name": "En Exploitation", "wipLimit": null }
-  ],
-  "domains": ["Ingenierie", "Soutien", "Industrie", "Corporate", "ERP",
-              "PLM", "Infra", "Archi & Dev", "Cyber"],
-  "agingStepsDays": [7, 21, 45, 90],
-  "andonThresholdDays": 5
-}
-```
+## 5. UI specification (carries over)
 
-Rules: `wipLimit: null` renders as "non defini" and enforces nothing; WIP
-values are calibrated later from real flow data, the tool must be fully
-usable without them. A WIP limit, once set, displays count/limit and turns
-the column header red when exceeded; it warns, it does not hard-block.
-Diacritics in display names come from the config file as-is.
-
-## 5. UI specification
-
-Visual reference: the existing mockup (provided separately as image/code).
 Aesthetic: industrial control panel. Dense, sober, professional. No
 decoration, no gradients-for-style, no animation except the blocked pulse.
+(Implemented in hand-written CSS now; adapted to Tailwind/Radix later.)
 
 - Grid: lanes as horizontal swimlanes, columns as vertical stages.
-- Aging: card background darkens through the `agingStepsDays` steps based on
-  time in current column (derived from events). CSS custom properties.
-- Blocked: red pulsing border (CSS animation), reason on hover/focus card.
-  Blocked longer than `andonThresholdDays`: add a static escalation marker.
-- Three view modes, keyboard-switchable:
-  - normal: full cards (title, domain, owner, tags, age).
-  - radiator: cards compressed to thin bars (color = state), whole portfolio
-    of 100+ items visible on one screen.
-  - focus: one lane-column cell expanded, rest dimmed.
-- Swimlane collapse: any lane collapses to a single summary row.
+- Aging: card background darkens through `agingStepsDays` based on time in
+  current column (derived from events).
+- Blocked: red pulsing border, reason on hover/focus; past `andonThresholdDays`
+  add a static escalation marker.
+- Three keyboard-switchable view modes: normal (full cards), radiator
+  (compressed bars, 100+ items on one screen), focus (one cell expanded).
+- Swimlane collapse to a summary row.
 - Hard acceptance criterion: at 1920x1080 with 100+ cards, the full board is
-  visible with zero scrolling in radiator mode, and normal mode never
-  produces horizontal scroll.
-- Sidebar (Sprint 2): filters by domain, owner, blocked, age; counts.
-- All UI strings in French, exactly as written in config (the board's
-  vocabulary is the client's, including English loan-words like "Done").
-- Card movement: drag and drop (native HTML5) plus keyboard fallback. Every
-  move writes an event with actor and timestamp.
+  visible with zero scrolling in radiator mode; normal mode never produces
+  horizontal scroll.
+- Sidebar: filters by domain, owner, blocked, age; counts.
+- All UI strings in French, exactly as written in config.
+- Card movement: drag and drop plus keyboard fallback. Every move POSTs an
+  intent; the middle writes the event with server-assigned actor/ts.
 
 ## 6. Security posture (shapes every choice)
 
-- The built app must be reviewable by a human security officer: small SBOM,
-  reproducible offline build, readable output.
-- Generate an SBOM (CycloneDX) as part of the build.
-- `package-lock.json` committed; installs are `npm ci` only; dependency
-  tarballs vendored under `vendor/` for offline install.
-- Secrets: never in code, never in the repo, never in logs. Sync credentials
-  in a chmod-600 file referenced by path.
-- Sessions (Sprint 4): httpOnly, SameSite=Strict, Secure cookies. No JWT.
-- No self-registration. Admin creates accounts.
+- Reviewable by a human security officer: the dependency surface is the
+  client's authorized SBOM; the container build is reproducible.
+- Generate an SBOM (e.g. CycloneDX) as part of the image build where feasible.
+- Secrets: never in code, never in the repo, never in logs. Sync and DB
+  credentials in env/secret files outside the repo, referenced by path
+  (dotenv per the SBOM).
+- Sessions: **JWT in an httpOnly + SameSite=Strict cookie** (Secure behind
+  TLS; an explicit `INSECURE_COOKIES` switch drops Secure for a plain-HTTP
+  locked-down LAN). cookie-parser is in the SBOM. The token stays out of
+  JS/XSS reach (chosen over a Bearer header + the front's react-secure-
+  storage). Token lifetime/refresh set at RP3.
+- No self-registration. Admin creates accounts via a CLI (no settings UI).
 - Logs contain no card titles or financial values, only ids.
+- Network/VM access control is part of the posture; app-level auth is
+  additive. Tamper-evident audit-log hashing was **declined** — handled by
+  infrastructure access control.
+- Carried-over server hardening to re-implement in Express: CSP
+  (`default-src 'self'`, plus `style-src 'unsafe-inline'` while inline styles
+  remain), security headers set explicitly (no helmet unless authorized),
+  request body cap, request timeouts, same-origin only (CORS configured
+  to deny cross-origin, even though `cors` is available).
 
-## 7. Two-machine workflow (development reality)
+## 7. Development & delivery workflow
 
-Code is authored on the author's personal machine with Claude Code, then
-reproduced on a client-side machine where it is rebuilt and run. Therefore:
+Code is authored on the author's machine with Claude Code, then delivered as
+container images into the client's platform.
 
-- Fixtures only, ever, on the personal machine. No real client data here.
-- Everything must build and verify offline: `verify.sh` runs, in order,
-  offline install from `vendor/`, lint, typecheck, tests, build, SBOM. It
-  must pass identically on both machines. Pin Node via `.nvmrc` + `engines`.
-- Minimize crossing cost: develop and iterate a module to stability here,
-  cross it once. Keep modules small and self-contained. After any crossing,
-  per-file sha256 comparison is the integrity ritual.
-- Nothing in the codebase may assume internet access at runtime or at
-  install time.
+- Fixtures only, ever, on the author's machine. No real client data here.
+- Local dev runs the stack with Docker Compose (front + middle + a dev
+  PostgreSQL). The pipeline runs lint (the client's ESLint), typecheck
+  (`tsc`), tests (`node:test`), and the container build.
+- Delivery is by container image into the client's platform/registry (⚠ exact
+  channel/registry to settle with the tech lead, §12). This replaces the
+  former offline-vendoring / per-file sha256 crossing ritual.
+- Nothing in the codebase may assume public-internet access at runtime.
 
 ## 8. Code conventions (enforced)
 
-- Files: 300 lines maximum. Functions: 40 lines maximum. Cyclomatic
-  complexity capped by lint config.
-- Identifiers in English. Comments in English (pending the client team's
-  house style, which overrides this default once known).
-- Documentation files (README, ADRs, SECURITY.md, user guide) in French.
+- Files: 300 lines maximum. Functions: 40 lines maximum.
+- Lint: adopt the client's **ESLint** configuration (their front SBOM ships
+  ESLint + typescript-eslint + react-hooks rules) — it is the house style and
+  caps complexity.
+- Identifiers and code comments in English; documentation (README, ADRs,
+  SECURITY.md, DEPENDENCIES.md, user guide) in French.
 - Every exported function carries a doc comment: purpose, inputs, outputs,
-  failure modes. No clever one-liners; prefer the boring obvious version.
-- ADRs in `docs/adr/NNN-title.md`, one page each, in French: context,
-  decision, consequences. Every architectural choice gets one.
-- Tests: `node:test` for core and server (no test framework dependency),
-  table-driven where natural. Core logic coverage is the priority; UI gets
-  smoke tests.
+  failure modes. Prefer the boring obvious version.
+- ADRs in `docs/adr/NNN-title.md`, one page each, French: context, decision,
+  consequences. Every architectural choice gets one (the re-platform itself
+  gets an ADR at RP0).
+- Tests: `node:test` for `core/` and `middle/` (dependency-free, native);
+  core logic coverage is the priority. The front has no test runner in the
+  SBOM, so the UI gets manual/preview verification for now; **Vitest** (built
+  on Vite, already in the stack) is the natural addition if automated UI tests
+  are wanted later — cleared with the tech lead first.
 - Module Definition of Done: code + tests + doc comments + ADR if
-  architectural + `verify.sh` green. Nothing merges without all five.
+  architectural + green pipeline. Nothing merges without all five.
 
-## 9. Repository layout
+## 9. Repository layout (target after re-platform)
 
 ```
-core/        domain logic, plain TS, no React, no Node APIs
-adapters/    fixtures / csv-import / sciforma / planisware
-server/      node:http API + static serving
-sync/        CLI sync process
-ui/          React app (thin view over core/)
+core/        shared domain logic, plain TS — no React, no Node APIs, no framework
+adapters/    fixtures / csv-import / sciforma / planisware (PortfolioDataSource)
+middle/      Express + TS API; Postgres adapter behind BoardStorage; JWT auth
+front/       React 18 + Vite + TS; thin view over core/
+sync/        CLI/job: active adapter -> PostgreSQL, exits
 config/      board.json (+ example configs)
 fixtures/    synthetic dataset
+docker/      Dockerfiles (front, middle) + compose (with dev PostgreSQL)
 docs/adr/    decision records (French)
-vendor/      vendored dependency tarballs
-verify.sh
-DEPENDENCIES.md
 SECURITY.md  (French)
+DEPENDENCIES.md (French)
 README.md    (French)
 ```
 
-## 10. Sprint plan
+`core/` is shared as a dependency-free **npm workspace** consumed by both
+`front/` and `middle/` (npm workspaces is built in — no new tooling); each
+Dockerfile builds its workspace with `core/` in the build context. Current
+`ui/` and `server/` map to `front/` and `middle/`; the move and the
+node:http→Express / sqlite→Postgres swaps are the re-platform work.
 
-- Sprint 1 (NOW): core board. Config loading, fixtures adapter, board
-  rendering (normal + radiator + focus + collapse), aging, blocked pulse,
-  drag and drop writing events to an in-memory event store, one-screen
-  acceptance test. No backend yet: the UI runs against fixtures through the
-  same port interface the server will later implement.
-- Sprint 2: sidebar, filters, counts, keyboard navigation.
-- Sprint 3: server + SQLite + events persisted; UI switches to API.
-- Sprint 4: auth (local accounts, scrypt, roles), audit hardening.
-- Sprint 5: csv-import adapter, then sciforma adapter (read-only) behind a
-  flag; sync CLI.
-- Sprint 6: flow metrics view (cycle time, throughput, time-in-column,
-  aging distribution), computed exclusively from `card_events`.
+## 10. Plan
+
+Done on the original minimalist stack (Sprints 1-3): core domain modules +
+fixtures; board UI (normal/radiator/focus/collapse, aging, blocked pulse,
+filters, keyboard nav, metrics pulled forward); node:http server + SQLite/
+JSONL storage behind the `BoardStorage` port + UI on the API. This validated
+the product, the ports and the event model; `core/` and the API logic carry
+over unchanged.
+
+Re-platform phases:
+
+- **RP0**: record the re-platform ADR; stand up the npm-workspace monorepo +
+  Docker skeleton (front + middle + dev PostgreSQL); confirm `core/` ports
+  unchanged into the new structure.
+- **RP1**: middle on Express + a PostgreSQL adapter (`pg`) behind
+  `BoardStorage` (reuse `foldEvents`, validation, event-building); `/api/config`
+  + board API.
+- **RP2**: front on React 18 + Vite; port the components over the unchanged
+  `core/` (hand-written CSS first, Tailwind/Radix adaptation after).
+- **RP3**: auth via JWT-in-cookie (login, roles viewer/editor/admin, actor
+  attribution replacing "anonymous"); account CLI; audit hardening.
+- **RP4**: csv-import then sciforma adapters (read-only, flagged); sync job.
+- **RP5**: flow metrics view, computed exclusively from `card_events`.
+- **RP6**: Dockerization + CI within the client's platform; SBOM alignment.
 
 ## 11. Working agreement for Claude Code
 
-- Plan first. For any task, propose the file-level plan and wait for
-  approval before writing code.
-- One module per session. Small diffs. The human reads every line.
-- Never add a dependency. If something seems to need one, stop and say so.
-- Never weaken a rule in this file to satisfy a request; flag the conflict.
+- Plan first. For any task, propose the file-level plan and wait for approval
+  before writing code.
+- Small, reviewable diffs. The author is technical but does not read code
+  line-by-line: explain changes in plain language with their risk, prove them
+  by running tests and the app, and rely on adversarial review agents for
+  line-level scrutiny. Decisions and direction are the author's; building and
+  verifying are Claude's.
+- Never add a dependency outside the client's authorized SBOM. If something
+  seems to need one, stop and say so (it requires the tech lead's approval).
+- Never weaken a constraint in this file to satisfy a request; flag the
+  conflict.
 - When touching `core/`, write or update tests in the same session.
+- Log every architecture change in `docs/ARCHITECTURE.md` — a dated,
+  plain-language running record kept in sync with the author's Claude (web)
+  project — in addition to the formal ADR.
 - If a question's answer lives under "Open decisions", ask, do not invent.
 
-## 12. Open decisions (do not assume)
+## 12. Open decisions
 
-- Sanctioned channel for source entering the client environment (internal
-  Git, file-import gateway, or keyboard-only). If keyboard-only with no
-  internal package mirror, the fallback is vanilla ES modules + JSDoc types
-  with zero toolchain; `core/` must stay portable to that mode.
-- Internal npm mirror availability on the client side.
-- Exact Node LTS version on the target VM (decides node:sqlite vs
-  better-sqlite3).
-- Client dev team's house style (comment language, lint config: theirs
-  replaces ours on adoption).
-- Data sensitivity classification of portfolio data (may constrain hosting
-  and logging further).
-- Aging step values and andon threshold are defaults; confirm with users.
+**Governance:** the tool is the author's, built for the PMO team, deployed on
+the client's platform. The tech lead governs only the SBOM ceiling (what may
+run on the platform). Every internal design decision is the author's.
+
+**Decided (author, 2026-06-19):**
+
+- SBOM is a ceiling — use the minimum within the authorized versions.
+- Middle on **Express** (SBOM's cors/cookie-parser are Express middleware);
+  the existing node:http API logic ports into it.
+- Storage: **PostgreSQL** via **`pg`**; the **event-sourced** append-only
+  model is retained.
+- Auth: **JWT in an httpOnly+SameSite=Strict cookie**; **scrypt**
+  (node:crypto) for passwords; admin-creates-accounts via CLI; roles
+  viewer/editor/admin.
+- UI: keep hand-written CSS now, adapt to Tailwind/Radix later.
+- Tests: `node:test` for core/middle; UI by preview; Vitest later if wanted.
+- `core/` shared via an **npm workspace** across `front/` and `middle/`.
+- Runtime Node `>=22.18 <24`, containerized; lint = the client's ESLint.
+
+**To clear with the tech lead (runtime additions to their platform):**
+
+- Authorize **`pg`** (node-postgres) on the system — not in the reference
+  SBOM. (The only hard external ask; everything else fits the ceiling.)
+- The exact delivery channel / image registry into the platform.
+
+**Still open (product):**
+
+- Aging step values and andon threshold are defaults; confirm with the PMO users.
 - Sciforma field mapping for financials (budget, consumed, remaining).

@@ -1,33 +1,76 @@
-# Dépendances — budget et justification
+# Dépendances — gouvernance et justification
 
-Budget (CLAUDE.md §2) : **1 dépendance runtime maximum** (réservée au
-serveur : `node:sqlite` ou `better-sqlite3`, décision au Sprint 3) et
-**12 dépendances directes maximum**, devDependencies comprises.
+**Modèle de gouvernance (2026-06-19).** L'outil appartient à l'auteur et est
+déployé sur la plateforme conteneurisée du client pour l'équipe PMO. Le
+référent technique du client fixe le **plafond SBOM** : la liste des
+composants open-source et des versions autorisés à tourner sur la plateforme
+(fichiers `package.json` front + middle fournis). Ce plafond remplace
+l'ancien budget « 1 runtime / 12 directes » (CLAUDE.md §2, désormais retiré).
 
-État : **8 / 12** dépendances directes. **0 / 1** dépendance runtime serveur.
+Règle : **le SBOM est un plafond, pas une obligation.** On reste dans les
+versions autorisées et on n'utilise que le strict nécessaire ; rien n'oblige à
+adopter Tailwind/Radix/axios au seul motif qu'ils figurent dans la liste.
+Toute dépendance **hors plafond** (un composant runtime supplémentaire sur la
+plateforme) exige l'accord du référent technique, une ligne ici **et** un ADR.
 
-Note d'interprétation (voir ADR 001) : `react` et `react-dom` figurent dans
-`dependencies` au sens npm, mais sont compilées dans le bundle statique au
-build — au runtime, le serveur ne charge aucun module tiers. Le budget
-« runtime » vise le processus serveur.
+## SBOM autorisé (plafond plateforme)
 
-| Paquet | Version | Type | Justification |
-|---|---|---|---|
-| react | 19.2.7 (exacte) | bundle UI | Couche de vue imposée par la stack (CLAUDE.md §3). Composants fonctionnels uniquement. |
-| react-dom | 19.2.7 (exacte) | bundle UI | Rendu DOM de React, indissociable de react. |
-| typescript | 6.0.3 (exacte) | dev | TypeScript strict partout (CLAUDE.md §3). |
-| vite | 8.0.16 (exacte) | dev | Outil de build imposé par la stack. Build hors-ligne reproductible. |
-| @vitejs/plugin-react | 6.0.2 (exacte) | dev | Transformation JSX pour Vite. |
-| @types/react | 19.2.17 (exacte) | dev | Typage de react. |
-| @types/react-dom | 19.2.3 (exacte) | dev | Typage de react-dom. |
-| @types/node | 25.9.3 (exacte) | dev | Typage de `node:test` / `node:fs` pour les tests et scripts. |
+### Front — React / TypeScript / Vite, conteneurisé
+
+| Catégorie | Composants autorisés |
+|---|---|
+| Vue | react, react-dom (**18.3**), react-router-dom (7) |
+| Design system | tailwindcss (4), @tailwindcss/vite, @radix-ui/react-* (icons, slot, tooltip), lucide-react, class-variance-authority, clsx, tailwind-merge, next-themes, sonner, tw-animate-css |
+| Réseau | axios |
+| Stockage client | react-secure-storage |
+| Outils (dev) | vite (7), @vitejs/plugin-react, typescript (~5.9), eslint (9) + typescript-eslint + plugins react-hooks/react-refresh, @types/*, globals |
+| Runtime | Node `>=22.18 <24` |
+
+### Middle — Node / Express / TypeScript, conteneurisé
+
+| Catégorie | Composants autorisés |
+|---|---|
+| Serveur | express (5) |
+| HTTP / sessions | cookie-parser, cors, jsonwebtoken |
+| Config | dotenv, dotenv-expand |
+| Outils (dev) | typescript (5.9), nodemon, ts-node, tsx, @types/* |
+
+## Ce que l'outil utilise réellement (sous-ensemble du plafond)
+
+| Paquet | Rôle | Justification |
+|---|---|---|
+| react, react-dom 18 | Front | Couche de vue (CLAUDE.md §3). Composants fonctionnels uniquement. |
+| vite + @vitejs/plugin-react | Build front | Build conteneurisé. |
+| react-router-dom | Front | Navigation. |
+| express | Middle | Serveur HTTP du middle ; `cors`/`cookie-parser` du SBOM sont des middlewares Express. La logique d'API existante (validation, fold, construction d'évènements) s'y branche sans changement. |
+| cookie-parser, cors | Middle | Cookie de session JWT (httpOnly) ; CORS configuré same-origin (refus du cross-origin). |
+| jsonwebtoken | Middle | Jeton de session JWT (RP3). |
+| dotenv (+ expand) | Middle | Lecture des secrets (BD, sync) depuis des fichiers hors dépôt. |
+| typescript, eslint (+ plugins) | Dev | TypeScript strict ; ESLint = style maison du client (CLAUDE.md §8). |
+| nodemon / tsx / ts-node | Dev | Exécution/relance du middle en TypeScript. |
+
+Tailwind, Radix, lucide, axios, react-secure-storage, sonner, etc. **sont
+autorisés mais pas encore employés** : le CSS reste écrit à la main pour
+l'instant, adapté au design system plus tard (CLAUDE.md §5). axios reste
+optionnel (le wrapper `fetch` existant suffit).
+
+## Hors plafond — à faire autoriser
+
+| Paquet | Rôle | Statut |
+|---|---|---|
+| **`pg`** (node-postgres) | Client PostgreSQL du middle (port `BoardStorage`) | **À autoriser par le référent technique** — absent du SBOM de référence. Choix standard, mûr, auditable. Seul ajout runtime requis. |
+
+## Modules natifs Node (aucune dépendance, dans tout plafond)
+
+- `scrypt` de `node:crypto` — hachage des mots de passe (préféré à
+  bcrypt/argon2, non listés et à compilation native).
+- `node:test` — tests de `core/` et `middle/`, sans framework.
 
 ## Règles
 
-- Toute addition exige une ligne justifiée ici **et** un ADR.
-- Versions épinglées exactes ; installation par `npm ci` uniquement.
-- Pas de framework de test (tests sur `node:test`, natif Node 24).
-- Pas d'outil SBOM tiers (`scripts/sbom.ts` est maison).
-- Le lint de complexité attend la décision « style maison de l'équipe
-  cliente » (CLAUDE.md §12) ; en attendant, `scripts/check-conventions.ts`
-  fait respecter les plafonds fichier/fonction sans dépendance.
+- Versions épinglées aux versions autorisées du SBOM ; installation par
+  `npm ci`.
+- Pas d'ORM ; SQL paramétré, fin, derrière le port `BoardStorage`.
+- Tout ajout hors plafond : accord référent + ligne ici + ADR.
+- Pour des tests UI automatisés ultérieurs : **Vitest** (bâti sur Vite, déjà
+  dans la stack) serait l'ajout naturel, à faire autoriser.

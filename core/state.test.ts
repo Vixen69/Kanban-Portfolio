@@ -20,6 +20,27 @@ test("toCard merges financials, null financials yield null fields", () => {
   assert.equal(subject.id, "S001");
 });
 
+test("edited patch with prototype-named keys neither throws nor corrupts state", () => {
+  const card = testCard({ title: "Origine" });
+  const poison = ["hasOwnProperty", "valueOf", "isPrototypeOf", "constructor", "toString", "__proto__"];
+  const events = poison.map((key, index) =>
+    event({
+      id: `evt-${index + 1}`,
+      ts: `2026-03-0${index + 1}T00:00:00.000Z`,
+      type: "edited",
+      cardId: "S001",
+      payload: { patch: { [key]: "x" } },
+    }),
+  );
+  const [state] = foldEvents([card], events);
+  // The fold is total: no throw, the title is untouched, and no forged key
+  // was assigned as an OWN property of the state object.
+  assert.equal(state?.title, "Origine");
+  for (const key of poison) {
+    assert.equal(Object.prototype.hasOwnProperty.call(state, key), false);
+  }
+});
+
 test("no events: position from import, enteredColumnAt = createdAt", () => {
   const card = testCard({ createdAt: "2026-02-01T00:00:00.000Z" });
   const [state] = foldEvents([card], []);

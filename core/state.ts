@@ -24,6 +24,9 @@ const EDITABLE: Record<string, (value: unknown) => boolean> = {
   remaining: isNumberOrNull,
 };
 
+/** The field names an "edited" event may patch (callers validate against this). */
+export const EDITABLE_FIELDS: readonly string[] = Object.keys(EDITABLE);
+
 /**
  * Combines a subject with its financials into a full Card.
  * Inputs: a Subject from a data source, its Financials (or null).
@@ -56,7 +59,13 @@ function applyBlocked(state: CardState, event: CardEvent): void {
 function applyEdited(state: CardState, event: CardEvent): void {
   const patch = event.payload["patch"];
   if (typeof patch !== "object" || patch === null || Array.isArray(patch)) return;
-  for (const [key, value] of Object.entries(patch)) {
+  const fields = patch as Record<string, unknown>;
+  // Iterate the whitelist, never the payload's own keys: a forged key like
+  // "hasOwnProperty" or "constructor" must never reach a prototype-chain
+  // lookup (which would throw or corrupt state on every replay).
+  for (const key of EDITABLE_FIELDS) {
+    if (!Object.prototype.hasOwnProperty.call(fields, key)) continue;
+    const value = fields[key];
     const accepts = EDITABLE[key];
     if (accepts && accepts(value)) {
       // The whitelist above guarantees the value matches the field's type.

@@ -109,6 +109,18 @@ function Overlays({ app }: { app: AppContext }) {
   );
 }
 
+// The loading / error screen shown until the board fetch resolves, or null
+// once the store is ready (kept out of App to stay under the line cap).
+function statusScreen(store: AppContext["store"]): React.JSX.Element | null {
+  if (store.status === "loading") {
+    return <div className="app-status">Chargement du portefeuille…</div>;
+  }
+  if (store.status === "error") {
+    return <div className="app-status app-status--error">{store.error}</div>;
+  }
+  return null;
+}
+
 function Screen({ app }: { app: AppContext }) {
   const stats = portfolioStats(app.store.cards);
   return (
@@ -149,13 +161,14 @@ function Screen({ app }: { app: AppContext }) {
  * Root of the board UI.
  * Input: the validated board topology (props.config).
  * Output: the full application (header, sidebar, grid, detail modal,
- * metrics view, footer) bound to the fixtures-backed event store.
+ * metrics view, footer) bound to the API-backed board store; a loading or
+ * French error screen while the board is fetched.
  * Failure: none — config errors are caught before this component renders
- * (see main.tsx).
+ * (see main.tsx); board fetch failures surface via the store status.
  */
 export function App({ config }: { config: BoardConfig }) {
   const now = useNow();
-  const store = useBoardStore(config, now);
+  const store = useBoardStore();
   const focus = useFocusCell(store.cards);
   const lanes = useCollapsedLanes(focus.focusCell?.laneId ?? null, focus.clearFocus);
   const drag = useDragOverCell();
@@ -189,5 +202,5 @@ export function App({ config }: { config: BoardConfig }) {
     config, now, store, focus, lanes, drag, movement, view, filters, detail,
     dimmed, sidebar, codes, metrics, searchRef,
   };
-  return <Screen app={app} />;
+  return statusScreen(store) ?? <Screen app={app} />;
 }
