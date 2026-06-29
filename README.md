@@ -50,9 +50,22 @@ Node 22 (voir `.nvmrc` ; le dev fonctionne aussi sur Node 24.x, la cible de
 déploiement est Node 22). Monorepo npm workspaces : `core/` (partagé, sans
 dépendance), `middle/` (API Express), `front/` (React 18 + Vite).
 
-```bash
-npm ci
+**Le plus simple** — une seule commande peuple les fixtures (si besoin), lance
+le middle **et** le front, puis ouvre le navigateur ; `Ctrl+C` arrête tout :
 
+```bash
+npm ci       # une fois
+npm start    # → ouvre http://127.0.0.1:5173
+```
+
+> **Windows / PowerShell** : si `npm` est bloqué (« running scripts is disabled…
+> npm.ps1 »), lancer directement `node scripts/dev.ts`, **ou** autoriser les
+> scripts une fois : `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
+> En `cmd.exe` ou Git Bash, `npm start` fonctionne tel quel.
+
+À la main (deux terminaux, pratique en développement) :
+
+```bash
 # 1. Peupler le stockage de dev depuis les fixtures (une fois). Garde-fou
 #    explicite : un `npm run seed` nu refuse (jamais sur la machine cliente).
 KANBAN_ALLOW_SEED=1 npm run seed     # écrit data/board.jsonl (~113 cartes)

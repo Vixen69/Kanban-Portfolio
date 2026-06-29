@@ -13,6 +13,7 @@
     "node": ">=22.18"
   },
   "scripts": {
+    "start": "node scripts/dev.ts",
     "dev": "npm run -w @portfolio-kanban/front dev",
     "build": "npm run -w @portfolio-kanban/front build",
     "preview": "npm run -w @portfolio-kanban/front preview",
