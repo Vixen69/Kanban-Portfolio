@@ -1,8 +1,9 @@
-// Express transport for the middle (ADR 010/011). Wraps the transport-agnostic
-// API logic (api.ts) in routes; all domain logic stays in core/. Security
-// headers on every response, a 64 KB JSON body cap, same-origin only (no
-// CORS). Zero egress: the middle only listens and responds. The front is
-// served by its own container (nginx), so the middle has no static serving.
+// Express transport for the middle (ADR 010/011/012/013). Wraps the
+// transport-agnostic API logic (api.ts, cards.ts) in routes; all domain logic
+// stays in core/. Security headers on every response, a 64 KB JSON body cap,
+// same-origin only (no CORS). Zero egress: the middle only listens and
+// responds. The front is served by its own container (nginx), so the middle
+// has no static serving.
 
 import express, {
   type Express,
@@ -10,9 +11,10 @@ import express, {
   type Request,
   type Response,
 } from "express";
-import type { BoardConfig } from "../core/types.ts";
 import type { BoardStorage } from "../core/ports.ts";
-import { BadRequest, getBoard, getConfig, postEvent } from "./api.ts";
+import { BadRequest, getBoard, getConfig, postEvent, putConfig } from "./api.ts";
+import { postCard } from "./cards.ts";
+import type { ConfigStore } from "./config-store.ts";
 import { logError, logRequest } from "./log.ts";
 
 const SECURITY_HEADERS: Record<string, string> = {
@@ -30,7 +32,7 @@ const MAX_BODY = "64kb";
 /** What the transport needs to answer requests. */
 export interface MiddleDeps {
   storage: BoardStorage;
-  config: BoardConfig;
+  configStore: ConfigStore;
 }
 
 // HTTP status carried by express.json's own errors (413 too large, 400 parse).
@@ -59,7 +61,7 @@ function errorHandler(err: unknown, req: Request, res: Response, _next: NextFunc
   }
   const status = bodyErrorStatus(err);
   if (status === 413) {
-    res.status(413).json({ error: "Corps de requete trop volumineux." });
+    res.status(413).json({ error: "Corps de requête trop volumineux." });
     return;
   }
   if (status === 400) {
@@ -70,9 +72,38 @@ function errorHandler(err: unknown, req: Request, res: Response, _next: NextFunc
   res.status(500).json({ error: "Erreur interne." });
 }
 
+// Mounts the six API routes. Handlers throw BadRequest on invalid input;
+// Express 5 forwards the synchronous throw to errorHandler (→ 400).
+function mountRoutes(app: Express, deps: MiddleDeps): void {
+  app.get("/api/config", (_req: Request, res: Response) => {
+    const result = getConfig(deps.configStore.getRuntime());
+    res.status(result.status).json(result.body);
+  });
+  app.get("/api/config/default", (_req: Request, res: Response) => {
+    const result = getConfig(deps.configStore.getDefaults());
+    res.status(result.status).json(result.body);
+  });
+  app.put("/api/config", (req: Request, res: Response) => {
+    const result = putConfig(deps.configStore, req.body);
+    res.status(result.status).json(result.body);
+  });
+  app.get("/api/board", (_req: Request, res: Response) => {
+    const result = getBoard(deps.storage);
+    res.status(result.status).json(result.body);
+  });
+  app.post("/api/cards", (req: Request, res: Response) => {
+    const result = postCard(deps.storage, deps.configStore.getRuntime(), req.body);
+    res.status(result.status).json(result.body);
+  });
+  app.post("/api/events", (req: Request, res: Response) => {
+    const result = postEvent(deps.storage, deps.configStore.getRuntime(), req.body);
+    res.status(result.status).json(result.body);
+  });
+}
+
 /**
  * Builds the Express app bound to the given dependencies.
- * Inputs: the storage and the validated board config.
+ * Inputs: the storage and the config store (runtime override + defaults).
  * Output: an Express application (not yet listening).
  * Failure: none here; per-request errors become 4xx/5xx via errorHandler.
  */
@@ -89,22 +120,7 @@ export function createApp(deps: MiddleDeps): Express {
     next();
   });
   app.use(express.json({ limit: MAX_BODY }));
-
-  app.get("/api/config", (_req: Request, res: Response) => {
-    const result = getConfig(deps.config);
-    res.status(result.status).json(result.body);
-  });
-  app.get("/api/board", (_req: Request, res: Response) => {
-    const result = getBoard(deps.storage);
-    res.status(result.status).json(result.body);
-  });
-  app.post("/api/events", (req: Request, res: Response) => {
-    // postEvent throws BadRequest on an invalid intent; Express 5 forwards the
-    // synchronous throw to errorHandler (→ 400).
-    const result = postEvent(deps.storage, deps.config, req.body);
-    res.status(result.status).json(result.body);
-  });
-
+  mountRoutes(app, deps);
   app.use((_req: Request, res: Response) => {
     res.status(404).json({ error: "Ressource introuvable." });
   });

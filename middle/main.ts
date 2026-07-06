@@ -1,21 +1,24 @@
 // Middle entry point. Reads non-secret config from the environment, loads and
-// validates the board topology, opens the configured storage, serves the
-// Express API, and closes the storage cleanly on shutdown. Zero egress.
+// validates the default board topology, opens the runtime config store (a
+// persisted admin override wins over the defaults — ADR 013) and the
+// configured storage, serves the Express API, and closes the storage cleanly
+// on shutdown. Zero egress.
 
 import { mkdirSync, readFileSync } from "node:fs";
-import { dirname } from "node:path";
 import { validateBoardConfig } from "../core/config.ts";
 import { createStorage } from "./storage/select.ts";
 import { loadServerConfig } from "./config.ts";
+import { createConfigStore } from "./config-store.ts";
 import { createApp } from "./app.ts";
 
 const cfg = loadServerConfig(process.env);
 const raw: unknown = JSON.parse(readFileSync(cfg.boardConfigPath, "utf8"));
-const boardConfig = validateBoardConfig(raw);
+const defaults = validateBoardConfig(raw);
 
-mkdirSync(dirname(cfg.dataPath), { recursive: true });
+mkdirSync(cfg.dataDir, { recursive: true });
 const storage = createStorage(cfg.storageDriver, cfg.dataPath);
-const app = createApp({ storage, config: boardConfig });
+const configStore = createConfigStore(cfg.dataDir, defaults);
+const app = createApp({ storage, configStore });
 
 const server = app.listen(cfg.port, cfg.host, () => {
   console.log(`${new Date().toISOString()} kanban middle: http://${cfg.host}:${cfg.port} (${cfg.storageDriver})`);

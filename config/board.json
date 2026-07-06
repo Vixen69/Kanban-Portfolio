@@ -1,28 +1,117 @@
 {
   "lanes": [
-    { "id": "projets", "name": "Projets", "nature": "Compliqué" },
-    { "id": "petits", "name": "Petits Projets", "nature": "Clair" },
-    { "id": "complexes", "name": "Projets Complexes", "nature": "Complexe" }
+    {
+      "id": "projets",
+      "name": "Projets",
+      "nature": "Compliqué",
+      "detail": "Séquence de gates complète · architecture obligatoire"
+    },
+    {
+      "id": "petits_projets",
+      "name": "Petits Projets",
+      "nature": "Clair",
+      "detail": "RTM-lite · 1 équipe · ≤ 3 mois"
+    },
+    {
+      "id": "projets_complexes",
+      "name": "Projets Complexes",
+      "nature": "Complexe",
+      "detail": "RDLI incrémental · MVP avant engagement"
+    }
   ],
   "columns": [
-    { "id": "demandes", "name": "Demandes", "wipLimit": null },
-    { "id": "qualification", "name": "Qualification / RDO", "wipLimit": null },
-    { "id": "etudes", "name": "Etudes", "wipLimit": null },
-    { "id": "prets", "name": "Prets", "wipLimit": null },
-    { "id": "actifs", "name": "Actifs", "wipLimit": null },
-    { "id": "done", "name": "Done", "wipLimit": null },
-    { "id": "exploitation", "name": "En Exploitation", "wipLimit": null }
+    {
+      "id": "demandes",
+      "name": "Demandes",
+      "wip": 7,
+      "gate": null,
+      "note": "File d’entrée · priorité verticale"
+    },
+    {
+      "id": "qualification",
+      "name": "Qualification",
+      "wip": 6,
+      "gate": null,
+      "note": "RDO · détection de nature"
+    },
+    {
+      "id": "etudes",
+      "name": "Études",
+      "wip": 7,
+      "gate": null,
+      "note": "DAAT · estimation · dépendances"
+    },
+    {
+      "id": "prets",
+      "name": "Prêts",
+      "wip": 5,
+      "gate": "DoR",
+      "note": "Qualifié, estimé — tiré par l’équipe"
+    },
+    {
+      "id": "pause",
+      "name": "Pause",
+      "wip": null,
+      "gate": null,
+      "note": "Mise en pause — repli pour piloter le flux"
+    },
+    {
+      "id": "actifs",
+      "name": "Actifs",
+      "wip": 6,
+      "gate": null,
+      "note": "En cours · Andon si bloqué > 5j",
+      "hasBlockedZone": true
+    },
+    {
+      "id": "done",
+      "name": "Done",
+      "wip": 6,
+      "gate": "DoD",
+      "note": "DoD atteinte · PV Reprise d’Exploitation"
+    },
+    {
+      "id": "exploitation",
+      "name": "Exploitation",
+      "wip": null,
+      "gate": null,
+      "note": "En production · état terminal"
+    }
   ],
-  "domains": ["Ingenierie", "Soutien", "Industrie", "Corporate", "ERP",
-              "PLM", "Infra", "Archi & Dev", "Cyber"],
+  "domains": [
+    { "id": "ingenierie", "name": "Ingénierie", "short": "ING", "color": "#10b981" },
+    { "id": "soutien", "name": "Soutien", "short": "SOU", "color": "#6366f1" },
+    { "id": "industrie", "name": "Industrie", "short": "IND", "color": "#f59e0b" },
+    { "id": "corporate", "name": "Corporate", "short": "COR", "color": "#8b5cf6" },
+    { "id": "erp", "name": "ERP", "short": "ERP", "color": "#ef4444" },
+    { "id": "plm", "name": "PLM", "short": "PLM", "color": "#06b6d4" },
+    { "id": "infra", "name": "Infra", "short": "INF", "color": "#ec4899" },
+    { "id": "archi_dev", "name": "Archi & Dev", "short": "A&D", "color": "#14b8a6" },
+    { "id": "cyber", "name": "Cyber", "short": "CYB", "color": "#f97316" }
+  ],
   "types": [
-    { "id": "achat", "name": "Achat", "short": "ACH" },
-    { "id": "etude", "name": "Étude", "short": "ETU" },
-    { "id": "evolution_tma", "name": "Evolution - TMA", "short": "EVO" },
-    { "id": "obsolescence", "name": "Gestion d’obsolescence", "short": "OBS" },
-    { "id": "mise_en_oeuvre", "name": "Mise en œuvre", "short": "MEP" },
-    { "id": "tma_corrective", "name": "TMA Corrective", "short": "TMA" }
+    { "id": "achat", "name": "Achat", "short": "ACH", "color": "#0369a1" },
+    { "id": "etude", "name": "Étude", "short": "ETU", "color": "#15803d" },
+    { "id": "evolution_tma", "name": "Evolution - TMA", "short": "EVO", "color": "#0d9488" },
+    { "id": "obsolescence", "name": "Gestion d’obsolescence", "short": "OBS", "color": "#b45309" },
+    { "id": "mise_en_oeuvre", "name": "Mise en œuvre", "short": "MEP", "color": "#4338ca" },
+    { "id": "tma_corrective", "name": "TMA Corrective", "short": "TMA", "color": "#7c3aed" }
   ],
-  "agingStepsDays": [7, 21, 45, 90],
+  "natures": {
+    "simple": { "label": "Clair", "bg": "#ccfbf1", "fg": "#0d9488" },
+    "complicated": { "label": "Compliqué", "bg": "#dbeafe", "fg": "#2563eb" },
+    "complex": { "label": "Complexe", "bg": "#ffedd5", "fg": "#c2410c" }
+  },
+  "criticalities": {
+    "top": { "label": "Top", "badge": "TOP", "bg": "#eab308", "fg": "#1a1505" },
+    "major": { "label": "Major", "badge": "MAJOR", "bg": "#475569", "fg": "#e2e8f0" },
+    "normal": { "label": "Normal", "badge": null }
+  },
+  "gateDefs": {
+    "DoR": { "name": "Definition of Ready", "color": "#1d4ed8" },
+    "DoD": { "name": "Definition of Done", "color": "#047857" }
+  },
+  "fields": [],
+  "age": { "freshMaxDays": 7, "recentMaxDays": 28, "agingMaxDays": 60 },
   "andonThresholdDays": 5
 }

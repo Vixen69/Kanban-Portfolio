@@ -1,54 +1,55 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { CardEvent } from "./types.ts";
-import { foldEvents, toCard } from "./state.ts";
+import { EDITABLE_FIELDS, foldEvents, toCard } from "./state.ts";
 import { testCard } from "./test-helpers.ts";
 
 function event(partial: Partial<CardEvent> & Pick<CardEvent, "id" | "ts" | "type" | "cardId">): CardEvent {
   return { actor: "test", fromColumn: null, toColumn: null, payload: {}, ...partial };
 }
 
-test("toCard merges financials, null financials yield null fields", () => {
-  const subject = { ...testCard(), budget: undefined, consumed: undefined, remaining: undefined };
-  const { budget: _b, consumed: _c, remaining: _r, ...bare } = testCard();
-  const withMoney = toCard(bare, { budget: 100, consumed: 40, remaining: 60 });
-  assert.equal(withMoney.budget, 100);
-  assert.equal(withMoney.remaining, 60);
-  const withoutMoney = toCard(bare, null);
-  assert.equal(withoutMoney.budget, null);
-  assert.equal(withoutMoney.consumed, null);
-  assert.equal(subject.id, "S001");
+test("toCard maps budget→budgetEstimated and consumed→budgetConsumed", () => {
+  const withMoney = toCard(testCard(), { budget: 100, consumed: 40, remaining: 60 });
+  assert.equal(withMoney.budgetEstimated, 100);
+  assert.equal(withMoney.budgetConsumed, 40);
+  // remaining is never stored — derived at display time.
+  assert.equal("remaining" in withMoney, false);
+  const withoutMoney = toCard(testCard({ budgetEstimated: 999 }), null);
+  assert.equal(withoutMoney.budgetEstimated, null);
+  assert.equal(withoutMoney.budgetConsumed, null);
 });
 
-test("edited patch with prototype-named keys neither throws nor corrupts state", () => {
-  const card = testCard({ title: "Origine" });
-  const poison = ["hasOwnProperty", "valueOf", "isPrototypeOf", "constructor", "toString", "__proto__"];
-  const events = poison.map((key, index) =>
-    event({
-      id: `evt-${index + 1}`,
-      ts: `2026-03-0${index + 1}T00:00:00.000Z`,
-      type: "edited",
-      cardId: "S001",
-      payload: { patch: { [key]: "x" } },
-    }),
+test("EDITABLE_FIELDS is exactly the v2 CardPatch key set", () => {
+  assert.deepEqual(
+    [...EDITABLE_FIELDS].sort(),
+    [
+      "budgetConsumed", "budgetEstimated", "codename", "criticality", "custom",
+      "domain", "effortConsumed", "effortEstimated", "loadPlan", "nature",
+      "notes", "owner", "resources", "tags", "title", "typeId",
+    ].sort(),
   );
-  const [state] = foldEvents([card], events);
-  // The fold is total: no throw, the title is untouched, and no forged key
-  // was assigned as an OWN property of the state object.
-  assert.equal(state?.title, "Origine");
-  for (const key of poison) {
-    assert.equal(Object.prototype.hasOwnProperty.call(state, key), false);
-  }
 });
 
-test("no events: position from import, enteredColumnAt = createdAt", () => {
+test("no events: position from import, enteredColumnAt = createdAt, no comments", () => {
   const card = testCard({ createdAt: "2026-02-01T00:00:00.000Z" });
   const [state] = foldEvents([card], []);
   assert.equal(state?.columnId, "col1");
   assert.equal(state?.enteredColumnAt, "2026-02-01T00:00:00.000Z");
+  assert.deepEqual(state?.comments, []);
 });
 
-test("moved updates column, lane and enteredColumnAt", () => {
+test("created/imported set enteredColumnAt, column and payload lane", () => {
+  const card = testCard({ columnId: "col2", laneId: "laneB" });
+  const [state] = foldEvents(
+    [card],
+    [event({ id: "evt-1", ts: "2026-01-15T00:00:00.000Z", type: "imported", cardId: "S001", toColumn: "col1", payload: { laneId: "laneA" } })],
+  );
+  assert.equal(state?.columnId, "col1");
+  assert.equal(state?.laneId, "laneA");
+  assert.equal(state?.enteredColumnAt, "2026-01-15T00:00:00.000Z");
+});
+
+test("moved updates column, lane from payload.laneId, and enteredColumnAt", () => {
   const card = testCard();
   const [state] = foldEvents(
     [card],
@@ -60,13 +61,23 @@ test("moved updates column, lane and enteredColumnAt", () => {
         cardId: "S001",
         fromColumn: "col1",
         toColumn: "col2",
-        payload: { fromLane: "laneA", toLane: "laneB" },
+        payload: { fromLaneId: "laneA", laneId: "laneB" },
       }),
     ],
   );
   assert.equal(state?.columnId, "col2");
   assert.equal(state?.laneId, "laneB");
   assert.equal(state?.enteredColumnAt, "2026-03-01T00:00:00.000Z");
+});
+
+test("moved without payload lane keeps the current lane", () => {
+  const card = testCard({ laneId: "laneB" });
+  const [state] = foldEvents(
+    [card],
+    [event({ id: "evt-1", ts: "2026-03-01T00:00:00.000Z", type: "moved", cardId: "S001", toColumn: "col3" })],
+  );
+  assert.equal(state?.columnId, "col3");
+  assert.equal(state?.laneId, "laneB");
 });
 
 test("blocked then unblocked round-trips the blocked fields", () => {
@@ -91,40 +102,30 @@ test("blocked then unblocked round-trips the blocked fields", () => {
   assert.equal(roundTrip?.blockedSince, null);
 });
 
-test("created/imported set enteredColumnAt (and column when present)", () => {
-  const card = testCard({ columnId: "col2" });
+test("blocked with a malformed reason still blocks, reason falls back to null", () => {
   const [state] = foldEvents(
-    [card],
-    [event({ id: "evt-1", ts: "2026-01-15T00:00:00.000Z", type: "created", cardId: "S001", toColumn: "col1" })],
+    [testCard()],
+    [event({ id: "evt-1", ts: "2026-03-02T00:00:00.000Z", type: "blocked", cardId: "S001", payload: { reason: 42 } })],
   );
-  assert.equal(state?.columnId, "col1");
-  assert.equal(state?.enteredColumnAt, "2026-01-15T00:00:00.000Z");
+  assert.equal(state?.blocked, true);
+  assert.equal(state?.blockedReason, null);
 });
 
 test("events are replayed in timestamp order regardless of input order", () => {
   const card = testCard();
-  const later = event({ id: "evt-2", ts: "2026-04-01T00:00:00.000Z", type: "moved", cardId: "S001", toColumn: "col3", payload: { toLane: "laneA" } });
-  const earlier = event({ id: "evt-1", ts: "2026-03-01T00:00:00.000Z", type: "moved", cardId: "S001", toColumn: "col2", payload: { toLane: "laneA" } });
+  const later = event({ id: "evt-2", ts: "2026-04-01T00:00:00.000Z", type: "moved", cardId: "S001", toColumn: "col3" });
+  const earlier = event({ id: "evt-1", ts: "2026-03-01T00:00:00.000Z", type: "moved", cardId: "S001", toColumn: "col2" });
   const [state] = foldEvents([card], [later, earlier]);
   assert.equal(state?.columnId, "col3");
 });
 
-test("same-instant events tie-break on event id (insertion order)", () => {
-  const card = testCard();
-  const ts = "2026-04-01T00:00:00.000Z";
-  const first = event({ id: "evt-1", ts, type: "moved", cardId: "S001", toColumn: "col2", payload: { toLane: "laneA" } });
-  const second = event({ id: "evt-2", ts, type: "moved", cardId: "S001", toColumn: "col3", payload: { toLane: "laneA" } });
-  const [state] = foldEvents([card], [second, first]);
-  assert.equal(state?.columnId, "col3");
-});
-
-test("insertion order is numeric, not lexicographic (evt-9 before evt-10)", () => {
+test("same-instant events tie-break on numeric id (evt-9 before evt-10)", () => {
   const card = testCard();
   const ts = "2026-04-01T00:00:00.000Z";
   const ninth = event({ id: "evt-9", ts, type: "blocked", cardId: "S001", payload: { reason: "x" } });
   const tenth = event({ id: "evt-10", ts, type: "unblocked", cardId: "S001" });
   const [state] = foldEvents([card], [tenth, ninth]);
-  assert.equal(state?.blocked, false, "evt-10 (unblocked) doit rejouer apres evt-9");
+  assert.equal(state?.blocked, false, "evt-10 (unblocked) must replay after evt-9");
 });
 
 test("events for unknown cards are ignored, patch-less edited is a no-op", () => {
@@ -133,71 +134,170 @@ test("events for unknown cards are ignored, patch-less edited is a no-op", () =>
     [card],
     [
       event({ id: "evt-1", ts: "2026-03-01T00:00:00.000Z", type: "moved", cardId: "GHOST", toColumn: "col3" }),
-      event({ id: "evt-2", ts: "2026-03-02T00:00:00.000Z", type: "edited", cardId: "S001", payload: { title: "x" } }),
+      event({ id: "evt-2", ts: "2026-03-02T00:00:00.000Z", type: "deleted", cardId: "GHOST" }),
+      event({ id: "evt-3", ts: "2026-03-03T00:00:00.000Z", type: "edited", cardId: "S001", payload: { title: "x" } }),
+      event({ id: "evt-4", ts: "2026-03-04T00:00:00.000Z", type: "edited", cardId: "S001", payload: { patch: "pas un objet" } }),
     ],
   );
   assert.equal(state?.columnId, "col1");
   assert.equal(state?.title, "Sujet de test");
 });
 
-test("edited applies whitelisted patch fields and ignores the rest", () => {
+test("edited applies every whitelisted v2 field and ignores the rest", () => {
   const card = testCard();
+  const patch = {
+    title: "Nouveau titre", owner: "Mme Nouvelle", domain: "beta",
+    criticality: "top", typeId: "t2", codename: "PX9999999", nature: "complex",
+    tags: ["a", "b"], effortEstimated: 120, effortConsumed: 45,
+    budgetEstimated: 200, budgetConsumed: 80, loadPlan: "1,5 ETP",
+    resources: ["Data", "Infra"], notes: "vu au Sync", custom: { risque: "haut" },
+    // Forged non-editable fields — all must be ignored:
+    id: "HACKED", columnId: "col3", laneId: "laneB", blocked: true,
+    blockedSince: "1999-01-01T00:00:00.000Z", createdAt: "1999-01-01T00:00:00.000Z",
+    source: "sciforma", sciformaId: "SCF-0000", dependencies: ["X"],
+  };
   const [state] = foldEvents(
     [card],
-    [
-      event({
-        id: "evt-1",
-        ts: "2026-03-02T00:00:00.000Z",
-        type: "edited",
-        cardId: "S001",
-        payload: {
-          patch: {
-            title: "Nouveau titre",
-            owner: "Mme Nouvelle",
-            criticality: "top",
-            typeId: "t2",
-            budget: 200,
-            consumed: 50,
-            remaining: 150,
-            tags: ["a", "b"],
-            id: "HACKED",
-            columnId: "col3",
-            blocked: true,
-            createdAt: "1999-01-01T00:00:00.000Z",
-          },
-        },
-      }),
-    ],
+    [event({ id: "evt-1", ts: "2026-03-02T00:00:00.000Z", type: "edited", cardId: "S001", payload: { patch } })],
   );
   assert.equal(state?.title, "Nouveau titre");
   assert.equal(state?.owner, "Mme Nouvelle");
+  assert.equal(state?.domain, "beta");
   assert.equal(state?.criticality, "top");
   assert.equal(state?.typeId, "t2");
-  assert.equal(state?.budget, 200);
+  assert.equal(state?.codename, "PX9999999");
+  assert.equal(state?.nature, "complex");
   assert.deepEqual(state?.tags, ["a", "b"]);
+  assert.equal(state?.effortEstimated, 120);
+  assert.equal(state?.effortConsumed, 45);
+  assert.equal(state?.budgetEstimated, 200);
+  assert.equal(state?.budgetConsumed, 80);
+  assert.equal(state?.loadPlan, "1,5 ETP");
+  assert.deepEqual(state?.resources, ["Data", "Infra"]);
+  assert.equal(state?.notes, "vu au Sync");
+  assert.deepEqual(state?.custom, { risque: "haut" });
   // Non-editable fields are untouched, whatever the payload claims.
   assert.equal(state?.id, "S001");
   assert.equal(state?.columnId, "col1");
+  assert.equal(state?.laneId, "laneA");
   assert.equal(state?.blocked, false);
+  assert.equal(state?.blockedSince, null);
   assert.equal(state?.createdAt, "2026-01-01T00:00:00.000Z");
+  assert.equal(state?.source, "fixtures");
+  assert.equal(state?.sciformaId, null);
+  assert.deepEqual(state?.dependencies, []);
 });
 
-test("edited rejects badly-typed patch values", () => {
+test("edited rejects badly-typed patch values field by field", () => {
+  const card = testCard({ loadPlan: "2 ETP" });
+  const patch = {
+    title: "", owner: 3, criticality: "urgent", nature: "chaotique",
+    typeId: 5, effortEstimated: "beaucoup", budgetEstimated: Number.NaN,
+    budgetConsumed: Number.POSITIVE_INFINITY, tags: [1, 2], resources: "solo",
+    loadPlan: 7, notes: null, custom: "pas une map",
+  };
+  const [state] = foldEvents(
+    [card],
+    [event({ id: "evt-1", ts: "2026-03-02T00:00:00.000Z", type: "edited", cardId: "S001", payload: { patch } })],
+  );
+  assert.equal(state?.title, "Sujet de test");
+  assert.equal(state?.owner, "M. Test");
+  assert.equal(state?.criticality, "normal");
+  assert.equal(state?.nature, "simple");
+  assert.equal(state?.typeId, "t1");
+  assert.equal(state?.effortEstimated, null);
+  assert.equal(state?.budgetEstimated, null);
+  assert.equal(state?.budgetConsumed, null);
+  assert.deepEqual(state?.tags, []);
+  assert.deepEqual(state?.resources, []);
+  assert.equal(state?.loadPlan, "2 ETP");
+  assert.equal(state?.notes, "");
+  assert.deepEqual(state?.custom, {});
+});
+
+test("custom REPLACES the whole map; a map with a bad value is rejected whole", () => {
+  const card = testCard({ custom: { a: 1, b: "x" } });
+  const replaced = foldEvents(
+    [card],
+    [event({ id: "evt-1", ts: "2026-03-02T00:00:00.000Z", type: "edited", cardId: "S001", payload: { patch: { custom: { c: true } } } })],
+  )[0];
+  assert.deepEqual(replaced?.custom, { c: true });
+  const rejected = foldEvents(
+    [card],
+    [event({ id: "evt-1", ts: "2026-03-02T00:00:00.000Z", type: "edited", cardId: "S001", payload: { patch: { custom: { ok: "oui", bad: { nested: 1 } } } } })],
+  )[0];
+  assert.deepEqual(rejected?.custom, { a: 1, b: "x" });
+});
+
+test("patched arrays and custom map are copies, never payload aliases", () => {
+  const tags = ["a"];
+  const custom: Record<string, unknown> = { a: 1 };
+  const [state] = foldEvents(
+    [testCard()],
+    [event({ id: "evt-1", ts: "2026-03-02T00:00:00.000Z", type: "edited", cardId: "S001", payload: { patch: { tags, custom } } })],
+  );
+  tags.push("b");
+  custom["b"] = 2;
+  assert.deepEqual(state?.tags, ["a"]);
+  assert.deepEqual(state?.custom, { a: 1 });
+});
+
+test("edited patch with prototype-named keys neither throws nor corrupts state", () => {
+  const card = testCard({ title: "Origine" });
+  const poison = ["hasOwnProperty", "valueOf", "isPrototypeOf", "constructor", "toString", "__proto__"];
+  const events = poison.map((key, index) =>
+    event({
+      id: `evt-${index + 1}`,
+      ts: `2026-03-0${index + 1}T00:00:00.000Z`,
+      type: "edited",
+      cardId: "S001",
+      payload: { patch: { [key]: "x" } },
+    }),
+  );
+  const [state] = foldEvents([card], events);
+  assert.equal(state?.title, "Origine");
+  for (const key of poison) {
+    assert.equal(Object.prototype.hasOwnProperty.call(state, key), false);
+  }
+});
+
+test("commented accumulates chronologically; malformed texts are skipped", () => {
   const card = testCard();
   const [state] = foldEvents(
     [card],
     [
-      event({
-        id: "evt-1",
-        ts: "2026-03-02T00:00:00.000Z",
-        type: "edited",
-        cardId: "S001",
-        payload: { patch: { title: "", criticality: "urgent", budget: "beaucoup", tags: [1, 2] } },
-      }),
+      event({ id: "evt-2", ts: "2026-03-05T00:00:00.000Z", type: "commented", cardId: "S001", actor: "Marie", payload: { text: "Deuxième point" } }),
+      event({ id: "evt-3", ts: "2026-03-06T00:00:00.000Z", type: "commented", cardId: "S001", payload: {} }),
+      event({ id: "evt-4", ts: "2026-03-07T00:00:00.000Z", type: "commented", cardId: "S001", payload: { text: 42 } }),
+      event({ id: "evt-1", ts: "2026-03-01T00:00:00.000Z", type: "commented", cardId: "S001", actor: "Pierre", payload: { text: "C’est prêt" } }),
     ],
   );
-  assert.equal(state?.title, "Sujet de test");
-  assert.equal(state?.criticality, "normal");
-  assert.equal(state?.budget, null);
-  assert.deepEqual(state?.tags, []);
+  assert.deepEqual(state?.comments, [
+    { actor: "Pierre", ts: "2026-03-01T00:00:00.000Z", text: "C’est prêt" },
+    { actor: "Marie", ts: "2026-03-05T00:00:00.000Z", text: "Deuxième point" },
+  ]);
+});
+
+test("deleted excludes the card from folded output, other cards remain", () => {
+  const kept = testCard({ id: "S002", title: "Survivant" });
+  const states = foldEvents(
+    [testCard(), kept],
+    [event({ id: "evt-1", ts: "2026-03-01T00:00:00.000Z", type: "deleted", cardId: "S001" })],
+  );
+  assert.deepEqual(states.map((s) => s.id), ["S002"]);
+});
+
+test("deletion mid-stream: earlier events apply, later ones are ignored", () => {
+  const card = testCard();
+  const states = foldEvents(
+    [card],
+    [
+      event({ id: "evt-1", ts: "2026-03-01T00:00:00.000Z", type: "moved", cardId: "S001", toColumn: "col2" }),
+      event({ id: "evt-2", ts: "2026-03-02T00:00:00.000Z", type: "deleted", cardId: "S001" }),
+      event({ id: "evt-3", ts: "2026-03-03T00:00:00.000Z", type: "moved", cardId: "S001", toColumn: "col3" }),
+      event({ id: "evt-4", ts: "2026-03-04T00:00:00.000Z", type: "commented", cardId: "S001", payload: { text: "fantôme" } }),
+      event({ id: "evt-5", ts: "2026-03-05T00:00:00.000Z", type: "created", cardId: "S001", toColumn: "col1" }),
+    ],
+  );
+  assert.deepEqual(states, []);
 });

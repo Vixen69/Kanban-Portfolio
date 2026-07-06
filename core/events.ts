@@ -1,5 +1,6 @@
 // The append-only event log: audit trail AND single source of flow truth.
-// Sprint 1 keeps it in memory; Sprint 3 persists the same shape to SQLite.
+// InMemoryEventStore backs core tests and the fixtures generator; the middle
+// persists the same event shape behind the BoardStorage port.
 
 import type { CardEvent, CardEventType } from "./types.ts";
 
@@ -60,8 +61,10 @@ export class InMemoryEventStore {
 /**
  * Builds a "moved" event input.
  * Inputs: card id, lane/column before and after, actor, timestamp.
- * Output: a CardEventInput recording the move (lanes in payload — the
- * card_events schema only has from/to columns as first-class fields).
+ * Output: a CardEventInput recording the move. Columns travel first-class
+ * (fromColumn/toColumn); lanes travel in the payload — "laneId" is the
+ * destination lane read back by foldEvents, "fromLaneId" is kept for the
+ * audit trail only.
  * Failure: none.
  */
 export function movedEvent(
@@ -78,14 +81,17 @@ export function movedEvent(
     type: "moved",
     fromColumn: from.columnId,
     toColumn: to.columnId,
-    payload: { fromLane: from.laneId, toLane: to.laneId },
+    payload: { fromLaneId: from.laneId, laneId: to.laneId },
   };
 }
 
 /**
  * Builds a lifecycle event input (created / imported / blocked / unblocked /
- * edited) without column transition.
- * Inputs: event type, card id, actor, timestamp, optional payload.
+ * edited / commented / deleted) without column transition.
+ * Inputs: event type (any type but "moved"), card id, actor, timestamp, and
+ * an optional payload — { reason } for blocked, { patch } for edited,
+ * { text } for commented, { laneId } (plus a toColumn set by the caller on
+ * the stored input) for created/imported, {} for unblocked/deleted.
  * Output: a CardEventInput with fromColumn/toColumn set to null.
  * Failure: none.
  */

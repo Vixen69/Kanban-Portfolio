@@ -62,7 +62,8 @@ test("movedEvent records columns first-class and lanes in the payload", () => {
   assert.equal(input.type, "moved");
   assert.equal(input.fromColumn, "etudes");
   assert.equal(input.toColumn, "prets");
-  assert.deepEqual(input.payload, { fromLane: "projets", toLane: "petits" });
+  // "laneId" is what foldEvents reads back; "fromLaneId" is audit-only.
+  assert.deepEqual(input.payload, { fromLaneId: "projets", laneId: "petits" });
   assert.equal(input.actor, "local");
   assert.equal(input.ts, TS);
 });
@@ -73,4 +74,18 @@ test("lifecycleEvent leaves columns null and carries the payload", () => {
   assert.equal(input.fromColumn, null);
   assert.equal(input.toColumn, null);
   assert.deepEqual(input.payload, { reason: "attente budget" });
+});
+
+test("lifecycleEvent builds commented and deleted inputs", () => {
+  const commented = lifecycleEvent("commented", "S042", "Marie", TS, { text: "C’est prêt" });
+  assert.equal(commented.type, "commented");
+  assert.deepEqual(commented.payload, { text: "C’est prêt" });
+  assert.equal(commented.fromColumn, null);
+  assert.equal(commented.toColumn, null);
+
+  const deleted = lifecycleEvent("deleted", "S042", "local", TS);
+  assert.equal(deleted.type, "deleted");
+  assert.deepEqual(deleted.payload, {});
+  assert.equal(deleted.fromColumn, null);
+  assert.equal(deleted.toColumn, null);
 });

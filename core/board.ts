@@ -1,25 +1,21 @@
-// Board selectors: cells, WIP read-outs and lane summaries.
+// Board selectors: cells, WIP read-outs and cell/portfolio summaries.
 // Pure queries over CardState[] — the React layer only renders these.
 
 import type { BoardConfig, CardState } from "./types.ts";
 import { isStale } from "./aging.ts";
 
-/** WIP read-out of one column: display string + warning state. */
-export interface WipStatus {
-  count: number;
-  limit: number | null;
-  /** "4 / non defini" when no limit, "4/6" when set. */
-  display: string;
-  /** True when a set limit is exceeded — warns, never blocks. */
-  exceeded: boolean;
-}
+/** WIP heat of one cell: no limit / under / nearing (>= 80%) / exceeded. */
+export type WipState = "na" | "ok" | "warn" | "over";
 
-/** Glance summary of one lane-column cell (used by collapsed lanes). */
+/** Glance summary of one lane-column cell (collapsed lanes/columns). */
 export interface CellSummary {
   count: number;
   blockedCount: number;
   staleCount: number;
 }
+
+/** Ratio of a WIP limit at which the read-out warns before it overflows. */
+const WIP_WARN_RATIO = 0.8;
 
 /**
  * Cards sitting in one lane-column cell, in stable input order.
@@ -31,24 +27,36 @@ export function cellCards(cards: CardState[], laneId: string, columnId: string):
 }
 
 /**
- * WIP read-out for one column across all lanes.
- * Inputs: all card states, the column definition's id and wipLimit.
- * Output: a WipStatus; with a null limit the display reads "non defini"
- * and exceeded is always false (nothing is enforced).
- * Failure: none.
+ * WIP heat for a card count against a column's limit: "na" without a limit,
+ * "over" when count/limit > 1, "warn" from count/limit >= 0.8, else "ok".
+ * A WIP limit warns, it never blocks.
+ * Inputs: card count, the column's wip (null = no limit).
+ * Output: a WipState. Failure: none (a non-positive limit reads as "na").
  */
-export function wipStatus(cards: CardState[], columnId: string, limit: number | null): WipStatus {
-  const count = cards.reduce((n, card) => (card.columnId === columnId ? n + 1 : n), 0);
-  if (limit === null) {
-    return { count, limit, display: `${count} / non defini`, exceeded: false };
-  }
-  return { count, limit, display: `${count}/${limit}`, exceeded: count > limit };
+export function wipState(count: number, wip: number | null): WipState {
+  if (wip === null || wip <= 0) return "na";
+  const ratio = count / wip;
+  if (ratio > 1) return "over";
+  if (ratio >= WIP_WARN_RATIO) return "warn";
+  return "ok";
+}
+
+/**
+ * WIP read-out text: "n/limit" when a limit is set, plain "n" otherwise.
+ * Inputs: card count, the column's wip (null = no limit).
+ * Output: the display string. Failure: none (a non-positive limit reads
+ * as no limit, matching wipState).
+ */
+export function wipDisplay(count: number, wip: number | null): string {
+  if (wip === null || wip <= 0) return String(count);
+  return `${count}/${wip}`;
 }
 
 /**
  * Glance summary of one cell: total, blocked and stagnant counts.
  * Inputs: all card states, lane id, column id, board config, now.
- * Output: a CellSummary. Failure: none.
+ * Output: a CellSummary (a card both blocked and stale counts in both).
+ * Failure: none.
  */
 export function cellSummary(
   cards: CardState[],
@@ -74,28 +82,4 @@ export function portfolioStats(cards: CardState[]): { total: number; blocked: nu
     total: cards.length,
     blocked: cards.reduce((n, card) => (card.blocked ? n + 1 : n), 0),
   };
-}
-
-/**
- * Neighbour cell for the keyboard move fallback (arrow direction).
- * Inputs: board config, current lane/column ids, a direction.
- * Output: the target {laneId, columnId}, or null at the board edge or when
- * the current ids are unknown to the config.
- * Failure: none.
- */
-export function neighbourCell(
-  config: BoardConfig,
-  laneId: string,
-  columnId: string,
-  direction: "left" | "right" | "up" | "down",
-): { laneId: string; columnId: string } | null {
-  const laneIndex = config.lanes.findIndex((lane) => lane.id === laneId);
-  const columnIndex = config.columns.findIndex((column) => column.id === columnId);
-  if (laneIndex < 0 || columnIndex < 0) return null;
-  const laneDelta = direction === "up" ? -1 : direction === "down" ? 1 : 0;
-  const columnDelta = direction === "left" ? -1 : direction === "right" ? 1 : 0;
-  const lane = config.lanes[laneIndex + laneDelta];
-  const column = config.columns[columnIndex + columnDelta];
-  if (!lane || !column) return null;
-  return { laneId: lane.id, columnId: column.id };
 }

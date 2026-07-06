@@ -1,22 +1,23 @@
-// Radiator layout arithmetic — the one-screen acceptance criterion as code.
-// The UI reads these constants (single source of truth for the CSS custom
-// properties), and the acceptance test checks the fixture portfolio fits
-// a 1920x1080 viewport with zero scrolling in radiator mode.
+// Board layout arithmetic — the CSS grid templates (focus / collapse) and
+// the one-screen acceptance criterion as code. The UI reads these values
+// (single source of truth for the grid styles), and the acceptance test
+// checks the fixture portfolio fits a 1920x1080 viewport with zero
+// scrolling.
 
-import type { BoardConfig, CardState } from "./types.ts";
+import type { BoardConfig, CardState, Column, Lane } from "./types.ts";
 import { cellCards } from "./board.ts";
 
 /** Pixel constants shared between the CSS and the acceptance test. */
 export const LAYOUT = {
   /** App header bar. */
   headerHeight: 44,
-  /** Keyboard hints footer. */
+  /** Bottom margin kept free (former hints footer; now a safety margin). */
   footerHeight: 22,
   /** Column header row of the grid. */
   columnHeadHeight: 38,
-  /** One radiator bar. */
+  /** One mini card bar (the static --card-h of the design). */
   radiatorBarHeight: 16,
-  /** Vertical gap between radiator bars. */
+  /** Vertical gap between mini card bars. */
   radiatorGap: 2,
   /** Cell padding (top + bottom) plus the per-cell count strip. */
   cellOverhead: 18,
@@ -25,8 +26,47 @@ export const LAYOUT = {
 } as const;
 
 /**
- * Height in pixels one lane needs in radiator mode: its fullest cell
- * decides, since cells of a lane share the row.
+ * CSS grid-template-columns for the board: the lane-label gutter followed
+ * by one weight per column. A collapsed column is a fixed 30px strip; the
+ * focused column takes 2.6fr while the other expanded columns shrink to
+ * 0.62fr; with no focus every expanded column gets 1fr. Collapse wins
+ * over focus.
+ * Inputs: columns in board order, the focused column id (or null), the
+ * set of collapsed column ids.
+ * Output: the grid-template-columns string. Failure: none.
+ */
+export function columnTemplate(
+  columns: Column[],
+  focusedColumnId: string | null,
+  collapsedColumnIds: ReadonlySet<string>,
+): string {
+  const weights = columns.map((column) =>
+    collapsedColumnIds.has(column.id)
+      ? "30px"
+      : column.id === focusedColumnId
+        ? "2.6fr"
+        : focusedColumnId !== null
+          ? "0.62fr"
+          : "1fr",
+  );
+  return `var(--lane-w) ${weights.join(" ")}`;
+}
+
+/**
+ * CSS grid-template-rows for the board: "auto" for the column-header row,
+ * then one weight per lane — a fixed 26px strip for a collapsed lane,
+ * an equal 1fr share otherwise.
+ * Inputs: lanes in board order, the set of collapsed lane ids.
+ * Output: the grid-template-rows string. Failure: none.
+ */
+export function rowTemplate(lanes: Lane[], collapsedLaneIds: ReadonlySet<string>): string {
+  const weights = lanes.map((lane) => (collapsedLaneIds.has(lane.id) ? "26px" : "1fr"));
+  return ["auto", ...weights].join(" ");
+}
+
+/**
+ * Height in pixels one lane needs to stack its mini cards: its fullest
+ * cell decides, since cells of a lane share the row.
  * Inputs: all card states, the lane id, the board config.
  * Output: required pixel height of the lane row. Failure: none.
  */
@@ -41,9 +81,10 @@ export function laneRequiredHeight(cards: CardState[], laneId: string, config: B
 }
 
 /**
- * Total pixel height the whole board needs in radiator mode. The CSS grid
- * gives every expanded lane an EQUAL share (1fr rows), so the binding
- * constraint is laneCount x the tallest lane — not the sum of lanes.
+ * Total pixel height the whole board needs with every lane expanded. The
+ * CSS grid gives every expanded lane an EQUAL share (1fr rows), so the
+ * binding constraint is laneCount x the tallest lane — not the sum of
+ * lanes.
  * Inputs: all card states, the board config.
  * Output: required viewport height in pixels. Failure: none.
  */
@@ -58,7 +99,7 @@ export function boardRequiredHeight(cards: CardState[], config: BoardConfig): nu
 
 /**
  * The hard acceptance criterion: at the given viewport height, the whole
- * portfolio is visible in radiator mode with zero scrolling.
+ * portfolio is visible with zero scrolling.
  * Inputs: all card states, the board config, viewport height (default 1080).
  * Output: true when everything fits. Failure: none.
  */

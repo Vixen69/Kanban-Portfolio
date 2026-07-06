@@ -8,6 +8,7 @@ test("defaults are local and safe when the environment is empty", () => {
   assert.equal(cfg.port, 8787);
   assert.equal(cfg.storageDriver, "jsonl");
   assert.equal(cfg.dataPath, "data/board.jsonl");
+  assert.equal(cfg.dataDir, "data");
   assert.equal(cfg.boardConfigPath, "config/board.json");
 });
 
@@ -23,6 +24,7 @@ test("environment variables override every field", () => {
   assert.equal(cfg.port, 9000);
   assert.equal(cfg.storageDriver, "postgres");
   assert.equal(cfg.dataPath, "data/board.custom.jsonl");
+  assert.equal(cfg.dataDir, "data"); // config override lives next to the data file
   assert.equal(cfg.boardConfigPath, "/etc/kanban/board.json");
 });
 

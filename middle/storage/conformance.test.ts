@@ -6,7 +6,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { BoardStorage } from "../../core/ports.ts";
@@ -20,10 +20,20 @@ const TS = "2026-06-01T10:00:00.000Z";
 interface Driver {
   name: string;
   open(dir: string): BoardStorage;
+  /** Plants a data file in the previous (pre-v9) on-disk format. */
+  writeLegacyData(dir: string): void;
 }
 
 const DRIVERS: Driver[] = [
-  { name: "jsonl", open: (dir) => createJsonlStorage(join(dir, "board.jsonl")) },
+  {
+    name: "jsonl",
+    open: (dir) => createJsonlStorage(join(dir, "board.jsonl")),
+    writeLegacyData: (dir) =>
+      writeFileSync(
+        join(dir, "board.jsonl"),
+        '{"kind":"header","format":"kanban-board-storage","version":1}\n',
+      ),
+  },
 ];
 
 // Fresh temp dir per test; the store must be closed before cleanup or
@@ -79,7 +89,7 @@ for (const driver of DRIVERS) {
       );
       const stored = store.appendEvent(input);
       assert.deepEqual(store.listEvents(), [stored]);
-      assert.deepEqual(stored.payload, { fromLane: "laneA", toLane: "laneB" });
+      assert.deepEqual(stored.payload, { fromLaneId: "laneA", laneId: "laneB" });
     });
   });
 
@@ -126,8 +136,10 @@ for (const driver of DRIVERS) {
         id: "S100",
         tags: ["erp", "priorite"],
         dependencies: ["S101"],
-        budget: 1500.5,
-        consumed: 200,
+        effortEstimated: 120,
+        effortConsumed: 45.5,
+        budgetEstimated: 1500.5,
+        budgetConsumed: 200,
         blocked: true,
         blockedReason: "attente budget",
         blockedSince: TS,
@@ -170,6 +182,62 @@ for (const driver of DRIVERS) {
     });
   });
 
+  test(`[${driver.name}] insertCard stores one new base card`, () => {
+    withStore(driver, (store) => {
+      const card = testCard({ id: "S151", title: "Sujet saisi", source: "manual" });
+      store.insertCard(card);
+      assert.deepEqual(store.listBaseCards(), [card]);
+    });
+  });
+
+  test(`[${driver.name}] insertCard refuses a duplicate id, in French`, () => {
+    withStore(driver, (store) => {
+      store.insertCard(testCard({ id: "S151", title: "Original" }));
+      assert.throws(
+        () => store.insertCard(testCard({ id: "S151", title: "Doublon" })),
+        /existe déjà/,
+      );
+      // The refused insert must not have overwritten nor duplicated anything.
+      const cards = store.listBaseCards();
+      assert.equal(cards.length, 1);
+      assert.equal(cards[0]?.title, "Original");
+    });
+  });
+
+  test(`[${driver.name}] insertCard refuses an id already taken by an import`, () => {
+    withStore(driver, (store) => {
+      store.importCards([testCard({ id: "S100" })], []);
+      assert.throws(() => store.insertCard(testCard({ id: "S100" })), /existe déjà/);
+    });
+  });
+
+  test(`[${driver.name}] an inserted card survives close and reopen`, () => {
+    withTempDir((dir) => {
+      const card = testCard({ id: "S151", title: "Sujet saisi", source: "manual" });
+      const store = driver.open(dir);
+      try {
+        store.insertCard(card);
+      } finally {
+        store.close();
+      }
+      const reopened = driver.open(dir);
+      try {
+        assert.deepEqual(reopened.listBaseCards(), [card]);
+        // The duplicate guard also holds against the reloaded snapshot.
+        assert.throws(() => reopened.insertCard(testCard({ id: "S151" })), /existe déjà/);
+      } finally {
+        reopened.close();
+      }
+    });
+  });
+
+  test(`[${driver.name}] a pre-v9 data file is refused on open, telling to reseed`, () => {
+    withTempDir((dir) => {
+      driver.writeLegacyData(dir);
+      assert.throws(() => driver.open(dir), /supprimez le fichier de données.*seed/is);
+    });
+  });
+
   test(`[${driver.name}] folds identically to the in-memory store`, () => {
     withStore(driver, (store) => {
       const base = [testCard({ id: "S001" }), testCard({ id: "S002", columnId: "col2" })];
@@ -203,6 +271,7 @@ for (const driver of DRIVERS) {
       store.close();
       store.close();
       assert.throws(() => store.appendEvent(lifecycleEvent("created", "S001", "local", TS)));
+      assert.throws(() => store.insertCard(testCard()));
       assert.throws(() => store.listEvents());
     });
   });

@@ -9,10 +9,11 @@ import type { CardEventInput } from "./events.ts";
 
 /**
  * A subject as delivered by a portfolio data source, before the event log
- * takes over. Identical to Card minus the financials, which are fetched
- * separately through getFinancials (PPM tools expose them separately).
+ * takes over. Identical to Card minus the financial fields (budget estimé /
+ * consommé, k€), which are fetched separately through getFinancials — PPM
+ * tools expose them separately. core/state.ts toCard() joins the two.
  */
-export type Subject = Omit<Card, "budget" | "consumed" | "remaining">;
+export type Subject = Omit<Card, "budgetEstimated" | "budgetConsumed">;
 
 /**
  * Read-only access to a portfolio source. Implementations must never write
@@ -41,6 +42,14 @@ export interface BoardStorage {
    * Failure: throws on storage errors; the whole batch is rolled back.
    */
   importCards(cards: Card[], events: CardEventInput[]): void;
+  /**
+   * Inserts one new base card — the UI intake path (POST /api/cards).
+   * Input: the complete Card to persist (the caller builds it, id included).
+   * Output: none; the card becomes visible through listBaseCards.
+   * Failure: throws when a card with the same id already exists (never
+   * overwrites — id allocation is the caller's job), or on storage errors.
+   */
+  insertCard(card: Card): void;
   /**
    * Appends one event and returns the stored copy with its assigned id.
    * Failure: throws on storage errors (store closed, I/O); never partial.

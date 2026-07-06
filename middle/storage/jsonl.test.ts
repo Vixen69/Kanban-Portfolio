@@ -31,7 +31,7 @@ test("a new file starts with a versioned header line", () => {
     assert.deepEqual(JSON.parse(lines[0] ?? ""), {
       kind: "header",
       format: "kanban-board-storage",
-      version: 1,
+      version: 2,
     });
     assert.equal(JSON.parse(lines[1] ?? "").event.id, "evt-1");
     assert.equal(lines.length, 2); // human-readable: one record per line
@@ -71,14 +71,30 @@ test("an incomplete trailing line is truncated and recovered on open", () => {
 test("a foreign or missing header is refused", () => {
   withFile((path) => {
     writeFileSync(path, '{"kind":"event","seq":1,"event":{"id":"evt-1"}}\n');
-    assert.throws(() => createJsonlStorage(path), /en-tete de format/);
+    assert.throws(() => createJsonlStorage(path), /en-tête de format/);
   });
 });
 
-test("an unsupported format version is refused", () => {
+test("an unsupported format version is refused, naming both versions", () => {
   withFile((path) => {
     writeFileSync(path, '{"kind":"header","format":"kanban-board-storage","version":999}\n');
-    assert.throws(() => createJsonlStorage(path), /non supporte/);
+    assert.throws(() => createJsonlStorage(path), /version de données 999.*version attendue : 2/s);
+  });
+});
+
+test("a pre-v9 file (version 1) is refused with the delete-and-reseed remedy", () => {
+  withFile((path) => {
+    writeFileSync(
+      path,
+      '{"kind":"header","format":"kanban-board-storage","version":1}\n' +
+        '{"kind":"event","seq":1,"event":{"id":"evt-1","ts":"' +
+        TS +
+        '","actor":"local","cardId":"S001","type":"created","fromColumn":null,"toColumn":null,"payload":{}}}\n',
+    );
+    assert.throws(
+      () => createJsonlStorage(path),
+      /supprimez le fichier de données puis relancez l’initialisation \(npm run seed\)/,
+    );
   });
 });
 
@@ -125,7 +141,7 @@ test("seq is recovered from the event id when the seq field is absent", () => {
   withFile((path) => {
     writeFileSync(
       path,
-      '{"kind":"header","format":"kanban-board-storage","version":1}\n' +
+      '{"kind":"header","format":"kanban-board-storage","version":2}\n' +
         '{"kind":"event","event":{"id":"evt-7","ts":"' +
         TS +
         '","actor":"local","cardId":"S001","type":"created","fromColumn":null,"toColumn":null,"payload":{}}}\n',
@@ -144,6 +160,19 @@ test("a single garbage line with no header is refused, not silently wiped", () =
   withFile((path) => {
     writeFileSync(path, "ceci n'est pas du json");
     assert.throws(() => createJsonlStorage(path), /corrompu/);
+  });
+});
+
+test("insertCard appends exactly one human-readable card line", () => {
+  withFile((path) => {
+    const store = createJsonlStorage(path);
+    store.insertCard(testCard({ id: "S151", source: "manual" }));
+    store.close();
+    const lines = readFileSync(path, "utf8").trimEnd().split("\n");
+    assert.equal(lines.length, 2); // header + one card record
+    const record = JSON.parse(lines[1] ?? "") as { kind: string; card: { id: string } };
+    assert.equal(record.kind, "card");
+    assert.equal(record.card.id, "S151");
   });
 });
 

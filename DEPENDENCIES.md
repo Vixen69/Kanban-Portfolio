@@ -41,7 +41,6 @@ plateforme) exige l'accord du référent technique, une ligne ici **et** un ADR.
 |---|---|---|
 | react, react-dom 18 | Front | Couche de vue (CLAUDE.md §3). Composants fonctionnels uniquement. |
 | vite + @vitejs/plugin-react | Build front | Build conteneurisé. |
-| react-router-dom | Front | Navigation. |
 | express | Middle | Serveur HTTP du middle ; `cors`/`cookie-parser` du SBOM sont des middlewares Express. La logique d'API existante (validation, fold, construction d'évènements) s'y branche sans changement. |
 | cookie-parser, cors | Middle | Cookie de session JWT (httpOnly) ; CORS configuré same-origin (refus du cross-origin). |
 | jsonwebtoken | Middle | Jeton de session JWT (RP3). |
@@ -49,10 +48,19 @@ plateforme) exige l'accord du référent technique, une ligne ici **et** un ADR.
 | typescript, eslint (+ plugins) | Dev | TypeScript strict ; ESLint = style maison du client (CLAUDE.md §8). |
 | nodemon / tsx / ts-node | Dev | Exécution/relance du middle en TypeScript. |
 
-Tailwind, Radix, lucide, axios, react-secure-storage, sonner, etc. **sont
-autorisés mais pas encore employés** : le CSS reste écrit à la main pour
-l'instant, adapté au design system plus tard (CLAUDE.md §5). axios reste
+Tailwind, Radix, lucide, axios, react-secure-storage, sonner,
+react-router-dom, etc. **sont autorisés mais pas encore employés** : le CSS
+reste écrit à la main pour l'instant, adapté au design system plus tard
+(CLAUDE.md §5) ; l'application est mono-vue (pas de routeur) ; axios reste
 optionnel (le wrapper `fetch` existant suffit).
+
+## Ressources embarquées (non-npm)
+
+- **Polices DM Sans (variable 400–700) et DM Serif Display (400)** —
+  fichiers `.woff2` (latin + latin-ext) embarqués dans
+  `front/public/fonts/` et déclarés en `@font-face`. Licence SIL OFL
+  (redistribution permise). Auto-hébergées pour respecter le zéro-egress :
+  aucune police distante, aucun appel à Google Fonts à l'exécution.
 
 ## Hors plafond — à faire autoriser
 

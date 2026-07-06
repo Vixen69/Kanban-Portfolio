@@ -1,14 +1,19 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cellCards, cellSummary, neighbourCell, portfolioStats, wipStatus } from "./board.ts";
+import { cellCards, cellSummary, portfolioStats, wipDisplay, wipState } from "./board.ts";
+import type { WipState } from "./board.ts";
 import { testCard, testConfig } from "./test-helpers.ts";
 import type { CardState } from "./types.ts";
 
 const NOW = new Date("2026-06-11T12:00:00.000Z");
-const CONFIG = testConfig();
+const CONFIG = testConfig(); // age.agingMaxDays = 60
 
 function state(overrides: Parameters<typeof testCard>[0] = {}, daysHere = 1): CardState {
-  return { ...testCard(overrides), enteredColumnAt: new Date(NOW.getTime() - daysHere * 86_400_000).toISOString() };
+  return {
+    ...testCard(overrides),
+    enteredColumnAt: new Date(NOW.getTime() - daysHere * 86_400_000).toISOString(),
+    comments: [],
+  };
 }
 
 test("cellCards filters by lane and column, keeps order", () => {
@@ -21,51 +26,53 @@ test("cellCards filters by lane and column, keeps order", () => {
   assert.deepEqual(cellCards(cards, "laneA", "col2"), []);
 });
 
-test("wipStatus without limit reads 'non defini' and never warns", () => {
-  const cards = [state({ columnId: "col1" }), state({ id: "S002", columnId: "col1" })];
-  const status = wipStatus(cards, "col1", null);
-  assert.equal(status.display, "2 / non defini");
-  assert.equal(status.exceeded, false);
+test("wipState: na without limit, warn from 0.8, over strictly above 1 (table)", () => {
+  const cases: [number, number | null, WipState][] = [
+    [0, null, "na"],
+    [12, null, "na"],
+    [0, 6, "ok"],
+    [79, 100, "ok"], // ratio 0.79
+    [80, 100, "warn"], // ratio 0.80
+    [100, 100, "warn"], // ratio 1.00 — full but not over
+    [101, 100, "over"], // ratio 1.01
+    [5, 6, "warn"], // ratio ~0.83
+    [7, 6, "over"],
+  ];
+  for (const [count, wip, expected] of cases) {
+    assert.equal(wipState(count, wip), expected, `${count}/${wip ?? "∅"}`);
+  }
 });
 
-test("wipStatus with a limit shows count/limit and warns only above it", () => {
-  const cards = (n: number) => Array.from({ length: n }, (_, i) => state({ id: `S${i}`, columnId: "col2" }));
-  assert.equal(wipStatus(cards(3), "col2", 3).display, "3/3");
-  assert.equal(wipStatus(cards(3), "col2", 3).exceeded, false);
-  assert.equal(wipStatus(cards(4), "col2", 3).exceeded, true);
+test("wipDisplay: 'n/limit' with a limit, plain 'n' without", () => {
+  assert.equal(wipDisplay(3, 6), "3/6");
+  assert.equal(wipDisplay(7, 6), "7/6");
+  assert.equal(wipDisplay(4, null), "4");
+  assert.equal(wipDisplay(0, null), "0");
 });
 
-test("cellSummary counts total, blocked and stale", () => {
+test("cellSummary counts total, blocked and stale over a mixed cell", () => {
   const cards = [
-    state({ id: "S001" }, 2),
-    state({ id: "S002", blocked: true, blockedSince: NOW.toISOString() }, 3),
-    state({ id: "S003" }, 120),
+    state({ id: "S001" }, 2), // fresh, unblocked
+    state({ id: "S002", blocked: true, blockedSince: NOW.toISOString() }, 3), // blocked only
+    state({ id: "S003" }, 120), // stale only (> 60d)
+    state({ id: "S004", blocked: true, blockedSince: NOW.toISOString() }, 200), // blocked AND stale
+    state({ id: "S005", laneId: "laneB" }, 300), // other cell — ignored
   ];
   const summary = cellSummary(cards, "laneA", "col1", CONFIG, NOW);
-  assert.equal(summary.count, 3);
-  assert.equal(summary.blockedCount, 1);
-  assert.equal(summary.staleCount, 1);
+  assert.equal(summary.count, 4);
+  assert.equal(summary.blockedCount, 2);
+  assert.equal(summary.staleCount, 2);
+});
+
+test("cellSummary of an empty cell is all zeroes", () => {
+  assert.deepEqual(cellSummary([], "laneA", "col1", CONFIG, NOW), {
+    count: 0,
+    blockedCount: 0,
+    staleCount: 0,
+  });
 });
 
 test("portfolioStats counts total and blocked", () => {
   const cards = [state(), state({ id: "S002", blocked: true })];
   assert.deepEqual(portfolioStats(cards), { total: 2, blocked: 1 });
-});
-
-test("neighbourCell navigates the grid and stops at the edges (table)", () => {
-  const cases: [string, string, "left" | "right" | "up" | "down", { laneId: string; columnId: string } | null][] = [
-    ["laneA", "col1", "right", { laneId: "laneA", columnId: "col2" }],
-    ["laneA", "col2", "left", { laneId: "laneA", columnId: "col1" }],
-    ["laneA", "col1", "down", { laneId: "laneB", columnId: "col1" }],
-    ["laneB", "col1", "up", { laneId: "laneA", columnId: "col1" }],
-    ["laneA", "col1", "left", null],
-    ["laneA", "col1", "up", null],
-    ["laneB", "col3", "right", null],
-    ["laneB", "col3", "down", null],
-  ];
-  for (const [laneId, columnId, direction, expected] of cases) {
-    assert.deepEqual(neighbourCell(CONFIG, laneId, columnId, direction), expected, `${laneId}/${columnId} ${direction}`);
-  }
-  assert.equal(neighbourCell(CONFIG, "ghost", "col1", "right"), null);
-  assert.equal(neighbourCell(CONFIG, "laneA", "ghost", "right"), null);
 });

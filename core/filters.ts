@@ -1,152 +1,145 @@
-// Sidebar filters (Sprint 2): search, domain, type, nature, criticality,
-// owner, blocked, age — plus the counts the sidebar displays. Filters DIM
-// cards, they never remove them: the spatial structure of the board is
-// always the truth. Pure logic, rendered by front/components/Sidebar*.tsx.
+// Sidebar filters (design v9): search plus four pill groups — project
+// type, nature, criticality, domain. Filters DIM cards, they never remove
+// them: the spatial structure of the board is always the truth. Pure
+// logic, rendered by front/components/Sidebar.tsx.
 
-import type { BoardConfig, CardState, Criticality } from "./types.ts";
-import { daysInColumn, isStale } from "./aging.ts";
+import type { BoardConfig, Card, CardState, Criticality, NatureKey } from "./types.ts";
+import { isStale } from "./aging.ts";
 
-/** The togglable filter groups (domain/type/nature/criticality pills). */
-export type FilterGroup = "domains" | "types" | "natures" | "crits";
+/** The togglable pill groups of FilterState (everything except search). */
+export type FilterGroup = "type" | "nature" | "crit" | "domain";
 
-/** The filter state driven by the sidebar. A card failing any criterion
- *  is dimmed. Group maps record key -> enabled; absent keys mean enabled. */
+/**
+ * The filter state driven by the sidebar. Group maps record key ->
+ * enabled; a key missing from a map counts as enabled (the design's
+ * `!== false` convention, tolerant to config edits).
+ */
 export interface FilterState {
-  /** Matches title or codename, case-insensitive. Empty = no search. */
+  /** Matches title or codename, trimmed, case-insensitive. Empty = all. */
   search: string;
-  domains: Record<string, boolean>;
-  types: Record<string, boolean>;
-  natures: Record<string, boolean>;
-  crits: Record<string, boolean>;
-  /** Exactly one owner, or null for all owners. */
-  owner: string | null;
-  /** True = only blocked cards stay lit. */
-  blockedOnly: boolean;
-  /** Minimum days in column, or null for any age. */
-  minAgeDays: number | null;
+  type: Record<string, boolean>;
+  nature: Record<NatureKey, boolean>;
+  crit: Record<Criticality, boolean>;
+  domain: Record<string, boolean>;
 }
 
-/** Counts for one sidebar stat row: lit cards vs the whole portfolio. */
-export interface GroupCounts {
+/**
+ * The live read-out of the sidebar and header: how many cards are shown
+ * (non-dimmed) and how the shown subset splits by state, criticality and
+ * nature. `total` is always the whole portfolio.
+ */
+export interface ViewCounts {
   shown: number;
   total: number;
-}
-
-/** The headline counts of the sidebar read-out. */
-export interface ViewCounts extends GroupCounts {
-  blocked: GroupCounts;
-  stale: GroupCounts;
-  crits: Record<Criticality, GroupCounts>;
-}
-
-/**
- * Distinct lane natures, in lane order (drives the Nature filter; empty
- * when no lane declares a nature).
- * Input: the board config. Output: distinct nature strings. Failure: none.
- */
-export function laneNatures(config: BoardConfig): string[] {
-  const natures: string[] = [];
-  for (const lane of config.lanes) {
-    if (lane.nature && !natures.includes(lane.nature)) natures.push(lane.nature);
-  }
-  return natures;
+  blocked: number;
+  stale: number;
+  top: number;
+  major: number;
+  normal: number;
+  simple: number;
+  complicated: number;
+  complex: number;
 }
 
 /**
- * The neutral filter state: everything enabled, nothing dimmed.
- * Input: the board config (domain/type/nature lists).
- * Output: a fresh FilterState. Failure: none.
+ * The neutral filter state: empty search, every key of every group true.
+ * Input: the board config (type/domain id lists).
+ * Output: a fresh FilterState (safe to mutate). Failure: none.
  */
 export function defaultFilters(config: BoardConfig): FilterState {
-  const on = (keys: string[]) => Object.fromEntries(keys.map((key) => [key, true]));
+  const on = (keys: string[]): Record<string, boolean> =>
+    Object.fromEntries(keys.map((key) => [key, true]));
   return {
     search: "",
-    domains: on(config.domains),
-    types: on(config.types.map((type) => type.id)),
-    natures: on(laneNatures(config)),
-    crits: on(["top", "major", "normal"]),
-    owner: null,
-    blockedOnly: false,
-    minAgeDays: null,
+    type: on(config.types.map((type) => type.id)),
+    nature: { simple: true, complicated: true, complex: true },
+    crit: { top: true, major: true, normal: true },
+    domain: on(config.domains.map((domain) => domain.id)),
   };
 }
 
 /**
- * True when the state differs from the neutral state (drives the
- * "Filtré : x/y" chip and the reset button).
- * Input: a FilterState. Output: boolean. Failure: none.
+ * True when the board is currently narrowed: a non-blank search or any
+ * group key toggled off (drives the "Filtré : x/y" chip and the reset
+ * buttons). Input: a FilterState. Output: boolean. Failure: none.
  */
 export function isFilterActive(filters: FilterState): boolean {
-  const groupOff = (group: Record<string, boolean>) => Object.values(group).some((enabled) => !enabled);
+  const groupOff = (group: Record<string, boolean>) =>
+    Object.values(group).some((enabled) => enabled === false);
   return (
     filters.search.trim() !== "" ||
-    groupOff(filters.domains) ||
-    groupOff(filters.types) ||
-    groupOff(filters.natures) ||
-    groupOff(filters.crits) ||
-    filters.owner !== null ||
-    filters.blockedOnly ||
-    filters.minAgeDays !== null
+    groupOff(filters.type) ||
+    groupOff(filters.nature) ||
+    groupOff(filters.crit) ||
+    groupOff(filters.domain)
   );
 }
 
-function matchesSearch(card: CardState, search: string): boolean {
-  const query = search.trim().toLowerCase();
-  if (query === "") return true;
-  if (card.title.toLowerCase().includes(query)) return true;
-  return (card.codename ?? "").toLowerCase().includes(query);
-}
-
 /**
- * Whether one card passes the filters (stays lit). Criteria combine with
- * AND; untyped cards and lanes without a nature pass those criteria.
- * Inputs: a CardState, the filters, the board config (lane natures), now.
- * Output: true when the card passes every criterion. Failure: none —
- * keys missing from a group map count as enabled.
+ * Whether one card stays lit: the search matches its title OR codename
+ * (trimmed, case-insensitive) AND every group passes. A group passes when
+ * the card's key is missing from the map or mapped to true; a null typeId
+ * always passes the type group.
+ * Inputs: a Card (CardState included), the filters.
+ * Output: true when the card passes everything. Failure: none.
  */
-export function passesFilters(
-  card: CardState,
-  filters: FilterState,
-  config: BoardConfig,
-  now: Date,
-): boolean {
-  if (!matchesSearch(card, filters.search)) return false;
-  if (filters.domains[card.domain] === false) return false;
-  if (card.typeId !== null && filters.types[card.typeId] === false) return false;
-  if (filters.crits[card.criticality] === false) return false;
-  const nature = config.lanes.find((lane) => lane.id === card.laneId)?.nature;
-  if (nature && filters.natures[nature] === false) return false;
-  if (filters.owner !== null && card.owner !== filters.owner) return false;
-  if (filters.blockedOnly && !card.blocked) return false;
-  if (filters.minAgeDays !== null && daysInColumn(card, now) < filters.minAgeDays) return false;
+export function cardMatches(card: Card, filters: FilterState): boolean {
+  const query = filters.search.trim().toLowerCase();
+  const matchesSearch =
+    query === "" ||
+    card.title.toLowerCase().includes(query) ||
+    (card.codename ?? "").toLowerCase().includes(query);
+  if (!matchesSearch) return false;
+  if (filters.nature[card.nature] === false) return false;
+  if (filters.crit[card.criticality] === false) return false;
+  if (filters.domain[card.domain] === false) return false;
+  if (card.typeId !== null && filters.type[card.typeId] === false) return false;
   return true;
 }
 
 /**
- * Ids of the cards the filters dim (the complement of passesFilters).
- * Inputs: all card states, the filters, the board config, now.
+ * Ids of the cards the filters dim (the complement of cardMatches).
+ * Inputs: all card states, the filters.
  * Output: a Set of card ids to render dimmed (empty when neutral).
  * Failure: none.
  */
-export function dimmedCardIds(
-  cards: CardState[],
-  filters: FilterState,
-  config: BoardConfig,
-  now: Date,
-): Set<string> {
+export function dimmedCardIds(cards: CardState[], filters: FilterState): Set<string> {
   const dimmed = new Set<string>();
-  if (!isFilterActive(filters)) return dimmed;
   for (const card of cards) {
-    if (!passesFilters(card, filters, config, now)) dimmed.add(card.id);
+    if (!cardMatches(card, filters)) dimmed.add(card.id);
   }
   return dimmed;
 }
 
+function emptyCounts(total: number): ViewCounts {
+  return {
+    shown: 0,
+    total,
+    blocked: 0,
+    stale: 0,
+    top: 0,
+    major: 0,
+    normal: 0,
+    simple: 0,
+    complicated: 0,
+    complex: 0,
+  };
+}
+
+function tally(counts: ViewCounts, card: CardState, config: BoardConfig, now: Date): void {
+  counts.shown++;
+  if (card.blocked) counts.blocked++;
+  if (isStale(card, config, now)) counts.stale++;
+  counts[card.criticality]++;
+  counts[card.nature]++;
+}
+
 /**
- * The sidebar's live read-out: lit counts against portfolio totals, plus
- * per-criticality counts for the stats block.
- * Inputs: all card states, the dimmed id set, the board config, now.
- * Output: a ViewCounts. Failure: none.
+ * Counts over the VISIBLE subset: only non-dimmed cards are tallied
+ * (shown, blocked, stale, per-criticality, per-nature); total is the
+ * whole portfolio size.
+ * Inputs: all card states, the dimmed id set, the board config (stale
+ * threshold), now. Output: a ViewCounts. Failure: none.
  */
 export function viewCounts(
   cards: CardState[],
@@ -154,57 +147,23 @@ export function viewCounts(
   config: BoardConfig,
   now: Date,
 ): ViewCounts {
-  const zero = (): GroupCounts => ({ shown: 0, total: 0 });
-  const counts: ViewCounts = {
-    shown: 0,
-    total: cards.length,
-    blocked: zero(),
-    stale: zero(),
-    crits: { top: zero(), major: zero(), normal: zero() },
-  };
-  const bump = (group: GroupCounts, lit: boolean) => {
-    group.total++;
-    if (lit) group.shown++;
-  };
+  const counts = emptyCounts(cards.length);
   for (const card of cards) {
-    const lit = !dimmed.has(card.id);
-    if (lit) counts.shown++;
-    if (card.blocked) bump(counts.blocked, lit);
-    if (isStale(card, config, now)) bump(counts.stale, lit);
-    bump(counts.crits[card.criticality], lit);
+    if (!dimmed.has(card.id)) tally(counts, card, config, now);
   }
   return counts;
 }
 
 /**
- * Lit/total card counts per key for one filter dimension, in the given
- * key order (domain pills, nature stats…).
- * Inputs: all card states, the dimmed id set, the ordered keys, a
- * function mapping a card to its key (or null to skip the card).
- * Output: key -> GroupCounts. Failure: none — unknown keys are ignored.
+ * Counts over the WHOLE portfolio, ignoring filters (the sidebar's muted
+ * reference totals and the header stats). shown always equals total.
+ * Inputs: all card states, the board config, now.
+ * Output: a ViewCounts. Failure: none.
  */
-export function groupCounts(
-  cards: CardState[],
-  dimmed: ReadonlySet<string>,
-  keys: string[],
-  keyOf: (card: CardState) => string | null,
-): Record<string, GroupCounts> {
-  const counts = Object.fromEntries(keys.map((key) => [key, { shown: 0, total: 0 }]));
+export function portfolioCounts(cards: CardState[], config: BoardConfig, now: Date): ViewCounts {
+  const counts = emptyCounts(cards.length);
   for (const card of cards) {
-    const key = keyOf(card);
-    const entry = key === null ? undefined : counts[key];
-    if (!entry) continue;
-    entry.total++;
-    if (!dimmed.has(card.id)) entry.shown++;
+    tally(counts, card, config, now);
   }
   return counts;
-}
-
-/**
- * The distinct owners present in the portfolio, sorted for the owner
- * select. Input: all card states. Output: sorted owner names.
- * Failure: none.
- */
-export function listOwners(cards: CardState[]): string[] {
-  return [...new Set(cards.map((card) => card.owner))].sort((a, b) => a.localeCompare(b, "fr"));
 }

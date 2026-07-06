@@ -24,7 +24,9 @@ import type { CardEventInput } from "../../core/events.ts";
 import type { Card, CardEvent } from "../../core/types.ts";
 
 const FORMAT = "kanban-board-storage";
-const VERSION = 1;
+// Version 2 = design-v9 card model (ADR 012). Files written under version 1
+// carry the pre-v9 card shape and are refused on open: delete and reseed.
+const VERSION = 2;
 
 type CardRecord = { kind: "card"; card: Card };
 type EventRecord = { kind: "event"; seq: number; event: CardEvent };
@@ -44,15 +46,20 @@ function headerLine(): string {
 }
 
 // The header must be the first record; a missing or foreign one means the
-// file is not ours (or a future format) — refuse rather than guess.
+// file is not ours — refuse rather than guess. A recognized file with a
+// different version (pre-v9 data, or a future format) is refused with the
+// remedy: the data file is a rebuildable cache of the fixtures/PPM source,
+// so the operator deletes it and reseeds — no migration path is offered.
 function validateHeader(rec: unknown): void {
-  if (
-    !isRecord(rec) ||
-    rec["kind"] !== "header" ||
-    rec["format"] !== FORMAT ||
-    rec["version"] !== VERSION
-  ) {
-    throw new Error("Stockage JSONL : en-tete de format absent ou non supporte.");
+  if (!isRecord(rec) || rec["kind"] !== "header" || rec["format"] !== FORMAT) {
+    throw new Error("Stockage JSONL : en-tête de format absent ou non supporté.");
+  }
+  if (rec["version"] !== VERSION) {
+    throw new Error(
+      `Stockage JSONL : version de données ${String(rec["version"])} non prise en charge ` +
+        `(version attendue : ${VERSION}). Ce fichier provient d’un modèle antérieur : ` +
+        "supprimez le fichier de données puis relancez l’initialisation (npm run seed).",
+    );
   }
 }
 
@@ -176,6 +183,18 @@ function doImport(fd: number, state: State, cards: Card[], events: CardEventInpu
   state.maxSeq = seq;
 }
 
+// Appends one card snapshot — the UI intake path. Duplicate ids are refused
+// before any write: the caller allocates the id from the stored snapshot, so
+// a collision is a logic error (or a second writer) — never overwrite.
+function doInsert(fd: number, state: State, card: Card): void {
+  if (state.cards.has(card.id)) {
+    throw new Error(`Stockage JSONL : une carte avec l’identifiant « ${card.id} » existe déjà.`);
+  }
+  const built = buildCard(card);
+  appendLines(fd, [built.line]);
+  state.cards.set(built.card.id, built.card);
+}
+
 function doAppend(fd: number, state: State, input: CardEventInput): CardEvent {
   const seq = state.maxSeq + 1;
   const { line, event } = buildEvent(seq, input);
@@ -188,12 +207,16 @@ function doAppend(fd: number, state: State, input: CardEventInput): CardEvent {
 function buildStorage(fd: number, state: State): BoardStorage {
   let open = true;
   const assertOpen = (): void => {
-    if (!open) throw new Error("Stockage JSONL : operation sur un magasin ferme.");
+    if (!open) throw new Error("Stockage JSONL : opération sur un magasin fermé.");
   };
   return {
     importCards(cards, events) {
       assertOpen();
       doImport(fd, state, cards, events);
+    },
+    insertCard(card) {
+      assertOpen();
+      doInsert(fd, state, card);
     },
     appendEvent(input) {
       assertOpen();
@@ -225,9 +248,10 @@ function buildStorage(fd: number, state: State): BoardStorage {
  * Inputs: the JSONL file path (a real path — no in-memory mode).
  * Output: an open BoardStorage; a new file gets the versioned header, and an
  * incomplete trailing line from an interrupted write is truncated on open.
- * Failure: throws when the file cannot be read/opened, the header is foreign
- * or unsupported, or a non-final line is corrupt; every method throws once
- * close() has been called.
+ * Failure: throws when the file cannot be read/opened, the header is foreign,
+ * the header version is not the current one (pre-v9 file — the error tells
+ * the operator to delete the data file and reseed), or a non-final line is
+ * corrupt; every method throws once close() has been called.
  */
 export function createJsonlStorage(path: string): BoardStorage {
   const exists = existsSync(path);

@@ -16,6 +16,16 @@ information is listed under "Open decisions", ask rather than assume.
 > opinion (§1), the hexagonal architecture and the event-sourced model (§4)
 > carry over intact; the runtime edges are re-platformed.
 
+> **2026-07-05 — Design v9 is the product reference.** The validated Claude
+> Design mockup (`design/`, « Portefeuille DSI — Kanban NMO ») supersedes the
+> earlier UI spec on three points, per the author's instruction (ADR 012/013):
+> the card model is complete (nature, charge j.h + budget k€, plan de charge,
+> ressources, commentaires, notes, champs personnalisés, création locale,
+> suppression par événement `deleted`); age is carried by the text pill (no
+> background darkening by default); and an **admin-only topology
+> configuration panel** exists (runtime override + append-only history;
+> `config/board.json` stays the versioned default model).
+
 ## 1. What this project is
 
 An opinionated portfolio kanban instrument: a single-page board that makes a
@@ -26,16 +36,20 @@ later) through an adapter layer.
 
 It is an instrument, not a platform. The product's value IS its opinion:
 
-- Pull flow. Work is pulled forward, never pushed.
-- Time is visible. Cards darken progressively as they age in a column.
-- Blockages scream. Blocked cards pulse; long blockages get an escalation marker.
+- Pull flow. Work is pulled forward, never pushed. All intake enters left.
+- Time is visible. Every card wears its age (text pill, warn/danger colors;
+  background decay kept in core as an option — off in the validated design).
+- Blockages scream. Blocked cards pulse; cells show a blocked count badge.
 - One screen, zero scroll. The whole portfolio is visible at once, always.
-- The event log is the truth. Every movement is recorded append-only.
+- The event log is the truth. Every movement, edit, comment and deletion is
+  recorded append-only (deletion is itself an event).
 
 These behaviors are hard-coded and non-negotiable. What IS configurable is
-topology only: lane names, column names, their count and order, domain list,
-threshold values. Topology lives in a versioned config file. There is no
-settings UI.
+topology/vocabulary only: lanes, columns (order, WIP, gates), domains, types,
+nature/criticality labels, custom card fields, threshold values. Defaults live
+in a versioned config file; an **admin-only configuration panel** may apply a
+runtime override, persisted with an append-only history (ADR 013). Behavior is
+never configurable.
 
 ## 2. Constraints
 
@@ -101,10 +115,10 @@ PortfolioDataSource           (read-only PPM access — adapters/)
   getFinancials(subjectId): { budget, consumed, remaining } | null
 
 BoardStorage                  (persistence — Postgres adapter behind it)
-  importCards / appendEvent / listEvents / listBaseCards / close
+  importCards / insertCard / appendEvent / listEvents / listBaseCards / close
 ```
 
-`PortfolioDataSource` adapters, in order: `fixtures` (synthetic, ~80-120
+`PortfolioDataSource` adapters, in order: `fixtures` (synthetic, 150
 cards — the ONLY adapter on the author's machine), `csv-import` (manual PPM
 export, first real-data path, client side only), `sciforma` (REST, read-only,
 least-privilege; stub until the security dossier is approved), `planisware`
@@ -120,16 +134,22 @@ Data model (**PostgreSQL** tables; same shape as before, jsonb for json
 fields, append-only enforced by table grants/triggers):
 
 - `cards` : id, title, domain, lane_id, column_id, owner, criticality
-  (top/major/normal), type_id, codename, tags (jsonb), dependencies (jsonb),
-  blocked, blocked_reason, blocked_since, budget, consumed, remaining,
-  created_at, source (fixtures/csv/sciforma). lane_id/column_id/blocked/
-  blocked_reason/blocked_since hold the import-time snapshot only; live values
-  are derived by folding `card_events` on read, never written back
-  (ADR 002). criticality/type_id/codename added by ADR 006.
+  (top/major/normal), type_id, codename, nature (simple/complicated/complex),
+  tags (jsonb), dependencies (jsonb), blocked, blocked_reason, blocked_since,
+  effort_estimated, effort_consumed (j.h), budget_estimated, budget_consumed
+  (k€), load_plan, resources (jsonb), notes, sciforma_id, custom (jsonb),
+  created_at, source (fixtures/csv/sciforma/manual). lane_id/column_id/
+  blocked/blocked_reason/blocked_since hold the import-time snapshot only;
+  live values are derived by folding `card_events` on read, never written
+  back (ADR 002). criticality/type_id/codename added by ADR 006; the full
+  design-v9 card (nature, charge, budget, plan de charge, ressources, notes,
+  sciforma_id, custom, source manual) by ADR 012.
 - `card_events` : append-only. seq (bigint sequence, ordering), id
   (evt-<seq>), ts, actor, card_id, type
-  (created/moved/blocked/unblocked/edited/imported), from_column, to_column,
-  payload (jsonb). Never updated, never deleted.
+  (created/moved/blocked/unblocked/edited/commented/deleted/imported),
+  from_column, to_column, payload (jsonb). Never updated, never deleted.
+  Comments are a projection of `commented` events; deletion is a `deleted`
+  event (the fold excludes the card, the log keeps everything — ADR 012).
 - `users`: id, login, scrypt_hash, role (viewer/editor/admin), created_at,
   disabled.
 
@@ -141,11 +161,15 @@ to the platform the middle is a standard Express+Postgres service doing
 INSERT/SELECT. Courtesy heads-up to the tech lead: the schema is append-only
 (no UPDATE/DELETE), in case their DB tooling assumes mutable rows.
 
-Config (`config/board.json`, versioned in git): unchanged — lanes, columns
-(with `wipLimit`), domains, `agingStepsDays`, `andonThresholdDays`.
-`wipLimit: null` renders "non defini" and enforces nothing; a set WIP shows
-count/limit and reddens the header when exceeded (warns, never hard-blocks).
-Diacritics in display names come from the config as-is.
+Config (`config/board.json`, versioned in git — the NMO default model):
+lanes (name, nature, detail), columns (name, `wip`, `gate` DoR/DoD, note),
+domains and types (name, short, color), nature/criticality labels, custom
+field definitions, `age` thresholds (fresh/recent/aging/stale), and
+`andonThresholdDays`. `wip: null` shows the bare count and enforces nothing;
+a set WIP shows count/limit, warns at ≥ 80 %, reddens beyond 100 % (warns,
+never hard-blocks). An admin-panel override is persisted server-side with an
+append-only history; « Réinitialiser le modèle » returns to board.json
+(ADR 013). Diacritics in display names come from the config as-is.
 
 ## 5. UI specification (carries over)
 
@@ -153,21 +177,30 @@ Aesthetic: industrial control panel. Dense, sober, professional. No
 decoration, no gradients-for-style, no animation except the blocked pulse.
 (Implemented in hand-written CSS now; adapted to Tailwind/Radix later.)
 
-- Grid: lanes as horizontal swimlanes, columns as vertical stages.
-- Aging: card background darkens through `agingStepsDays` based on time in
-  current column (derived from events).
-- Blocked: red pulsing border, reason on hover/focus; past `andonThresholdDays`
-  add a static escalation marker.
-- Three keyboard-switchable view modes: normal (full cards), radiator
-  (compressed bars, 100+ items on one screen), focus (one cell expanded).
-- Swimlane collapse to a summary row.
-- Hard acceptance criterion: at 1920x1080 with 100+ cards, the full board is
-  visible with zero scrolling in radiator mode; normal mode never produces
-  horizontal scroll.
-- Sidebar: filters by domain, owner, blocked, age; counts.
+- Grid: lanes as horizontal swimlanes (canaux), columns as vertical stages;
+  gate badges (DoR/DoD) on their columns.
+- Aging (design v9): age is worn as a text pill (3j/2s/4m; warn ≥ recent,
+  danger ≥ aging thresholds). No background darkening by default.
+- Blocked: pulsing red dot + blocked card wash, reason on the card in focus
+  and in the detail; per-cell blocked count badge.
+- Radiator bars (~16px) are THE default view; clicking a column (or a card
+  in a non-focused column) focuses that stage (2.6fr, expanded cards);
+  second click on a card opens the detail. Lanes collapse to summary rows;
+  columns collapse to 30px strips (Pause starts collapsed).
+- Hard acceptance criterion: at 1920x1080 with 150 cards, the full board is
+  visible with zero scrolling; never any horizontal scroll.
+- Sidebar: search (title + codename), codes-projet toggle, filters by type /
+  nature / criticality / domain with tout·rien; live shown/total counts.
+  Filters dim, never remove (spatial truth).
 - All UI strings in French, exactly as written in config.
 - Card movement: drag and drop plus keyboard fallback. Every move POSTs an
   intent; the middle writes the event with server-assigned actor/ts.
+- Card detail: charge j.h + budget k€ bars, plan de charge, ressources,
+  commentaires (event-backed), historique (event-backed), DoR/DoD doc links,
+  signaler/lever un blocage, full edit, delete (as `deleted` event).
+- QuickAdd (« + Sujet », touche N): always enters the first column.
+- Admin panel (⚙): topology/vocabulary only (ADR 013). Metrics view (☷):
+  flow metrics computed from cards + events (core/metrics).
 
 ## 6. Security posture (shapes every choice)
 

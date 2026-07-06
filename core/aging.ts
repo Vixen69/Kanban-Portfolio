@@ -1,9 +1,17 @@
-// Time is visible: aging steps, age labels and the andon escalation rule.
-// All thresholds come from the board config — nothing hard-coded here.
+// Time is visible: age categories, decay overlay, age labels and the andon
+// escalation rule. All thresholds come from BoardConfig.age / the board
+// config — nothing hard-coded here (design v9: AGE fresh/recent/aging/stale).
 
-import type { BoardConfig, CardState } from "./types.ts";
+import type { AgeCategory, AgeThresholds, BoardConfig, CardState } from "./types.ts";
 
 const DAY_MS = 86_400_000;
+
+// Decay curve constants (design formula, generalized to config thresholds).
+const AGING_ALPHA_START = 0.12;
+const AGING_ALPHA_END = 0.3;
+const STALE_ALPHA_MAX = 0.45;
+/** The stale ramp spans 1.5 x agingMaxDays (design: 90 days for a 60-day threshold). */
+const STALE_RAMP_FACTOR = 1.5;
 
 /**
  * Whole days elapsed between two ISO timestamps, clamped to >= 0.
@@ -18,7 +26,7 @@ export function daysSince(startIso: string, now: Date): number {
 }
 
 /**
- * Days a card has sat in its current column (drives the darkening).
+ * Days a card has sat in its current column (drives all age signals).
  * Inputs: a CardState (enteredColumnAt derived from events) and now.
  * Output: integer day count >= 0.
  * Failure: none (delegates to daysSince).
@@ -28,22 +36,45 @@ export function daysInColumn(card: CardState, now: Date): number {
 }
 
 /**
- * Aging step for a day count: 0 = fresh, then one step per crossed
- * threshold of agingStepsDays (e.g. [7,21,45,90] yields steps 0..4).
- * Inputs: day count, the board config.
- * Output: integer step in [0, agingStepsDays.length].
- * Failure: none.
+ * Age bucket for a day count against the config thresholds:
+ * <= freshMaxDays "fresh", <= recentMaxDays "recent", <= agingMaxDays
+ * "aging", beyond "stale".
+ * Inputs: day count, the age thresholds (BoardConfig.age).
+ * Output: one of the four AgeCategory values.
+ * Failure: none (assumes validated, strictly ascending thresholds).
  */
-export function agingStep(days: number, config: BoardConfig): number {
-  let step = 0;
-  for (const threshold of config.agingStepsDays) {
-    if (days >= threshold) step++;
-  }
-  return step;
+export function ageCategory(days: number, age: AgeThresholds): AgeCategory {
+  if (days <= age.freshMaxDays) return "fresh";
+  if (days <= age.recentMaxDays) return "recent";
+  if (days <= age.agingMaxDays) return "aging";
+  return "stale";
 }
 
 /**
- * Compact French age label: "3j" under 14 days, "2s" under 60, else "4m".
+ * Black-overlay alpha for stagnation. Deliberately 0 through fresh/recent
+ * (the age text carries the fine grain); then 0.12 -> 0.30 across the aging
+ * band, and 0.30 -> 0.45 over a stale ramp of 1.5 x agingMaxDays, capped.
+ * Inputs: day count, the age thresholds (BoardConfig.age).
+ * Output: alpha in [0, 0.45].
+ * Failure: degenerate (non-ascending) thresholds fall back to the band's
+ * end value instead of dividing by zero.
+ */
+export function decayAlpha(days: number, age: AgeThresholds): number {
+  if (days <= age.recentMaxDays) return 0;
+  if (days <= age.agingMaxDays) {
+    const band = age.agingMaxDays - age.recentMaxDays;
+    if (band <= 0) return AGING_ALPHA_END;
+    return AGING_ALPHA_START + ((days - age.recentMaxDays) / band) * (AGING_ALPHA_END - AGING_ALPHA_START);
+  }
+  const ramp = age.agingMaxDays * STALE_RAMP_FACTOR;
+  if (ramp <= 0) return STALE_ALPHA_MAX;
+  const alpha = AGING_ALPHA_END + ((days - age.agingMaxDays) / ramp) * (STALE_ALPHA_MAX - AGING_ALPHA_END);
+  return Math.min(STALE_ALPHA_MAX, alpha);
+}
+
+/**
+ * Compact French age label: "3j" under 14 days, rounded "2s" under 60,
+ * else rounded "4m".
  * Input: integer day count. Output: the label string. Failure: none.
  */
 export function ageLabel(days: number): string {
@@ -53,32 +84,19 @@ export function ageLabel(days: number): string {
 }
 
 /**
- * True when the age label itself should alert (red): the card has crossed
- * the second-to-last aging threshold (45 days with the default steps).
- * Inputs: integer day count, the board config. Output: boolean.
- * Failure: none — a single-step config alerts from that lone threshold.
- */
-export function isHotAge(days: number, config: BoardConfig): boolean {
-  const steps = config.agingStepsDays;
-  const threshold = steps.length > 1 ? steps[steps.length - 2] : steps[0];
-  return threshold !== undefined && days >= threshold;
-}
-
-/**
- * True when a card is stagnant: in its column beyond the last aging step.
+ * True when a card is stagnant: in its column strictly beyond agingMaxDays.
  * Inputs: a CardState, the board config, now. Output: boolean.
  * Failure: none.
  */
 export function isStale(card: CardState, config: BoardConfig, now: Date): boolean {
-  const last = config.agingStepsDays[config.agingStepsDays.length - 1];
-  return last !== undefined && daysInColumn(card, now) > last;
+  return daysInColumn(card, now) > config.age.agingMaxDays;
 }
 
 /**
  * Andon rule: blocked longer than andonThresholdDays gets the static
  * escalation marker (on top of the pulsing border every blocked card has).
  * Inputs: a CardState, the board config, now.
- * Output: true when the card is blocked beyond the threshold.
+ * Output: true when the card is blocked strictly beyond the threshold.
  * Failure: none — a blocked card without blockedSince never escalates.
  */
 export function isAndon(card: CardState, config: BoardConfig, now: Date): boolean {

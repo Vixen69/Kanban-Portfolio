@@ -1,73 +1,58 @@
 // Card history for the detail modal — a readable projection of the event
-// log (the log IS the history; nothing is stored elsewhere).
+// log (the log IS the history; nothing is stored elsewhere). Design v9
+// narrates movements only (created / imported / moved), most recent
+// first; blockages and comments have their own display surfaces.
 
 import type { BoardConfig, CardEvent } from "./types.ts";
 
-/** One readable history entry of a card's life. */
+/** One movement in a card's life, ready for the detail modal list. */
 export interface HistoryEntry {
-  /** "created" | "moved" | "blocked" | "unblocked" — drives the wording. */
-  kind: "created" | "moved" | "blocked" | "unblocked";
-  /** Column display name the card came from (null for creation). */
+  /** Column display name the card came from, null at creation/import. */
   fromName: string | null;
-  /** Column display name the card arrived in (null for block events). */
-  toName: string | null;
-  /** Blocked reason, for "blocked" entries. */
-  reason: string | null;
+  /** Column display name the card arrived in ("Entrée" as a fallback). */
+  toName: string;
   ts: string;
   actor: string;
 }
 
+const MOVEMENT_TYPES: ReadonlySet<CardEvent["type"]> = new Set(["created", "imported", "moved"]);
+
+/** French fallback when an event carries no destination column at all. */
+const ENTRY_LABEL = "Entrée";
+
 function columnName(config: BoardConfig, columnId: string | null): string | null {
-  if (columnId === null) return null;
+  if (columnId === null || columnId === "") return null;
   return config.columns.find((column) => column.id === columnId)?.name ?? columnId;
 }
 
-function toEntry(event: CardEvent, config: BoardConfig): HistoryEntry | null {
-  if (event.type === "created" || event.type === "imported") {
-    return {
-      kind: "created",
-      fromName: null,
-      toName: columnName(config, event.toColumn),
-      reason: null,
-      ts: event.ts,
-      actor: event.actor,
-    };
-  }
-  if (event.type === "moved") {
-    return {
-      kind: "moved",
-      fromName: columnName(config, event.fromColumn),
-      toName: columnName(config, event.toColumn),
-      reason: null,
-      ts: event.ts,
-      actor: event.actor,
-    };
-  }
-  if (event.type === "blocked" || event.type === "unblocked") {
-    const reason = event.payload["reason"];
-    return {
-      kind: event.type,
-      fromName: null,
-      toName: null,
-      reason: typeof reason === "string" ? reason : null,
-      ts: event.ts,
-      actor: event.actor,
-    };
-  }
-  return null; // "edited" carries no movement to narrate
+function numericSuffix(eventId: string): number {
+  const match = /(\d+)$/.exec(eventId);
+  return match ? Number(match[1]) : 0;
+}
+
+function newestFirst(a: CardEvent, b: CardEvent): number {
+  if (a.ts !== b.ts) return a.ts < b.ts ? 1 : -1;
+  return numericSuffix(b.id) - numericSuffix(a.id);
 }
 
 /**
- * The readable history of one card, most recent first.
+ * The movement history of one card, most recent first.
  * Inputs: the full event list, the card id, the board config (column
- * display names).
- * Output: HistoryEntry[] sorted by timestamp descending; unknown column
- * ids fall back to the raw id. Failure: none.
+ * display names). Only created/imported/moved events are narrated.
+ * Output: HistoryEntry[] sorted by ts descending, ties broken by the
+ * numeric suffix of the event id (the fold order, reversed). Unknown
+ * column ids fall back to the raw id; a missing destination becomes
+ * "Entrée"; created/imported entries always have fromName null.
+ * Failure: none.
  */
 export function cardHistory(events: CardEvent[], cardId: string, config: BoardConfig): HistoryEntry[] {
   return events
-    .filter((event) => event.cardId === cardId)
-    .map((event) => toEntry(event, config))
-    .filter((entry): entry is HistoryEntry => entry !== null)
-    .sort((a, b) => (a.ts < b.ts ? 1 : -1));
+    .filter((event) => event.cardId === cardId && MOVEMENT_TYPES.has(event.type))
+    .sort(newestFirst)
+    .map((event) => ({
+      fromName: event.type === "moved" ? columnName(config, event.fromColumn) : null,
+      toName: columnName(config, event.toColumn) ?? ENTRY_LABEL,
+      ts: event.ts,
+      actor: event.actor,
+    }));
 }

@@ -1,7 +1,7 @@
-// The Sprint 1 hard acceptance criterion, executed against the REAL
-// config/board.json: at 1920x1080 with 100+ cards, the full board fits
-// with zero scrolling in radiator mode. (Normal mode's "no horizontal
-// scroll" is guaranteed by CSS: fr-unit columns with min-width 0.)
+// The hard acceptance criterion, executed against the REAL config/board.json:
+// at 1920x1080 with the 150-card design portfolio, the full board is visible
+// with zero scrolling (radiator density 16px), and the portfolio exercises
+// the whole visual vocabulary (aging, blocked, andon).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -12,8 +12,9 @@ import { isAndon, isStale } from "../../core/aging.ts";
 import { fitsOneScreen, boardRequiredHeight } from "../../core/layout.ts";
 import { InMemoryEventStore } from "../../core/events.ts";
 import { createFixtures } from "./index.ts";
+import { TOTAL_CARDS } from "./generate.ts";
 
-const NOW = new Date("2026-06-11T12:00:00.000Z");
+const NOW = new Date("2026-07-06T12:00:00.000Z");
 const CONFIG = validateBoardConfig(
   JSON.parse(readFileSync(new URL("../../config/board.json", import.meta.url), "utf8")),
 );
@@ -26,9 +27,8 @@ function boardStates() {
   return foldEvents(cards, store.list());
 }
 
-test("the fixtures portfolio holds 100 to 120 cards", () => {
-  const states = boardStates();
-  assert.ok(states.length >= 100 && states.length <= 120, `cartes: ${states.length}`);
+test("the fixtures portfolio holds exactly 150 cards", () => {
+  assert.equal(boardStates().length, TOTAL_CARDS);
 });
 
 test("acceptance: the whole portfolio fits 1080px in radiator mode", () => {
@@ -43,9 +43,14 @@ test("acceptance: the whole portfolio fits 1080px in radiator mode", () => {
 test("the portfolio exercises the full visual vocabulary", () => {
   const states = boardStates();
   assert.ok(states.some((s) => isStale(s, CONFIG, NOW)), "aucun sujet stagnant");
-  assert.ok(states.some((s) => s.blocked), "aucun sujet bloque");
+  assert.ok(states.some((s) => s.blocked), "aucun sujet bloqué");
   assert.ok(states.some((s) => isAndon(s, CONFIG, NOW)), "aucun sujet en andon");
   for (const column of CONFIG.columns) {
-    assert.ok(states.some((s) => s.columnId === column.id), `colonne vide: ${column.id}`);
+    const inColumn = states.filter((s) => s.columnId === column.id);
+    if (column.id === "pause") {
+      assert.equal(inColumn.length, 0, "pause doit démarrer vide");
+    } else {
+      assert.ok(inColumn.length > 0, `colonne vide : ${column.id}`);
+    }
   }
 });

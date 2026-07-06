@@ -1,14 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  cardMatches,
   defaultFilters,
   dimmedCardIds,
-  groupCounts,
   isFilterActive,
-  laneNatures,
-  listOwners,
-  passesFilters,
+  portfolioCounts,
   viewCounts,
+  type FilterState,
 } from "./filters.ts";
 import { testCard, testConfig } from "./test-helpers.ts";
 import type { CardState } from "./types.ts";
@@ -20,99 +19,126 @@ function state(overrides: Parameters<typeof testCard>[0] = {}, daysHere = 1): Ca
   return {
     ...testCard(overrides),
     enteredColumnAt: new Date(NOW.getTime() - daysHere * 86_400_000).toISOString(),
+    comments: [],
   };
 }
 
-// laneA nature "Clair", laneB nature "Complexe" (see test-helpers).
+// Age thresholds from testConfig: stale beyond 60 days in column.
 const PORTFOLIO: CardState[] = [
-  state({ id: "S001", domain: "Alpha", owner: "Mme A", typeId: "t1", criticality: "top", codename: "PX1111111" }, 2),
-  state({ id: "S002", domain: "Beta", owner: "M. B", typeId: "t2", criticality: "normal" }, 30),
   state(
-    { id: "S003", domain: "Alpha", owner: "M. B", blocked: true, blockedSince: NOW.toISOString(), typeId: null, criticality: "major", laneId: "laneB" },
+    { id: "S001", title: "Refonte GMAO", domain: "alpha", typeId: "t1", criticality: "top", nature: "simple", codename: "PX1111111" },
+    2,
+  ),
+  state(
+    { id: "S002", title: "Sujet Beta", domain: "beta", typeId: "t2", criticality: "normal", nature: "complicated", codename: "PX2222222" },
+    30,
+  ),
+  state(
+    {
+      id: "S003",
+      title: "Migration ERP",
+      domain: "alpha",
+      typeId: null,
+      criticality: "major",
+      nature: "complex",
+      codename: null,
+      blocked: true,
+      blockedSince: "2026-06-01T00:00:00.000Z",
+    },
     50,
   ),
-  state({ id: "S004", domain: "Beta", owner: "Mme A", typeId: "t1", criticality: "normal", laneId: "laneB" }, 120),
+  state(
+    { id: "S004", title: "Sujet Delta", domain: "beta", typeId: "t1", criticality: "normal", nature: "simple", codename: "PX4444444" },
+    120,
+  ),
 ];
 
-test("default filters are neutral: nothing dimmed, not active", () => {
+test("default filters are neutral: every key true, nothing dimmed, not active", () => {
   const filters = defaultFilters(CONFIG);
+  assert.deepEqual(filters.type, { t1: true, t2: true });
+  assert.deepEqual(filters.domain, { alpha: true, beta: true });
+  assert.deepEqual(filters.nature, { simple: true, complicated: true, complex: true });
+  assert.deepEqual(filters.crit, { top: true, major: true, normal: true });
   assert.equal(isFilterActive(filters), false);
-  assert.equal(dimmedCardIds(PORTFOLIO, filters, CONFIG, NOW).size, 0);
+  assert.equal(dimmedCardIds(PORTFOLIO, filters).size, 0);
 });
 
-test("laneNatures lists distinct natures in lane order", () => {
-  assert.deepEqual(laneNatures(CONFIG), ["Clair", "Complexe"]);
-  const bare = { ...CONFIG, lanes: [{ id: "x", name: "X" }] };
-  assert.deepEqual(laneNatures(bare), []);
+test("a blank search stays inactive", () => {
+  const filters = defaultFilters(CONFIG);
+  filters.search = "   ";
+  assert.equal(isFilterActive(filters), false);
+  assert.equal(dimmedCardIds(PORTFOLIO, filters).size, 0);
 });
 
-test("each criterion dims the right cards (table)", () => {
-  const base = () => defaultFilters(CONFIG);
-  const cases: { name: string; mutate: (f: ReturnType<typeof base>) => void; dimmed: string[] }[] = [
-    { name: "search by title", mutate: (f) => (f.search = "sujet de test"), dimmed: [] },
-    { name: "search no match", mutate: (f) => (f.search = "zzz"), dimmed: ["S001", "S002", "S003", "S004"] },
-    { name: "search by codename", mutate: (f) => (f.search = "px111"), dimmed: ["S002", "S003", "S004"] },
-    { name: "domain off", mutate: (f) => (f.domains["Alpha"] = false), dimmed: ["S001", "S003"] },
-    { name: "type off (untyped passes)", mutate: (f) => (f.types["t1"] = false), dimmed: ["S001", "S004"] },
-    { name: "crit top off", mutate: (f) => (f.crits["top"] = false), dimmed: ["S001"] },
-    { name: "nature Complexe off", mutate: (f) => (f.natures["Complexe"] = false), dimmed: ["S003", "S004"] },
-    { name: "owner", mutate: (f) => (f.owner = "Mme A"), dimmed: ["S002", "S003"] },
-    { name: "blocked only", mutate: (f) => (f.blockedOnly = true), dimmed: ["S001", "S002", "S004"] },
-    { name: "min age 21", mutate: (f) => (f.minAgeDays = 21), dimmed: ["S001"] },
-    { name: "min age 90", mutate: (f) => (f.minAgeDays = 90), dimmed: ["S001", "S002", "S003"] },
+test("each filter dimension dims the right cards (table)", () => {
+  const cases: { name: string; mutate: (filters: FilterState) => void; dimmed: string[] }[] = [
+    { name: "search by title, case-insensitive", mutate: (f) => (f.search = "SUJET"), dimmed: ["S001", "S003"] },
+    { name: "search matches codename, trimmed", mutate: (f) => (f.search = "  px111  "), dimmed: ["S002", "S003", "S004"] },
+    { name: "search without match dims all", mutate: (f) => (f.search = "zzz"), dimmed: ["S001", "S002", "S003", "S004"] },
+    { name: "domain off", mutate: (f) => (f.domain["alpha"] = false), dimmed: ["S001", "S003"] },
+    { name: "type off (null typeId passes)", mutate: (f) => (f.type["t1"] = false), dimmed: ["S001", "S004"] },
+    { name: "crit top off", mutate: (f) => (f.crit.top = false), dimmed: ["S001"] },
+    { name: "crit normal off", mutate: (f) => (f.crit.normal = false), dimmed: ["S002", "S004"] },
+    { name: "nature simple off", mutate: (f) => (f.nature.simple = false), dimmed: ["S001", "S004"] },
+    { name: "nature complex off", mutate: (f) => (f.nature.complex = false), dimmed: ["S003"] },
   ];
   for (const c of cases) {
-    const filters = base();
+    const filters = defaultFilters(CONFIG);
     c.mutate(filters);
     assert.equal(isFilterActive(filters), true, c.name);
-    assert.deepEqual([...dimmedCardIds(PORTFOLIO, filters, CONFIG, NOW)].sort(), c.dimmed, c.name);
+    assert.deepEqual([...dimmedCardIds(PORTFOLIO, filters)].sort(), c.dimmed, c.name);
   }
 });
 
-test("criteria combine with AND", () => {
+test("criteria combine with AND across search and groups", () => {
   const filters = defaultFilters(CONFIG);
-  filters.owner = "M. B";
-  filters.blockedOnly = true;
-  const dimmed = dimmedCardIds(PORTFOLIO, filters, CONFIG, NOW);
-  assert.deepEqual([...dimmed].sort(), ["S001", "S002", "S004"]);
-  assert.equal(passesFilters(PORTFOLIO[2] as CardState, filters, CONFIG, NOW), true);
+  filters.search = "px"; // S003 has no codename and no "px" in its title
+  filters.type["t1"] = false;
+  assert.deepEqual([...dimmedCardIds(PORTFOLIO, filters)].sort(), ["S001", "S003", "S004"]);
 });
 
 test("a key missing from a group map counts as enabled", () => {
   const filters = defaultFilters(CONFIG);
-  delete filters.domains["Alpha"];
-  delete filters.crits["top"];
-  assert.equal(passesFilters(PORTFOLIO[0] as CardState, filters, CONFIG, NOW), true);
+  delete filters.domain["alpha"];
+  delete (filters.crit as Record<string, boolean>)["top"];
+  delete (filters.nature as Record<string, boolean>)["simple"];
+  assert.equal(cardMatches(PORTFOLIO[0] as CardState, filters), true);
 });
 
-test("viewCounts: lit counts against totals, including criticalities", () => {
+test("viewCounts tallies only non-dimmed cards against the portfolio total", () => {
   const filters = defaultFilters(CONFIG);
-  filters.owner = "M. B";
-  const dimmed = dimmedCardIds(PORTFOLIO, filters, CONFIG, NOW);
-  const counts = viewCounts(PORTFOLIO, dimmed, CONFIG, NOW);
-  assert.equal(counts.total, 4);
-  assert.equal(counts.shown, 2);
-  assert.deepEqual(counts.blocked, { shown: 1, total: 1 });
-  assert.deepEqual(counts.stale, { shown: 0, total: 1 }); // S004 dimmed
-  assert.deepEqual(counts.crits.top, { shown: 0, total: 1 });
-  assert.deepEqual(counts.crits.major, { shown: 1, total: 1 });
-  assert.deepEqual(counts.crits.normal, { shown: 1, total: 2 });
+  filters.domain["beta"] = false; // dims S002 and S004 (the stale one)
+  const dimmed = dimmedCardIds(PORTFOLIO, filters);
+  assert.deepEqual(viewCounts(PORTFOLIO, dimmed, CONFIG, NOW), {
+    shown: 2,
+    total: 4,
+    blocked: 1,
+    stale: 0,
+    top: 1,
+    major: 1,
+    normal: 0,
+    simple: 1,
+    complicated: 0,
+    complex: 1,
+  });
 });
 
-test("groupCounts follow key order and the dimmed set", () => {
-  const filters = defaultFilters(CONFIG);
-  filters.blockedOnly = true;
-  const dimmed = dimmedCardIds(PORTFOLIO, filters, CONFIG, NOW);
-  const perDomain = groupCounts(PORTFOLIO, dimmed, CONFIG.domains, (card) => card.domain);
-  assert.deepEqual(perDomain["Alpha"], { shown: 1, total: 2 });
-  assert.deepEqual(perDomain["Beta"], { shown: 0, total: 2 });
-  const natures = laneNatures(CONFIG);
-  const natureOf = (card: CardState) => CONFIG.lanes.find((lane) => lane.id === card.laneId)?.nature ?? null;
-  const perNature = groupCounts(PORTFOLIO, dimmed, natures, natureOf);
-  assert.deepEqual(perNature["Clair"], { shown: 0, total: 2 });
-  assert.deepEqual(perNature["Complexe"], { shown: 1, total: 2 });
+test("portfolioCounts ignores filters: shown equals total", () => {
+  assert.deepEqual(portfolioCounts(PORTFOLIO, CONFIG, NOW), {
+    shown: 4,
+    total: 4,
+    blocked: 1,
+    stale: 1,
+    top: 1,
+    major: 1,
+    normal: 2,
+    simple: 2,
+    complicated: 1,
+    complex: 1,
+  });
 });
 
-test("listOwners is distinct and sorted", () => {
-  assert.deepEqual(listOwners(PORTFOLIO), ["M. B", "Mme A"]);
+test("neutral viewCounts equals portfolioCounts", () => {
+  const dimmed = dimmedCardIds(PORTFOLIO, defaultFilters(CONFIG));
+  assert.deepEqual(viewCounts(PORTFOLIO, dimmed, CONFIG, NOW), portfolioCounts(PORTFOLIO, CONFIG, NOW));
 });
