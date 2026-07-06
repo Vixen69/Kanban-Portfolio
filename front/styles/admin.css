@@ -1,0 +1,32 @@
+/* Admin / configuration panel — tabs, editable rows, field editor.
+   Ported verbatim from design/Portefeuille DSI - Kanban NMO.html (design v9). */
+
+.admin-modal { width: 620px; }
+.atabs { display: flex; gap: 4px; border-bottom: 1px solid var(--bd-sub); margin-bottom: 13px; }
+.atab { font-size: 11px; font-weight: 600; color: var(--tx-3); background: none; border: none; border-bottom: 2px solid transparent; padding: 6px 11px; cursor: pointer; font-family: inherit; }
+.atab:hover { color: var(--tx-1); }
+.atab.on { color: var(--accent); border-bottom-color: var(--accent); }
+.apane { max-height: 52vh; overflow-y: auto; padding-right: 4px; }
+.asection-label { font-size: 8px; text-transform: uppercase; letter-spacing: .1em; color: var(--tx-4); margin: 13px 0 7px; }
+.asection-label:first-child { margin-top: 0; }
+.arow { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+.amove { display: flex; gap: 2px; }
+.abtn { width: 22px; height: 24px; font-size: 11px; background: #f1f4f9; border: 1px solid var(--bd); border-radius: 4px; color: var(--tx-2); cursor: pointer; line-height: 1; }
+.abtn:hover:not(:disabled) { border-color: #97a3b4; color: var(--tx-1); }
+.abtn:disabled { opacity: .35; cursor: default; }
+.abtn.del:hover:not(:disabled) { border-color: var(--danger); color: var(--danger-strong); }
+.ainp { background: #fff; border: 1px solid var(--bd); border-radius: 4px; padding: 5px 7px; font-size: 11px; color: var(--tx-1); font-family: inherit; }
+.ainp:focus { outline: none; border-color: var(--accent); }
+.ainp.grow { flex: 1; min-width: 0; }
+.wip-inp { width: 52px; } .gate-inp { width: 72px; } .nature-inp { width: 110px; } .short-inp { width: 48px; text-transform: uppercase; } .type-inp { width: 110px; }
+.acolor { width: 26px; height: 26px; padding: 1px; border: 1px solid var(--bd); border-radius: 4px; background: #fff; cursor: pointer; }
+.a-add { font-size: 10px; font-weight: 600; color: var(--accent); background: none; border: 1px dashed var(--bd); border-radius: 5px; padding: 5px 10px; cursor: pointer; font-family: inherit; margin-top: 2px; }
+.a-add:hover { border-color: var(--accent); }
+.a-empty { font-size: 10px; color: var(--tx-4); padding: 8px 0; }
+.afield { border: 1px solid var(--bd-sub); border-radius: 6px; padding: 7px; margin-bottom: 7px; background: #fafbfd; }
+.afield .arow { margin-bottom: 0; }
+.opt-inp { width: 100%; margin-top: 6px; }
+.a-check { display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--tx-3); white-space: nowrap; }
+.crit-key { width: 22px; text-align: center; color: var(--tx-3); font-size: 12px; }
+/* Inline failure line for a refused « Appliquer » / reset (server message). */
+.a-error { font-size: 10px; font-weight: 600; color: var(--danger-strong); background: #fdecec; border: 1px solid #f3c4c4; border-radius: 5px; padding: 6px 9px; margin-top: 10px; }

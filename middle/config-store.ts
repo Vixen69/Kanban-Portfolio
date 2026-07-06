@@ -17,10 +17,14 @@ export interface ConfigStore {
   /** The pristine defaults (config/board.json as validated at startup). */
   getDefaults(): BoardConfig;
   /**
-   * Persists a new runtime override and appends one history line.
+   * Persists a new runtime override and appends one history line. The
+   * history line is written FIRST: if the override write then fails, the
+   * audit trail carries at worst one extra entry — never an active override
+   * that no history line accounts for (ADR 013).
    * Inputs: an already-validated config, the acting user.
    * Output: the stored config (now returned by getRuntime).
-   * Failure: throws on I/O errors; nothing is cached on failure.
+   * Failure: throws on I/O errors; neither memory nor the served config
+   * change on failure.
    */
   setRuntime(config: BoardConfig, actor: string): BoardConfig;
 }
@@ -58,9 +62,11 @@ export function createConfigStore(dataDir: string, defaults: BoardConfig): Confi
     getDefaults: () => defaults,
     setRuntime: (config: BoardConfig, actor: string): BoardConfig => {
       mkdirSync(dataDir, { recursive: true });
-      writeFileSync(overridePath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
+      // History first: a failure between the two writes leaves an extra
+      // audit line, never an unaudited override that a restart would adopt.
       const line = JSON.stringify({ ts: new Date().toISOString(), actor, config });
       appendFileSync(historyPath, `${line}\n`, "utf8");
+      writeFileSync(overridePath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
       runtime = config;
       return config;
     },

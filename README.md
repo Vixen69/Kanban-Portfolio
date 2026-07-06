@@ -5,37 +5,49 @@ blocages criants, journal d'événements en source de vérité. Déployé sur la
 plateforme conteneurisée on-premise du client (front React 18, middle Express,
 back PostgreSQL — ADR 011) ; zéro egress applicatif.
 
-C'est un **instrument, pas une plateforme**. Les comportements (vieillissement,
-pulsation des bloqués, andon, un écran sans défilement) sont câblés en dur.
-Seule la **topologie** est configurable : `config/board.json` (canaux,
-colonnes, domaines, seuils), versionné dans git. Il n'y a pas d'interface de
-réglages.
+C'est un **instrument, pas une plateforme**. Les comportements (âge visible,
+pulsation des bloqués, flux tiré, un écran sans défilement) sont câblés en
+dur. Seule la **topologie** est configurable : `config/board.json` (canaux,
+colonnes, WIP, gates, domaines, types, seuils) est le modèle par défaut
+versionné dans git ; un panneau d'administration (⚙, réservé à l'admin)
+peut appliquer une surcharge à chaud, historisée en append-only (ADR 013).
 
 Architecture en couches et historique : voir `docs/ARCHITECTURE.md` (journal
 vivant) et `docs/adr/` (décisions). Le contrat de travail est `CLAUDE.md`.
 
-## Fonctionnalités
+## Fonctionnalités (design v9, ADR 012/013)
 
-- Trois modes d'affichage commutables au clavier : **Normal** (`1`, cartes
-  complètes), **Radiateur** (`2`, barres fines — tout le portefeuille d'un
-  coup), **Focus** (`3` ou clic, une cellule canal×colonne agrandie).
-- Vieillissement : le fond des cartes fonce par paliers (`agingStepsDays`),
-  dérivé du journal. Bloqué : bordure rouge pulsante + raison ; au-delà de
-  `andonThresholdDays`, marqueur d'escalade (▲). Repli d'un canal en synthèse.
-- Panneau latéral (`S`) : recherche (`/`), codes projet, filtres type /
-  nature / criticité / domaine / responsable / bloqués / âge. Les filtres
-  **estompent**, ne retirent jamais (ADR 005). Compteurs et stats en direct.
-- Cartes : criticité (★ Top, pip Major), type, code projet masquable, barre
-  budget. **Clic en deux temps** : focus puis fiche détaillée (historique tiré
-  du journal, signalement/levée de blocage, édition par événement `edited`).
-- Navigation clavier : flèches déplacent la sélection ; `Ctrl`+flèches
-  déplacent la carte. `Échap` déroule métriques → fiche → focus → panneau.
-- **Métriques de flux** (`M`, ADR 007) : flux/temps par étape, composition
+- **Radiateur par défaut** : barres fines (~16 px), tout le portefeuille d'un
+  coup. Cliquer une colonne (ou une carte hors focus) **focalise ce stade**
+  (cartes étendues) ; second clic sur une carte → fiche détaillée. Canaux
+  repliables en ligne de synthèse ; colonnes repliables en bandeau (« Pause »
+  démarre repliée). Gates **DoR/DoD** en badge + liseré sur leurs colonnes.
+- Âge porté par la **pastille texte** (3j/2s/4m ; orange dès « récent »
+  dépassé, rouge dès « vieillit » dépassé — seuils 7/28/60 en config).
+  Bloqué : point rouge pulsant + fond rosé + raison ; badge de comptage des
+  bloqués par cellule. WIP : n/limite, avertit à ≥ 80 %, rougit au-delà de
+  100 % — signale, ne bloque jamais.
+- Panneau latéral (`S`) : recherche titre + code projet (`/`), interrupteur
+  codes projet, filtres type / nature / criticité / domaine avec tout·rien.
+  Les filtres **estompent**, ne retirent jamais (ADR 005). Compteurs
+  affichés/total et stats en direct ; état vide avec réinitialisation.
+- Fiche détaillée : charge (consommé/estimé j.h), budget (k€), plan de
+  charge, ressources clés, commentaires (événements `commented`),
+  historique (journal), liens DoR/DoD, signalement/levée de blocage,
+  édition complète (`edited`), suppression (événement `deleted` — le
+  journal garde tout). **« + Sujet »** (`N`) : création locale, entre
+  toujours dans la première colonne (flux tiré).
+- **Panneau d'administration** (⚙) : topologie/vocabulaire uniquement —
+  colonnes (ordre, WIP, gate), canaux, domaines, types, libellés natures/
+  criticités, champs de carte personnalisés. Surcharge persistée côté
+  middle avec historique append-only ; « Réinitialiser le modèle » revient
+  à `config/board.json` (ADR 013).
+- **Métriques de flux** (☷, ADR 007) : flux/temps par étape, composition
   d'âge, blocages, charge par canal, goulot — calculés exclusivement depuis
-  le journal d'événements.
-- Source des données : adaptateur `fixtures` (≈113 sujets synthétiques
-  déterministes) derrière le port `PortfolioDataSource`. csv-import / sciforma
-  à venir (RP4).
+  cartes + journal d'événements.
+- Source des données : adaptateur `fixtures` (150 sujets synthétiques
+  déterministes, seed 20260609) derrière le port `PortfolioDataSource`.
+  csv-import / sciforma à venir (RP4).
 - Persistance : le middle écrit chaque action dans le journal append-only
   `card_events` via le port `BoardStorage` (pilote **JSONL** ; **PostgreSQL**
   via `pg` à venir, ADR 011). L'état (position, blocage, âge) est replié à la
@@ -50,8 +62,12 @@ Node 22 (voir `.nvmrc` ; le dev fonctionne aussi sur Node 24.x, la cible de
 déploiement est Node 22). Monorepo npm workspaces : `core/` (partagé, sans
 dépendance), `middle/` (API Express), `front/` (React 18 + Vite).
 
-**Le plus simple** — une seule commande peuple les fixtures (si besoin), lance
-le middle **et** le front, puis ouvre le navigateur ; `Ctrl+C` arrête tout :
+**Le plus simple (sans terminal)** — double-cliquer **`Lancer le
+tableau.cmd`** à la racine du dépôt : il installe les dépendances si besoin,
+peuple les fixtures, lance l'API et le front, puis ouvre le navigateur.
+Fermer la fenêtre (ou `Ctrl+C`) arrête tout.
+
+En ligne de commande, l'équivalent :
 
 ```bash
 npm ci       # une fois
@@ -68,7 +84,7 @@ npm start    # → ouvre http://127.0.0.1:5173
 ```bash
 # 1. Peupler le stockage de dev depuis les fixtures (une fois). Garde-fou
 #    explicite : un `npm run seed` nu refuse (jamais sur la machine cliente).
-KANBAN_ALLOW_SEED=1 npm run seed     # écrit data/board.jsonl (~113 cartes)
+KANBAN_ALLOW_SEED=1 npm run seed     # écrit data/board.jsonl (150 cartes)
 
 # 2. Terminal A — l'API (middle Express, :8787, pilote JSONL) :
 npm run serve
@@ -121,13 +137,13 @@ fixtures/    jeux de données synthétiques
 docker/      Dockerfiles + compose (Postgres de dev) — finalisés au RP6
 docs/adr/    décisions d'architecture (français)
 docs/ARCHITECTURE.md  journal vivant des changements d'architecture
-design/      maquette de référence (prototype Sprint 0)
+design/      maquette validée v9 (référence produit, ADR 012)
 ```
 
 ## Documents
 
 - `CLAUDE.md` — le contrat de travail du projet.
 - `docs/ARCHITECTURE.md` — journal des changements d'architecture.
-- `docs/adr/` — une décision par fichier (001-011).
+- `docs/adr/` — une décision par fichier (001-013).
 - `SECURITY.md` — posture de sécurité.
 - `DEPENDENCIES.md` — gouvernance des dépendances (plafond SBOM).

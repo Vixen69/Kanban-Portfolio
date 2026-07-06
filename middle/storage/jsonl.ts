@@ -183,16 +183,23 @@ function doImport(fd: number, state: State, cards: Card[], events: CardEventInpu
   state.maxSeq = seq;
 }
 
-// Appends one card snapshot — the UI intake path. Duplicate ids are refused
-// before any write: the caller allocates the id from the stored snapshot, so
-// a collision is a logic error (or a second writer) — never overwrite.
-function doInsert(fd: number, state: State, card: Card): void {
+// Appends one card snapshot plus its "created" event in a single write —
+// the UI intake path. Duplicate ids are refused before any write: the caller
+// allocates the id from the stored snapshot, so a collision is a logic error
+// (or a second writer) — never overwrite. Both lines land in one appendLines
+// batch so a card can never be persisted without its creation trace.
+function doInsert(fd: number, state: State, card: Card, created: CardEventInput): CardEvent {
   if (state.cards.has(card.id)) {
     throw new Error(`Stockage JSONL : une carte avec l’identifiant « ${card.id} » existe déjà.`);
   }
-  const built = buildCard(card);
-  appendLines(fd, [built.line]);
-  state.cards.set(built.card.id, built.card);
+  const builtCard = buildCard(card);
+  const seq = state.maxSeq + 1;
+  const builtEvent = buildEvent(seq, created); // throws before any write
+  appendLines(fd, [builtCard.line, builtEvent.line]);
+  state.cards.set(builtCard.card.id, builtCard.card);
+  state.events.push(builtEvent.event);
+  state.maxSeq = seq;
+  return builtEvent.event;
 }
 
 function doAppend(fd: number, state: State, input: CardEventInput): CardEvent {
@@ -214,9 +221,9 @@ function buildStorage(fd: number, state: State): BoardStorage {
       assertOpen();
       doImport(fd, state, cards, events);
     },
-    insertCard(card) {
+    insertCard(card, created) {
       assertOpen();
-      doInsert(fd, state, card);
+      return doInsert(fd, state, card, created);
     },
     appendEvent(input) {
       assertOpen();

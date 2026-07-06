@@ -1,8 +1,8 @@
 // Deterministic generator of the 150-subject portfolio — an exact port of
-// design/data.jsx (same seed, same pools, same distributions, same RNG call
-// order for card values), remapped onto the v2 event model: the movement
-// history becomes imported + moved events (actor "sciforma-sync"), blockages
-// become blocked events and follow-up comments become commented events.
+// design/data.jsx (same seed, pools, distributions and RNG call order for
+// card values), remapped onto the v2 event model: the movement history
+// becomes imported + moved events ("sciforma-sync"), blockages become
+// blocked events, follow-up comments become commented events.
 
 import type { BoardConfig, Criticality, Financials, NatureKey } from "../../core/types.ts";
 import type { Subject } from "../../core/ports.ts";
@@ -16,6 +16,18 @@ import {
   SUBJECT_NAMES,
 } from "../../fixtures/dataset.ts";
 import { createSeededRandom, type SeededRandom } from "./random.ts";
+import {
+  AGE_PROFILE,
+  BLOCKED_FILL,
+  CANALS,
+  COLUMN_FILL,
+  CONSUMED_RATIO,
+  DOMAIN_FILL,
+  EFFORT_BAND,
+  FLOW_ORDER,
+  STEP_DAYS,
+  TYPE_FILL,
+} from "./distributions.ts";
 
 /** Default seed (design/data.jsx) — every machine renders the same board. */
 export const FIXTURES_SEED = 20260609;
@@ -26,53 +38,6 @@ export const TOTAL_CARDS = 150;
 
 const DAY_MS = 86_400_000;
 const HOUR_MS = 3_600_000;
-
-// Distributions ported verbatim from design/data.jsx. Every fill sums to
-// TOTAL_CARDS; the "pause" column deliberately starts empty.
-const CANALS: { laneId: string; nature: NatureKey; top: number; major: number; normal: number }[] = [
-  { laneId: "projets", nature: "complicated", top: 7, major: 14, normal: 29 },
-  { laneId: "petits_projets", nature: "simple", top: 1, major: 8, normal: 51 },
-  { laneId: "projets_complexes", nature: "complex", top: 2, major: 8, normal: 30 },
-];
-const COLUMN_FILL: [string, number][] = [
-  ["demandes", 23], ["qualification", 18], ["etudes", 27], ["prets", 12],
-  ["actifs", 37], ["done", 15], ["exploitation", 18],
-];
-const DOMAIN_FILL: [string, number][] = [
-  ["ingenierie", 23], ["soutien", 15], ["industrie", 15], ["corporate", 21],
-  ["erp", 18], ["plm", 15], ["infra", 18], ["archi_dev", 15], ["cyber", 10],
-];
-const TYPE_FILL: [string, number][] = [
-  ["mise_en_oeuvre", 40], ["evolution_tma", 35], ["etude", 25],
-  ["obsolescence", 20], ["tma_corrective", 18], ["achat", 12],
-];
-/** Blocked-card quotas per column, applied in this order (design step 3). */
-const BLOCKED_FILL: [string, number][] = [
-  ["qualification", 3], ["etudes", 4], ["actifs", 9], ["done", 2],
-];
-// Day-in-column range per stage — active/study stages skew older.
-const AGE_PROFILE: Record<string, [number, number]> = {
-  demandes: [1, 22], qualification: [4, 48], etudes: [18, 95], prets: [1, 26],
-  actifs: [12, 130], done: [3, 28], exploitation: [8, 80],
-};
-// Days spent in a prior stage when reconstructing the path backwards.
-const STEP_DAYS: Record<string, [number, number]> = {
-  demandes: [2, 18], qualification: [3, 20], etudes: [10, 45], prets: [1, 14],
-  actifs: [15, 70], done: [3, 16], exploitation: [10, 60],
-};
-// Consumed/estimated effort ratio band per stage (nothing before Actifs).
-const CONSUMED_RATIO: Record<string, [number, number]> = {
-  demandes: [0, 0], qualification: [0, 0.05], etudes: [0, 0.12], prets: [0, 0.05],
-  actifs: [0.15, 0.85], done: [0.85, 1.1], exploitation: [0.9, 1.15],
-};
-// Best-estimate band (jours-homme) per canal.
-const EFFORT_BAND: Record<string, [number, number]> = {
-  petits_projets: [10, 60], projets: [60, 320], projets_complexes: [40, 260],
-};
-/** The pull-flow path; "pause" is a parking column, never on the path. */
-export const FLOW_ORDER = [
-  "demandes", "qualification", "etudes", "prets", "actifs", "done", "exploitation",
-];
 
 /** Everything the fixtures adapter needs to serve and seed a board. */
 export interface FixturesPortfolio {
@@ -93,20 +58,16 @@ interface Draft {
   events: CardEventInput[];
 }
 
-function iso(ms: number): string {
-  return new Date(ms).toISOString();
-}
+const iso = (ms: number): string => new Date(ms).toISOString();
 
-// Looks a stage/canal up in a distribution table; unknown keys are a
-// programming error (the dataset is pinned to the default topology).
+// Distribution-table lookup; an unknown key is a programming error.
 function range(table: Record<string, [number, number]>, key: string): [number, number] {
   const found = table[key];
   if (!found) throw new Error(`fixtures : étape inconnue « ${key} »`);
   return found;
 }
 
-// The dataset hard-codes the default NMO topology ids; refuse any config
-// that lost one of them rather than emit dangling references.
+// Refuse a config that lost a default NMO id (no dangling references).
 function assertTopology(config: BoardConfig): void {
   const has = (list: { id: string }[], id: string): boolean => list.some((item) => item.id === id);
   const missing: string[] = [];
@@ -182,7 +143,6 @@ function draftCard(
     nature: spec.nature, tags: [], dependencies: [],
     blocked: false, blockedReason: null, blockedSince: null,
     effortEstimated: data.effortEstimated, effortConsumed: data.effortConsumed,
-    budgetEstimated: null, budgetConsumed: null,
     loadPlan: data.loadPlan, resources: data.resources, notes: "",
     sciformaId: data.sciformaId, custom: {}, createdAt: "", source: "fixtures",
   };
@@ -220,6 +180,11 @@ function buildHistory(rng: SeededRandom, draft: Draft, nowMs: number): void {
   for (let k = index; k >= 1; k--) {
     const from = FLOW_ORDER[k - 1] as string;
     const to = FLOW_ORDER[k] as string;
+    // The design draws an actor for the LAST transition (pick(['vous',
+    // 'sciforma-sync'])); our actor is fixed, but the draw must still be
+    // consumed so every later draw — hence every per-card age — matches the
+    // validated prototype exactly.
+    if (k === index) rng.next();
     moves.unshift(movedEvent(
       subject.id,
       { laneId: subject.laneId, columnId: from },

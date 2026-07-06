@@ -10,7 +10,8 @@ import type { BoardConfig } from "../../core/types.ts";
 import { InMemoryEventStore, type CardEventInput } from "../../core/events.ts";
 import { foldEvents, toCard } from "../../core/state.ts";
 import { createFixtures } from "./index.ts";
-import { FIXTURES_ACTOR, FLOW_ORDER, generatePortfolio } from "./generate.ts";
+import { FIXTURES_ACTOR, generatePortfolio } from "./generate.ts";
+import { AGE_PROFILE, FLOW_ORDER } from "./distributions.ts";
 import { COMMENTS, CP_NAMES } from "../../fixtures/dataset.ts";
 
 const NOW = new Date("2026-07-06T12:00:00.000Z");
@@ -73,6 +74,29 @@ test("event timestamps are non-decreasing per card, all before now", () => {
     }
     for (const event of events) assert.ok(event.ts < nowIso, subject.id);
   }
+});
+
+test("age in column follows AGE_PROFILE; blocked cards respect the age floor", () => {
+  const DAY_MS = 86_400_000;
+  for (const subject of PORTFOLIO.subjects) {
+    const days = Math.round((NOW.getTime() - Date.parse(entryTs(subject.id))) / DAY_MS);
+    const [lo, hi] = AGE_PROFILE[subject.columnId] as [number, number];
+    if (subject.blocked) {
+      // Floor = rand(35, hi); rand(35, 28) degenerates to 29–35 for "done".
+      const floor = subject.columnId === "done" ? 29 : 35;
+      assert.ok(days >= floor, `${subject.id}: ${days}j bloqué < ${floor}j`);
+      assert.ok(days <= Math.max(hi, 35), `${subject.id}: ${days}j > max`);
+    } else {
+      assert.ok(days >= lo && days <= hi, `${subject.id}: ${days}j hors [${lo}, ${hi}]`);
+    }
+  }
+});
+
+test("the seed reproduces the design prototype's per-card ages (S002)", () => {
+  // Regression pin for the RNG alignment with design/data.jsx (the design
+  // draws an actor for the last transition; the port burns that draw).
+  // S002 entered « actifs » 54 days before NOW in the validated prototype.
+  assert.equal(entryTs("S002"), "2026-05-13T12:00:00.000Z");
 });
 
 test("blocked cards carry exactly one blocked event, after column entry", () => {

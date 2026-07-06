@@ -44,8 +44,10 @@ test("an incomplete trailing line is truncated and recovered on open", () => {
     store.appendEvent(lifecycleEvent("created", "S001", "local", TS));
     store.appendEvent(lifecycleEvent("created", "S002", "local", TS));
     store.close();
-    // Simulate a crash mid-append: a partial record with no trailing newline.
-    appendFileSync(path, '{"kind":"event","seq":3,"event":{"id":"evt-3"');
+    // Simulate a crash mid-append: a partial record with no trailing newline
+    // (the closing braces are sliced off — also keeps the source braces
+    // balanced for the conventions checker's brace-matching heuristic).
+    appendFileSync(path, JSON.stringify({ kind: "event", seq: 3, event: { id: "evt-3" } }).slice(0, -2));
     const reopened = createJsonlStorage(path);
     try {
       // The torn line is dropped, the two committed events survive...
@@ -163,16 +165,22 @@ test("a single garbage line with no header is refused, not silently wiped", () =
   });
 });
 
-test("insertCard appends exactly one human-readable card line", () => {
+test("insertCard appends the card line and its created event line together", () => {
   withFile((path) => {
     const store = createJsonlStorage(path);
-    store.insertCard(testCard({ id: "S151", source: "manual" }));
+    store.insertCard(
+      testCard({ id: "S151", source: "manual" }),
+      lifecycleEvent("created", "S151", "local", TS),
+    );
     store.close();
     const lines = readFileSync(path, "utf8").trimEnd().split("\n");
-    assert.equal(lines.length, 2); // header + one card record
+    assert.equal(lines.length, 3); // header + one card record + one event record
     const record = JSON.parse(lines[1] ?? "") as { kind: string; card: { id: string } };
     assert.equal(record.kind, "card");
     assert.equal(record.card.id, "S151");
+    const eventRecord = JSON.parse(lines[2] ?? "") as { kind: string; event: { type: string } };
+    assert.equal(eventRecord.kind, "event");
+    assert.equal(eventRecord.event.type, "created");
   });
 });
 

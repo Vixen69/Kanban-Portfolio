@@ -154,8 +154,8 @@ test("efforts follow the canal bands and the stage consumption ratios", () => {
 test("financials carry the budget pair correlated to the effort", () => {
   for (const subject of PORTFOLIO.subjects) {
     // Budgets travel through getFinancials, never on the subject snapshot.
-    assert.equal(subject.budgetEstimated, null, subject.id);
-    assert.equal(subject.budgetConsumed, null, subject.id);
+    assert.ok(!("budgetEstimated" in subject), subject.id);
+    assert.ok(!("budgetConsumed" in subject), subject.id);
     const financials = PORTFOLIO.financialsById.get(subject.id);
     assert.ok(financials, subject.id);
     const estimated = subject.effortEstimated as number;

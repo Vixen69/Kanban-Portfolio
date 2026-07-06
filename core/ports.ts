@@ -43,13 +43,19 @@ export interface BoardStorage {
    */
   importCards(cards: Card[], events: CardEventInput[]): void;
   /**
-   * Inserts one new base card — the UI intake path (POST /api/cards).
-   * Input: the complete Card to persist (the caller builds it, id included).
-   * Output: none; the card becomes visible through listBaseCards.
+   * Inserts one new base card together with its creation event, in one
+   * atomic batch — the UI intake path (POST /api/cards). Either both are
+   * persisted or neither is: a card must never exist without its "created"
+   * trace in the append-only log (the log is the audit truth).
+   * Inputs: the complete Card (the caller builds it, id included) and the
+   * "created" CardEventInput to append with it.
+   * Output: the stored event with its assigned id; the card becomes visible
+   * through listBaseCards.
    * Failure: throws when a card with the same id already exists (never
-   * overwrites — id allocation is the caller's job), or on storage errors.
+   * overwrites — id allocation is the caller's job), or on storage errors;
+   * on failure nothing is persisted.
    */
-  insertCard(card: Card): void;
+  insertCard(card: Card, created: CardEventInput): CardEvent;
   /**
    * Appends one event and returns the stored copy with its assigned id.
    * Failure: throws on storage errors (store closed, I/O); never partial.

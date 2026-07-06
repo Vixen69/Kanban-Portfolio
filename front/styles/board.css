@@ -1,0 +1,54 @@
+/* Board grid — column heads, lane labels, cells, collapsed strips/rows,
+   gate lines, empty-state overlay.
+   Ported verbatim from design/Portefeuille DSI - Kanban NMO.html (design v9). */
+
+/* Empty state: structure stays, cards are gone. */
+.empty-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(224,229,236,.55); backdrop-filter: blur(1px); z-index: 8; }
+.empty-card { background: #fff; border: 1px solid var(--bd); border-radius: 9px; padding: 20px 24px; text-align: center; box-shadow: 0 12px 32px rgba(15,23,42,.18); max-width: 320px; }
+.empty-title { font-size: 14px; font-weight: 700; color: var(--tx-1); margin-bottom: 6px; }
+.empty-sub { font-size: 11px; color: var(--tx-3); line-height: 1.5; margin-bottom: 14px; }
+
+/* ---------- Board grid ---------- */
+.board-area { grid-area: board; position: relative; overflow: hidden; }
+.board { height: 100%; width: 100%; display: grid; gap: 1px; background: var(--bd); transition: grid-template-columns .22s ease, grid-template-rows .2s ease; }
+.corner { background: var(--bg-page); }
+
+.col-head { background: var(--bg-page); padding: 5px 9px; cursor: pointer; display: flex; flex-direction: column; gap: 2px; justify-content: center; overflow: hidden; }
+.col-head:hover { background: #e7ebf2; }
+.col-head.focused { background: var(--bg-cell-2); box-shadow: inset 0 -2px 0 var(--accent); }
+.col-head-top { display: flex; align-items: center; gap: 6px; }
+.col-label { font-size: 11px; font-weight: 600; color: var(--tx-1); letter-spacing: .02em; white-space: nowrap; }
+.gate-badge { font-size: 7px; font-weight: 700; color: var(--gate); border: 1px solid var(--gate); border-radius: 3px; padding: 0 3px; letter-spacing: .04em; }
+.col-note { font-size: 8px; color: var(--tx-4); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.col-collapse { margin-left: auto; background: none; border: none; color: var(--tx-4); cursor: pointer; font-size: 14px; line-height: 1; padding: 0 3px; border-radius: 3px; }
+.col-collapse:hover { color: var(--tx-1); background: #dde3ee; }
+.col-collapsed { flex-direction: column; align-items: center; gap: 7px; padding: 7px 0; cursor: pointer; }
+.col-collapsed:hover { background: #e7ebf2; }
+.col-collapsed .collapse-caret { font-size: 11px; color: var(--tx-4); }
+.col-label-v { writing-mode: vertical-rl; transform: rotate(180deg); font-size: 10px; font-weight: 600; color: var(--tx-2); letter-spacing: .03em; white-space: nowrap; }
+.ccol-cell { background: var(--bg-cell); display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 5px 0; overflow: hidden; }
+
+.lane-label { position: relative; background: var(--bg-page); border-right: 1px solid var(--bd); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; writing-mode: vertical-rl; transform: rotate(180deg); padding: 8px 0; }
+.lane-label:hover { background: #e7ebf2; }
+.lane-name { font-size: 11px; font-weight: 600; color: var(--tx-2); letter-spacing: .03em; }
+.lane-nature { font-size: 8px; color: var(--tx-4); text-transform: uppercase; letter-spacing: .1em; }
+.collapse-caret { font-size: 9px; color: var(--tx-4); }
+.lane-label.collapsed .lane-nature { display: none; }
+
+.cell { position: relative; background: var(--bg-cell); overflow: hidden; display: flex; flex-direction: column; padding: 2px; }
+.cell.focused { background: var(--bg-cell-2); }
+.cell.dragover { background: #d7e2f8; outline: 1px dashed var(--accent); outline-offset: -2px; }
+.cell[data-wip="over"] { box-shadow: inset 0 0 0 1px rgba(220,38,38,.4), inset 0 0 22px rgba(220,38,38,.10); }
+.gate-line { position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: linear-gradient(to bottom, transparent, var(--gate), transparent); opacity: .75; z-index: 4; }
+.cell-head { display: flex; align-items: center; justify-content: flex-end; gap: 5px; height: 12px; padding: 0 3px; flex: 0 0 auto; }
+.wip { font-size: 8px; font-variant-numeric: tabular-nums; color: var(--tx-4); }
+.wip.warn { color: var(--warn); font-weight: 600; } .wip.over { color: var(--danger-strong); font-weight: 700; }
+.cell-blocked { font-size: 8px; font-weight: 700; color: #fff; background: var(--danger); border-radius: 7px; padding: 0 4px; line-height: 1.45; }
+.cell-cards { flex: 1; display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
+.cell.focused .cell-cards { overflow-y: auto; }
+.cell-empty { flex: 1; }
+
+.ccell { background: var(--bg-cell); display: flex; align-items: center; justify-content: center; gap: 6px; }
+.ccount { font-size: 11px; font-weight: 600; color: var(--tx-2); font-variant-numeric: tabular-nums; }
+.cblk { font-size: 8px; font-weight: 700; color: #fff; background: var(--danger); border-radius: 7px; padding: 0 4px; }
+.cstale { width: 6px; height: 6px; border-radius: 50%; background: var(--warn); }

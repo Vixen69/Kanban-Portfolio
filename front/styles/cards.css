@@ -1,0 +1,42 @@
+/* Cards — mini (radiator) and focus cards, badges, type tags, blocked pulse,
+   criticality marks, estimé/consommé mini-bar.
+   Ported verbatim from design/Portefeuille DSI - Kanban NMO.html (design v9);
+   tweak-variant-only rules (dot accent, age edge) are omitted. */
+
+.mini { position: relative; display: flex; align-items: center; gap: 5px; padding: 0 6px 0 10px; border-radius: 2px; background: var(--bg-card); cursor: grab; overflow: hidden; flex: 0 0 auto; box-shadow: 0 1px 1.5px rgba(15,23,42,.06); }
+.mini:hover { box-shadow: 0 1px 4px rgba(15,23,42,.16); }
+.mini:active { cursor: grabbing; }
+.mini-accent { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
+.mini-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 9px; color: var(--tx-1); font-weight: 500; }
+.age { font-size: 8px; color: var(--tx-3); flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+.age.aging { color: var(--warn); font-weight: 600; } .age.stale { color: var(--danger-strong); font-weight: 700; }
+.blk-pulse { width: 5px; height: 5px; border-radius: 50%; background: var(--danger); flex: 0 0 auto; box-shadow: 0 0 0 0 rgba(220,38,38,.5); animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(220,38,38,.45); } 50% { opacity: .55; box-shadow: 0 0 0 3px rgba(220,38,38,0); } }
+.crit-star { color: #a16207; flex: 0 0 auto; line-height: 1; }
+.crit-pip { flex: 0 0 auto; background: #475569; transform: rotate(45deg); border-radius: 1px; }
+.dimmed { opacity: .16; }
+/* Type-of-project tag — deliberately more prominent than the domain bar. */
+.type-tag { font-size: 8px; font-weight: 700; color: #fff; padding: 0 4px; border-radius: 3px; line-height: 1.55; letter-spacing: .03em; flex: 0 0 auto; white-space: nowrap; }
+.type-tag.big { font-size: 9px; padding: 1px 7px; border-radius: 4px; line-height: 1.5; }
+.mini-code { font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace; font-size: 8px; color: var(--tx-4); flex: 0 0 auto; }
+.focus-code { font-family: ui-monospace, Menlo, monospace; font-size: 9px; color: var(--tx-4); }
+
+.focus-card { position: relative; display: flex; gap: 8px; padding: 7px 9px 7px 13px; border-radius: 4px; background: var(--bg-card); min-height: 58px; cursor: grab; overflow: hidden; flex: 0 0 auto; box-shadow: 0 1px 2px rgba(15,23,42,.08); }
+.focus-card:hover { box-shadow: 0 2px 7px rgba(15,23,42,.14); }
+.focus-accent { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
+.focus-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.focus-line1 { display: flex; align-items: center; gap: 6px; }
+.focus-name { flex: 1; min-width: 0; font-size: 11px; font-weight: 600; color: var(--tx-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.focus-line2 { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.dom-pill { font-size: 8px; font-weight: 700; letter-spacing: .05em; padding: 1px 5px; border: 1px solid; border-radius: 3px; }
+.muted { color: var(--tx-3); font-size: 9px; }
+.badge { font-size: 8px; font-weight: 700; padding: 1px 5px; border-radius: 3px; letter-spacing: .03em; }
+.crit-top { background: #eab308; color: #1a1505; } .crit-major { background: #475569; color: #fff; }
+.nature-simple { background: #ccfbf1; color: #115e59; } .nature-complicated { background: #dbeafe; color: #1e40af; } .nature-complex { background: #fde9c8; color: #92400e; }
+.focus-block { font-size: 9px; color: var(--danger-strong); font-weight: 500; }
+
+/* ---------- Focus card: estimé / consommé mini-bar ---------- */
+.ec-row { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+.ec-label { font-size: 8px; color: var(--tx-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ec-track { flex: 1; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden; }
+.ec-fill { display: block; height: 100%; border-radius: 2px; }

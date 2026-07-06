@@ -1,64 +1,61 @@
-// The sidebar frame: search, live read-out, codes toggle, the filter
-// sections, the stats block and the keyboard hints. Filters dim cards on
-// the board, they never remove them.
+// The sidebar (design v9 chrome.jsx): search, live read-out, codes-projet
+// toggle, four filter pill groups, the stats block and the keyboard hints.
+// Filters dim cards on the board, they never remove them (spatial truth).
+// Pure view over core/filters state owned by App — no context, no fetch.
 
-import type { RefObject } from "react";
-import type { CardState } from "../../core/types.ts";
-import { groupCounts, laneNatures, viewCounts } from "../../core/filters.ts";
-import { CRITICALITY_LABELS } from "../domains.ts";
-import type { Filters } from "../useFilters.ts";
-import {
-  CritSection,
-  DomainSection,
-  NatureSection,
-  OwnerSection,
-  StateAndAgeSection,
-  TypeSection,
-  type SectionProps,
-} from "./SidebarFilters.tsx";
+import type { ReactNode, Ref } from "react";
+import type { BoardConfig, NatureKey } from "../../core/types.ts";
+import type { FilterGroup, FilterState, ViewCounts } from "../../core/filters.ts";
 
-export interface SidebarProps extends SectionProps {
+/** Props of the sidebar. All state and callbacks are owned by App. */
+export interface SidebarProps {
   open: boolean;
-  now: Date;
-  showCodes: boolean;
-  onToggleCodes: () => void;
+  config: BoardConfig;
+  search: string;
+  setSearch: (value: string) => void;
+  filters: FilterState;
+  onToggle: (group: FilterGroup, key: string) => void;
+  onSetGroup: (group: FilterGroup, value: boolean) => void;
+  /** Whole-portfolio counts (the muted reference totals). */
+  stats: ViewCounts;
+  /** Counts over the visible (non-dimmed) subset. */
+  view: ViewCounts;
+  filtersActive: boolean;
+  onReset: () => void;
   /** Focused by the "/" shortcut. */
-  searchRef: RefObject<HTMLInputElement>;
+  searchRef: Ref<HTMLInputElement>;
+  showCodes: boolean;
+  setShowCodes: (value: boolean) => void;
 }
 
-function SearchBox({ filters, searchRef }: { filters: Filters; searchRef: SidebarProps["searchRef"] }) {
+/** Display order of the nature pills (fixed keys, labels from config). */
+const NATURE_KEYS: NatureKey[] = ["simple", "complicated", "complex"];
+
+// One filter pill: optional colored dot + label, lit when active.
+function Pill(props: { active: boolean; onClick: () => void; color?: string; children: ReactNode }) {
   return (
-    <div className="sb-section sb-search-wrap">
-      <input
-        ref={searchRef}
-        className="search"
-        placeholder="Rechercher un sujet…"
-        value={filters.state.search}
-        onChange={(event) => filters.setSearch(event.target.value)}
-      />
-      {filters.state.search && (
-        <button className="search-x" onClick={() => filters.setSearch("")} title="Effacer">✕</button>
-      )}
-    </div>
+    <button className={"pill" + (props.active ? " on" : "")} onClick={props.onClick}>
+      {props.color && <span className="pill-dot" style={{ background: props.color }} />}
+      {props.children}
+    </button>
   );
 }
 
-function CodesToggle({ showCodes, onToggleCodes }: { showCodes: boolean; onToggleCodes: () => void }) {
+// Category header: label + tout/rien quick toggles (matters most for 9 RDOM).
+function CatHead(props: { label: string; allOn: boolean; noneOn: boolean; onAll: () => void; onNone: () => void }) {
   return (
-    <div className="sb-section">
-      <label className="code-toggle">
-        <span className="sb-label">Codes projet</span>
-        <span className={"switch" + (showCodes ? " on" : "")} onClick={onToggleCodes}>
-          <span className="knob" />
-        </span>
-      </label>
-      <div className="code-hint">
-        {showCodes ? "Affichés sur les cartes (ex. PX4520155)" : "Masqués — recherchables ci-dessus"}
+    <div className="cat-head">
+      <span className="sb-label">{props.label}</span>
+      <div className="cat-actions">
+        <button className="mini-act" disabled={props.allOn} onClick={props.onAll}>tout</button>
+        <span className="cat-sep">·</span>
+        <button className="mini-act" disabled={props.noneOn} onClick={props.onNone}>rien</button>
       </div>
     </div>
   );
 }
 
+// One stat row. When filtering, the visible count leads; total trails muted.
 function StatRow(props: { label: string; value: number; total: number; active: boolean; alert?: boolean }) {
   return (
     <div className={"stat-row" + (props.alert ? " alert" : "")}>
@@ -71,33 +68,157 @@ function StatRow(props: { label: string; value: number; total: number; active: b
   );
 }
 
+// One filter section: CatHead wired to the group + a pill row.
+function GroupSection(props: {
+  label: string;
+  group: FilterGroup;
+  wrap?: boolean;
+  filters: FilterState;
+  onSetGroup: SidebarProps["onSetGroup"];
+  children: ReactNode;
+}) {
+  const values = Object.values(props.filters[props.group]);
+  return (
+    <div className="sb-section">
+      <CatHead
+        label={props.label}
+        allOn={values.every((enabled) => enabled)}
+        noneOn={values.every((enabled) => !enabled)}
+        onAll={() => props.onSetGroup(props.group, true)}
+        onNone={() => props.onSetGroup(props.group, false)}
+      />
+      <div className={"pill-row" + (props.wrap ? " wrap" : "")}>{props.children}</div>
+    </div>
+  );
+}
+
+function SearchSection(props: SidebarProps) {
+  return (
+    <div className="sb-section sb-search-wrap">
+      <input
+        ref={props.searchRef}
+        className="search"
+        placeholder="Rechercher un sujet…"
+        value={props.search}
+        onChange={(event) => props.setSearch(event.target.value)}
+      />
+      {props.search && (
+        <button className="search-x" onClick={() => props.setSearch("")} title="Effacer">✕</button>
+      )}
+    </div>
+  );
+}
+
+// Live read-out: what is on screen right now, and a one-click way back.
+function ResultRow(props: SidebarProps) {
+  return (
+    <div className="sb-result">
+      <span className="sb-result-count">
+        <b>{props.view.shown}</b> / {props.stats.total} affichés
+      </span>
+      {props.filtersActive && (
+        <button className="reset-btn" onClick={props.onReset}>Réinitialiser</button>
+      )}
+    </div>
+  );
+}
+
+function CodesSection(props: SidebarProps) {
+  return (
+    <div className="sb-section">
+      <label className="code-toggle">
+        <span className="sb-label" style={{ marginBottom: 0 }}>Codes projet</span>
+        <span className={"switch" + (props.showCodes ? " on" : "")} onClick={() => props.setShowCodes(!props.showCodes)}>
+          <span className="knob" />
+        </span>
+      </label>
+      <div className="code-hint">
+        {props.showCodes ? "Affichés sur les cartes (ex. PX4520155)" : "Masqués — recherchables dans la barre ci-dessus"}
+      </div>
+    </div>
+  );
+}
+
+function TypeSection(props: SidebarProps) {
+  return (
+    <GroupSection label="Type de projet" group="type" wrap filters={props.filters} onSetGroup={props.onSetGroup}>
+      {props.config.types.map((type) => (
+        <Pill
+          key={type.id}
+          active={props.filters.type[type.id] !== false}
+          onClick={() => props.onToggle("type", type.id)}
+          color={type.color}
+        >
+          {type.name}
+        </Pill>
+      ))}
+    </GroupSection>
+  );
+}
+
+function NatureSection(props: SidebarProps) {
+  return (
+    <GroupSection label="Nature" group="nature" filters={props.filters} onSetGroup={props.onSetGroup}>
+      {NATURE_KEYS.map((key) => (
+        <Pill
+          key={key}
+          active={props.filters.nature[key] !== false}
+          onClick={() => props.onToggle("nature", key)}
+          color={props.config.natures[key].fg}
+        >
+          {props.config.natures[key].label}
+        </Pill>
+      ))}
+    </GroupSection>
+  );
+}
+
+function CritSection(props: SidebarProps) {
+  const { crit } = props.filters;
+  const crits = props.config.criticalities;
+  return (
+    <GroupSection label="Criticité" group="crit" filters={props.filters} onSetGroup={props.onSetGroup}>
+      <Pill active={crit.normal !== false} onClick={() => props.onToggle("crit", "normal")}>{crits.normal.label}</Pill>
+      <Pill active={crit.major !== false} onClick={() => props.onToggle("crit", "major")} color="#94a3b8">{crits.major.label}</Pill>
+      <Pill active={crit.top !== false} onClick={() => props.onToggle("crit", "top")} color="#eab308">★ {crits.top.label}</Pill>
+    </GroupSection>
+  );
+}
+
+function DomainSection(props: SidebarProps) {
+  return (
+    <GroupSection label="Domaine RDOM" group="domain" wrap filters={props.filters} onSetGroup={props.onSetGroup}>
+      {props.config.domains.map((domain) => (
+        <Pill
+          key={domain.id}
+          active={props.filters.domain[domain.id] !== false}
+          onClick={() => props.onToggle("domain", domain.id)}
+          color={domain.color}
+        >
+          {domain.short}
+        </Pill>
+      ))}
+    </GroupSection>
+  );
+}
+
 function StatsBlock(props: SidebarProps) {
-  const counts = viewCounts(props.cards, props.dimmed, props.config, props.now);
-  const natures = laneNatures(props.config);
-  const natureOf = (card: CardState) =>
-    props.config.lanes.find((lane) => lane.id === card.laneId)?.nature ?? null;
-  const perNature = groupCounts(props.cards, props.dimmed, natures, natureOf);
-  const active = props.filters.active;
+  const { view, stats, filtersActive: active, config } = props;
+  const natures = config.natures;
   return (
     <div className="sb-stats">
-      <div className="sb-label">{active ? "Sélection · total" : "Vue d'ensemble"}</div>
-      <StatRow label="Total" value={counts.shown} total={counts.total} active={active} />
-      <StatRow label="Bloqués" value={counts.blocked.shown} total={counts.blocked.total} active={active} alert />
-      <StatRow label="Stagnants" value={counts.stale.shown} total={counts.stale.total} active={active} />
+      <div className="sb-label">{active ? "Sélection · total" : "Vue d’ensemble"}</div>
+      <StatRow label="Total" value={view.shown} total={stats.total} active={active} />
+      <StatRow label="Bloqués" value={view.blocked} total={stats.blocked} alert active={active} />
+      <StatRow label={`Stagnants (> ${config.age.agingMaxDays}j)`} value={view.stale} total={stats.stale} active={active} />
       <div className="stat-divider" />
-      <StatRow label={`★ ${CRITICALITY_LABELS.top}`} value={counts.crits.top.shown} total={counts.crits.top.total} active={active} />
-      <StatRow label={CRITICALITY_LABELS.major} value={counts.crits.major.shown} total={counts.crits.major.total} active={active} />
-      <StatRow label={CRITICALITY_LABELS.normal} value={counts.crits.normal.shown} total={counts.crits.normal.total} active={active} />
-      {natures.length > 0 && <div className="stat-divider" />}
-      {natures.map((nature) => (
-        <StatRow
-          key={nature}
-          label={nature}
-          value={perNature[nature]?.shown ?? 0}
-          total={perNature[nature]?.total ?? 0}
-          active={active}
-        />
-      ))}
+      <StatRow label={`★ ${config.criticalities.top.label}`} value={view.top} total={stats.top} active={active} />
+      <StatRow label={config.criticalities.major.label} value={view.major} total={stats.major} active={active} />
+      <StatRow label={config.criticalities.normal.label} value={view.normal} total={stats.normal} active={active} />
+      <div className="stat-divider" />
+      <StatRow label={natures.simple.label} value={view.simple} total={stats.simple} active={active} />
+      <StatRow label={natures.complicated.label} value={view.complicated} total={stats.complicated} active={active} />
+      <StatRow label={natures.complex.label} value={view.complex} total={stats.complex} active={active} />
     </div>
   );
 }
@@ -106,41 +227,32 @@ function Shortcuts() {
   return (
     <div className="sb-shortcuts">
       <span><kbd>/</kbd> rechercher</span>
+      <span><kbd>N</kbd> nouveau</span>
       <span><kbd>S</kbd> panneau</span>
-      <span><kbd>1·2·3</kbd> modes</span>
-      <span><kbd>Échap</kbd> revenir</span>
+      <span><kbd>Esc</kbd> revenir</span>
     </div>
   );
 }
 
 /**
- * The sidebar. Hidden (zero width) when closed; S, the ≡ button or Échap
- * toggle it; "/" opens it and focuses the search box.
- * Inputs: SidebarProps (open flag, config, card states, now, the Filters
- * bundle, the dimmed id set, codes toggle state, search ref).
- * Output: the aside with search, read-out, codes toggle, filter sections,
- * stats and shortcuts. Failure: none.
+ * The sidebar. Hidden (zero width) when closed; S or the ≡ button toggles
+ * it, "/" opens it and focuses the search box. Sections in design order:
+ * search, live result row, codes-projet switch, Type de projet, Nature,
+ * Criticité, Domaine RDOM, the stats block, keyboard shortcuts.
+ * Inputs: SidebarProps (open flag, config, filter state + callbacks,
+ * portfolio/visible counts, codes toggle, search ref).
+ * Output: the aside element. Failure: none.
  */
 export function Sidebar(props: SidebarProps) {
-  const counts = viewCounts(props.cards, props.dimmed, props.config, props.now);
   return (
     <aside className={"sidebar" + (props.open ? " open" : "")}>
-      <SearchBox filters={props.filters} searchRef={props.searchRef} />
-      <div className="sb-result">
-        <span className="sb-result-count">
-          <b>{counts.shown}</b> / {counts.total} affichés
-        </span>
-        {props.filters.active && (
-          <button className="reset-btn" onClick={props.filters.reset}>Réinitialiser</button>
-        )}
-      </div>
-      <CodesToggle showCodes={props.showCodes} onToggleCodes={props.onToggleCodes} />
+      <SearchSection {...props} />
+      <ResultRow {...props} />
+      <CodesSection {...props} />
       <TypeSection {...props} />
       <NatureSection {...props} />
       <CritSection {...props} />
       <DomainSection {...props} />
-      <OwnerSection {...props} />
-      <StateAndAgeSection {...props} />
       <StatsBlock {...props} />
       <Shortcuts />
     </aside>

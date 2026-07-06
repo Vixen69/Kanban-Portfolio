@@ -20,20 +20,20 @@ interface NewCardInput {
 
 /**
  * POST /api/cards — validates a creation intent against the runtime config,
- * builds the full Card server-side, inserts it and appends its "created"
- * event (toColumn = first column, payload { laneId }).
+ * builds the full Card server-side, and persists it WITH its "created"
+ * event (toColumn = first column, payload { laneId }) in one atomic
+ * storage batch: the card can never exist without its audit trace.
  * Inputs: the storage, the runtime board config, the parsed JSON body
  * ({ title, domain, laneId, typeId, nature, criticality, owner }).
  * Output: 201 with { card, event }.
  * Failure: throws BadRequest (→ 400) on invalid input; propagates storage
- * errors, including a duplicate id (→ 500).
+ * errors, including a duplicate id (→ 500) — nothing is persisted then.
  */
 export function postCard(storage: BoardStorage, config: BoardConfig, raw: unknown): ApiResult {
   const input = validateCardInput(config, asObject(raw));
   const ts = new Date().toISOString();
   const card = buildCard(config, storage.listBaseCards(), input, ts);
-  storage.insertCard(card);
-  const event = storage.appendEvent({
+  const event = storage.insertCard(card, {
     ts,
     actor: SERVER_ACTOR,
     cardId: card.id,

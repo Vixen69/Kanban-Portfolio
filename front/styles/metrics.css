@@ -1,0 +1,34 @@
+/* Metrics view — full-screen flow-metrics overlay: KPIs, per-stage bars,
+   age composition, charge par canal.
+   Ported verbatim from design/Portefeuille DSI - Kanban NMO.html (design v9). */
+
+.metrics-view { position: fixed; inset: 0; z-index: 70; background: var(--bg-page); display: flex; flex-direction: column; padding: 18px 22px; overflow-y: auto; }
+.metrics-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; }
+.metrics-title { font-family: 'DM Serif Display', serif; font-size: 22px; color: var(--tx-1); }
+.metrics-sub { font-size: 11px; color: var(--tx-3); }
+.metrics-kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 14px; }
+.kpi { background: #fff; border: 1px solid var(--bd); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 3px; }
+.kpi-num { font-size: 22px; font-weight: 700; color: var(--tx-1); line-height: 1; }
+.kpi-lab { font-size: 9px; text-transform: uppercase; letter-spacing: .06em; color: var(--tx-4); }
+.kpi.alert .kpi-num { color: var(--danger-strong); } .kpi.warn .kpi-num { color: var(--warn); } .kpi.accent .kpi-num { color: var(--accent); font-size: 15px; }
+.metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.metric-panel { background: #fff; border: 1px solid var(--bd); border-radius: 8px; padding: 14px 16px; }
+.metric-panel.wide { grid-column: 1 / -1; }
+.mp-title { font-size: 12px; font-weight: 700; color: var(--tx-1); margin-bottom: 11px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.mp-hint { font-size: 9px; font-weight: 400; color: var(--tx-4); display: flex; align-items: center; gap: 2px; }
+.lg-sw { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-left: 6px; }
+.mp-empty { font-size: 11px; color: var(--ok); }
+.mb-row { display: flex; align-items: center; gap: 9px; margin: 5px 0; }
+.mb-label { width: 96px; font-size: 10px; color: var(--tx-2); flex: 0 0 auto; text-align: right; }
+.mb-track { flex: 1; height: 13px; background: #eef1f6; border-radius: 3px; overflow: hidden; }
+.mb-track.stack { display: flex; }
+.mb-fill { display: block; height: 100%; border-radius: 3px; }
+.seg { height: 100%; }
+.mb-val { width: 44px; font-size: 10px; font-weight: 600; color: var(--tx-2); flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+.charge-canal { display: flex; align-items: center; gap: 9px; margin: 7px 0; }
+.cc-label { width: 120px; font-size: 11px; color: var(--tx-2); flex: 0 0 auto; }
+.cc-label i { color: var(--tx-4); font-style: normal; }
+.cc-track { flex: 1; height: 15px; background: #eef1f6; border-radius: 3px; overflow: hidden; }
+.cc-est { display: block; height: 100%; background: #d3dceb; border-radius: 3px; }
+.cc-cons { display: block; height: 100%; border-radius: 3px; }
+.cc-val { width: 96px; font-size: 10px; font-weight: 600; color: var(--tx-2); text-align: right; flex: 0 0 auto; font-variant-numeric: tabular-nums; }

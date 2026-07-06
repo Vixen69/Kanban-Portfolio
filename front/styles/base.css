@@ -1,0 +1,60 @@
+/* Base — reset, page shell, .app grid, header, scrollbars, focus ring.
+   Ported verbatim from design/Portefeuille DSI - Kanban NMO.html (design v9). */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  background: #d6dbe3;
+  color: #0f172a;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+:focus-visible { outline: 2px solid #1d4ed8; outline-offset: 2px; border-radius: 2px; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #b6bfcd; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #97a3b4; }
+
+.app {
+  /* Light, low-saturation neutrals. Lightness rises page < cell < card. */
+  --bg-page: #e0e5ec; --bg-cell: #edf0f5; --bg-cell-2: #e3e9f2; --bg-card: #ffffff;
+  --bd: #c4cdda; --bd-sub: #d4dbe5;
+  --tx-1: #0f172a; --tx-2: #334155; --tx-3: #475569; --tx-4: #64748b;
+  /* Signal colors, all AA on white. */
+  --danger: #dc2626; --danger-strong: #b91c1c; --warn: #b45309; --accent: #1d4ed8; --ok: #047857;
+  --lane-w: 46px; --card-h: 16px;
+  display: grid;
+  grid-template-columns: 0 1fr;
+  grid-template-rows: 44px 1fr;
+  grid-template-areas: "header header" "sidebar board";
+  height: 100vh; width: 100vw;
+  background: var(--bg-page);
+}
+
+/* ---------- Header ---------- */
+.header { grid-area: header; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 0 12px; background: var(--bg-page); border-bottom: 1px solid var(--bd); }
+.hd-left { display: flex; align-items: center; gap: 10px; }
+.icon-btn { background: #fff; border: 1px solid var(--bd); color: var(--tx-2); width: 27px; height: 24px; border-radius: 4px; cursor: pointer; font-size: 13px; line-height: 1; }
+.icon-btn:hover { color: var(--tx-1); border-color: #97a3b4; }
+.hd-title { font-family: 'DM Serif Display', serif; font-size: 17px; color: var(--tx-1); letter-spacing: .01em; }
+.hd-ghost { font-size: 8px; letter-spacing: .2em; text-transform: uppercase; color: var(--tx-4); }
+.focus-chip { font-size: 9px; background: #e7edfb; border: 1px solid var(--accent); color: var(--accent); border-radius: 11px; padding: 3px 9px; cursor: pointer; font-weight: 600; }
+.filter-chip { font-size: 9px; background: #fff; border: 1px solid var(--bd); color: var(--tx-2); border-radius: 11px; padding: 3px 9px; cursor: pointer; font-weight: 600; }
+.filter-chip:hover { border-color: #97a3b4; color: var(--tx-1); }
+.hd-right { display: flex; align-items: center; gap: 14px; }
+.hd-stat { font-size: 10px; color: var(--tx-2); white-space: nowrap; }
+.hd-stat b { color: var(--tx-1); font-size: 12px; }
+.hd-stat.alert b { color: var(--danger-strong); }
+.blk-dot-static { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--danger); vertical-align: middle; }
+.hd-legend { display: flex; gap: 7px; flex-wrap: wrap; max-width: 470px; }
+.lg { display: flex; align-items: center; gap: 3px; font-size: 8px; color: var(--tx-3); }
+.lg-dot { width: 7px; height: 7px; border-radius: 2px; }
+.add-btn { background: var(--accent); border: none; color: #fff; font-size: 11px; font-weight: 600; padding: 6px 13px; border-radius: 5px; cursor: pointer; white-space: nowrap; }
+.add-btn:hover { background: #1e40af; }
+
+/* ---------- Write-failure banner (store.lastError) ---------- */
+/* A refused or unreachable write: the board stayed unchanged; the server's
+   French message is shown until dismissed or the next successful action. */
+.err-banner { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 300; display: flex; align-items: center; gap: 10px; max-width: 640px; background: #7f1d1d; color: #fee2e2; font-size: 11px; font-weight: 500; padding: 7px 12px; border-radius: 6px; box-shadow: 0 4px 14px rgba(15, 23, 42, .35); }
+.err-banner button { background: none; border: none; color: #fecaca; cursor: pointer; font-size: 12px; line-height: 1; padding: 0; }
+.err-banner button:hover { color: #fff; }

@@ -11,8 +11,11 @@ const SCANNED_DIRS = ["core", "adapters", "fixtures", "front", "scripts", "middl
 const EXTENSIONS = [".ts", ".tsx", ".mjs"];
 const MAX_FILE_LINES = 300;
 const MAX_FUNCTION_LINES = 40;
-const FUNCTION_START =
-  /^\s*(?:export\s+)?(?:async\s+)?function\s+\w+|^\s*(?:export\s+)?const\s+\w+\s*=\s*(?:async\s*)?(?:\([^)]*\)|\w+)\s*(?::[^=]+)?=>\s*\{\s*$/;
+// Named function declarations, plus ANY line ending with "=> {": const
+// arrows, object-literal methods and anonymous callbacks (test bodies) are
+// all measured. Arrows with multi-line parameter lists are measured from
+// the "=> {" line (a slight undercount — acceptable for a heuristic).
+const FUNCTION_START = /^\s*(?:export\s+)?(?:async\s+)?function\s+\w+|=>\s*\{\s*$/;
 
 interface Finding {
   line: number;

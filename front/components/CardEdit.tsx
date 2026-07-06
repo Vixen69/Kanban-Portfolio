@@ -1,153 +1,247 @@
-// Edit mode of the card detail (design's "Modifier"). Saving appends ONE
-// "edited" event carrying the whitelisted field patch — the fold applies
-// it; nothing is mutated. Position and blocked state keep their own
-// interactions (drag & drop, Signaler/Lever un blocage).
+// Card edit form (design/modals.jsx CardDetail edit branch), a full modal
+// of its own. Saving computes three deltas for App: a whitelisted CardPatch
+// (only the fields that actually changed), a move intent when the canal or
+// colonne changed, and a block/unblock delta when the Bloqué toggle
+// changed — blocked state is NOT part of CardPatch (own event types).
 
 import { useState } from "react";
-import type { BoardConfig, CardPatch, CardState, Criticality } from "../../core/types.ts";
-import { CRITICALITY_LABELS } from "../domains.ts";
+import type { BoardConfig, CardPatch, CardState, Criticality, CustomValue, FieldDef, NatureKey } from "../../core/types.ts";
+import { reconcileCardRefs } from "../../core/config.ts";
+import { CRITICALITY_KEYS, CustomInput, Field, NATURE_KEYS, SelectField } from "./modalParts.tsx";
 
+/** Move intent computed on save when the card changed cell. */
+export interface EditMove {
+  laneId: string;
+  columnId: string;
+}
+
+/** Block delta computed on save when the Bloqué toggle changed. */
+export interface EditBlock {
+  blocked: boolean;
+  reason: string;
+}
+
+/** Props of the card edit modal. */
 export interface CardEditProps {
   card: CardState;
   config: BoardConfig;
+  /** Overlay click and ✕ — closes the whole card modal (design behavior). */
+  onClose: () => void;
+  /** « Annuler » — back to the read-mode detail, nothing saved. */
   onCancel: () => void;
-  onSave: (patch: CardPatch) => void;
+  /**
+   * Called on Enregistrer with the diffed patch (may be empty when nothing
+   * changed — App should skip the edit intent then), the move intent or
+   * null, and the block delta or null.
+   */
+  onSave: (patch: CardPatch, move: EditMove | null, block: EditBlock | null) => void;
+  onDelete: (id: string) => void;
 }
 
+// Form state: numeric fields kept as strings for controlled inputs.
 interface Draft {
-  title: string;
-  owner: string;
-  domain: string;
-  criticality: Criticality;
-  typeId: string;
-  codename: string;
-  tags: string;
-  budget: string;
-  consumed: string;
+  title: string; typeId: string; codename: string;
+  domain: string; laneId: string; columnId: string;
+  nature: NatureKey; criticality: Criticality; owner: string;
+  blocked: boolean; blockedReason: string;
+  effortEstimated: string; effortConsumed: string;
+  loadPlan: string; resourcesCsv: string;
+  budgetEstimated: string; budgetConsumed: string;
+  custom: Record<string, CustomValue>; notes: string;
 }
 
-function toDraft(card: CardState): Draft {
+type SetDraft = (patch: Partial<Draft>) => void;
+
+function numText(value: number | null): string {
+  return value === null ? "" : String(value);
+}
+
+function numOrNull(raw: string): number | null {
+  if (raw.trim() === "") return null;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+// Builds the initial form state; stale config references are remapped to
+// the first config entry for display (reconcileCardRefs — never an event).
+function toDraft(card: CardState, config: BoardConfig): Draft {
+  const refs = reconcileCardRefs(card, config);
   return {
-    title: card.title,
-    owner: card.owner,
-    domain: card.domain,
-    criticality: card.criticality,
-    typeId: card.typeId ?? "",
-    codename: card.codename ?? "",
-    tags: card.tags.join(", "),
-    budget: card.budget === null ? "" : String(card.budget),
-    consumed: card.consumed === null ? "" : String(card.consumed),
+    title: card.title, typeId: refs.typeId ?? "", codename: card.codename ?? "",
+    domain: refs.domain, laneId: refs.laneId, columnId: refs.columnId,
+    nature: card.nature, criticality: card.criticality, owner: card.owner,
+    blocked: card.blocked, blockedReason: card.blockedReason ?? "",
+    effortEstimated: numText(card.effortEstimated), effortConsumed: numText(card.effortConsumed),
+    loadPlan: card.loadPlan ?? "", resourcesCsv: card.resources.join(", "),
+    budgetEstimated: numText(card.budgetEstimated), budgetConsumed: numText(card.budgetConsumed),
+    custom: { ...card.custom }, notes: card.notes,
   };
 }
 
-function toPatch(draft: Draft): CardPatch {
-  const number = (raw: string): number | null => {
-    const parsed = Number(raw);
-    return raw.trim() === "" || !Number.isFinite(parsed) ? null : parsed;
-  };
-  const budget = number(draft.budget);
-  const consumed = number(draft.consumed);
+// Every editable field of the form as a full CardPatch (before diffing).
+function fullPatch(draft: Draft): CardPatch {
   return {
-    title: draft.title.trim(),
-    owner: draft.owner.trim(),
-    domain: draft.domain,
-    criticality: draft.criticality,
+    title: draft.title.trim(), owner: draft.owner.trim(),
+    domain: draft.domain, criticality: draft.criticality, nature: draft.nature,
     typeId: draft.typeId === "" ? null : draft.typeId,
     codename: draft.codename.trim() === "" ? null : draft.codename.trim(),
-    tags: draft.tags.split(",").map((tag) => tag.trim()).filter(Boolean),
-    budget,
-    consumed,
-    remaining: budget !== null && consumed !== null ? budget - consumed : null,
+    effortEstimated: numOrNull(draft.effortEstimated), effortConsumed: numOrNull(draft.effortConsumed),
+    budgetEstimated: numOrNull(draft.budgetEstimated), budgetConsumed: numOrNull(draft.budgetConsumed),
+    loadPlan: draft.loadPlan.trim() === "" ? null : draft.loadPlan.trim(),
+    resources: draft.resourcesCsv.split(",").map((entry) => entry.trim()).filter(Boolean),
+    custom: draft.custom, notes: draft.notes,
   };
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+// Keeps only the entries of `after` whose value differs from `before`.
+function diffPatch(before: CardPatch, after: CardPatch): CardPatch {
+  const patch: CardPatch = {};
+  for (const key of Object.keys(after) as (keyof CardPatch)[]) {
+    if (JSON.stringify(before[key] ?? null) !== JSON.stringify(after[key] ?? null)) {
+      (patch as Record<keyof CardPatch, unknown>)[key] = after[key] ?? null;
+    }
+  }
+  return patch;
+}
+
+// Move intent when the canal or colonne select changed, else null.
+function buildMove(initial: Draft, draft: Draft): EditMove | null {
+  if (draft.laneId === initial.laneId && draft.columnId === initial.columnId) return null;
+  return { laneId: draft.laneId, columnId: draft.columnId };
+}
+
+// Block delta when the Bloqué toggle changed — or when the card stays
+// blocked with an edited reason (posted as a fresh blocked intent, so a
+// reason-only change is never silently dropped; blockedSince resets then).
+// Blocking without a reason falls back to the design's default reason.
+function buildBlock(initial: Draft, draft: Draft): EditBlock | null {
+  const reason = draft.blockedReason.trim() || "Blocage signalé";
+  if (draft.blocked === initial.blocked) {
+    if (!draft.blocked || reason === initial.blockedReason.trim()) return null;
+    return { blocked: true, reason };
+  }
+  return { blocked: draft.blocked, reason: draft.blocked ? reason : "" };
+}
+
+// Type de projet + Code projet row.
+function TypeCodeRow({ draft, config, set }: { draft: Draft; config: BoardConfig; set: SetDraft }) {
   return (
-    <label className="field">
-      <span className="field-label">{label}</span>
-      {children}
-    </label>
+    <div className="field-2col">
+      <SelectField label="Type de projet" value={draft.typeId} options={config.types.map((t) => ({ value: t.id, label: t.name }))} onChange={(v) => set({ typeId: v })} />
+      <Field label="Code projet"><input className="inp" value={draft.codename} onChange={(e) => set({ codename: e.target.value })} /></Field>
+    </div>
   );
 }
 
-function Selects({ draft, config, set }: { draft: Draft; config: BoardConfig; set: (patch: Partial<Draft>) => void }) {
+// Domaine / Canal / Colonne / Nature / Criticité / Chef de projet grid.
+function RefsGrid({ draft, config, set }: { draft: Draft; config: BoardConfig; set: SetDraft }) {
   return (
     <div className="field-2col">
-      <Field label="Domaine">
-        <select className="inp" value={draft.domain} onChange={(e) => set({ domain: e.target.value })}>
-          {config.domains.map((domain) => (
-            <option key={domain} value={domain}>{domain}</option>
-          ))}
-        </select>
-      </Field>
-      <Field label="Criticité">
-        <select
-          className="inp"
-          value={draft.criticality}
-          onChange={(e) => set({ criticality: e.target.value as Criticality })}
-        >
-          {(["normal", "major", "top"] as const).map((crit) => (
-            <option key={crit} value={crit}>{CRITICALITY_LABELS[crit]}</option>
-          ))}
-        </select>
-      </Field>
-      {config.types.length > 0 && (
-        <Field label="Type de projet">
-          <select className="inp" value={draft.typeId} onChange={(e) => set({ typeId: e.target.value })}>
-            <option value="">—</option>
-            {config.types.map((type) => (
-              <option key={type.id} value={type.id}>{type.name}</option>
-            ))}
-          </select>
+      <SelectField label="Domaine RDOM" value={draft.domain} options={config.domains.map((d) => ({ value: d.id, label: d.name }))} onChange={(v) => set({ domain: v })} />
+      <SelectField label="Canal" value={draft.laneId} options={config.lanes.map((l) => ({ value: l.id, label: l.name }))} onChange={(v) => set({ laneId: v })} />
+      <SelectField label="Colonne" value={draft.columnId} options={config.columns.map((c) => ({ value: c.id, label: c.name }))} onChange={(v) => set({ columnId: v })} />
+      <SelectField label="Nature" value={draft.nature} options={NATURE_KEYS.map((k) => ({ value: k, label: config.natures[k].label }))} onChange={(v) => set({ nature: v as NatureKey })} />
+      <SelectField label="Criticité" value={draft.criticality} options={CRITICALITY_KEYS.map((k) => ({ value: k, label: config.criticalities[k].label }))} onChange={(v) => set({ criticality: v as Criticality })} />
+      <Field label="Chef de projet"><input className="inp" value={draft.owner} onChange={(e) => set({ owner: e.target.value })} /></Field>
+    </div>
+  );
+}
+
+// Bloqué toggle + reason input (surfaced as a block delta, not a patch).
+function BlockFields({ draft, set }: { draft: Draft; set: SetDraft }) {
+  return (
+    <>
+      <label className="toggle-row">
+        <input type="checkbox" checked={draft.blocked} onChange={(e) => set({ blocked: e.target.checked })} />
+        <span>Bloqué</span>
+      </label>
+      {draft.blocked && (
+        <Field label="Raison du blocage">
+          <input className="inp" value={draft.blockedReason} onChange={(e) => set({ blockedReason: e.target.value })} />
         </Field>
       )}
-      <Field label="Code projet">
-        <input className="inp" value={draft.codename} onChange={(e) => set({ codename: e.target.value })} />
-      </Field>
+    </>
+  );
+}
+
+// Effort (j.h), plan de charge, ressources and budget (k€) grid.
+function EffortGrid({ draft, set }: { draft: Draft; set: SetDraft }) {
+  return (
+    <div className="field-2col">
+      <Field label="Meilleur estimé (j.h)"><input className="inp" type="number" min="0" value={draft.effortEstimated} onChange={(e) => set({ effortEstimated: e.target.value })} /></Field>
+      <Field label="Consommé (j.h)"><input className="inp" type="number" min="0" value={draft.effortConsumed} onChange={(e) => set({ effortConsumed: e.target.value })} /></Field>
+      <Field label="Plan de charge"><input className="inp" value={draft.loadPlan} onChange={(e) => set({ loadPlan: e.target.value })} /></Field>
+      <Field label="Ressources clés (virgules)"><input className="inp" value={draft.resourcesCsv} onChange={(e) => set({ resourcesCsv: e.target.value })} /></Field>
+      <Field label="Budget estimé (k€)"><input className="inp" type="number" min="0" value={draft.budgetEstimated} onChange={(e) => set({ budgetEstimated: e.target.value })} /></Field>
+      <Field label="Budget consommé (k€)"><input className="inp" type="number" min="0" value={draft.budgetConsumed} onChange={(e) => set({ budgetConsumed: e.target.value })} /></Field>
+    </div>
+  );
+}
+
+// Champs personnalisés section (only when the config defines fields).
+function CustomSection({ fields, custom, onChange }: {
+  fields: FieldDef[];
+  custom: Record<string, CustomValue>;
+  onChange: (id: string, value: CustomValue) => void;
+}) {
+  if (fields.length === 0) return null;
+  return (
+    <div className="custom-section">
+      <div className="field-label" style={{ marginBottom: 7 }}>Champs personnalisés</div>
+      {fields.map((field) => (
+        <CustomInput key={field.id} field={field} value={custom[field.id]} onChange={(value) => onChange(field.id, value)} />
+      ))}
     </div>
   );
 }
 
 /**
- * The edit form of the card detail modal.
- * Inputs: CardEditProps (the card, the config vocabularies, cancel/save).
- * Output: the form; "Enregistrer" emits one CardPatch (remaining is
- * recomputed from budget and consumed) and is disabled on an empty title.
- * Failure: none — unparseable numbers save as null.
+ * The card edit modal (design "Modifier" form).
+ * Inputs: CardEditProps — the folded card, the runtime config and the
+ * cancel/save/delete callbacks.
+ * Output: overlay + modal; Enregistrer calls onSave(patch, move, block)
+ * where patch is the diffed CardPatch (possibly empty), move the cell
+ * change or null and block the blocked-state delta (toggle flip or edited
+ * reason) or null; Supprimer calls onDelete(card.id); overlay/✕ call
+ * onClose (whole modal), « Annuler » calls onCancel (back to detail).
+ * Failure modes: none — unparseable numbers save as null and an empty
+ * title disables Enregistrer (deliberate guard: the middle rejects empty
+ * titles; the disabled button carries an explanatory tooltip).
  */
 export function CardEdit(props: CardEditProps) {
-  const [draft, setDraft] = useState<Draft>(() => toDraft(props.card));
-  const set = (patch: Partial<Draft>) => setDraft((current) => ({ ...current, ...patch }));
+  const { card, config } = props;
+  const [draft, setDraft] = useState<Draft>(() => toDraft(card, config));
+  const set: SetDraft = (patch) => setDraft((current) => ({ ...current, ...patch }));
+  const barDomain = config.domains.find((entry) => entry.id === draft.domain);
+  const save = () => {
+    const initial = toDraft(card, config);
+    props.onSave(diffPatch(fullPatch(initial), fullPatch(draft)), buildMove(initial, draft), buildBlock(initial, draft));
+  };
   return (
-    <div className="modal-body">
-      <div className="modal-top">
-        <h2 className="modal-name">Modifier</h2>
-        <button className="x" onClick={props.onCancel}>✕</button>
-      </div>
-      <Field label="Nom">
-        <input className="inp" autoFocus value={draft.title} onChange={(e) => set({ title: e.target.value })} />
-      </Field>
-      <Selects draft={draft} config={props.config} set={set} />
-      <div className="field-2col">
-        <Field label="Responsable">
-          <input className="inp" value={draft.owner} onChange={(e) => set({ owner: e.target.value })} />
-        </Field>
-        <Field label="Tags (virgules)">
-          <input className="inp" value={draft.tags} onChange={(e) => set({ tags: e.target.value })} />
-        </Field>
-        <Field label="Budget estimé (k€)">
-          <input className="inp" type="number" min="0" value={draft.budget} onChange={(e) => set({ budget: e.target.value })} />
-        </Field>
-        <Field label="Budget consommé (k€)">
-          <input className="inp" type="number" min="0" value={draft.consumed} onChange={(e) => set({ consumed: e.target.value })} />
-        </Field>
-      </div>
-      <div className="modal-actions">
-        <span className="spacer" />
-        <button className="btn ghost" onClick={props.onCancel}>Annuler</button>
-        <button className="btn primary" disabled={draft.title.trim() === ""} onClick={() => props.onSave(toPatch(draft))}>
-          Enregistrer
-        </button>
+    <div className="overlay" onClick={props.onClose}>
+      <div className="modal" onClick={(event) => event.stopPropagation()}>
+        <span className="modal-bar" style={{ background: card.blocked ? "#b91c1c" : barDomain?.color ?? "#94a3b8" }} />
+        <div className="modal-body">
+          <div className="modal-top">
+            <h2 className="modal-name">Modifier</h2>
+            <button className="x" onClick={props.onClose}>✕</button>
+          </div>
+          <Field label="Nom"><input className="inp" value={draft.title} onChange={(e) => set({ title: e.target.value })} /></Field>
+          <TypeCodeRow draft={draft} config={config} set={set} />
+          <RefsGrid draft={draft} config={config} set={set} />
+          <BlockFields draft={draft} set={set} />
+          <EffortGrid draft={draft} set={set} />
+          <CustomSection fields={config.fields} custom={draft.custom} onChange={(id, value) => setDraft((c) => ({ ...c, custom: { ...c.custom, [id]: value } }))} />
+          <Field label="Notes"><textarea className="inp" rows={2} value={draft.notes} onChange={(e) => set({ notes: e.target.value })} /></Field>
+          <div className="modal-actions">
+            <button className="btn danger" onClick={() => props.onDelete(card.id)}>Supprimer</button>
+            <span style={{ flex: 1 }} />
+            <button className="btn ghost" onClick={props.onCancel}>Annuler</button>
+            <button className="btn primary" disabled={draft.title.trim() === ""}
+              title={draft.title.trim() === "" ? "Le nom est requis" : undefined}
+              onClick={save}>Enregistrer</button>
+          </div>
+        </div>
       </div>
     </div>
   );

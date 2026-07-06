@@ -19,20 +19,22 @@ function stubStorage(cards: Card[] = [testCard({ id: "S001" })]): BoardStorage {
   const baseCards = cards.map((card) => ({ ...card }));
   const events: CardEvent[] = [];
   let seq = 0;
+  const append = (input: CardEventInput): CardEvent => {
+    seq += 1;
+    const event: CardEvent = { ...input, id: `evt-${seq}` };
+    events.push(event);
+    return event;
+  };
   return {
     importCards() {
       throw new Error("importCards non utilisé dans ces tests");
     },
-    insertCard(card: Card) {
+    insertCard(card: Card, created: CardEventInput): CardEvent {
       if (baseCards.some((c) => c.id === card.id)) throw new Error(`id dupliqué : ${card.id}`);
       baseCards.push({ ...card });
+      return append(created);
     },
-    appendEvent(input: CardEventInput): CardEvent {
-      seq += 1;
-      const event: CardEvent = { ...input, id: `evt-${seq}` };
-      events.push(event);
-      return event;
-    },
+    appendEvent: append,
     listEvents: () => events.slice(),
     listBaseCards: () => baseCards.map((card) => ({ ...card })),
     close() {},

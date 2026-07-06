@@ -29,8 +29,9 @@ test("jsonl is selectable and returns a working storage", () => {
       const stored = store.appendEvent(lifecycleEvent("created", "S001", "local", TS));
       assert.equal(stored.id, "evt-1");
       assert.equal(store.listEvents().length, 1);
-      store.insertCard(testCard({ id: "S002" }));
+      store.insertCard(testCard({ id: "S002" }), lifecycleEvent("created", "S002", "local", TS));
       assert.equal(store.listBaseCards().length, 1);
+      assert.equal(store.listEvents().length, 2);
     } finally {
       store.close();
     }

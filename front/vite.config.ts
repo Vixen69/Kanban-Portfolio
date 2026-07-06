@@ -9,11 +9,13 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: "127.0.0.1",
-    proxy: { "/api": "http://127.0.0.1:8787" },
+    // "^/api/" (regex, trailing slash) — a bare "/api" prefix would also
+    // capture the front's own /api.ts module request and 404 it.
+    proxy: { "^/api/": "http://127.0.0.1:8787" },
   },
   preview: {
     host: "127.0.0.1",
-    proxy: { "/api": "http://127.0.0.1:8787" },
+    proxy: { "^/api/": "http://127.0.0.1:8787" },
   },
   build: {
     outDir: "dist",

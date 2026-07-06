@@ -1,41 +1,24 @@
-// Bootstrap: fetch the topology from the API, validate it, then render the
-// board. A failed fetch or a broken config renders a readable French error
-// instead of a blank page.
+// Entry point: bundles the whole stylesheet set (self-hosted fonts first,
+// then chrome, board, cards and modals) and mounts the App. Data loading,
+// error screens and all state live in App/useBoardStore — this file only
+// binds React to #root.
 
 import { StrictMode } from "react";
-import { createRoot, type Root } from "react-dom/client";
-import { validateBoardConfig } from "../core/config.ts";
-import { fetchConfig } from "./api.ts";
+import { createRoot } from "react-dom/client";
 import { App } from "./App.tsx";
-import "./styles.css";
-import "./sidebar.css";
-import "./modal.css";
-import "./metrics.css";
+import "./styles/fonts.css";
+import "./styles/base.css";
+import "./styles/sidebar.css";
+import "./styles/board.css";
+import "./styles/cards.css";
+import "./styles/modal.css";
+import "./styles/admin.css";
+import "./styles/metrics.css";
 
 const root = document.getElementById("root");
 if (!root) throw new Error("élément #root introuvable");
-const reactRoot = createRoot(root);
-
-function renderError(message: string): void {
-  reactRoot.render(
-    <div className="config-error">
-      <h1>Tableau indisponible</h1>
-      <p>{message}</p>
-    </div>,
-  );
-}
-
-async function bootstrap(target: Root): Promise<void> {
-  try {
-    const config = validateBoardConfig(await fetchConfig());
-    target.render(
-      <StrictMode>
-        <App config={config} />
-      </StrictMode>,
-    );
-  } catch (error) {
-    renderError(error instanceof Error ? error.message : String(error));
-  }
-}
-
-void bootstrap(reactRoot);
+createRoot(root).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+);

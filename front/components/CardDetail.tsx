@@ -1,143 +1,116 @@
-// Card detail modal (design P5: just enough to point at a card and make a
-// 2-minute decision). Read-only projection of the card + its event-log
-// history; the only actions are signaling and lifting a blockage — both
-// appended to the event log, never mutations.
+// Card detail modal, read mode (design/modals.jsx CardDetail read branch).
+// A projection of the folded card + its event history; every action —
+// block, unblock, comment, switch to edit — is an intent surfaced to App,
+// never a local mutation.
 
-import { useState } from "react";
-import type { BoardConfig, CardEvent, CardPatch, CardState } from "../../core/types.ts";
+import { useEffect, useState } from "react";
+import type { BoardConfig, CardState } from "../../core/types.ts";
 import { daysInColumn } from "../../core/aging.ts";
-import { cardHistory, type HistoryEntry } from "../../core/history.ts";
-import { CRITICALITY_LABELS, domainColor, natureColor, typeById } from "../domains.ts";
-import { laneNatures } from "../../core/filters.ts";
+import { reconcileCardRefs } from "../../core/config.ts";
+import type { HistoryEntry } from "../../core/history.ts";
 import { TypeTag } from "./cardParts.tsx";
-import { CardEdit } from "./CardEdit.tsx";
+import { CustomKV, Tag } from "./modalParts.tsx";
+import { ChargeBox, CommentList, DocRow, HistoryList, ResourceChips } from "./DetailSections.tsx";
 
+/** Props of the card detail modal — all intents flow up to App. */
 export interface CardDetailProps {
   card: CardState;
   config: BoardConfig;
-  now: Date;
-  events: CardEvent[];
-  /** All cards, to resolve dependency ids into titles. */
-  cards: CardState[];
+  /** Epoch milliseconds of the shared 1 s ticker. */
+  now: number;
+  /** Movement history of this card, most recent first (core/history). */
+  history: HistoryEntry[];
   onClose: () => void;
-  onBlock: (cardId: string, reason: string) => void;
-  onUnblock: (cardId: string) => void;
-  /** Appends one "edited" event with the whitelisted patch. */
-  onEdit: (cardId: string, patch: CardPatch) => void;
+  /** Switches App to the edit form (CardEdit). */
+  onEdit: () => void;
+  onBlock: (reason: string) => void;
+  onUnblock: () => void;
+  onComment: (text: string) => void;
 }
 
-function Tag({ color, solid, children }: { color: string; solid?: boolean; children: React.ReactNode }) {
-  const style = solid
-    ? { background: color, color: "#1a1505", borderColor: color }
-    : { color: "#0f172a", borderColor: color, background: "#fff" };
-  return <span className="dtag" style={style}>{children}</span>;
+// Title, code projet and the close button.
+function TopBar({ card, onClose }: { card: CardState; onClose: () => void }) {
+  return (
+    <div className="modal-top">
+      <div>
+        <h2 className="modal-name">{card.title}</h2>
+        {card.codename && <span className="modal-code">{card.codename}</span>}
+      </div>
+      <button className="x" onClick={onClose}>✕</button>
+    </div>
+  );
 }
 
-function DetailTags({ card, config }: { card: CardState; config: BoardConfig }) {
-  const lane = config.lanes.find((l) => l.id === card.laneId);
-  const column = config.columns.find((c) => c.id === card.columnId);
+// Tag row: type (big), domain, canal, colonne, nature, TOP/MAJOR badge.
+// Stale config references are remapped for display only (never an event).
+function TagRow({ card, config }: { card: CardState; config: BoardConfig }) {
+  const refs = reconcileCardRefs(card, config);
+  const domain = config.domains.find((entry) => entry.id === refs.domain)!;
+  const lane = config.lanes.find((entry) => entry.id === refs.laneId)!;
+  const column = config.columns.find((entry) => entry.id === refs.columnId)!;
+  const type = refs.typeId === null ? null : (config.types.find((entry) => entry.id === refs.typeId) ?? null);
+  const nature = config.natures[card.nature];
+  const crit = config.criticalities[card.criticality];
   return (
     <div className="tag-row">
-      <TypeTag config={config} typeId={card.typeId} big />
-      <Tag color={domainColor(config, card.domain)}>{card.domain}</Tag>
-      <Tag color="#94a3b8">{lane?.name ?? card.laneId}</Tag>
-      <Tag color="#94a3b8">{column?.name ?? card.columnId}</Tag>
-      {lane?.nature && <Tag color={natureColor(laneNatures(config), lane.nature)}>{lane.nature}</Tag>}
-      {card.criticality === "top" && <Tag color="#eab308" solid>★ TOP</Tag>}
-      {card.criticality === "major" && <Tag color="#94a3b8">MAJOR</Tag>}
+      <TypeTag type={type} big />
+      <Tag color={domain.color}>{domain.name}</Tag>
+      <Tag color="#94a3b8">{lane.name}</Tag>
+      <Tag color="#94a3b8">{column.name}</Tag>
+      <Tag color={nature.fg}>{nature.label}</Tag>
+      {card.criticality === "top" && crit.badge !== null && <Tag color="#eab308" solid>★ {crit.badge}</Tag>}
+      {card.criticality === "major" && crit.badge !== null && <Tag color="#cbd5e1">{crit.badge}</Tag>}
     </div>
   );
 }
 
-function DetailKv({ card, config, now, moves }: { card: CardState; config: BoardConfig; now: Date; moves: number }) {
-  const days = daysInColumn(card, now);
-  const heat = days > 60 ? "hot" : days > 28 ? "warm" : "";
+// Blocked banner with the reason and the "Lever" action.
+function BlockedAlert({ reason, onUnblock }: { reason: string | null; onUnblock: () => void }) {
+  return (
+    <div className="alert-box">
+      <span className="blk-pulse" /> <b>Bloqué</b> — {reason || "raison non précisée"}
+      <button className="lift-btn" onClick={onUnblock}>Lever</button>
+    </div>
+  );
+}
+
+// Key/value grid: owner, time in column (warm/hot past the config
+// thresholds), plan de charge, movement count, then custom fields.
+function KvGrid({ card, config, now, moves }: { card: CardState; config: BoardConfig; now: number; moves: number }) {
+  const days = daysInColumn(card, new Date(now));
+  const heat = days > config.age.agingMaxDays ? "hot" : days > config.age.recentMaxDays ? "warm" : "";
   return (
     <div className="kv-grid">
-      <div className="kv"><span>Responsable</span><b>{card.owner}</b></div>
+      <div className="kv"><span>Chef de projet</span><b>{card.owner || "—"}</b></div>
       <div className="kv"><span>Dans la colonne depuis</span><b className={heat}>{days} jours</b></div>
+      <div className="kv"><span>Plan de charge</span><b>{card.loadPlan || "—"}</b></div>
       <div className="kv"><span>Mouvements</span><b>{moves}</b></div>
-      <div className="kv"><span>Criticité</span><b>{CRITICALITY_LABELS[card.criticality]}</b></div>
-      {config.types.length > 0 && (
-        <div className="kv"><span>Type de projet</span><b>{typeById(config, card.typeId)?.name ?? "—"}</b></div>
-      )}
-      <div className="kv"><span>Source</span><b>{card.source}</b></div>
+      {config.fields.map((field) => <CustomKV key={field.id} field={field} value={card.custom[field.id]} />)}
     </div>
   );
 }
 
-function DetailBudget({ card }: { card: CardState }) {
-  if (card.budget === null) return null;
-  const consumed = card.consumed ?? 0;
-  const pct = card.budget > 0 ? Math.round((consumed / card.budget) * 100) : 0;
-  const over = consumed > card.budget;
+// Actions row; the block button hides while blocked or while the form shows.
+function Actions({ blocked, blockForm, onOpenBlock, onClose, onEdit }: {
+  blocked: boolean;
+  blockForm: boolean;
+  onOpenBlock: () => void;
+  onClose: () => void;
+  onEdit: () => void;
+}) {
   return (
-    <div className="charge-box">
-      <div className="charge-head">
-        <span className="field-label">Budget · k€</span>
-        <span className={"charge-num" + (over ? " over" : "")}>
-          {consumed} / {card.budget} k€{over ? " · dépassement" : ""}
-        </span>
-      </div>
-      <div className="charge-track">
-        <span
-          className="charge-fill"
-          style={{
-            width: `${Math.min(100, pct)}%`,
-            background: over ? "var(--danger)" : pct >= 85 ? "var(--warn)" : "var(--accent)",
-          }}
-        />
-      </div>
+    <div className="modal-actions">
+      {!blocked && !blockForm && <button className="btn block-btn" onClick={onOpenBlock}>Signaler un blocage</button>}
+      <span style={{ flex: 1 }} />
+      <button className="btn ghost" onClick={onClose}>Fermer</button>
+      <button className="btn primary" onClick={onEdit}>Modifier</button>
     </div>
   );
 }
 
-function Dependencies({ card, cards }: { card: CardState; cards: CardState[] }) {
-  if (card.dependencies.length === 0) return null;
-  return (
-    <div className="res-box">
-      <span className="field-label">Dépendances</span>
-      <div className="res-chips">
-        {card.dependencies.map((id) => (
-          <span key={id} className="res-chip" title={id}>
-            {cards.find((other) => other.id === id)?.title ?? id}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function historyText(entry: HistoryEntry): React.ReactNode {
-  if (entry.kind === "moved") {
-    return <>{entry.fromName} → <b>{entry.toName}</b></>;
-  }
-  if (entry.kind === "created") return <>Entrée → <b>{entry.toName ?? "?"}</b></>;
-  if (entry.kind === "blocked") return <b>Bloqué{entry.reason ? ` — ${entry.reason}` : ""}</b>;
-  return <b>Débloqué</b>;
-}
-
-function HistoryList({ entries }: { entries: HistoryEntry[] }) {
-  return (
-    <div className="history">
-      <span className="field-label">Historique</span>
-      <div className="hist-list">
-        {entries.map((entry, index) => (
-          <div className="hist" key={index}>
-            <span className={"hist-dot" + (entry.kind === "blocked" ? " danger" : "")} />
-            <span className="hist-move">{historyText(entry)}</span>
-            <span className="hist-meta">
-              {new Date(entry.ts).toLocaleDateString("fr-FR")} · {entry.actor}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
+// Inline form to describe and signal a blockage (textarea autofocus).
 function BlockForm({ onCancel, onSubmit }: { onCancel: () => void; onSubmit: (reason: string) => void }) {
-  const [reason, setReason] = useState("");
+  const [text, setText] = useState("");
   return (
     <div className="block-form">
       <span className="field-label">Décrire le blocage précisément</span>
@@ -146,122 +119,56 @@ function BlockForm({ onCancel, onSubmit }: { onCancel: () => void; onSubmit: (re
         rows={2}
         autoFocus
         placeholder="Ex. dépendance équipe Infra non livrée, attente arbitrage…"
-        value={reason}
-        onChange={(event) => setReason(event.target.value)}
+        value={text}
+        onChange={(event) => setText(event.target.value)}
       />
       <div className="modal-actions">
-        <span className="spacer" />
+        <span style={{ flex: 1 }} />
         <button className="btn ghost" onClick={onCancel}>Annuler</button>
-        <button className="btn danger" onClick={() => onSubmit(reason.trim() || "Blocage signalé")}>
-          Signaler le blocage
-        </button>
+        <button className="btn danger" onClick={() => onSubmit(text.trim() || "Blocage signalé")}>Signaler le blocage</button>
       </div>
-    </div>
-  );
-}
-
-function DetailRead({ props, onEditStart }: { props: CardDetailProps; onEditStart: () => void }) {
-  const { card, config } = props;
-  const [blockForm, setBlockForm] = useState(false);
-  const history = cardHistory(props.events, card.id, config);
-  const moves = history.filter((entry) => entry.kind === "moved").length;
-  return (
-    <div className="modal-body">
-      <div className="modal-top">
-        <div>
-          <h2 className="modal-name">{card.title}</h2>
-          {card.codename && <span className="modal-code">{card.codename}</span>}
-        </div>
-        <button className="x" onClick={props.onClose}>✕</button>
-      </div>
-      <DetailTags card={card} config={config} />
-      {card.blocked && (
-        <div className="alert-box">
-          <span className="blk-dot" /> <b>Bloqué</b> — {card.blockedReason ?? "raison non précisée"}
-          <button className="lift-btn" onClick={() => props.onUnblock(card.id)}>Lever</button>
-        </div>
-      )}
-      <DetailKv card={card} config={config} now={props.now} moves={moves} />
-      <DetailBudget card={card} />
-      <Dependencies card={card} cards={props.cards} />
-      <HistoryList entries={history} />
-      <DetailActions
-        props={props}
-        blockForm={blockForm}
-        onOpenBlockForm={() => setBlockForm(true)}
-        onCloseBlockForm={() => setBlockForm(false)}
-        onEditStart={onEditStart}
-      />
     </div>
   );
 }
 
 /**
- * The card detail modal (second click of the two-stage card click).
- * Read mode by default, toggles to the edit form ("Modifier").
- * Inputs: CardDetailProps (card, config, now, event log, all cards,
- * close/block/unblock/edit callbacks).
- * Output: the overlay + modal; clicking the overlay or ✕ closes (Escape
- * is handled globally). Failure: none.
+ * The card detail modal, read mode (second click of the two-stage click).
+ * Inputs: CardDetailProps — the folded card, the runtime config, the shared
+ * ticker, the card's history and the close/edit/block/unblock/comment
+ * callbacks.
+ * Output: overlay + modal; the bar is red when blocked, else the domain
+ * color; clicking the overlay or ✕ closes (Escape is handled globally).
+ * Failure modes: none — stale config references fall back to first entries
+ * for display via reconcileCardRefs.
  */
 export function CardDetail(props: CardDetailProps) {
   const { card, config } = props;
-  const [edit, setEdit] = useState(false);
+  const [blockForm, setBlockForm] = useState(false);
+  useEffect(() => { setBlockForm(false); }, [card.id]);
+  const refs = reconcileCardRefs(card, config);
+  const domain = config.domains.find((entry) => entry.id === refs.domain)!;
+  const column = config.columns.find((entry) => entry.id === refs.columnId)!;
   return (
     <div className="overlay" onClick={props.onClose}>
       <div className="modal" onClick={(event) => event.stopPropagation()}>
-        <span className="modal-bar" style={{ background: card.blocked ? "#b91c1c" : domainColor(config, card.domain) }} />
-        {edit ? (
-          <CardEdit
-            card={card}
-            config={config}
-            onCancel={() => setEdit(false)}
-            onSave={(patch) => {
-              props.onEdit(card.id, patch);
-              setEdit(false);
-            }}
-          />
-        ) : (
-          <DetailRead props={props} onEditStart={() => setEdit(true)} />
-        )}
+        <span className="modal-bar" style={{ background: card.blocked ? "#b91c1c" : domain.color }} />
+        <div className="modal-body">
+          <TopBar card={card} onClose={props.onClose} />
+          <TagRow card={card} config={config} />
+          {card.blocked && <BlockedAlert reason={card.blockedReason} onUnblock={props.onUnblock} />}
+          <KvGrid card={card} config={config} now={props.now} moves={props.history.length} />
+          <ChargeBox card={card} />
+          <ResourceChips resources={card.resources} />
+          <DocRow gate={column.gate} gateDef={column.gate === null ? null : config.gateDefs[column.gate]} />
+          <CommentList key={card.id} comments={card.comments} onAdd={props.onComment} />
+          <HistoryList entries={props.history} />
+          {card.sciformaId && <div className="scf">Réf. Sciforma : {card.sciformaId}</div>}
+          <Actions blocked={card.blocked} blockForm={blockForm} onOpenBlock={() => setBlockForm(true)} onClose={props.onClose} onEdit={props.onEdit} />
+          {blockForm && (
+            <BlockForm onCancel={() => setBlockForm(false)} onSubmit={(reason) => { props.onBlock(reason); setBlockForm(false); }} />
+          )}
+        </div>
       </div>
     </div>
-  );
-}
-
-function DetailActions({
-  props,
-  blockForm,
-  onOpenBlockForm,
-  onCloseBlockForm,
-  onEditStart,
-}: {
-  props: CardDetailProps;
-  blockForm: boolean;
-  onOpenBlockForm: () => void;
-  onCloseBlockForm: () => void;
-  onEditStart: () => void;
-}) {
-  const { card } = props;
-  return (
-    <>
-      <div className="modal-actions">
-        {!card.blocked && !blockForm && (
-          <button className="btn block-btn" onClick={onOpenBlockForm}>Signaler un blocage</button>
-        )}
-        <span className="spacer" />
-        <button className="btn ghost" onClick={props.onClose}>Fermer</button>
-        <button className="btn primary" onClick={onEditStart}>Modifier</button>
-      </div>
-      {blockForm && (
-        <BlockForm
-          onCancel={onCloseBlockForm}
-          onSubmit={(reason) => {
-            props.onBlock(card.id, reason);
-            onCloseBlockForm();
-          }}
-        />
-      )}
-    </>
   );
 }

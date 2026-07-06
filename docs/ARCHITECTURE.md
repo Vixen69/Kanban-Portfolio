@@ -176,6 +176,88 @@ de son ADR.
   (front/ et middle/ existent ; middle pas encore constructible — pas de
   script `build`, RP6).
 
+### 2026-07-06 — Reconstruction fidèle au design v9 (« the true version »)
+- La maquette validée (`design/`, « Portefeuille DSI — Kanban NMO » v9) devient
+  **la référence produit** (bannière datée dans CLAUDE.md ; ADR 012 modèle
+  complet, ADR 013 configuration à chaud). Reconstruction sur les trois
+  couches, orchestrée en deux workflows multi-agents (14 agents
+  d'implémentation + 2 portes d'intégration + revue adversariale).
+- **Contrats v2** : `config/board.json` (8 colonnes avec WIP actifs, gates
+  DoR/DoD, notes, colonne « Pause » repliée par défaut ; canaux nature+détail ;
+  domaines et types colorés ; natures/criticités renommables ; champs
+  personnalisés ; seuils d'âge frais/récent/vieillit/stagnant 7/28/60) ;
+  `core/types.ts` (carte complète : nature par carte, charge j.h, budget k€,
+  plan de charge, ressources, notes, sciformaId, custom ; événements
+  `commented`/`deleted` ; source `manual`).
+- **core/** réécrit et testé sur le modèle v2 (fold avec commentaires,
+  suppression par événement, patch étendu ; wipState na/ok/warn/over ;
+  gabarits de grille focus/repli ; métriques de flux portées de la maquette).
+  **middle/** : `POST /api/cards` (intake, id S-suivant + codename serveur),
+  événements étendus, `PUT /api/config` + `GET /api/config/default` (surcharge
+  `data/config.json` + historique append-only `data/config-history.jsonl`) ;
+  port `BoardStorage.insertCard` ; en-tête JSONL v2 (rejet des données
+  pré-v9). **fixtures** : générateur 150 sujets porté à l'identique (seed
+  20260609), historique émis en événements (seed = 150 cartes, 768 évts).
+- **front/** reconstruit 1:1 sur les modules de la maquette (CSS portée
+  verbatim en 8 fichiers sous `front/styles/` ; polices DM Sans/DM Serif
+  Display **auto-hébergées** (`front/public/fonts/`, OFL) — zéro egress ;
+  valeurs tweaks validées figées : densité 16 px, pulse, barre domaine,
+  fond neutre, pas d'assombrissement d'âge). Panneau admin (⚙, 3 onglets),
+  fiche complète (charge/budget/ressources/commentaires/historique/
+  suppression), QuickAdd, métriques (☷), état vide, raccourcis / N S Esc.
+- **Vérifié** : 253 tests verts (porte finale sans aucun correctif) ;
+  typecheck 3 tsconfigs ; conventions ; build (JS 206 Ko — 63 gzip, CSS
+  24,7 Ko) ; **en navigateur à 1920×1080** : 150 cartes zéro défilement,
+  focus 2.6fr, replis, fiche (commentaire→`evt commented`, blocage/levée,
+  édition, suppression→`evt deleted`), QuickAdd (S151 créé puis supprimé —
+  le journal garde tout), admin appliquer/réinitialiser (historisé, 2
+  lignes), métriques (goulot = Actifs), recherche estompante (16/150),
+  drag & drop (`evt-774 moved demandes→qualification`), zéro erreur console.
+  Correctif découvert en vérification : proxy Vite `^/api/` (un préfixe nu
+  `/api` capturait la requête du module `/api.ts` → 404).
+- Accès simple : **« Lancer le tableau.cmd »** (double-clic : install si
+  besoin + seed + middle + front + navigateur) ; README réaligné v9.
+- ⚠ Arbitrages PO en attente : la maquette v9 n'affiche pas de marqueur
+  d'escalade Andon (seuil conservé en core, ADR 012) ; `fitsOneScreen`
+  littéral impossible avec la graine (cellule projets×actifs à 19 barres →
+  écrêtage fidèle au design, test d'acceptation ajusté en conséquence) ;
+  ré-exporter le design si une version postérieure au 11/06 a été validée.
+
+### 2026-07-06 — Correctifs de la revue adversariale v9
+
+- **Remap d'affichage côté plateau** : les cartes dont le canal/la colonne a
+  été supprimé par une édition admin restent visibles (App applique
+  `reconcileCardRefs` à toutes les cartes avant placement — affichage
+  seulement, jamais d'évènement ; grid, compteurs et modales voient la même
+  liste). Corrige la disparition silencieuse de cartes (invariant « tout le
+  portefeuille visible »).
+- **Intake atomique** : le port `BoardStorage.insertCard(card, created)`
+  écrit la carte ET son évènement `created` en un seul lot (une carte ne
+  peut plus exister sans trace d'audit) ; `middle/cards.ts` et le pilote
+  JSONL adaptés, suite de conformance mise à jour.
+- **config-store** : la ligne d'historique append-only est écrite AVANT la
+  surcharge (un échec entre les deux laisse au pire une entrée d'historique
+  en trop, jamais une surcharge active non auditée).
+- **Échecs d'écriture visibles** : le store expose `lastError` (bandeau
+  d'erreur dans le shell) ; `saveEdit` s'arrête au premier intent refusé ;
+  le panneau admin reste ouvert sur un « Appliquer » refusé et affiche le
+  message français du serveur ; « Réinitialiser le modèle » passe par
+  `store.resetConfig` (re-télécharge les défauts si le fetch initial a
+  échoué). Édition d'une carte bloquée : un changement de raison seul poste
+  un intent `blocked` (la raison n'est plus perdue ; `blockedSince` se
+  réinitialise alors — assumé).
+- **Fidélité** : ✕ et clic-overlay du formulaire d'édition ferment toute la
+  modale (design) ; « Annuler » seul revient à la fiche. Générateur de
+  fixtures réaligné au prototype (tirage RNG « acteur » consommé : les âges
+  par carte correspondent aux 150 cartes de la maquette ; test de régression
+  S002 + assertion des bandes AGE_PROFILE). Tables de distribution extraites
+  dans `adapters/fixtures/distributions.ts`.
+- **Outillage/tests** : le vérificateur de conventions voit désormais les
+  fonctions anonymes (`=> {` en fin de ligne) ; tests ajoutés : move validé
+  contre l'état foldé post-move (rejet même-cellule), move canal-seul,
+  non-réutilisation d'un id supprimé ; `detailId` orphelin nettoyé par
+  effet. 259 tests verts.
+
 ### À venir
 - **RP3** : auth JWT-en-cookie (login, rôles viewer/editor/admin, acteur =
   utilisateur authentifié à la place de « anonymous ») ; CLI de comptes ;

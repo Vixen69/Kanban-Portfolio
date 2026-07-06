@@ -182,32 +182,44 @@ for (const driver of DRIVERS) {
     });
   });
 
-  test(`[${driver.name}] insertCard stores one new base card`, () => {
+  test(`[${driver.name}] insertCard stores the card AND its created event`, () => {
     withStore(driver, (store) => {
       const card = testCard({ id: "S151", title: "Sujet saisi", source: "manual" });
-      store.insertCard(card);
+      const stored = store.insertCard(card, lifecycleEvent("created", "S151", "local", TS));
       assert.deepEqual(store.listBaseCards(), [card]);
+      assert.equal(stored.id, "evt-1");
+      assert.deepEqual(store.listEvents(), [stored]);
     });
   });
 
   test(`[${driver.name}] insertCard refuses a duplicate id, in French`, () => {
     withStore(driver, (store) => {
-      store.insertCard(testCard({ id: "S151", title: "Original" }));
+      store.insertCard(
+        testCard({ id: "S151", title: "Original" }),
+        lifecycleEvent("created", "S151", "local", TS),
+      );
       assert.throws(
-        () => store.insertCard(testCard({ id: "S151", title: "Doublon" })),
+        () =>
+          store.insertCard(
+            testCard({ id: "S151", title: "Doublon" }),
+            lifecycleEvent("created", "S151", "local", TS),
+          ),
         /existe déjà/,
       );
-      // The refused insert must not have overwritten nor duplicated anything.
+      // The refused insert must not have persisted anything, event included.
       const cards = store.listBaseCards();
       assert.equal(cards.length, 1);
       assert.equal(cards[0]?.title, "Original");
+      assert.equal(store.listEvents().length, 1);
     });
   });
 
   test(`[${driver.name}] insertCard refuses an id already taken by an import`, () => {
     withStore(driver, (store) => {
       store.importCards([testCard({ id: "S100" })], []);
-      assert.throws(() => store.insertCard(testCard({ id: "S100" })), /existe déjà/);
+      const created = lifecycleEvent("created", "S100", "local", TS);
+      assert.throws(() => store.insertCard(testCard({ id: "S100" }), created), /existe déjà/);
+      assert.equal(store.listEvents().length, 0);
     });
   });
 
@@ -216,15 +228,23 @@ for (const driver of DRIVERS) {
       const card = testCard({ id: "S151", title: "Sujet saisi", source: "manual" });
       const store = driver.open(dir);
       try {
-        store.insertCard(card);
+        store.insertCard(card, lifecycleEvent("created", "S151", "local", TS));
       } finally {
         store.close();
       }
       const reopened = driver.open(dir);
       try {
         assert.deepEqual(reopened.listBaseCards(), [card]);
+        assert.equal(reopened.listEvents().length, 1);
         // The duplicate guard also holds against the reloaded snapshot.
-        assert.throws(() => reopened.insertCard(testCard({ id: "S151" })), /existe déjà/);
+        assert.throws(
+          () =>
+            reopened.insertCard(
+              testCard({ id: "S151" }),
+              lifecycleEvent("created", "S151", "local", TS),
+            ),
+          /existe déjà/,
+        );
       } finally {
         reopened.close();
       }
@@ -271,7 +291,7 @@ for (const driver of DRIVERS) {
       store.close();
       store.close();
       assert.throws(() => store.appendEvent(lifecycleEvent("created", "S001", "local", TS)));
-      assert.throws(() => store.insertCard(testCard()));
+      assert.throws(() => store.insertCard(testCard(), lifecycleEvent("created", "S001", "local", TS)));
       assert.throws(() => store.listEvents());
     });
   });
