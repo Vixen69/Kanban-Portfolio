@@ -1,0 +1,18 @@
+# Build-context filter for the container images (ADR 015). Keep the context
+# small and deterministic: no installed modules, no VCS, no local data, no
+# prebuilt outputs (the images build front/dist themselves). config/ is NOT
+# ignored — the middle image needs config/board.json at runtime.
+node_modules
+**/node_modules
+.git
+.gitattributes
+**/dist
+front/dist
+data
+docker/data
+docker/.env
+*.log
+*.jsonl
+sbom.json
+.claude
+.nvmrc

@@ -15,7 +15,7 @@ peut appliquer une surcharge à chaud, historisée en append-only (ADR 013).
 Architecture en couches et historique : voir `docs/ARCHITECTURE.md` (journal
 vivant) et `docs/adr/` (décisions). Le contrat de travail est `CLAUDE.md`.
 
-## Fonctionnalités (design v9, ADR 012/013)
+## Fonctionnalités (design v10, ADR 012/013/014)
 
 - **Radiateur par défaut** : barres fines (~16 px), tout le portefeuille d'un
   coup. Cliquer une colonne (ou une carte hors focus) **focalise ce stade**
@@ -31,12 +31,16 @@ vivant) et `docs/adr/` (décisions). Le contrat de travail est `CLAUDE.md`.
   codes projet, filtres type / nature / criticité / domaine avec tout·rien.
   Les filtres **estompent**, ne retirent jamais (ADR 005). Compteurs
   affichés/total et stats en direct ; état vide avec réinitialisation.
-- Fiche détaillée : charge (consommé/estimé j.h), budget (k€), plan de
-  charge, ressources clés, commentaires (événements `commented`),
-  historique (journal), liens DoR/DoD, signalement/levée de blocage,
-  édition complète (`edited`), suppression (événement `deleted` — le
-  journal garde tout). **« + Sujet »** (`N`) : création locale, entre
-  toujours dans la première colonne (flux tiré).
+- Fiche détaillée (design v10, ADR 014) : **plan de charge par profil DSI**
+  (j.h répartis, barres consommé/estimé), **risque de contention** (profils
+  en tension + note), **budget · graphe croisé** (enveloppe RDLI / estimé /
+  engagé / réalisé), **risques & alertes** (alertes dérivées + risques typés
+  éditables + alertes libres), **contraintes du projet**, **date RDR**
+  (livraison projetée) — tous éditables en ligne. Plus : commentaires
+  (`commented`), historique (journal), liens DoR/DoD, signalement/levée de
+  blocage, édition complète (`edited`), suppression (`deleted` — le journal
+  garde tout). **« + Sujet »** (`N`) : création locale, entre toujours dans
+  la première colonne (flux tiré).
 - **Panneau d'administration** (⚙) : topologie/vocabulaire uniquement —
   colonnes (ordre, WIP, gate), canaux, domaines, types, libellés natures/
   criticités, champs de carte personnalisés. Surcharge persistée côté
@@ -121,8 +125,18 @@ Portail local avant conteneurisation, dans l'ordre : install (`npm ci`),
 conventions, typecheck (core + middle + front), tests (`node:test`, dont le
 test de frontières d'architecture `scripts/architecture.test.ts`), build du
 front, SBOM (CycloneDX, `sbom.json`). La livraison vers la plateforme du
-client se fait par **image conteneur** (ADR 011), non plus par installation
-hors-ligne.
+client se fait par **image conteneur** (ADR 011/015), non plus par
+installation hors-ligne.
+
+## Livrer (conteneurs)
+
+Deux images — **front** (nginx, statique + proxy `/api`) et **middle**
+(Express, JSONL sur volume) — construites depuis ce dépôt, même origine, zéro
+egress, dans le plafond SBOM. Le dossier de remise **[`LIVRAISON.md`](LIVRAISON.md)**
+détaille : construire, lancer, config/env, le SBOM, les deux points à trancher
+avec le référent (`pg`, canal de livraison), la checklist, et un **runbook de
+test local Docker** (`docker compose -f docker/compose.yaml --profile app up
+--build`).
 
 ## Disposition du dépôt
 
@@ -134,16 +148,17 @@ front/       application React 18 + Vite (couche de vue mince sur core/)
 sync/        (RP4) processus CLI de synchronisation
 config/      board.json (topologie versionnée)
 fixtures/    jeux de données synthétiques
-docker/      Dockerfiles + compose (Postgres de dev) — finalisés au RP6
+docker/      Dockerfiles (front nginx, middle Express) + compose — ADR 015
 docs/adr/    décisions d'architecture (français)
 docs/ARCHITECTURE.md  journal vivant des changements d'architecture
-design/      maquette validée v9 (référence produit, ADR 012)
+design/      maquette validée v10 (référence produit, ADR 012/014)
 ```
 
 ## Documents
 
 - `CLAUDE.md` — le contrat de travail du projet.
+- `LIVRAISON.md` — dossier de remise conteneurisée (construire / livrer / tester).
 - `docs/ARCHITECTURE.md` — journal des changements d'architecture.
-- `docs/adr/` — une décision par fichier (001-013).
+- `docs/adr/` — une décision par fichier (001-015).
 - `SECURITY.md` — posture de sécurité.
 - `DEPENDENCIES.md` — gouvernance des dépendances (plafond SBOM).

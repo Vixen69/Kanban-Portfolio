@@ -23,11 +23,17 @@ de son ADR.
   front **React 18 / Vite**, middle **Node / Express**, back **PostgreSQL**,
   Docker. Authentification **JWT en cookie httpOnly** + **scrypt**.
   Dépendances bornées au **plafond SBOM** autorisé par le client.
+- **Référence produit** : design **v10** (ADR 014) — couche risques /
+  contraintes / contention / plan de charge par profil dans la fiche détail,
+  au-dessus de la v9 (ADR 012/013).
 - **État live** : monorepo `core/` + `middle/` (Express, pilote JSONL — `pg`
-  différé) + `front/` (React 18) ; **135 tests** `node:test` (dont les
+  différé) + `front/` (React 18) ; **263 tests** `node:test` (dont les
   frontières d'architecture). Lancement dev : `npm run serve` (middle :8787)
   + `npm run dev` (front :5173, proxy `/api`) ; données via
   `KANBAN_ALLOW_SEED=1 npm run seed`. Cf. README « Démarrer ».
+- **Livraison** : conteneurisée (images front nginx + middle Express, même
+  origine, JSONL sur volume ; SBOM CycloneDX), ADR 015 — dossier
+  `LIVRAISON.md` (construire / lancer / vérifier / test local Docker).
 
 ## Journal des changements
 
@@ -331,6 +337,30 @@ de son ADR.
   Plusieurs scissions de fichiers/fonctions pour tenir les plafonds
   (`config-types.ts`, `config-parse.ts`, `adapters/fixtures/extras.ts`,
   `middle/test-helpers.ts`, `front/detailModel.ts`, `DetailPlan/DetailRisk`).
+
+### 2026-07-07 — Conteneurisation & livraison (RP6) + dossier de remise
+
+- **Images réellement constructibles** (ADR 015). `Dockerfile.middle` réécrit
+  sur le modèle **exécution TS directe** (`node middle/main.ts`, Node 22.18
+  type-stripping — plus de faux `build`/`dist`) ; copie `core/ middle/ config/`,
+  `npm ci --omit=dev`, volume `/data` (JSONL), génère son propre `sbom.json`.
+  `Dockerfile.front` : ajout du proxy `/api` (`docker/nginx.default.conf.
+  template`, upstream `MIDDLE_HOST`/`MIDDLE_PORT` par envsubst). `.dockerignore`
+  ajouté ; Node épinglé `22.18-alpine` ; `compose.yaml` réécrit (volume JSONL,
+  `db` sous profil `postgres` infra-seule, `DATABASE_URL` trompeur retiré).
+- **Vérifié par équivalents hôte** (pas de Docker sur la machine d'auteur) :
+  build front → `front/dist` (CSS 35 Ko avec la couche v10) ; `node
+  middle/main.ts` + env conteneur → l'API sert 150 cartes / 768 évts et la
+  config (19 profils, 6 types de risque) ; `node scripts/sbom.ts` → CycloneDX
+  1.5 (202 composants) ; seed → 150 cartes JSONL. Le 1ᵉʳ `docker build` reste
+  à lancer sur une machine Docker (runbook `LIVRAISON.md` §8).
+- **`LIVRAISON.md`** (dossier de remise) : livrables, construire, lancer,
+  config/env, SBOM, JSONL-maintenant/Postgres-ensuite, les 2 demandes au
+  référent (`pg`, canal/registre), checklist, **runbook de test local Docker**.
+- **ADR 014** (import design v10) et **ADR 015** (conteneurisation/livraison)
+  écrits ; ADR 001/008/009/010 marqués « supersédé par ADR 011 » ; résumé
+  ARCHITECTURE réaligné (263 tests) ; README/CLAUDE/DEPENDENCIES réconciliés
+  v9→v10 et sur la surface de dépendances réellement installée.
 
 ### À venir
 - **RP3** : auth JWT-en-cookie (login, rôles viewer/editor/admin, acteur =

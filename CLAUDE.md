@@ -143,7 +143,12 @@ fields, append-only enforced by table grants/triggers):
   live values are derived by folding `card_events` on read, never written
   back (ADR 002). criticality/type_id/codename added by ADR 006; the full
   design-v9 card (nature, charge, budget, plan de charge, ressources, notes,
-  sciforma_id, custom, source manual) by ADR 012.
+  sciforma_id, custom, source manual) by ADR 012; the design-v10 layer by
+  ADR 014 — risks (jsonb), project_constraints, contention_profiles +
+  contention_note, charge_by_profile (jsonb, j.h per DSI profile), alerts,
+  date_rdr, budget_rdli + budget_engaged (k€). The profile/role/risk/
+  constraint/severity typologies live in the board config (ADR 014), not on
+  the card.
 - `card_events` : append-only. seq (bigint sequence, ordering), id
   (evt-<seq>), ts, actor, card_id, type
   (created/moved/blocked/unblocked/edited/commented/deleted/imported),

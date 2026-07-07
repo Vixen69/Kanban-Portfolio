@@ -1,5 +1,9 @@
 # ADR 008 — Port de stockage et pilote node:sqlite
 
+> **Supersédé quant à la pile par l'ADR 011** : `node:sqlite` est **retiré**
+> (Node 22 / conteneur). Le **port `BoardStorage`** décrit ici **subsiste** ;
+> pilote actif = **JSONL** (ADR 009), PostgreSQL via `pg` à venir (ADR 011/015).
+
 ## Contexte
 
 Le Sprint 3 persiste les cartes et le journal `card_events`. La VM cliente

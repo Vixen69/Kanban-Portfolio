@@ -1,5 +1,9 @@
 # ADR 009 — Pilote de stockage de repli JSONL
 
+> **Statut (ADR 011)** : le pilote **JSONL est aujourd'hui le pilote actif**
+> (et non plus un simple repli — `node:sqlite` retiré, ADR 008/011). Il tourne
+> en conteneur sur un volume `/data` (ADR 015). PostgreSQL via `pg` à venir.
+
 ## Contexte
 
 Le pilote primaire est `node:sqlite` (ADR 008), qui exige Node 24 LTS

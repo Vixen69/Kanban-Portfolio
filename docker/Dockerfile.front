@@ -1,14 +1,21 @@
-# Front (React 18 + Vite) — build static assets, serve via nginx. front/ exists
-# (RP2) and `npm run -w front build` is real; the remaining gap is the nginx
-# conf proxying /api -> middle (same-origin), added at RP6.
-FROM node:22-alpine AS build
+# Front (React 18 + Vite) — build the static bundle, serve it with nginx which
+# also reverse-proxies /api to the middle (same-origin, zero egress). Node
+# 22.18 to build, nginx 1.27-alpine to serve. ADR 015.
+FROM node:22.18-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
+COPY core/package.json ./core/package.json
+COPY middle/package.json ./middle/package.json
+COPY front/package.json ./front/package.json
+RUN npm ci
+# The front build (tsc + vite) needs core/ (it imports the pure domain types).
 COPY core ./core
 COPY front ./front
-RUN npm ci
 RUN npm run --workspace front build
 
 FROM nginx:1.27-alpine AS run
+# Upstream of the /api proxy — overridable (compose sets these to the service).
+ENV MIDDLE_HOST=middle MIDDLE_PORT=8787
+COPY docker/nginx.default.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/front/dist /usr/share/nginx/html
 EXPOSE 80

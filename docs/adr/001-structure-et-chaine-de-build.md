@@ -1,5 +1,10 @@
 # ADR 001 — Structure du dépôt et chaîne de build
 
+> **Note (ADR 011)** : la *chaîne de build* d'origine (node:http / SQLite,
+> vendoring hors-ligne) est **re-plateformée** par l'ADR 011 (conteneurs,
+> workspaces npm, livraison par image — ADR 015). La disposition ports &
+> adaptateurs et l'event-sourcing (ADR 002) subsistent.
+
 ## Contexte
 
 Le contrat (CLAUDE.md) impose : TypeScript strict, React + Vite en couche de

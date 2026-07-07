@@ -1,5 +1,10 @@
 # ADR 010 — Serveur node:http et surface de l'API
 
+> **Supersédé quant au transport par l'ADR 011** : le serveur `node:http`
+> devient **Express**. La **logique d'API et la surface** décrites ici
+> (`/api/*`, autorité serveur sur id/horodatage/acteur, en-têtes de sécurité,
+> même-origine) **subsistent**, portées inchangées dans Express (ADR 011).
+
 ## Contexte
 
 Le Sprint 3 expose le tableau via HTTP : le serveur sert le frontend statique

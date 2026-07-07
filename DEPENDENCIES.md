@@ -35,18 +35,24 @@ plateforme) exige l'accord du référent technique, une ligne ici **et** un ADR.
 | Config | dotenv, dotenv-expand |
 | Outils (dev) | typescript (5.9), nodemon, ts-node, tsx, @types/* |
 
-## Ce que l'outil utilise réellement (sous-ensemble du plafond)
+## Ce qui est réellement installé aujourd'hui (sous-ensemble du plafond)
 
-| Paquet | Rôle | Justification |
+À ce jour, **seuls `express` (+ `@types/express`), `react`/`react-dom` et la
+chaîne de build (`vite`, `@vitejs/plugin-react`, `typescript`, `@types/*`) sont
+installés** (voir les `package.json` + `package-lock.json`). `core/` est **sans
+dépendance**. Les paquets d'authentification et de config sont autorisés mais
+**pas encore installés** (l'auth est RP3).
+
+| Paquet | Rôle | Statut |
 |---|---|---|
-| react, react-dom 18 | Front | Couche de vue (CLAUDE.md §3). Composants fonctionnels uniquement. |
-| vite + @vitejs/plugin-react | Build front | Build conteneurisé. |
-| express | Middle | Serveur HTTP du middle ; `cors`/`cookie-parser` du SBOM sont des middlewares Express. La logique d'API existante (validation, fold, construction d'évènements) s'y branche sans changement. |
-| cookie-parser, cors | Middle | Cookie de session JWT (httpOnly) ; CORS configuré same-origin (refus du cross-origin). |
-| jsonwebtoken | Middle | Jeton de session JWT (RP3). |
-| dotenv (+ expand) | Middle | Lecture des secrets (BD, sync) depuis des fichiers hors dépôt. |
-| typescript, eslint (+ plugins) | Dev | TypeScript strict ; ESLint = style maison du client (CLAUDE.md §8). |
-| nodemon / tsx / ts-node | Dev | Exécution/relance du middle en TypeScript. |
+| react, react-dom 18 | Front (couche de vue, CLAUDE.md §3) | **installé** ; *bundlé* au build (aucun node_modules livré côté front) |
+| vite + @vitejs/plugin-react | Build front | **installé** (dev) |
+| express (+ @types/express) | Middle — serveur HTTP ; la logique d'API existante s'y branche sans changement | **installé** (seule dépendance runtime du middle) |
+| cookie-parser, cors | Middle — cookie JWT httpOnly ; CORS same-origin | **différé (RP3)** — pas installé (même-origine géré sans `cors` ; cf. `middle/app.ts`) |
+| jsonwebtoken | Middle — jeton de session JWT | **différé (RP3)** — pas installé |
+| dotenv (+ expand) | Middle — secrets (BD, sync) hors dépôt | **différé** — arrive avec `pg`/l'auth |
+| typescript, @types/* | Dev — TypeScript strict | **installé** (dev) |
+| eslint (+ plugins), nodemon / tsx / ts-node | Dev — style maison client ; exécution TS | **différé** — non requis (tests `node:test`, exécution `node middle/main.ts`) |
 
 Tailwind, Radix, lucide, axios, react-secure-storage, sonner,
 react-router-dom, etc. **sont autorisés mais pas encore employés** : le CSS
