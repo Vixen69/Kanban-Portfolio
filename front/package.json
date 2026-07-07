@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Front — React 18 + Vite, thin view over core/ (ADR 011). Hand-written CSS now; Tailwind/Radix later.",
   "engines": {
-    "node": ">=22.18"
+    "node": ">=22.18.0 <24.0.0"
   },
   "scripts": {
     "dev": "vite",
