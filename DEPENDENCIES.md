@@ -68,11 +68,11 @@ optionnel (le wrapper `fetch` existant suffit).
   (redistribution permise). Auto-hébergées pour respecter le zéro-egress :
   aucune police distante, aucun appel à Google Fonts à l'exécution.
 
-## Hors plafond — à faire autoriser
+## Hors plafond — non requis pour l'instant
 
 | Paquet | Rôle | Statut |
 |---|---|---|
-| **`pg`** (node-postgres) | Client PostgreSQL du middle (port `BoardStorage`) | **À autoriser par le référent technique** — absent du SBOM de référence. Choix standard, mûr, auditable. Seul ajout runtime requis. |
+| **`pg`** (node-postgres) | Client PostgreSQL du middle (port `BoardStorage`) | **Non requis pour la 1re mise en service** : le stockage **fichier JSONL durable** (volume persistant sauvegardé, middle mono-instance) est retenu — **zéro écart au plafond**. `pg` ne deviendrait à autoriser que si PostgreSQL s'impose (scaling horizontal du middle / exigence SGBD) ; il se branche alors derrière le port `BoardStorage`, sans autre changement. Client standard, mûr, JS pur (pas de build natif), auditable. |
 
 ## Modules natifs Node (aucune dépendance, dans tout plafond)
 

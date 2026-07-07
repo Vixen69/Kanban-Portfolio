@@ -97,25 +97,37 @@ plateforme.
   côté front). Le reste du plafond (cors, cookie-parser, jsonwebtoken, dotenv,
   design-system front…) est **autorisé mais pas encore installé** (auth = RP3).
 
-## 6. Stockage : JSONL aujourd'hui, PostgreSQL ensuite
+## 6. Stockage : stockage fichier durable (retenu pour la 1re mise en service)
 
-Le middle tourne sur un pilote **JSONL** (fichier append-only, lisible) derrière
-le port `BoardStorage`. **PostgreSQL est la cible** (`config/` §4) via **`pg`**,
-mais `pg` est **hors plafond SBOM** et le pilote `postgres` **lève une erreur**
-tant qu'il n'est pas autorisé (`middle/storage/select.ts`). Le service `db`
-(profil `postgres`) du compose est **infra seule**, non utilisé par l'app.
+Le middle est **event-sourced** : la vérité est un **journal append-only**. Il
+tourne sur un pilote **JSONL** (fichier append-only, lisible) derrière le port
+`BoardStorage`. **Choix retenu pour démarrer : ce stockage fichier**, sur un
+**volume persistant sauvegardé par la plateforme** — aucune dépendance hors
+plafond ; le fichier *est* la donnée, les snapshots de volume font office de
+sauvegarde.
 
-Bascule le jour où `pg` est autorisé : un seul fichier isolé derrière le port
-`BoardStorage`, sans recâblage (ADR 011).
+- **Contrainte** : un **middle mono-instance** (écrivain unique du journal).
+  Le fichier append-only n'est pas sûr en écriture concurrente multi-process.
+- **Bascule PostgreSQL** — si un jour il faut scaler le middle horizontalement
+  (plusieurs répliques) ou qu'un SGBD est exigé : **un seul adaptateur** derrière
+  le port `BoardStorage`, sans autre changement, et **là seulement** `pg`
+  (node-postgres) devient la dépendance à faire autoriser. Le service `db`
+  (profil `postgres`) du compose est prêt pour ce jour-là ; aujourd'hui le
+  pilote `postgres` lève une erreur tant que `pg` n'est pas là
+  (`middle/storage/select.ts`).
 
-## 7. À trancher avec le référent technique (deux points)
+## 7. À confirmer avec le référent technique (deux points)
 
-1. **Autoriser `pg` (node-postgres)** — seule dépendance runtime hors du SBOM
-   de référence. Sans elle : JSONL, pas PostgreSQL.
+1. **Stockage** : un **volume durable + sauvegardé** pour le fichier JSONL
+   convient-il pour cette 1re mise en service (middle mono-instance), ou
+   PostgreSQL est-il impératif d'emblée ? Le stockage fichier **évite toute
+   dépendance hors plafond** ; PostgreSQL n'ajouterait que `pg`, le jour où il
+   s'impose (§6).
 2. **Le canal de livraison / registre d'images** dans la plateforme (push
    registre, tarball d'image, Git interne) — encore non fixé.
 
-Aucun autre écart au plafond. Tout le reste est dans les versions autorisées.
+Avec le stockage fichier, **aucun écart au plafond**. Tout le reste est déjà
+dans les versions autorisées.
 
 ## 8. Tester en local avec Docker (avant d'en parler au client)
 
@@ -189,5 +201,6 @@ de zéro : supprimer `docker/data/board.jsonl`.
 - [ ] `docker compose --profile app build` réussit sur une machine Docker.
 - [ ] `--profile app up` : front:8080 rend le plateau, `/api` répond en même origine.
 - [ ] Aucune donnée réelle ni secret dans les images ni le dépôt (fixtures seulement).
+- [ ] Volume **durable + sauvegardé** monté sur `/data` du middle (§6) ; middle mono-instance.
+- [ ] Stockage fichier validé par le référent (§7-1) — sinon PostgreSQL + autorisation `pg`.
 - [ ] Canal de livraison / registre confirmé (§7-2).
-- [ ] `pg` : statut d'autorisation noté (§7-1) — livraison JSONL sinon.

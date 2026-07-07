@@ -355,8 +355,13 @@ de son ADR.
   1.5 (202 composants) ; seed → 150 cartes JSONL. Le 1ᵉʳ `docker build` reste
   à lancer sur une machine Docker (runbook `LIVRAISON.md` §8).
 - **`LIVRAISON.md`** (dossier de remise) : livrables, construire, lancer,
-  config/env, SBOM, JSONL-maintenant/Postgres-ensuite, les 2 demandes au
-  référent (`pg`, canal/registre), checklist, **runbook de test local Docker**.
+  config/env, SBOM, stockage, checklist, **runbook de test local Docker**.
+- **Décision stockage (auteur)** : **stockage fichier JSONL durable retenu
+  pour la 1re mise en service** (volume persistant sauvegardé, middle
+  mono-instance) → **zéro dépendance hors plafond, pas de `pg` à autoriser**.
+  PostgreSQL/`pg` = voie d'escalade (scaling / SGBD), un adaptateur derrière le
+  port `BoardStorage`. Les 2 points au référent deviennent : (1) volume durable
+  OK ou Postgres d'emblée, (2) canal de livraison/registre.
 - **ADR 014** (import design v10) et **ADR 015** (conteneurisation/livraison)
   écrits ; ADR 001/008/009/010 marqués « supersédé par ADR 011 » ; résumé
   ARCHITECTURE réaligné (263 tests) ; README/CLAUDE/DEPENDENCIES réconciliés
