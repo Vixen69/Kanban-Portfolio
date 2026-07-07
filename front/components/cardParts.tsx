@@ -13,17 +13,24 @@ import type {
 } from "../../core/types.ts";
 import { ageCategory, ageLabel } from "../../core/aging.ts";
 
+// Gold crown for a top-criticality card (design/board.jsx CrownSVG).
+function CrownSVG({ s }: { s: number }) {
+  return (
+    <svg className="crit-crown" width={s} height={s} viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M2 7l4.5 3.5L12 3l5.5 7.5L22 7l-1.8 12H3.8L2 7z" fill="#d4a017" stroke="#a16207" strokeWidth="1" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 /**
- * Criticality marker: top = gold star, major = slate pip, normal = none.
+ * Criticality marker: top = gold crown, major = gold star, normal = none.
  * Inputs: c — the card's criticality; big — expanded-card variant.
  * Output: the marker element, or null for "normal". Failure modes: none.
  */
 export function CritMark({ c, big }: { c: Criticality; big?: boolean }) {
-  if (c === "top") {
-    return <span className="crit-star" style={{ fontSize: big ? 14 : 10 }}>{"★"}</span>;
-  }
+  if (c === "top") return <CrownSVG s={big ? 16 : 12} />;
   if (c === "major") {
-    return <span className="crit-pip" style={{ width: big ? 7 : 5, height: big ? 7 : 5 }} />;
+    return <span className="crit-star" style={{ fontSize: big ? 14 : 11 }}>{"★"}</span>;
   }
   return null;
 }

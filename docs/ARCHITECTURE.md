@@ -258,6 +258,80 @@ de son ADR.
   non-réutilisation d'un id supprimé ; `detailId` orphelin nettoyé par
   effet. 259 tests verts.
 
+### 2026-07-07 — Import du design v10 : couche risques / contraintes / contention
+
+- **Import** : nouvelle version du design importée depuis Claude Design
+  (`design/`, format bundle auto-porté : le HTML self-contained embarque les
+  sources JSX en manifest gzip+base64 — extraites et réécrites dans `design/`
+  pour un diff propre). Delta vs 11/06 : `modals.jsx` 356→744, `config.jsx`
+  146→258, `data.jsx` 250→334 ; le plateau ne change (quasi) pas — l'ajout vit
+  dans la **fiche détail**. `tweaks-panel.jsx` identique.
+- **Nouveau modèle de carte** (9 champs, aucune suppression) : `risks`
+  ({type, desc}), `projectConstraints` (ids), `contentionProfiles` +
+  `contentionNote`, `chargeByProfile` ({profileId, jh, done}), `alerts`,
+  `dateRdr`, `budgetRdli` (enveloppe RDLI arbitrée) et `budgetEngaged`
+  (engagé). RDLI/engagé portés par la carte/Subject (pas par le port
+  `Financials` — valeurs d'arbitrage, pas financiers PPM standard).
+- **Nouvelles typologies = membres de plein droit de `BoardConfig`**
+  (choix auteur : « fully overridable ») : `profiles` (19, DSI),
+  `roleFamilies` (6), `roleOf` (ressource→famille), `riskTypes` (6),
+  `projectConstraints` (2), `riskSeverity` (faible/moyen/élevé). Ajoutées à
+  `config/board.json`, validées par `core/config.ts`, servies par
+  `/api/config`. Le panneau admin clone la config entière (`JSON.parse`/
+  `stringify`) → les typologies **transitent inchangées** dans une surcharge :
+  round-trip sûr sans casser « Appliquer ». (Onglet admin d'édition des
+  typologies : évolution ultérieure — le round-trip suffit à la justesse.)
+- **Slices livrées (1-3, testées)** :
+  - **core** : `types.ts` scindé (topologie/vocab → `config-types.ts`) pour
+    tenir le plafond 300 lignes ; primitives de validation extraites en
+    `config-parse.ts` ; `EDITABLE` (liste blanche d'édition) élargie aux 9
+    champs (validateurs structurels pour `chargeByProfile`/`risks`).
+  - **fixtures** : semis des 9 champs en **passe finale** (tirages RNG
+    **après** toute position/âge) → grille du plateau et âges **identiques**
+    au prototype (pin S002 vert) ; nouveaux champs déterministes et corrélés
+    aux valeurs réelles ; pools texte (risques/contention/alertes) dans
+    `fixtures/dataset.ts` ; helpers de semis en `adapters/fixtures/extras.ts`.
+  - **middle** : validation d'édition **config-aware** des 9 champs (ids de
+    profil/risque/contrainte doivent exister dans la topologie) ; `stubStorage`
+    de test extrait en `middle/test-helpers.ts`.
+- **Vérifié** : **263 tests verts**, typecheck (3 tsconfigs), conventions
+  (fichiers ≤300 / fonctions ≤40 — plusieurs scissions à cet effet). Aucune
+  régression : le modèle de données est câblé bout-en-bout (l'API accepte,
+  valide et sert tout le nouveau modèle).
+- **Slice 4 (front) LIVRÉE & vérifiée** : fiche détail portée 1:1. `InlineEdit`
+  générique + 4 éditeurs à cases (`ChargeEditor`, `ContentionEditor`,
+  `RiskEditor`, `ConstraintEditor`) dans `modalEditors.tsx` ; sections lecture
+  (owner-strip, RDR projetée, plan de charge j.h par profil, risque de
+  contention, graphe budget croisé RDLI/estimé/engagé/réalisé, risques &
+  alertes = auto-alertes dérivées + risques éditables + alertes libres) dans
+  `DetailPlan.tsx` / `DetailRisk.tsx` ; dérivations pures dans `detailModel.ts`
+  (pas de React). `CardDetail` recâblé : titre/codename/owner/date/risques
+  édités *en ligne* → prop `onPatch` → `store.editCard` (évènement `edited`).
+  Couronne SVG (top) / étoile (major) via `CritMark`. Les typologies servies
+  par `/api/config` alimentent les listes des éditeurs. CSS des nouvelles
+  sections ajoutée à `front/styles/modal.css` (extraite du bundle design).
+  Les ressources-par-famille-de-rôle sont **calculées mais non rendues** dans
+  le design v10 (section retirée) — donc non portées ; panneau « délais
+  kanban » (lead/cycle) reporté (historique de mouvements conservé).
+  **Vérifié en navigateur (1920×1080)** : 150 cartes, fiche complète rendue
+  fidèlement (owner « Mme Laurent », RDR « 12 avr. 2027 · dans 279 j », plan de
+  charge CdP INFRA SSI, graphe budget avec trait RDLI, risque SSG, note de
+  contention) ; **édition en ligne round-trip** (ajout d'alerte → `POST
+  /api/events 201` type `edited` seq 769 sur S034 → refetch) ; 10 couronnes
+  (top) + 30 étoiles (major) conformes au récap ; zéro erreur console.
+- **Outils demandés par l'auteur** : `npm run import-design`
+  (`scripts/import-design.ts`) — ré-importe un export Claude Design en une
+  commande : décompresse les sources JSX du manifest gzip+base64 du bundle,
+  les réécrit dans `design/*.jsx` (appariées par similarité de contenu) et
+  imprime un delta par fichier (idempotent quand le design n'a pas bougé).
+  « the card content will probably move again » → `git diff design/` montre
+  alors exactement ce qui a changé. Lancement du produit : double-clic sur
+  **« Lancer le tableau.cmd »** (déjà présent) = `npm start`.
+- **Total : 263 tests verts, typecheck 3 tsconfigs, conventions, build.**
+  Plusieurs scissions de fichiers/fonctions pour tenir les plafonds
+  (`config-types.ts`, `config-parse.ts`, `adapters/fixtures/extras.ts`,
+  `middle/test-helpers.ts`, `front/detailModel.ts`, `DetailPlan/DetailRisk`).
+
 ### À venir
 - **RP3** : auth JWT-en-cookie (login, rôles viewer/editor/admin, acteur =
   utilisateur authentifié à la place de « anonymous ») ; CLI de comptes ;

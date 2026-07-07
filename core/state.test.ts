@@ -23,9 +23,11 @@ test("EDITABLE_FIELDS is exactly the v2 CardPatch key set", () => {
   assert.deepEqual(
     [...EDITABLE_FIELDS].sort(),
     [
-      "budgetConsumed", "budgetEstimated", "codename", "criticality", "custom",
-      "domain", "effortConsumed", "effortEstimated", "loadPlan", "nature",
-      "notes", "owner", "resources", "tags", "title", "typeId",
+      "alerts", "budgetConsumed", "budgetEngaged", "budgetEstimated", "budgetRdli",
+      "chargeByProfile", "codename", "contentionNote", "contentionProfiles",
+      "criticality", "custom", "dateRdr", "domain", "effortConsumed",
+      "effortEstimated", "loadPlan", "nature", "notes", "owner",
+      "projectConstraints", "resources", "risks", "tags", "title", "typeId",
     ].sort(),
   );
 });

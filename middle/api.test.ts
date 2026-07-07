@@ -4,42 +4,14 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import type { BoardStorage } from "../core/ports.ts";
-import type { CardEventInput } from "../core/events.ts";
 import type { BoardConfig, Card, CardEvent } from "../core/types.ts";
 import { testCard, testConfig } from "../core/test-helpers.ts";
 import { BadRequest, getBoard, getConfig, postEvent, putConfig, SERVER_ACTOR } from "./api.ts";
 import { postCard } from "./cards.ts";
+import { stubStorage } from "./test-helpers.ts";
 import type { ConfigStore } from "./config-store.ts";
 
 const config = testConfig();
-
-// In-memory BoardStorage stub: base cards + append-only events, ids evt-<n>.
-function stubStorage(cards: Card[] = [testCard({ id: "S001" })]): BoardStorage {
-  const baseCards = cards.map((card) => ({ ...card }));
-  const events: CardEvent[] = [];
-  let seq = 0;
-  const append = (input: CardEventInput): CardEvent => {
-    seq += 1;
-    const event: CardEvent = { ...input, id: `evt-${seq}` };
-    events.push(event);
-    return event;
-  };
-  return {
-    importCards() {
-      throw new Error("importCards non utilisé dans ces tests");
-    },
-    insertCard(card: Card, created: CardEventInput): CardEvent {
-      if (baseCards.some((c) => c.id === card.id)) throw new Error(`id dupliqué : ${card.id}`);
-      baseCards.push({ ...card });
-      return append(created);
-    },
-    appendEvent: append,
-    listEvents: () => events.slice(),
-    listBaseCards: () => baseCards.map((card) => ({ ...card })),
-    close() {},
-  };
-}
 
 // ConfigStore stub recording every applied override.
 function stubConfigStore(
@@ -249,6 +221,15 @@ test("an edited patch passes with valid v2 fields of every kind", () => {
     criticality: "major",
     loadPlan: "1,5 ETP",
     notes: "",
+    budgetEngaged: 150,
+    budgetRdli: 220,
+    chargeByProfile: [{ profileId: "pA", jh: 30, done: 10 }],
+    contentionProfiles: ["pA"],
+    contentionNote: "Lead partagé",
+    risks: [{ type: "rSSG", desc: "Revue sécurité" }],
+    projectConstraints: ["legale"],
+    alerts: ["Décision COPROJ attendue"],
+    dateRdr: "2026-09-01T00:00:00.000Z",
   };
   const result = postEvent(storage, config, { type: "edited", cardId: "S001", patch });
   assert.equal(result.status, 201);
@@ -269,6 +250,12 @@ test("an edited patch is rejected field by field in French", () => {
     [{ typeId: "ghost" }, /Valeur invalide pour le champ « typeId »/],
     [{ nature: "bizarre" }, /Valeur invalide pour le champ « nature »/],
     [{ criticality: "mega" }, /Valeur invalide pour le champ « criticality »/],
+    [{ chargeByProfile: [{ profileId: "ghost", jh: 1, done: 0 }] }, /Valeur invalide pour le champ « chargeByProfile »/],
+    [{ chargeByProfile: [{ profileId: "pA", jh: -1, done: 0 }] }, /Valeur invalide pour le champ « chargeByProfile »/],
+    [{ risks: [{ type: "ghost", desc: "x" }] }, /Valeur invalide pour le champ « risks »/],
+    [{ contentionProfiles: ["ghost"] }, /Valeur invalide pour le champ « contentionProfiles »/],
+    [{ projectConstraints: ["ghost"] }, /Valeur invalide pour le champ « projectConstraints »/],
+    [{ dateRdr: 42 }, /Valeur invalide pour le champ « dateRdr »/],
   ];
   const storage = stubStorage();
   for (const [patch, message] of cases) {

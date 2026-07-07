@@ -63,7 +63,7 @@ function CollapsedColCell({ cards, lane, col }) {
 }
 
 // --- The whole grid. One CSS grid; focus widens a column, collapse shrinks a row/column. ---
-function BoardGrid({ cards, focusedColumn, collapsed, collapsedCols, t, showCodes, dragOver, onFocusColumn, onToggleLane, onToggleColumnCollapse, onOpen, onDragStart, onDragEnd, onDrop, onDragOverCell, onDragLeaveCell }) {
+function BoardGrid({ cards, focusedColumn, collapsed, collapsedCols, t, wipLimits, onSetWip, showCodes, dragOver, onFocusColumn, onToggleLane, onToggleColumnCollapse, onOpen, onDragStart, onDragEnd, onDrop, onDragOverCell, onDragLeaveCell }) {
   const colWeights = COLUMNS.map(c =>
     collapsedCols.has(c.id) ? '30px'
       : c.id === focusedColumn ? '2.6fr'
@@ -97,6 +97,8 @@ function BoardGrid({ cards, focusedColumn, collapsed, collapsedCols, t, showCode
                     cards={cards}
                     focused={focusedColumn === col.id}
                     t={t}
+                    wipLimit={wipLimits ? wipLimits[lane.id + ':' + col.id] : col.wip}
+                    onSetWip={onSetWip}
                     showCodes={showCodes}
                     dragOver={!!dragOver && dragOver.lane === lane.id && dragOver.column === col.id}
                     onOpen={onOpen}

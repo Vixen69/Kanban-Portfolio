@@ -2,7 +2,7 @@
 // The grid itself: MiniCard (radiator bar), FocusCard (expanded), Cell, BoardGrid.
 // Reads config + data globals exported by config.jsx / data.jsx.
 
-const { useState: useStateBoard } = React;
+const { useState: useStateBoard, useRef: useRefBoard, useEffect: useEffectBoard } = React;
 
 // --- Accent: how a card shows its RDOM domain (and blocked override). ---
 // Returns inline style fragments for the card root + the left accent element.
@@ -53,10 +53,15 @@ function cardBg(acc, dec, t, blocked) {
   return acc.root.background;
 }
 
-// Criticality marker: top = gold star, major = slate pip, normal = none.
+// Criticality marker: top = gold crown, major = gold star, normal = none.
+const CrownSVG = ({ s }) => (
+  <svg className="crit-crown" width={s} height={s} viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M2 7l4.5 3.5L12 3l5.5 7.5L22 7l-1.8 12H3.8L2 7z" fill="#d4a017" stroke="#a16207" strokeWidth="1" strokeLinejoin="round" />
+  </svg>
+);
 function CritMark({ c, big }) {
-  if (c === 'top') return <span className="crit-star" style={{ fontSize: big ? 14 : 10 }}>{'★'}</span>;
-  if (c === 'major') return <span className="crit-pip" style={{ width: big ? 7 : 5, height: big ? 7 : 5 }} />;
+  if (c === 'top') return <CrownSVG s={big ? 16 : 12} />;
+  if (c === 'major') return <span className="crit-star" style={{ fontSize: big ? 14 : 11 }}>{'★'}</span>;
   return null;
 }
 
@@ -180,15 +185,32 @@ function FocusCard({ card, t, showCodes, onOpen, onDragStart, onDragEnd }) {
 }
 
 // --- A single (lane x column) cell with WIP heat + blocked badge + gate line. ---
-function Cell({ lane, column, cards, focused, t, showCodes, dragOver, onOpen, onDragStart, onDragEnd, onDrop, onDragOverCell, onDragLeaveCell }) {
+function Cell({ lane, column, cards, focused, t, wipLimit, onSetWip, showCodes, dragOver, onOpen, onDragStart, onDragEnd, onDrop, onDragOverCell, onDragLeaveCell }) {
+  const [editing, setEditing] = useStateBoard(false);
   const list = cards.filter(c => c.canal === lane.id && c.column === column.id && !c.hidden);
   const visible = list.filter(c => !c.dimmed);
   const blockedCount = list.filter(c => c.blocked).length;
   const n = list.length;
-  const limit = column.wip;
+  const limit = wipLimit === undefined ? column.wip : wipLimit;
   const ratio = limit ? n / limit : 0;
   const wipState = !limit ? 'na' : ratio > 1 ? 'over' : ratio >= 0.8 ? 'warn' : 'ok';
   const gate = GATES[column.id];
+
+  // Scroll hint: show a fading down-arrow while the cell can scroll further down.
+  const cardsRef = useRefBoard(null);
+  const [scrollHint, setScrollHint] = useStateBoard(false);
+  const updateHint = () => {
+    const el = cardsRef.current;
+    if (!el) return;
+    setScrollHint(el.scrollHeight - el.clientHeight - el.scrollTop > 4);
+  };
+  useEffectBoard(() => { updateHint(); }, [list.length, focused]);
+
+  const commit = (e) => {
+    const raw = e.target.value.trim();
+    onSetWip(lane.id, column.id, raw === '' ? null : Math.max(0, parseInt(raw, 10) || 0));
+    setEditing(false);
+  };
 
   return (
     <div
@@ -198,12 +220,37 @@ function Cell({ lane, column, cards, focused, t, showCodes, dragOver, onOpen, on
       onDragLeave={onDragLeaveCell}
       onDrop={(e) => onDrop(e, lane, column)}
     >
+      {limit ? <span className="cell-cap" data-wip={wipState} style={{ width: Math.min(100, ratio * 100) + '%' }} /> : null}
       {gate && <span className="gate-line" style={{ '--gate': gate.color }} title={gate.code + ' — ' + gate.label} />}
       <div className="cell-head">
-        <span className={'wip ' + wipState}>{limit ? `${n}/${limit}` : n}</span>
+        {editing ? (
+          <span className="wip-edit-wrap" onClick={(e) => e.stopPropagation()}>
+            <span className="wip-edit-label">Limite d’encours</span>
+            <input
+              className="wip-edit" type="number" min="0" autoFocus
+              defaultValue={limit == null ? '' : limit}
+              placeholder="∞"
+              onBlur={commit}
+              onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); else if (e.key === 'Escape') setEditing(false); }}
+            />
+          </span>
+        ) : (
+          <span className="wip-display">
+            <span className="wip-cap-label">Limite d’encours</span>
+            <button
+              className={'wip-chip ' + wipState}
+              onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+              title="Limite d’encours — cliquer pour modifier"
+            >
+              <span className="wip-n">{n}</span>
+              <span className="wip-slash">/</span>
+              <span className="wip-lim">{limit == null ? '∞' : limit}</span>
+            </button>
+          </span>
+        )}
         {blockedCount > 0 && <span className="cell-blocked">{blockedCount}</span>}
       </div>
-      <div className="cell-cards">
+      <div className="cell-cards" ref={cardsRef} onScroll={updateHint}>
         {list.map(card =>
           focused
             ? <FocusCard key={card.id} card={card} t={t} showCodes={showCodes} onOpen={onOpen} onDragStart={onDragStart} onDragEnd={onDragEnd} />
@@ -211,6 +258,9 @@ function Cell({ lane, column, cards, focused, t, showCodes, dragOver, onOpen, on
         )}
         {n === 0 && <span className="cell-empty" />}
       </div>
+      <span className={'scroll-hint' + (scrollHint ? ' on' : '')} aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+      </span>
     </div>
   );
 }

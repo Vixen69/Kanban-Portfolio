@@ -113,6 +113,51 @@ const BLOCK_REASONS = [
   'Attente retour métier',
 ];
 
+// Pool de risques typés (chaque risque porte un type de contrainte).
+const RISK_POOL = [
+  { type: 'depend',    text: 'Dépendance inter-projets non sécurisée' },
+  { type: 'depend',    text: 'Livrable fournisseur en attente' },
+  { type: 'obso',      text: 'Composant en fin de support éditeur' },
+  { type: 'obso',      text: 'Version socle non maintenue' },
+  { type: 'secu',      text: 'Revue sécurité non planifiée' },
+  { type: 'secu',      text: 'Exposition de données à qualifier' },
+  { type: 'technique', text: 'Dette technique sur le socle existant' },
+  { type: 'technique', text: 'Capacité d’intégration à valider' },
+  { type: 'legale',    text: 'Échéance réglementaire à respecter' },
+  { type: 'legale',    text: 'Conformité RGPD à confirmer' },
+  { type: 'groupe',    text: 'Alignement directive Groupe requis' },
+  { type: 'groupe',    text: 'Standard Groupe à arbitrer' },
+];
+
+// Notes de contention (texte libre, exemples) — la zone est éditable côté carte.
+const CONTENTION_NOTES = [
+  'Lead dev mobilisé sur 2 autres sujets prioritaires ce trimestre.',
+  'Conflit de planning avec l’équipe Infra sur la fenêtre de migration.',
+  'Expert sécurité partagé — créneau de revue à caler avec la RSSI.',
+  'DBA fortement sollicité, risque de décalage sur la phase de recette.',
+  'Référent métier disponible seulement 1 j/semaine jusqu’à fin de trimestre.',
+  'Dépendance forte au même architecte que deux projets du portefeuille.',
+];
+
+// Alertes (texte libre, exemples) — la zone est éditable côté carte.
+const ALERT_NOTES = [
+  'Décision COPROJ attendue avant la prochaine étape.',
+  'Jalon réglementaire à confirmer avec le métier.',
+  'Risque de glissement si l’arbitrage budgétaire tarde.',
+  'Point de vigilance remonté au COPIL du mois.',
+  'Validation sponsor en attente — relance prévue.',
+];
+
+// Descriptions de risque par entité porteuse (typologie SSG/Infra/Métier/Achat/Fournisseur/A&D).
+const RISK_DESC = {
+  ssg:         ['Revue sécurité non planifiée', 'Exposition de données à qualifier', 'Conformité SSI à confirmer'],
+  infra:       ['Capacité d’hébergement à valider', 'Fenêtre de migration non sécurisée', 'Dépendance socle Infra'],
+  metier:      ['Disponibilité métier insuffisante', 'Spécifications fonctionnelles incomplètes', 'Adhésion utilisateurs à confirmer'],
+  achat:       ['Procédure d’achat non lancée', 'Délai de contractualisation serré', 'Budget achat non arbitré'],
+  fournisseur: ['Livrable fournisseur en attente', 'Performance fournisseur à surveiller', 'Dépendance éditeur externe'],
+  ad:          ['Validation architecture (DAAT) en attente', 'Alignement cible A&D à confirmer', 'Dette d’architecture identifiée'],
+};
+
 // Day-in-column ranges per stage — active/study stages skew older (P7).
 const AGE_PROFILE = {
   demandes:      [1, 22],
@@ -195,9 +240,48 @@ function generateCards() {
     // Budget (k€) corrélé à la charge : ~0,5–0,9 k€ par jour-homme.
     c.estimeBudget = Math.round(c.estime * (0.5 + rng() * 0.4));
     c.consommeBudget = c.estime ? Math.round(c.estimeBudget * (c.consomme / c.estime)) : 0;
+    // Graphe croisé budget : enveloppe RDLI (validée), meilleur estimé, engagé, réalisé.
+    //  - budgetRdli  : enveloppe arbitrée en RDLI (référence). ±15% autour du meilleur estimé.
+    //  - budgetEngage: commandes/contrats engagés (entre réalisé et meilleur estimé).
+    //  - réalisé     : consommeBudget (déjà calculé).
+    c.budgetRdli = Math.round(c.estimeBudget * (0.92 + rng() * 0.30));
+    c.budgetEngage = Math.round(c.consommeBudget + (Math.max(c.estimeBudget, c.consommeBudget) - c.consommeBudget) * (0.35 + rng() * 0.5));
     c.planCharge = pick(PLAN_CHARGE);
     // 1 à 3 ressources clés distinctes.
     c.ressources = shuffle(RESSOURCES).slice(0, rand(1, 3));
+    // Charge j/h par profil — répartie sur 1 à 3 profils tirés de la typologie DSI.
+    {
+      const ids = window.PROFILES.map(p => p.id);
+      const profs = shuffle(ids).slice(0, rand(1, 3));
+      const w = profs.map(() => 0.4 + rng());
+      const ws = w.reduce((a, b) => a + b, 0);
+      let acc = 0;
+      c.chargeByProfile = profs.map((p, i) => {
+        const jh = i === profs.length - 1 ? Math.max(0, c.estime - acc) : Math.round(c.estime * w[i] / ws);
+        acc += jh;
+        const done = c.estime ? Math.round(jh * (c.consomme / c.estime)) : 0;
+        return { profil: p, jh, done: Math.min(jh, done) };
+      });
+      // Profils en tension (risque de contention) : sous-ensemble des profils mobilisés.
+      c.contentionProfiles = rng() < 0.5 ? shuffle(profs).slice(0, rand(1, Math.min(2, profs.length))) : [];
+    }
+    // Note libre de contention.
+    c.contentionNote = rng() < 0.4 ? pick(CONTENTION_NOTES) : '';
+    // Date RDR (livraison) projetée — horizon décroissant à mesure que le sujet avance.
+    {
+      const horizonByCol = { demandes: [120, 320], qualification: [90, 240], etudes: [70, 190], prets: [45, 140], actifs: [-20, 90], done: [-90, -5], exploitation: [-220, -30] };
+      const [hl, hh] = horizonByCol[c.column] || [30, 180];
+      c.dateRDR = new Date(now0 + rand(hl, hh) * 86400000).toISOString();
+    }
+    // Risques retenus : 0 à 2 entités porteuses, chacune avec une description libre.
+    {
+      const types = shuffle(['ssg', 'infra', 'metier', 'achat', 'fournisseur', 'ad']).slice(0, rand(0, 2));
+      c.risks = types.map(t => ({ type: t, desc: pick(RISK_DESC[t] || ['']) }));
+    }
+    // Contraintes du projet (checkables) : Légale / Groupe.
+    c.projConstraints = shuffle(['legale', 'groupe']).slice(0, rand(0, 2));
+    // Alertes (texte libre, multiples) — 0 à 2.
+    c.alerts = rng() < 0.4 ? shuffle(ALERT_NOTES).slice(0, rand(1, 2)) : [];
     // 0 à 2 commentaires de suivi.
     c.commentaires = shuffle(COMMENTS).slice(0, rand(0, 2)).map((text, k) => ({
       user: pick(CP_NAMES), at: new Date(now0 - rand(1, 40) * 86400000).toISOString(), text,

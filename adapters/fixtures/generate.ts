@@ -16,6 +16,7 @@ import {
   SUBJECT_NAMES,
 } from "../../fixtures/dataset.ts";
 import { createSeededRandom, type SeededRandom } from "./random.ts";
+import { seedExtras } from "./extras.ts";
 import {
   AGE_PROFILE,
   BLOCKED_FILL,
@@ -144,6 +145,11 @@ function draftCard(
     blocked: false, blockedReason: null, blockedSince: null,
     effortEstimated: data.effortEstimated, effortConsumed: data.effortConsumed,
     loadPlan: data.loadPlan, resources: data.resources, notes: "",
+    // design-v10 detail fields — seeded by seedExtras (a final pass, so the
+    // per-card RNG order for positions/ages stays identical to the prototype).
+    budgetEngaged: null, budgetRdli: null, chargeByProfile: [],
+    contentionProfiles: [], contentionNote: "", risks: [],
+    projectConstraints: [], alerts: [], dateRdr: null,
     sciformaId: data.sciformaId, custom: {}, createdAt: "", source: "fixtures",
   };
   const financials: Financials = {
@@ -261,6 +267,7 @@ export function generatePortfolio(config: BoardConfig, now: Date, seed = FIXTURE
   assignBlockReasons(rng, drafts);
   for (const draft of drafts) buildHistory(rng, draft, nowMs);
   appendBlockedEvents(rng, drafts, nowMs);
+  for (const draft of drafts) seedExtras(rng, config, draft.subject, draft.financials, nowMs);
   const out: FixturesPortfolio = { subjects: [], financialsById: new Map(), events: [] };
   for (const draft of drafts) {
     const all = [...draft.events, ...commentEvents(draft)];

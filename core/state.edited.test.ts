@@ -47,6 +47,37 @@ test("edited applies every whitelisted v2 field", () => {
   assert.deepEqual(state?.custom, { risque: "haut" });
 });
 
+test("edited applies the design-v10 fields (charge, contention, risks, constraints, alerts, dateRdr, budgets)", () => {
+  const state = foldPatched({
+    budgetEngaged: 150, budgetRdli: 220,
+    chargeByProfile: [{ profileId: "pA", jh: 30, done: 10 }],
+    contentionProfiles: ["pA", "pB"], contentionNote: "Lead partagé",
+    risks: [{ type: "rSSG", desc: "Revue sécurité à planifier" }],
+    projectConstraints: ["legale"], alerts: ["Décision COPROJ attendue"],
+    dateRdr: "2026-09-01T00:00:00.000Z",
+  });
+  assert.equal(state?.budgetEngaged, 150);
+  assert.equal(state?.budgetRdli, 220);
+  assert.deepEqual(state?.chargeByProfile, [{ profileId: "pA", jh: 30, done: 10 }]);
+  assert.deepEqual(state?.contentionProfiles, ["pA", "pB"]);
+  assert.equal(state?.contentionNote, "Lead partagé");
+  assert.deepEqual(state?.risks, [{ type: "rSSG", desc: "Revue sécurité à planifier" }]);
+  assert.deepEqual(state?.projectConstraints, ["legale"]);
+  assert.deepEqual(state?.alerts, ["Décision COPROJ attendue"]);
+  assert.equal(state?.dateRdr, "2026-09-01T00:00:00.000Z");
+});
+
+test("edited rejects malformed charge/risks/contention (kept at their defaults)", () => {
+  const state = foldPatched({
+    chargeByProfile: [{ profileId: "pA", jh: "lots", done: 0 }], // jh not a number
+    risks: [{ type: "rSSG" }], // missing desc
+    contentionProfiles: "pA", // not an array
+  });
+  assert.deepEqual(state?.chargeByProfile, []);
+  assert.deepEqual(state?.risks, []);
+  assert.deepEqual(state?.contentionProfiles, []);
+});
+
 test("edited ignores forged non-editable fields", () => {
   const state = foldPatched({
     title: "Nouveau titre", // one legitimate field, applied alongside

@@ -28,6 +28,27 @@ test("the repository's config/board.json is valid", () => {
   assert.equal(config.columns.find((c) => c.id === "actifs")?.hasBlockedZone, true);
   assert.deepEqual(config.age, { freshMaxDays: 7, recentMaxDays: 28, agingMaxDays: 60 });
   assert.equal(config.andonThresholdDays, 5);
+  assert.equal(config.roleFamilies.length, 6);
+  assert.equal(config.profiles.length, 19);
+  assert.equal(config.riskTypes.length, 6);
+  assert.equal(config.projectConstraints.length, 2);
+  assert.equal(config.riskSeverity.eleve.rank, 3);
+  assert.equal(config.roleOf["Lead dev"], "dev");
+});
+
+test("rejects the new typologies when malformed", () => {
+  const badRoleOf = rawConfig();
+  badRoleOf.roleOf = { "Lead dev": "ghost" }; // unknown role family
+  assert.throws(() => validateBoardConfig(badRoleOf), ConfigError);
+  const badRank = rawConfig();
+  badRank.riskSeverity.moyen.rank = 0; // rank must be ≥ 1
+  assert.throws(() => validateBoardConfig(badRank), ConfigError);
+  const emptyProfiles = rawConfig();
+  emptyProfiles.profiles = []; // must be non-empty
+  assert.throws(() => validateBoardConfig(emptyProfiles), ConfigError);
+  const noRiskTypes = rawConfig();
+  delete noRiskTypes.riskTypes;
+  assert.throws(() => validateBoardConfig(noRiskTypes), ConfigError);
 });
 
 test("absent optional fields are normalized (wip/gate null, texts empty, fields [])", () => {

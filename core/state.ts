@@ -23,6 +23,26 @@ const isCustomMap = (value: unknown) =>
   value !== null &&
   !Array.isArray(value) &&
   Object.values(value).every(isCustomValue);
+const isFiniteNumber = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value);
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+// Plan de charge: array of { profileId: string, jh: number, done: number }.
+const isChargeByProfile = (value: unknown) =>
+  Array.isArray(value) &&
+  value.every(
+    (item) =>
+      isPlainObject(item) &&
+      typeof item.profileId === "string" &&
+      isFiniteNumber(item.jh) &&
+      isFiniteNumber(item.done),
+  );
+// Risks: array of { type: string, desc: string }.
+const isRisks = (value: unknown) =>
+  Array.isArray(value) &&
+  value.every(
+    (item) => isPlainObject(item) && typeof item.type === "string" && typeof item.desc === "string",
+  );
 
 const EDITABLE: Record<string, (value: unknown) => boolean> = {
   title: (value) => typeof value === "string" && value.length > 0,
@@ -40,6 +60,15 @@ const EDITABLE: Record<string, (value: unknown) => boolean> = {
   loadPlan: isStringOrNull,
   resources: isStringArray,
   notes: (value) => typeof value === "string",
+  budgetEngaged: isNumberOrNull,
+  budgetRdli: isNumberOrNull,
+  chargeByProfile: isChargeByProfile,
+  contentionProfiles: isStringArray,
+  contentionNote: (value) => typeof value === "string",
+  risks: isRisks,
+  projectConstraints: isStringArray,
+  alerts: isStringArray,
+  dateRdr: isStringOrNull,
   custom: isCustomMap,
 };
 

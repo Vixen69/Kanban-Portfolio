@@ -3,86 +3,13 @@
 // movement history. Plain projections — every action flows up to App.
 
 import { useState } from "react";
-import type { CardComment, CardState, GateCode, GateDef } from "../../core/types.ts";
+import type { CardComment, GateCode, GateDef } from "../../core/types.ts";
 import type { HistoryEntry } from "../../core/history.ts";
 import { displayActor } from "../lookup.ts";
 
 // French short date for comment and history metadata.
 function frDate(iso: string): string {
   return new Date(iso).toLocaleDateString("fr-FR");
-}
-
-// One head + track pair of the charge box (design colors: the given ok
-// color below 85 %, warn from 85 %, danger past 100 % with a suffix).
-function ChargeTrack({ label, consumed, estimated, unit, okColor, topGap }: {
-  label: string;
-  consumed: number;
-  estimated: number;
-  unit: string;
-  okColor: string;
-  topGap?: boolean;
-}) {
-  const pct = estimated ? Math.round((consumed / estimated) * 100) : 0;
-  const over = consumed > estimated;
-  const fill = over ? "var(--danger)" : pct >= 85 ? "var(--warn)" : okColor;
-  return (
-    <>
-      <div className="charge-head" style={topGap ? { marginTop: 9 } : undefined}>
-        <span className="field-label">{label}</span>
-        <span className={"charge-num" + (over ? " over" : "")}>
-          {consumed} / {estimated} {unit}{over ? " · dépassement" : ""}
-        </span>
-      </div>
-      <div className="charge-track">
-        <span className="charge-fill" style={{ width: `${Math.min(100, pct)}%`, background: fill }} />
-      </div>
-    </>
-  );
-}
-
-/**
- * Charge box: meilleur estimé vs consommé in jours-homme, then budget k€.
- * Input: the card state (null figures read as 0, as in the design).
- * Output: the div.charge-box with both tracks. Failure modes: none — a
- * zero estimate shows 0 % and flags any consumption as an overrun.
- */
-export function ChargeBox({ card }: { card: CardState }) {
-  return (
-    <div className="charge-box">
-      <ChargeTrack
-        label="Charge · jours-homme"
-        consumed={card.effortConsumed ?? 0}
-        estimated={card.effortEstimated ?? 0}
-        unit="j.h"
-        okColor="var(--accent)"
-      />
-      <ChargeTrack
-        label="Budget · k€"
-        consumed={card.budgetConsumed ?? 0}
-        estimated={card.budgetEstimated ?? 0}
-        unit="k€"
-        okColor="var(--ok)"
-        topGap
-      />
-    </div>
-  );
-}
-
-/**
- * Ressources clés as chips.
- * Input: the card's resources. Output: the div.res-box, or null when the
- * card has no resources. Failure modes: none.
- */
-export function ResourceChips({ resources }: { resources: string[] }) {
-  if (resources.length === 0) return null;
-  return (
-    <div className="res-box">
-      <span className="field-label">Ressources clés</span>
-      <div className="res-chips">
-        {resources.map((resource, index) => <span key={index} className="res-chip">{resource}</span>)}
-      </div>
-    </div>
-  );
 }
 
 /**

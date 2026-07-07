@@ -2,8 +2,28 @@
 // Root: state, filtering, drag & drop, focus, collapse, persistence, keyboard, tweaks.
 
 const { useState, useEffect, useRef, useMemo } = React;
-const STORAGE_KEY = 'nmo_portfolio_v4';
+const STORAGE_KEY = 'nmo_portfolio_v11';
 const CONFIG_KEY = 'nmo_board_config_v2';
+const WIP_KEY = 'nmo_wip_v1';
+
+// Per-cell WIP limits (lane × column), keyed "laneId:colId".
+// Defaults vary per cell — each canal gets its own capacity, not a shared column number.
+function defaultWipLimits() {
+  const m = {};
+  const offsets = [-2, -1, 0, 1, 2, 1]; // spread so cells in a column differ by canal
+  SWIMLANES.forEach((lane, li) => {
+    COLUMNS.forEach(col => {
+      const k = lane.id + ':' + col.id;
+      if (col.wip == null) { m[k] = null; return; }
+      m[k] = Math.max(2, col.wip + offsets[li % offsets.length]);
+    });
+  });
+  return m;
+}
+function loadWipLimits() {
+  try { const raw = localStorage.getItem(WIP_KEY); if (raw) return { ...defaultWipLimits(), ...JSON.parse(raw) }; } catch (e) {}
+  return defaultWipLimits();
+}
 
 // Load saved board config (admin panel) and apply it BEFORE first render.
 function loadBoardConfig() {
@@ -54,12 +74,15 @@ function App() {
   const [admin, setAdmin] = useState(false);
   const [metrics, setMetrics] = useState(false);
   const [cfg, setCfg] = useState(INITIAL_CFG);
+  const [wipLimits, setWipLimits] = useState(loadWipLimits);
   const [dragOver, setDragOver] = useState(null);
   const dragId = useRef(null);
   const searchRef = useRef(null);
 
   // Prototype-grade persistence (Sprint 0). Sprint 3 swaps this for the API.
   useEffect(() => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(cards)); } catch (e) {} }, [cards]);
+  useEffect(() => { try { localStorage.setItem(WIP_KEY, JSON.stringify(wipLimits)); } catch (e) {} }, [wipLimits]);
+  const onSetWip = (laneId, colId, val) => setWipLimits(m => ({ ...m, [laneId + ':' + colId]: val }));
 
   const toggle = (group, key) => setFilters(f => ({ ...f, [group]: { ...f[group], [key]: !f[group][key] } }));
 
@@ -228,6 +251,8 @@ function App() {
           collapsed={collapsed}
           collapsedCols={collapsedCols}
           t={t}
+          wipLimits={wipLimits}
+          onSetWip={onSetWip}
           showCodes={showCodes}
           dragOver={dragOver}
           onFocusColumn={onFocusColumn}
@@ -251,7 +276,7 @@ function App() {
         )}
       </div>
 
-      {detail && <CardDetail card={detail} onClose={() => setDetail(null)} onSave={onSave} onDelete={onDelete} />}
+      {detail && <CardDetail card={detail} allCards={cards} onClose={() => setDetail(null)} onSave={onSave} onDelete={onDelete} />}
       {adding && <QuickAdd onClose={() => setAdding(false)} onCreate={onCreate} />}
       {admin && <AdminPanel cfg={cfg} onApply={onApplyConfig} onClose={() => setAdmin(false)} />}
       {metrics && <MetricsView cards={cards} onClose={() => setMetrics(false)} />}

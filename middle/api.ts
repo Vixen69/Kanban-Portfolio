@@ -204,14 +204,41 @@ function buildCommented(
   return lifecycleEvent("commented", state.id, SERVER_ACTOR, ts, { text });
 }
 
+// Small structural predicates reused across the patch validators.
+const amountOrNull = (v: unknown) =>
+  v === null || (typeof v === "number" && Number.isFinite(v) && v >= 0);
+const stringArray = (v: unknown) =>
+  Array.isArray(v) && v.every((item) => typeof item === "string");
+const stringOrNull = (v: unknown) => v === null || typeof v === "string";
+const nonNegNumber = (v: unknown) => typeof v === "number" && Number.isFinite(v) && v >= 0;
+const isPlainObj = (v: unknown): v is Record<string, unknown> =>
+  typeof v === "object" && v !== null && !Array.isArray(v);
+
+// Config-aware validators for the design-v10 detail fields: referential ids
+// (profiles, risk types, project constraints) must point at existing topology.
+function designV10Validators(config: BoardConfig): Record<string, (v: unknown) => boolean> {
+  const profileIds = new Set(config.profiles.map((p) => p.id));
+  const riskIds = new Set(config.riskTypes.map((r) => r.id));
+  const constraintIds = new Set(config.projectConstraints.map((c) => c.id));
+  return {
+    budgetEngaged: amountOrNull,
+    budgetRdli: amountOrNull,
+    contentionNote: (v) => typeof v === "string",
+    contentionProfiles: (v) => stringArray(v) && (v as string[]).every((id) => profileIds.has(id)),
+    projectConstraints: (v) => stringArray(v) && (v as string[]).every((id) => constraintIds.has(id)),
+    alerts: stringArray,
+    dateRdr: stringOrNull,
+    chargeByProfile: (v) => Array.isArray(v) && v.every((e) =>
+      isPlainObj(e) && profileIds.has(e.profileId as string) && nonNegNumber(e.jh) && nonNegNumber(e.done)),
+    risks: (v) => Array.isArray(v) && v.every((r) =>
+      isPlainObj(r) && riskIds.has(r.type as string) && typeof r.desc === "string"),
+  };
+}
+
 // Per-field acceptance for an "edited" patch, closed over the runtime config
-// so referential fields (domain, typeId) must point at existing topology.
+// so referential fields (domain, typeId, profiles…) must point at existing
+// topology.
 function patchValidators(config: BoardConfig): Record<string, (value: unknown) => boolean> {
-  const amountOrNull = (v: unknown) =>
-    v === null || (typeof v === "number" && Number.isFinite(v) && v >= 0);
-  const stringArray = (v: unknown) =>
-    Array.isArray(v) && v.every((item) => typeof item === "string");
-  const stringOrNull = (v: unknown) => v === null || typeof v === "string";
   const customValue = (v: unknown): v is CustomValue =>
     v === null || typeof v === "string" || typeof v === "boolean" ||
     (typeof v === "number" && Number.isFinite(v));
@@ -231,6 +258,7 @@ function patchValidators(config: BoardConfig): Record<string, (value: unknown) =
     loadPlan: stringOrNull,
     resources: stringArray,
     notes: (v) => typeof v === "string",
+    ...designV10Validators(config),
     custom: (v) =>
       typeof v === "object" && v !== null && !Array.isArray(v) &&
       Object.values(v).every(customValue),

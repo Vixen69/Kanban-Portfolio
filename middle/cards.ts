@@ -86,6 +86,25 @@ function nextCardId(cards: Card[]): string {
   return `S${String(max + 1).padStart(3, "0")}`;
 }
 
+// The design-v10 fields all start empty on a freshly created card.
+function blankDesignV10Fields(): Pick<
+  Card,
+  | "budgetEngaged" | "budgetRdli" | "chargeByProfile" | "contentionProfiles"
+  | "contentionNote" | "risks" | "projectConstraints" | "alerts" | "dateRdr"
+> {
+  return {
+    budgetEngaged: null,
+    budgetRdli: null,
+    chargeByProfile: [],
+    contentionProfiles: [],
+    contentionNote: "",
+    risks: [],
+    projectConstraints: [],
+    alerts: [],
+    dateRdr: null,
+  };
+}
+
 // Server-built card: every non-intent field gets its creation default; the
 // card always enters the first column of the runtime config (pull flow).
 function buildCard(config: BoardConfig, existing: Card[], input: NewCardInput, ts: string): Card {
@@ -114,6 +133,7 @@ function buildCard(config: BoardConfig, existing: Card[], input: NewCardInput, t
     loadPlan: null,
     resources: [],
     notes: "",
+    ...blankDesignV10Fields(),
     sciformaId: null,
     custom: {},
     createdAt: ts,

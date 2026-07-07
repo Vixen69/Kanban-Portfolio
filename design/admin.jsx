@@ -67,7 +67,7 @@ function AdminPanel({ cfg, onApply, onClose }) {
                     <button className="abtn" disabled={i === draft.columns.length - 1} onClick={() => set('columns', moveItem(draft.columns, i, 1))}>{'↓'}</button>
                   </span>
                   <input className="ainp grow" value={c.label} onChange={(e) => upd('columns', i, { label: e.target.value })} />
-                  <input className="ainp wip-inp" type="number" min="0" placeholder="WIP" title="Limite WIP (vide = aucune)" value={c.wip == null ? '' : c.wip} onChange={(e) => upd('columns', i, { wip: e.target.value === '' ? null : +e.target.value })} />
+                  <input className="ainp wip-inp" type="number" min="0" placeholder="Enc." title="Limite d’encours par défaut (vide = aucune)" value={c.wip == null ? '' : c.wip} onChange={(e) => upd('columns', i, { wip: e.target.value === '' ? null : +e.target.value })} />
                   <select className="ainp gate-inp" title="Gate à l'entrée" value={c.gate || ''} onChange={(e) => upd('columns', i, { gate: e.target.value || undefined })}>
                     <option value="">— gate</option>
                     <option value="DoR">DoR</option>
@@ -129,7 +129,7 @@ function AdminPanel({ cfg, onApply, onClose }) {
               <div className="asection-label">Criticités (renommables)</div>
               {Object.entries(draft.crits).map(([k, c]) => (
                 <div className="arow" key={k}>
-                  <span className="crit-key">{k === 'top' ? '★' : k === 'major' ? '◆' : '·'}</span>
+                  <span className="crit-key">{k === 'top' ? '♛' : k === 'major' ? '★' : '·'}</span>
                   <input className="ainp grow" value={c.label} onChange={(e) => set('crits', { ...draft.crits, [k]: { ...c, label: e.target.value, badge: c.badge ? e.target.value.toUpperCase() : null } })} />
                 </div>
               ))}

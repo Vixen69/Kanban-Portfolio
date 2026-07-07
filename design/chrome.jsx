@@ -28,6 +28,13 @@ function Header({ stats, view, filtersActive, onResetFilters, onAdd, onAdmin, on
           <span className="blk-dot-static" /> <b>{stats.blocked}</b> bloqués
         </div>
         <div className="hd-legend">
+          <span className="lg" title="Criticité Top">
+            <svg width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 7l4.5 3.5L12 3l5.5 7.5L22 7l-1.8 12H3.8L2 7z" fill="#d4a017" stroke="#a16207" strokeWidth="1" strokeLinejoin="round" /></svg>Top
+          </span>
+          <span className="lg" title="Criticité Major">
+            <span style={{ color: '#d4a017', fontSize: 13, lineHeight: 1 }}>{'★'}</span>Major
+          </span>
+          <span className="lg-sep" />
           {DOMAINS.map(d => (
             <span className="lg" key={d.id} title={d.label}>
               <span className="lg-dot" style={{ background: d.color }} />{d.short}
@@ -130,8 +137,8 @@ function Sidebar({ open, search, setSearch, filters, toggle, setGroup, stats, vi
         <CatHead label="Criticité" allOn={allOn('crit')} noneOn={noneOn('crit')} onAll={() => setGroup('crit', true)} onNone={() => setGroup('crit', false)} />
         <div className="pill-row">
           <Pill active={filters.crit.normal} onClick={() => toggle('crit', 'normal')}>{CRITICALITY.normal.label}</Pill>
-          <Pill active={filters.crit.major} onClick={() => toggle('crit', 'major')} color="#94a3b8">{CRITICALITY.major.label}</Pill>
-          <Pill active={filters.crit.top} onClick={() => toggle('crit', 'top')} color="#eab308">{'★'} {CRITICALITY.top.label}</Pill>
+          <Pill active={filters.crit.major} onClick={() => toggle('crit', 'major')} color="#d4a017">{'★'} {CRITICALITY.major.label}</Pill>
+          <Pill active={filters.crit.top} onClick={() => toggle('crit', 'top')} color="#d4a017">{'♛'} {CRITICALITY.top.label}</Pill>
         </div>
       </div>
 
@@ -150,8 +157,8 @@ function Sidebar({ open, search, setSearch, filters, toggle, setGroup, stats, vi
         <StatRow label="Bloqués" value={view.blocked} total={stats.blocked} alert active={filtersActive} />
         <StatRow label="Stagnants (> 60j)" value={view.stale} total={stats.stale} active={filtersActive} />
         <div className="stat-divider" />
-        <StatRow label="★ Top" value={view.top} total={stats.top} active={filtersActive} />
-        <StatRow label="Major" value={view.major} total={stats.major} active={filtersActive} />
+        <StatRow label="♛ Top" value={view.top} total={stats.top} active={filtersActive} />
+        <StatRow label="★ Major" value={view.major} total={stats.major} active={filtersActive} />
         <StatRow label="Normal" value={view.normal} total={stats.normal} active={filtersActive} />
         <div className="stat-divider" />
         <StatRow label={NATURE.simple.label} value={view.simple} total={stats.simple} active={filtersActive} />

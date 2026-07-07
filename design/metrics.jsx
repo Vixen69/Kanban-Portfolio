@@ -107,7 +107,7 @@ function MetricsView({ cards, onClose }) {
 
       <div className="metrics-grid">
         <div className="metric-panel">
-          <div className="mp-title">Flux par étape <span className="mp-hint">nombre de sujets · limite WIP</span></div>
+          <div className="mp-title">Flux par étape <span className="mp-hint">nombre de sujets · limite d’encours</span></div>
           {m.order.map(id => {
             const c = m.perCol[id];
             const over = c.wip && c.count > c.wip;

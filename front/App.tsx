@@ -126,6 +126,7 @@ function CardModals({ ctx }: { ctx: Ctx }) {
     <CardDetail card={detailCard} config={config} now={ctx.nowMs} history={history}
       onClose={closeAll}
       onEdit={() => ui.setEditing(true)}
+      onPatch={(patch: CardPatch) => void store.editCard(detailCard.id, patch)}
       onBlock={(reason: string) => void store.blockCard(detailCard.id, reason)}
       onUnblock={() => void store.unblockCard(detailCard.id)}
       onComment={(text: string) => void store.commentCard(detailCard.id, text)} />

@@ -2,6 +2,12 @@
 // Mirrors the data model of CLAUDE.md section 4 (camelCase in TS), extended
 // to the validated design v9 (ADR 012: richer card model, comment/delete
 // events; ADR 013: runtime board configuration).
+//
+// The board topology & vocabulary types (Lane, Column, BoardConfig, the
+// typologies…) live in ./config-types.ts and are re-exported below, so every
+// consumer keeps importing all domain types from "./types.ts".
+
+export type * from "./config-types.ts";
 
 /** Where a card's data originally came from. "manual" = created in the UI. */
 export type CardSource = "fixtures" | "csv" | "sciforma" | "manual";
@@ -12,118 +18,8 @@ export type NatureKey = "simple" | "complicated" | "complex";
 /** Card criticality — fixed vocabulary, hard-coded product opinion. */
 export type Criticality = "top" | "major" | "normal";
 
-/** Quality gates. Human decisions at governance — never enforced in software. */
-export type GateCode = "DoR" | "DoD";
-
 /** Age buckets derived from days-in-column and BoardConfig.age thresholds. */
 export type AgeCategory = "fresh" | "recent" | "aging" | "stale";
-
-/** One swimlane ("canal"). nature/detail are free display text from config. */
-export interface Lane {
-  id: string;
-  name: string;
-  /** Subtitle under the lane name (e.g. "Compliqué"). Display as-is. */
-  nature: string;
-  /** One-line description of the canal's governance (tooltips/admin). */
-  detail: string;
-}
-
-/** One column (flow stage). wip null = no limit; a set WIP warns, never blocks. */
-export interface Column {
-  id: string;
-  name: string;
-  wip: number | null;
-  /** Gate at the entry of this column, or null. Rendered as a badge + line. */
-  gate: GateCode | null;
-  /** Short functional note shown under the column name. */
-  note: string;
-  /** Declarative marker (design: Actifs). No behavior attached today. */
-  hasBlockedZone?: boolean;
-}
-
-/** A responsible domain (RDOM) with its display color and 3-letter code. */
-export interface Domain {
-  id: string;
-  name: string;
-  short: string;
-  color: string;
-}
-
-/** A project type ("Achat", "Étude"…) — more visible than the domain on cards. */
-export interface ProjectType {
-  id: string;
-  name: string;
-  short: string;
-  color: string;
-}
-
-/** Display style of one nature (label is renamable in config, key is not). */
-export interface NatureStyle {
-  label: string;
-  bg: string;
-  fg: string;
-}
-
-/** Display style of one criticality. badge null = no badge (normal). */
-export interface CriticalityStyle {
-  label: string;
-  badge: string | null;
-  bg?: string;
-  fg?: string;
-}
-
-/** Definition of a quality gate (full name + color). */
-export interface GateDef {
-  name: string;
-  color: string;
-}
-
-/** Input kinds a custom card field can take. */
-export type FieldType = "text" | "number" | "date" | "select" | "checkbox" | "person";
-
-/** One option of a "select" custom field. */
-export interface FieldOption {
-  label: string;
-  color: string;
-}
-
-/** An admin-defined custom card field (detail panel; optional card badge). */
-export interface FieldDef {
-  id: string;
-  name: string;
-  type: FieldType;
-  /** Show the value as a badge on the expanded (focus) card. */
-  showOnCard: boolean;
-  /** Only for type "select". */
-  options?: FieldOption[];
-}
-
-/** Day thresholds separating fresh / recent / aging / stale. */
-export interface AgeThresholds {
-  freshMaxDays: number;
-  recentMaxDays: number;
-  agingMaxDays: number;
-}
-
-/**
- * Versioned board topology. Defaults live in config/board.json; a runtime
- * override applied from the admin panel is persisted by the middle with an
- * append-only history (ADR 013). Behavior stays hard-coded — only topology,
- * vocabulary and thresholds live here.
- */
-export interface BoardConfig {
-  lanes: Lane[];
-  columns: Column[];
-  domains: Domain[];
-  types: ProjectType[];
-  natures: Record<NatureKey, NatureStyle>;
-  criticalities: Record<Criticality, CriticalityStyle>;
-  gateDefs: Record<GateCode, GateDef>;
-  fields: FieldDef[];
-  age: AgeThresholds;
-  /** Blocked longer than this many days gets the static escalation marker. */
-  andonThresholdDays: number;
-}
 
 /** Values a custom field may hold (shallow scalars only). */
 export type CustomValue = string | number | boolean | null;
@@ -133,6 +29,24 @@ export interface Financials {
   budget: number | null;
   consumed: number | null;
   remaining: number | null;
+}
+
+/** One profile's share of a card's plan de charge, in jours-homme. */
+export interface ChargeEntry {
+  /** Profile id (see BoardConfig.profiles). */
+  profileId: string;
+  /** Charge planifiée, jours-homme. */
+  jh: number;
+  /** Consommé, jours-homme (0 ≤ done ≤ jh). */
+  done: number;
+}
+
+/** One retained risk on a card: bearing entity (type) + free description. */
+export interface Risk {
+  /** Risk type id (see BoardConfig.riskTypes). */
+  type: string;
+  /** Free-text description of the risk. */
+  desc: string;
 }
 
 /**
@@ -175,6 +89,24 @@ export interface Card {
   /** Ressources clés (roles/teams engaged). */
   resources: string[];
   notes: string;
+  /** Budget engagé (commandes/contrats), k€, null si inconnu. */
+  budgetEngaged: number | null;
+  /** Enveloppe RDLI arbitrée (référence d'arbitrage budgétaire), k€, null si inconnu. */
+  budgetRdli: number | null;
+  /** Plan de charge détaillé : j.h par profil DSI. */
+  chargeByProfile: ChargeEntry[];
+  /** Profils en tension (risque de contention) — profile ids. */
+  contentionProfiles: string[];
+  /** Note libre sur la contention (partage, disponibilité, conflits). */
+  contentionNote: string;
+  /** Risques retenus (par entité porteuse). */
+  risks: Risk[];
+  /** Contraintes projet cochées — project-constraint ids. */
+  projectConstraints: string[];
+  /** Alertes libres (texte), multiples. */
+  alerts: string[];
+  /** Date de livraison (RDR) projetée, ISO date, null si non planifiée. */
+  dateRdr: string | null;
   /** Read-only reference to the source PPM record, null when unlinked. */
   sciformaId: string | null;
   /** Values of admin-defined custom fields, keyed by FieldDef.id. */
@@ -255,6 +187,15 @@ export type CardPatch = Partial<
     | "loadPlan"
     | "resources"
     | "notes"
+    | "budgetEngaged"
+    | "budgetRdli"
+    | "chargeByProfile"
+    | "contentionProfiles"
+    | "contentionNote"
+    | "risks"
+    | "projectConstraints"
+    | "alerts"
+    | "dateRdr"
     | "custom"
   >
 >;

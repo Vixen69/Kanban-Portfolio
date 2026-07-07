@@ -112,6 +112,66 @@
     "DoD": { "name": "Definition of Done", "color": "#047857" }
   },
   "fields": [],
+  "roleFamilies": [
+    { "id": "archi", "name": "Architecture", "color": "#14b8a6" },
+    { "id": "dev", "name": "Développement", "color": "#4338ca" },
+    { "id": "infra", "name": "Infrastructure", "color": "#ec4899" },
+    { "id": "metier", "name": "Métier", "color": "#b45309" },
+    { "id": "secu", "name": "Sécurité", "color": "#dc2626" },
+    { "id": "exploit", "name": "Exploitation", "color": "#0369a1" }
+  ],
+  "profiles": [
+    { "id": "archi_ad", "name": "Architecte A&D", "color": "#0d9488" },
+    { "id": "cdp_ad", "name": "CdP A&D", "color": "#14b8a6" },
+    { "id": "cdp_corp", "name": "CdP CORPORATE", "color": "#475569" },
+    { "id": "cdp_erp", "name": "CdP ERP", "color": "#4338ca" },
+    { "id": "cdp_indus", "name": "CdP INDUSTRIE", "color": "#b45309" },
+    { "id": "cdp_infra_build", "name": "CdP INFRA BUILD", "color": "#db2777" },
+    { "id": "cdp_infra_ope", "name": "CdP INFRA OPE", "color": "#be185d" },
+    { "id": "cdp_infra_ssi", "name": "CdP INFRA SSI", "color": "#dc2626" },
+    { "id": "cdp_ing", "name": "CdP INGENIERIE", "color": "#15803d" },
+    { "id": "cdp_it4it", "name": "CdP IT4IT", "color": "#7c3aed" },
+    { "id": "cdp_soutien", "name": "CdP SOUTIEN", "color": "#0369a1" },
+    { "id": "expert", "name": "Expert", "color": "#9333ea" },
+    { "id": "data_biz", "name": "Data Business", "color": "#0891b2" },
+    { "id": "pilote_svc", "name": "Pilote de service", "color": "#ea580c" },
+    { "id": "cdp_buildteam", "name": "Chef de projet BuildTeam", "color": "#2563eb" },
+    { "id": "concept_dev", "name": "Concept.Dév.", "color": "#059669" },
+    { "id": "pmo", "name": "PMO", "color": "#64748b" },
+    { "id": "rdom", "name": "RDOM", "color": "#334155" },
+    { "id": "concept_dev_erp", "name": "Concept.Dév. ERP", "color": "#6366f1" }
+  ],
+  "roleOf": {
+    "Architecte DAAT": "archi",
+    "Lead dev": "dev",
+    "DevOps": "dev",
+    "Intégrateur": "dev",
+    "Équipe Infra": "infra",
+    "Équipe réseau": "infra",
+    "DBA": "infra",
+    "Infogérant": "infra",
+    "Référent métier": "metier",
+    "Product owner": "metier",
+    "Expert sécurité": "secu",
+    "Support N3": "exploit"
+  },
+  "riskTypes": [
+    { "id": "ssg", "name": "SSG", "short": "SSG", "color": "#b91c1c" },
+    { "id": "infra", "name": "Infra", "short": "Infra", "color": "#db2777" },
+    { "id": "metier", "name": "Métier", "short": "Métier", "color": "#b45309" },
+    { "id": "achat", "name": "Achat", "short": "Achat", "color": "#0369a1" },
+    { "id": "fournisseur", "name": "Fournisseur", "short": "Fourn.", "color": "#7c3aed" },
+    { "id": "ad", "name": "A&D", "short": "A&D", "color": "#0d9488" }
+  ],
+  "projectConstraints": [
+    { "id": "legale", "name": "Légale / réglementaire", "short": "Légale", "color": "#dc2626" },
+    { "id": "groupe", "name": "Directive Groupe", "short": "Groupe", "color": "#7c3aed" }
+  ],
+  "riskSeverity": {
+    "faible": { "label": "Faible", "color": "#64748b", "rank": 1 },
+    "moyen": { "label": "Moyen", "color": "#b45309", "rank": 2 },
+    "eleve": { "label": "Élevé", "color": "#b91c1c", "rank": 3 }
+  },
   "age": { "freshMaxDays": 7, "recentMaxDays": 28, "agingMaxDays": 60 },
   "andonThresholdDays": 5
 }

@@ -132,6 +132,28 @@ test("card fields come from the design pools", () => {
   assert.ok(linked > 0 && linked < TOTAL_CARDS, `sciforma: ${linked}`);
 });
 
+test("design-v10 detail fields are seeded and config-consistent for every subject", () => {
+  const profileIds = new Set(CONFIG.profiles.map((p) => p.id));
+  const riskIds = new Set(CONFIG.riskTypes.map((r) => r.id));
+  const constraintIds = new Set(CONFIG.projectConstraints.map((c) => c.id));
+  for (const s of PORTFOLIO.subjects) {
+    assert.ok(s.chargeByProfile.length >= 1 && s.chargeByProfile.length <= 3, s.id);
+    const chargeProfiles = new Set(s.chargeByProfile.map((e) => e.profileId));
+    for (const e of s.chargeByProfile) {
+      assert.ok(profileIds.has(e.profileId), `${s.id}: profil ${e.profileId}`);
+      assert.ok(e.jh >= 0 && e.done >= 0 && e.done <= e.jh, `${s.id}: charge ${e.jh}/${e.done}`);
+    }
+    // Contention is a subset of the mobilized profiles (design invariant).
+    for (const p of s.contentionProfiles) assert.ok(chargeProfiles.has(p), `${s.id}: contention ${p}`);
+    for (const r of s.risks) assert.ok(riskIds.has(r.type) && typeof r.desc === "string", `${s.id}: risque`);
+    for (const c of s.projectConstraints) assert.ok(constraintIds.has(c), `${s.id}: contrainte ${c}`);
+    assert.equal(typeof s.contentionNote, "string", s.id);
+    assert.ok(Array.isArray(s.alerts), s.id);
+    assert.ok(!Number.isNaN(Date.parse(s.dateRdr ?? "")), `${s.id}: dateRdr`);
+    assert.ok((s.budgetRdli ?? -1) >= 0 && (s.budgetEngaged ?? -1) >= 0, s.id);
+  }
+});
+
 test("efforts follow the canal bands and the stage consumption ratios", () => {
   const bands: Record<string, [number, number]> = {
     petits_projets: [10, 60], projets: [60, 320], projets_complexes: [40, 260],

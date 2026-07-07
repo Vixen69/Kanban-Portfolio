@@ -101,6 +101,113 @@ const NATURE = {
   complex:     { label: 'Complexe',  bg: '#ffedd5', fg: '#c2410c' },
 };
 
+// --- Typologie de rôles (familles de ressources) — pour lire la contention par métier. ---
+const ROLE_FAMILIES = [
+  { id: 'archi',   label: 'Architecture',    color: '#14b8a6' },
+  { id: 'dev',     label: 'Développement',   color: '#4338ca' },
+  { id: 'infra',   label: 'Infrastructure',  color: '#ec4899' },
+  { id: 'metier',  label: 'Métier',          color: '#b45309' },
+  { id: 'secu',    label: 'Sécurité',        color: '#dc2626' },
+  { id: 'exploit', label: 'Exploitation',    color: '#0369a1' },
+];
+const ROLE_BY_ID = Object.fromEntries(ROLE_FAMILIES.map(r => [r.id, r]));
+
+// --- Typologie des PROFILS (charge j/h & contention). Fournie par la DSI. ---
+const PROFILES = [
+  { id: 'archi_ad',        label: 'Architecte A&D',        color: '#0d9488' },
+  { id: 'cdp_ad',          label: 'CdP A&D',               color: '#14b8a6' },
+  { id: 'cdp_corp',        label: 'CdP CORPORATE',         color: '#475569' },
+  { id: 'cdp_erp',         label: 'CdP ERP',               color: '#4338ca' },
+  { id: 'cdp_indus',       label: 'CdP INDUSTRIE',         color: '#b45309' },
+  { id: 'cdp_infra_build', label: 'CdP INFRA BUILD',       color: '#db2777' },
+  { id: 'cdp_infra_ope',   label: 'CdP INFRA OPE',         color: '#be185d' },
+  { id: 'cdp_infra_ssi',   label: 'CdP INFRA SSI',         color: '#dc2626' },
+  { id: 'cdp_ing',         label: 'CdP INGENIERIE',        color: '#15803d' },
+  { id: 'cdp_it4it',       label: 'CdP IT4IT',             color: '#7c3aed' },
+  { id: 'cdp_soutien',     label: 'CdP SOUTIEN',           color: '#0369a1' },
+  { id: 'expert',          label: 'Expert',                color: '#9333ea' },
+  { id: 'data_biz',        label: 'Data Business',         color: '#0891b2' },
+  { id: 'pilote_svc',      label: 'Pilote de service',     color: '#ea580c' },
+  { id: 'cdp_buildteam',   label: 'Chef de projet BuildTeam', color: '#2563eb' },
+  { id: 'concept_dev',     label: 'Concept.Dév.',          color: '#059669' },
+  { id: 'pmo',             label: 'PMO',                   color: '#64748b' },
+  { id: 'rdom',            label: 'RDOM',                  color: '#334155' },
+  { id: 'concept_dev_erp', label: 'Concept.Dév. ERP',      color: '#6366f1' },
+];
+const PROFILE_BY_ID = Object.fromEntries(PROFILES.map(p => [p.id, p]));
+// Mappe chaque ressource clé vers sa famille de rôle.
+const ROLE_OF = {
+  'Architecte DAAT': 'archi',
+  'Lead dev': 'dev', 'DevOps': 'dev', 'Intégrateur': 'dev',
+  'Équipe Infra': 'infra', 'Équipe réseau': 'infra', 'DBA': 'infra', 'Infogérant': 'infra',
+  'Référent métier': 'metier', 'Product owner': 'metier',
+  'Expert sécurité': 'secu',
+  'Support N3': 'exploit',
+};
+function roleOf(res) { return ROLE_OF[res] || 'dev'; }
+
+// --- Typologie de contraintes (cadre des risques / alertes). ---
+const CONSTRAINT_TYPES = [
+  { id: 'legale',    label: 'Légale / réglementaire', short: 'Légale',  color: '#dc2626' },
+  { id: 'groupe',    label: 'Directive Groupe',       short: 'Groupe',  color: '#7c3aed' },
+  { id: 'obso',      label: 'Obsolescence',           short: 'Obso.',   color: '#b45309' },
+  { id: 'secu',      label: 'Sécurité',               short: 'Sécu.',   color: '#b91c1c' },
+  { id: 'depend',    label: 'Dépendance',             short: 'Dépend.', color: '#0369a1' },
+  { id: 'technique', label: 'Dette technique',        short: 'Tech.',   color: '#475569' },
+];
+const CONSTRAINT_BY_ID = Object.fromEntries(CONSTRAINT_TYPES.map(c => [c.id, c]));
+
+// --- Typologie des RISQUES retenus (par entité/métier porteur du risque). ---
+const RISK_TYPES = [
+  { id: 'ssg',         label: 'SSG',        short: 'SSG',  color: '#b91c1c' },
+  { id: 'infra',       label: 'Infra',      short: 'Infra', color: '#db2777' },
+  { id: 'metier',      label: 'Métier',     short: 'Métier', color: '#b45309' },
+  { id: 'achat',       label: 'Achat',      short: 'Achat', color: '#0369a1' },
+  { id: 'fournisseur', label: 'Fournisseur', short: 'Fourn.', color: '#7c3aed' },
+  { id: 'ad',          label: 'A&D',        short: 'A&D',  color: '#0d9488' },
+];
+const RISK_TYPE_BY_ID = Object.fromEntries(RISK_TYPES.map(r => [r.id, r]));
+
+// --- Contraintes du projet (checkables) — pour l'instant : Légale, Groupe. ---
+const PROJECT_CONSTRAINTS = [
+  { id: 'legale', label: 'Légale / réglementaire', short: 'Légale', color: '#dc2626' },
+  { id: 'groupe', label: 'Directive Groupe',       short: 'Groupe', color: '#7c3aed' },
+];
+const PROJECT_CONSTRAINT_BY_ID = Object.fromEntries(PROJECT_CONSTRAINTS.map(c => [c.id, c]));
+
+const RISK_SEVERITY = {
+  faible: { label: 'Faible', color: '#64748b', rank: 1 },
+  moyen:  { label: 'Moyen',  color: '#b45309', rank: 2 },
+  eleve:  { label: 'Élevé',  color: '#b91c1c', rank: 3 },
+};
+
+// --- Délais kanban : reconstruit les temps d'étape depuis l'historique. ---
+// Renvoie le timestamp (ms) de la 1re entrée dans une étape, ou null.
+function stageEntryAt(card, stageId) {
+  const h = (card.history || []).find(x => x.to === stageId);
+  return h ? new Date(h.at).getTime() : null;
+}
+function daysSince(ms) { return ms == null ? null : Math.max(0, Math.round((Date.now() - ms) / 86400000)); }
+function daysBetween(a, b) { return (a == null || b == null) ? null : Math.max(0, Math.round((b - a) / 86400000)); }
+// Lead time = entrée Demandes → fin (Done/Exploitation) ou aujourd'hui.
+// Cycle time = entrée Actifs → fin ou aujourd'hui (temps de réalisation).
+function flowTimes(card) {
+  const tDem = stageEntryAt(card, 'demandes') || (card.history && card.history[0] ? new Date(card.history[0].at).getTime() : null);
+  const tQual = stageEntryAt(card, 'qualification');
+  const tActif = stageEntryAt(card, 'actifs');
+  const tDone = stageEntryAt(card, 'done') || stageEntryAt(card, 'exploitation');
+  const end = tDone || Date.now();
+  return {
+    tDem, tQual, tActif, tDone,
+    ageDemandes: daysSince(tDem),
+    ageQualif: daysSince(tQual),
+    ageActif: daysSince(tActif),
+    leadTime: daysBetween(tDem, end),
+    cycleTime: tActif ? daysBetween(tActif, end) : null,
+    finished: !!tDone,
+  };
+}
+
 // --- Configurability (Season 2 admin panel, pulled forward) ---
 // The defaults above ARE the NMO model. An admin can reorder/rename/extend them;
 // the running config is applied onto window globals so every component reads it.
@@ -142,4 +249,9 @@ Object.assign(window, {
   COLUMNS, SWIMLANES, DOMAINS, DOMAIN_BY_ID, TYPES, TYPE_BY_ID, COLUMN_BY_ID, LANE_BY_ID,
   GATES, AGE, CRITICALITY, NATURE, ageCategory, decayAlpha, ageLabel,
   GATE_DEFS, defaultBoardConfig, applyBoardConfig, FIELDS: [],
+  ROLE_FAMILIES, ROLE_BY_ID, ROLE_OF, roleOf,
+  PROFILES, PROFILE_BY_ID,
+  CONSTRAINT_TYPES, CONSTRAINT_BY_ID, RISK_SEVERITY,
+  RISK_TYPES, RISK_TYPE_BY_ID, PROJECT_CONSTRAINTS, PROJECT_CONSTRAINT_BY_ID,
+  stageEntryAt, daysSince, daysBetween, flowTimes,
 });

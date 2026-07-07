@@ -72,3 +72,13 @@ export const EFFORT_BAND: Record<string, [number, number]> = {
 /** The pull-flow path; "pause" is a parking column, never on the path. */
 export const FLOW_ORDER =
   ["demandes", "qualification", "etudes", "prets", "actifs", "done", "exploitation"];
+
+/**
+ * Projected RDR (delivery) horizon in days per stage (design/data.jsx): the
+ * date shrinks as a subject advances — far out at intake, past due once done.
+ * "pause" and any unlisted column fall back to [30, 180].
+ */
+export const RDR_HORIZON: Record<string, [number, number]> = {
+  demandes: [120, 320], qualification: [90, 240], etudes: [70, 190], prets: [45, 140],
+  actifs: [-20, 90], done: [-90, -5], exploitation: [-220, -30],
+};

@@ -2,9 +2,43 @@
 
 import type { BoardConfig, Card } from "./types.ts";
 
+// The design-v10 typologies for tests (roles, profiles, risks, constraints,
+// severities). Split out so testConfig stays within the 40-line function cap.
+type Vocabularies = Pick<
+  BoardConfig,
+  "roleFamilies" | "profiles" | "roleOf" | "riskTypes" | "projectConstraints" | "riskSeverity"
+>;
+function testVocabularies(): Vocabularies {
+  return {
+    roleFamilies: [
+      { id: "rfDev", name: "Développement", color: "#4338ca" },
+      { id: "rfArchi", name: "Architecture", color: "#14b8a6" },
+    ],
+    profiles: [
+      { id: "pA", name: "Profil A", color: "#0d9488" },
+      { id: "pB", name: "Profil B", color: "#4338ca" },
+    ],
+    roleOf: { "Lead dev": "rfDev" },
+    riskTypes: [
+      { id: "rSSG", name: "SSG", short: "SSG", color: "#b91c1c" },
+      { id: "rInfra", name: "Infra", short: "Infra", color: "#db2777" },
+    ],
+    projectConstraints: [
+      { id: "legale", name: "Légale", short: "Légale", color: "#dc2626" },
+      { id: "groupe", name: "Groupe", short: "Groupe", color: "#7c3aed" },
+    ],
+    riskSeverity: {
+      faible: { label: "Faible", color: "#64748b", rank: 1 },
+      moyen: { label: "Moyen", color: "#b45309", rank: 2 },
+      eleve: { label: "Élevé", color: "#b91c1c", rank: 3 },
+    },
+  };
+}
+
 /**
  * A small valid v2 board topology for tests: 2 lanes, 3 columns (one WIP,
- * one gate), 2 domains, 2 types, no custom fields, design age thresholds.
+ * one gate), 2 domains, 2 types, no custom fields, design age thresholds,
+ * plus the design-v10 typologies (see testVocabularies).
  * Output: a fresh BoardConfig (safe to mutate in a test). Failure: none.
  */
 export function testConfig(): BoardConfig {
@@ -41,6 +75,7 @@ export function testConfig(): BoardConfig {
       DoD: { name: "Definition of Done", color: "#047857" },
     },
     fields: [],
+    ...testVocabularies(),
     age: { freshMaxDays: 7, recentMaxDays: 28, agingMaxDays: 60 },
     andonThresholdDays: 5,
   };
@@ -74,6 +109,15 @@ export function testCard(overrides: Partial<Card> = {}): Card {
     loadPlan: null,
     resources: [],
     notes: "",
+    budgetEngaged: null,
+    budgetRdli: null,
+    chargeByProfile: [],
+    contentionProfiles: [],
+    contentionNote: "",
+    risks: [],
+    projectConstraints: [],
+    alerts: [],
+    dateRdr: null,
     sciformaId: null,
     custom: {},
     createdAt: "2026-01-01T00:00:00.000Z",

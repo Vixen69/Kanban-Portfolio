@@ -6,81 +6,21 @@
 import type {
   AgeThresholds, BoardConfig, Card, Column, CriticalityStyle, Domain,
   FieldDef, FieldOption, FieldType, GateCode, GateDef, Lane, NatureStyle,
+  RiskSeverityStyle, RoleFamily,
 } from "./types.ts";
+import {
+  fail, isRecord, optionalText, parseKeyed, parseNonEmptyArray,
+  requireExactKeys, requireRecord, requireText, uniqueIds,
+} from "./config-parse.ts";
 
-/**
- * Raised when a board config is structurally invalid.
- * The message is a French sentence naming the first offending field.
- */
-export class ConfigError extends Error {}
+export { ConfigError } from "./config-parse.ts";
 
 const NATURE_KEYS = ["simple", "complicated", "complex"] as const;
 const CRITICALITY_KEYS = ["top", "major", "normal"] as const;
 const GATE_CODES: readonly GateCode[] = ["DoR", "DoD"];
 const FIELD_TYPES: readonly FieldType[] = ["text", "number", "date", "select", "checkbox", "person"];
 const AGE_KEYS = ["freshMaxDays", "recentMaxDays", "agingMaxDays"] as const;
-
-function fail(message: string): never {
-  throw new ConfigError(message);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-// A required, non-empty string (ids, names, short codes, colors, labels).
-function requireText(value: unknown, path: string): string {
-  if (typeof value !== "string" || value.length === 0) {
-    fail(`${path} doit être une chaîne non vide`);
-  }
-  return value;
-}
-
-// Display-only text: must be a string when present; absent means "".
-function optionalText(value: unknown, path: string): string {
-  if (value === undefined) return "";
-  if (typeof value !== "string") fail(`${path} doit être une chaîne`);
-  return value;
-}
-
-function requireRecord(value: unknown, path: string): Record<string, unknown> {
-  if (!isRecord(value)) fail(`${path} doit être un objet`);
-  return value;
-}
-
-// An object holding exactly the given keys — no more, no fewer.
-function requireExactKeys(value: unknown, path: string, keys: readonly string[]): Record<string, unknown> {
-  const record = requireRecord(value, path);
-  for (const key of keys) {
-    if (!(key in record)) fail(`${path}.${key} manquant`);
-  }
-  for (const key of Object.keys(record)) {
-    if (!keys.includes(key)) fail(`${path} : clé inattendue « ${key} »`);
-  }
-  return record;
-}
-
-// Parses an object with exactly the given keys, one sub-parse per key.
-function parseKeyed<T>(
-  value: unknown, path: string, keys: readonly string[],
-  parseOne: (item: unknown, itemPath: string) => T,
-): Record<string, T> {
-  const record = requireExactKeys(value, path, keys);
-  return Object.fromEntries(keys.map((key) => [key, parseOne(record[key], `${path}.${key}`)]));
-}
-
-function parseNonEmptyArray<T>(value: unknown, kind: string, parseItem: (item: unknown, index: number) => T): T[] {
-  if (!Array.isArray(value) || value.length === 0) fail(`${kind} doit être un tableau non vide`);
-  return value.map(parseItem);
-}
-
-function uniqueIds(items: { id: string }[], kind: string): void {
-  const seen = new Set<string>();
-  for (const item of items) {
-    if (seen.has(item.id)) fail(`${kind} : id dupliqué « ${item.id} »`);
-    seen.add(item.id);
-  }
-}
+const RISK_SEVERITY_KEYS = ["faible", "moyen", "eleve"] as const;
 
 function parseLane(value: unknown, index: number): Lane {
   const record = requireRecord(value, `lanes[${index}]`);
@@ -134,6 +74,42 @@ function parseColored(value: unknown, kind: string, index: number): Domain {
     name: requireText(record.name, `${kind}[${index}].name`),
     short: requireText(record.short, `${kind}[${index}].short`),
     color: requireText(record.color, `${kind}[${index}].color`),
+  };
+}
+
+// Role families and profiles share the same shape (id/name/color, no short).
+function parseIdNameColor(value: unknown, kind: string, index: number): RoleFamily {
+  const record = requireRecord(value, `${kind}[${index}]`);
+  return {
+    id: requireText(record.id, `${kind}[${index}].id`),
+    name: requireText(record.name, `${kind}[${index}].name`),
+    color: requireText(record.color, `${kind}[${index}].color`),
+  };
+}
+
+// The resource → role-family map. Every value must name a known role family.
+function parseRoleOf(value: unknown, familyIds: Set<string>): Record<string, string> {
+  const record = requireRecord(value, "roleOf");
+  const out: Record<string, string> = {};
+  for (const [resource, familyId] of Object.entries(record)) {
+    if (typeof familyId !== "string" || !familyIds.has(familyId)) {
+      fail(`roleOf[« ${resource} »] doit référencer une famille de rôle connue`);
+    }
+    out[resource] = familyId;
+  }
+  return out;
+}
+
+function parseRiskSeverityStyle(value: unknown, path: string): RiskSeverityStyle {
+  const record = requireRecord(value, path);
+  const rank = record.rank;
+  if (typeof rank !== "number" || !Number.isInteger(rank) || rank < 1) {
+    fail(`${path}.rank doit être un entier ≥ 1`);
+  }
+  return {
+    label: requireText(record.label, `${path}.label`),
+    color: requireText(record.color, `${path}.color`),
+    rank,
   };
 }
 
@@ -242,6 +218,29 @@ function parseAge(value: unknown): AgeThresholds {
  * Failure: throws ConfigError with a French message naming the first
  * offending field; never returns a partially valid config.
  */
+// design-v10 typologies; roleOf values must reference a declared role family.
+type Vocabularies = Pick<BoardConfig,
+  "roleFamilies" | "profiles" | "roleOf" | "riskTypes" | "projectConstraints" | "riskSeverity">;
+
+function parseVocabularies(raw: Record<string, unknown>): Vocabularies {
+  const roleFamilies = parseNonEmptyArray(raw.roleFamilies, "roleFamilies", (v, i) => parseIdNameColor(v, "roleFamilies", i));
+  const profiles = parseNonEmptyArray(raw.profiles, "profiles", (v, i) => parseIdNameColor(v, "profiles", i));
+  const riskTypes = parseNonEmptyArray(raw.riskTypes, "riskTypes", (v, i) => parseColored(v, "riskTypes", i));
+  const projectConstraints = parseNonEmptyArray(raw.projectConstraints, "projectConstraints", (v, i) => parseColored(v, "projectConstraints", i));
+  uniqueIds(roleFamilies, "roleFamilies");
+  uniqueIds(profiles, "profiles");
+  uniqueIds(riskTypes, "riskTypes");
+  uniqueIds(projectConstraints, "projectConstraints");
+  return {
+    roleFamilies,
+    profiles,
+    roleOf: parseRoleOf(raw.roleOf, new Set(roleFamilies.map((r) => r.id))),
+    riskTypes,
+    projectConstraints,
+    riskSeverity: parseKeyed(raw.riskSeverity, "riskSeverity", RISK_SEVERITY_KEYS, parseRiskSeverityStyle) as BoardConfig["riskSeverity"],
+  };
+}
+
 export function validateBoardConfig(raw: unknown): BoardConfig {
   if (!isRecord(raw)) fail("la configuration doit être un objet JSON");
   const lanes = parseNonEmptyArray(raw.lanes, "lanes", parseLane);
@@ -265,6 +264,7 @@ export function validateBoardConfig(raw: unknown): BoardConfig {
     criticalities: parseKeyed(raw.criticalities, "criticalities", CRITICALITY_KEYS, parseCriticalityStyle) as BoardConfig["criticalities"],
     gateDefs: parseKeyed(raw.gateDefs, "gateDefs", GATE_CODES, parseGateDef) as BoardConfig["gateDefs"],
     fields: parseFields(raw.fields),
+    ...parseVocabularies(raw),
     age: parseAge(raw.age),
     andonThresholdDays: andon,
   };

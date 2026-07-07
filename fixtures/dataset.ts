@@ -107,3 +107,32 @@ export const BLOCK_REASONS = [
   "Spécifications incomplètes",
   "Attente retour métier",
 ];
+
+/** Free-text contention notes (design/data.jsx) — editable on the card. */
+export const CONTENTION_NOTES = [
+  "Lead dev mobilisé sur 2 autres sujets prioritaires ce trimestre.",
+  "Conflit de planning avec l’équipe Infra sur la fenêtre de migration.",
+  "Expert sécurité partagé — créneau de revue à caler avec la RSSI.",
+  "DBA fortement sollicité, risque de décalage sur la phase de recette.",
+  "Référent métier disponible seulement 1 j/semaine jusqu’à fin de trimestre.",
+  "Dépendance forte au même architecte que deux projets du portefeuille.",
+];
+
+/** Free-text alert notes (design/data.jsx) — editable on the card. */
+export const ALERT_NOTES = [
+  "Décision COPROJ attendue avant la prochaine étape.",
+  "Jalon réglementaire à confirmer avec le métier.",
+  "Risque de glissement si l’arbitrage budgétaire tarde.",
+  "Point de vigilance remonté au COPIL du mois.",
+  "Validation sponsor en attente — relance prévue.",
+];
+
+/** Risk descriptions per bearing entity (riskType id → candidate texts). */
+export const RISK_DESC: Record<string, string[]> = {
+  ssg: ["Revue sécurité non planifiée", "Exposition de données à qualifier", "Conformité SSI à confirmer"],
+  infra: ["Capacité d’hébergement à valider", "Fenêtre de migration non sécurisée", "Dépendance socle Infra"],
+  metier: ["Disponibilité métier insuffisante", "Spécifications fonctionnelles incomplètes", "Adhésion utilisateurs à confirmer"],
+  achat: ["Procédure d’achat non lancée", "Délai de contractualisation serré", "Budget achat non arbitré"],
+  fournisseur: ["Livrable fournisseur en attente", "Performance fournisseur à surveiller", "Dépendance éditeur externe"],
+  ad: ["Validation architecture (DAAT) en attente", "Alignement cible A&D à confirmer", "Dette d’architecture identifiée"],
+};

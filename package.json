@@ -19,6 +19,7 @@
     "preview": "npm run -w @portfolio-kanban/front preview",
     "serve": "node middle/main.ts",
     "seed": "node scripts/seed.ts",
+    "import-design": "node scripts/import-design.ts",
     "typecheck": "tsc --noEmit && tsc -p middle/tsconfig.json && tsc -p front/tsconfig.json",
     "test": "node --test \"core/**/*.test.ts\" \"adapters/**/*.test.ts\" \"middle/**/*.test.ts\" \"front/**/*.test.ts\" \"scripts/**/*.test.ts\"",
     "conventions": "node scripts/check-conventions.ts",
