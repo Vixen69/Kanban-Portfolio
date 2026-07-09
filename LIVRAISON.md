@@ -150,11 +150,11 @@ port 5432 de la base est publié par le compose) :
 
 PowerShell :
 ```powershell
-$env:KANBAN_ALLOW_SEED="1"; $env:KANBAN_STORAGE_DRIVER="postgres"; $env:DATABASE_URL="postgres://kanban:change-me-in-dev@localhost:5432/kanban"; npm run seed
+$env:KANBAN_ALLOW_SEED="1"; $env:KANBAN_STORAGE_DRIVER="postgres"; $env:DATABASE_URL="postgres://kanban:thuglife@localhost:5432/kanban"; npm run seed
 ```
 Bash :
 ```bash
-KANBAN_ALLOW_SEED=1 KANBAN_STORAGE_DRIVER=postgres DATABASE_URL=postgres://kanban:change-me-in-dev@localhost:5432/kanban npm run seed
+KANBAN_ALLOW_SEED=1 KANBAN_STORAGE_DRIVER=postgres DATABASE_URL=postgres://kanban:thuglife@localhost:5432/kanban npm run seed
 ```
 Attendu : `seed: 150 cartes, 768 évènements importés.`
 

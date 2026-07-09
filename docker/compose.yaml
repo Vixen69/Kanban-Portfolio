@@ -15,7 +15,7 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-kanban}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-in-dev}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-thuglife}
       POSTGRES_DB: ${POSTGRES_DB:-kanban}
     ports:
       - "${DB_PORT:-5432}:5432"
@@ -36,7 +36,7 @@ services:
       KANBAN_HOST: 0.0.0.0
       KANBAN_PORT: "8787"
       KANBAN_STORAGE_DRIVER: postgres
-      DATABASE_URL: postgres://${POSTGRES_USER:-kanban}:${POSTGRES_PASSWORD:-change-me-in-dev}@db:5432/${POSTGRES_DB:-kanban}
+      DATABASE_URL: postgres://${POSTGRES_USER:-kanban}:${POSTGRES_PASSWORD:-thuglife}@db:5432/${POSTGRES_DB:-kanban}
       # Append-only log enforced by default (1). Set KANBAN_PG_APPEND_ONLY=0 to
       # drop the guard for a DEMO (direct DB hand-edits). Keep 1 in production.
       KANBAN_PG_APPEND_ONLY: "${KANBAN_PG_APPEND_ONLY:-1}"
@@ -65,7 +65,7 @@ services:
 
   # Web DB editor for DEMO/DEV only (profil `tools`, jamais en production).
   #   docker compose --profile app --profile tools up
-  #   -> http://localhost:8081  (Système PostgreSQL · Serveur db · kanban / kanban)
+  #   -> http://localhost:8081  (Système PostgreSQL · Serveur db · kanban / thuglife · base kanban)
   adminer:
     profiles: ["tools"]
     image: adminer:4

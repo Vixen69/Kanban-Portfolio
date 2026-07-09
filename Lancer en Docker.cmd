@@ -42,7 +42,7 @@ if not errorlevel 1 (
   echo Donnees de demonstration ^(idempotent^)...
   set KANBAN_ALLOW_SEED=1
   set KANBAN_STORAGE_DRIVER=postgres
-  set DATABASE_URL=postgres://kanban:change-me-in-dev@localhost:5432/kanban
+  set DATABASE_URL=postgres://kanban:thuglife@localhost:5432/kanban
   call node scripts/seed.ts
 )
 
@@ -52,7 +52,7 @@ start "" http://localhost:8080
 
 echo.
 echo   Tableau     : http://localhost:8080
-echo   Editeur BD  : http://localhost:8081   ^(Systeme PostgreSQL, Serveur db, kanban / change-me-in-dev, base kanban^)
+echo   Editeur BD  : http://localhost:8081   ^(Systeme PostgreSQL, Serveur db, kanban / thuglife, base kanban^)
 echo.
 echo Conteneurs lances. Pour arreter : double-cliquer "Arreter Docker.cmd".
 pause
