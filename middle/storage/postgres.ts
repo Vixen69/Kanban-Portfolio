@@ -21,6 +21,12 @@ CREATE TABLE IF NOT EXISTS card_events (
   seq  bigint PRIMARY KEY,
   data jsonb NOT NULL
 );
+`;
+
+// Append-only guard on the log — a product invariant (§1, ADR 016): blocks
+// UPDATE/DELETE on card_events. ON by default. Turned OFF only for demo/dev
+// (KANBAN_PG_APPEND_ONLY=0), to allow direct hand-edits of the database.
+const APPEND_ONLY_ON = `
 CREATE OR REPLACE FUNCTION card_events_immutable() RETURNS trigger AS $$
 BEGIN
   RAISE EXCEPTION 'card_events est append-only (UPDATE/DELETE interdits)';
@@ -31,6 +37,8 @@ CREATE TRIGGER card_events_no_mutation
   BEFORE UPDATE OR DELETE ON card_events
   FOR EACH ROW EXECUTE FUNCTION card_events_immutable();
 `;
+
+const APPEND_ONLY_OFF = "DROP TRIGGER IF EXISTS card_events_no_mutation ON card_events;";
 
 const UPSERT_CARD =
   "INSERT INTO cards (id, data) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data";
@@ -141,13 +149,16 @@ function buildStorage(pool: Pool, runTx: Tx): BoardStorage {
 
 /**
  * Opens a PostgreSQL-backed BoardStorage, creating the schema if needed.
- * Inputs: an optional connection string (else `pg` reads PG* env vars).
+ * Inputs: an optional connection string (else `pg` reads PG* env vars); and
+ * appendOnly (default true) — when false, the UPDATE/DELETE guard on the log
+ * is dropped so the database can be hand-edited directly (demo/dev only).
  * Output: an open BoardStorage; every method rejects once close() ran.
  * Failure: rejects when the database is unreachable, the schema DDL fails, or
  * an operation errors (a duplicate insertCard id, a non-serializable payload).
  */
-export async function createPostgresStorage(connectionString?: string): Promise<BoardStorage> {
+export async function createPostgresStorage(connectionString?: string, appendOnly = true): Promise<BoardStorage> {
   const pool = connectionString ? new Pool({ connectionString }) : new Pool();
   await pool.query(SCHEMA);
+  await pool.query(appendOnly ? APPEND_ONLY_ON : APPEND_ONLY_OFF);
   return buildStorage(pool, makeTx(pool));
 }

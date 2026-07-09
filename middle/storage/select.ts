@@ -25,7 +25,12 @@ export type StorageDriverId = (typeof STORAGE_DRIVERS)[number];
  */
 export async function createStorage(driver: string, path: string): Promise<BoardStorage> {
   if (driver === "jsonl") return createJsonlStorage(path);
-  if (driver === "postgres") return createPostgresStorage(process.env["DATABASE_URL"]);
+  if (driver === "postgres") {
+    // Append-only log is enforced by default; KANBAN_PG_APPEND_ONLY=0 drops the
+    // guard for demo/dev so the DB can be hand-edited (see ADR 016).
+    const appendOnly = process.env["KANBAN_PG_APPEND_ONLY"] !== "0";
+    return createPostgresStorage(process.env["DATABASE_URL"], appendOnly);
+  }
   throw new Error(
     `Pilote de stockage inconnu : « ${driver} ». Pilotes disponibles : ${STORAGE_DRIVERS.join(", ")}.`,
   );

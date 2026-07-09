@@ -5,7 +5,7 @@ title Portefeuille DSI - Kanban NMO (Docker) - Arret
 cd /d "%~dp0"
 
 echo Arret des conteneurs...
-docker compose -f docker/compose.yaml --profile app down
+docker compose -f docker/compose.yaml --profile app --profile tools down
 
 echo.
 echo Termine. Les images et les donnees ^(docker\data^) sont conservees.
