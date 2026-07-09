@@ -115,23 +115,26 @@ function ageTextClass(days) {
 }
 
 // --- Radiator bar: ~16px, the default whole-portfolio view. ---
-function MiniCard({ card, t, showCodes, onOpen, onDragStart, onDragEnd }) {
+function MiniCard({ card, t, showCodes, onOpen, onDragStart, onDragEnd, onCardOver, onCardDrop, dropTarget }) {
   const days = daysInColumn(card);
-  const acc = cardAccent(card, t, card.blocked);
+  const blk = cardBlocked(card);
+  const acc = cardAccent(card, t, blk);
   const dec = agingDecor(days, t);
   return (
     <div
-      className={'mini' + (card.dimmed ? ' dimmed' : '')}
+      className={'mini' + (card.dimmed ? ' dimmed' : '') + (dropTarget ? ' drop-before' : '')}
       draggable
       onClick={() => onOpen(card)}
       onDragStart={(e) => onDragStart(e, card)}
       onDragEnd={onDragEnd}
-      style={{ height: t.density, ...acc.root, background: cardBg(acc, dec, t, card.blocked), filter: dec.filter }}
+      onDragOver={onCardOver ? (e) => onCardOver(e, card) : undefined}
+      onDrop={onCardDrop ? (e) => onCardDrop(e, card) : undefined}
+      style={{ height: t.density, ...acc.root, background: cardBg(acc, dec, t, blk), filter: dec.filter }}
       title={`${card.name}  ·  ${(window.TYPE_BY_ID[card.type] || {}).label || ''}  ·  ${DOMAIN_BY_ID[card.rdom].label}  ·  ${card.cp}  ·  ${days}j`}
     >
       <span className="mini-accent" style={acc.accent} />
       {acc.dot && <span className="mini-dot" style={{ background: acc.dot }} />}
-      {card.blocked && t.blockedStyle !== 'wash' && <span className="blk-pulse" />}
+      {blk && t.blockedStyle !== 'wash' && <span className="blk-pulse" />}
       <CritMark c={card.criticality} />
       <TypeTag type={card.type} />
       {showCodes && <span className="mini-code">{card.codename}</span>}
@@ -143,25 +146,28 @@ function MiniCard({ card, t, showCodes, onOpen, onDragStart, onDragEnd }) {
 }
 
 // --- Expanded card shown when its column is in focus (~65px). ---
-function FocusCard({ card, t, showCodes, onOpen, onDragStart, onDragEnd }) {
+function FocusCard({ card, t, showCodes, onOpen, onDragStart, onDragEnd, onCardOver, onCardDrop, dropTarget }) {
   const days = daysInColumn(card);
   const dom = DOMAIN_BY_ID[card.rdom];
-  const acc = cardAccent(card, t, card.blocked);
+  const blk = cardBlocked(card);
+  const acc = cardAccent(card, t, blk);
   const dec = agingDecor(days, t);
   return (
     <div
-      className={'focus-card' + (card.dimmed ? ' dimmed' : '')}
+      className={'focus-card' + (card.dimmed ? ' dimmed' : '') + (dropTarget ? ' drop-before' : '')}
       draggable
       onClick={() => onOpen(card)}
       onDragStart={(e) => onDragStart(e, card)}
       onDragEnd={onDragEnd}
-      style={{ ...acc.root, background: cardBg(acc, dec, t, card.blocked), filter: dec.filter }}
+      onDragOver={onCardOver ? (e) => onCardOver(e, card) : undefined}
+      onDrop={onCardDrop ? (e) => onCardDrop(e, card) : undefined}
+      style={{ ...acc.root, background: cardBg(acc, dec, t, blk), filter: dec.filter }}
     >
       <span className="focus-accent" style={acc.accent} />
       {acc.dot && <span className="mini-dot" style={{ background: acc.dot, top: 8 }} />}
       <div className="focus-body">
         <div className="focus-line1">
-          {card.blocked && t.blockedStyle !== 'wash' && <span className="blk-pulse" />}
+          {blk && t.blockedStyle !== 'wash' && <span className="blk-pulse" />}
           <CritMark c={card.criticality} big />
           <span className="focus-name">{card.name}</span>
           <span className={ageTextClass(days)}>{ageLabel(days)}</span>
@@ -176,7 +182,7 @@ function FocusCard({ card, t, showCodes, onOpen, onDragStart, onDragEnd }) {
           )}
           <CustomBadges card={card} />
         </div>
-        {card.blocked && <div className="focus-block">{card.blockReason}</div>}
+        {blk && <div className="focus-block">{cardBlockReason(card)}</div>}
         <EstimeBar card={card} />
       </div>
       {dec.ageEdge && <span className="age-edge" style={{ background: dec.ageEdge }} />}
@@ -185,18 +191,18 @@ function FocusCard({ card, t, showCodes, onOpen, onDragStart, onDragEnd }) {
 }
 
 // --- A single (lane x column) cell with WIP heat + blocked badge + gate line. ---
-function Cell({ lane, column, cards, focused, t, wipLimit, onSetWip, showCodes, dragOver, onOpen, onDragStart, onDragEnd, onDrop, onDragOverCell, onDragLeaveCell }) {
+function Cell({ lane, column, cards, focused, t, wipLimit, onSetWip, showCodes, dragOver, onOpen, onDragStart, onDragEnd, onDrop, onDragOverCell, onDragLeaveCell, onCardOver, onCardDrop, dropCardId }) {
   const [editing, setEditing] = useStateBoard(false);
-  const list = cards.filter(c => c.canal === lane.id && c.column === column.id && !c.hidden);
+  const list = cards.filter(c => c.canal === lane.id && c.column === column.id && !c.hidden && !c.archived);
   const visible = list.filter(c => !c.dimmed);
-  const blockedCount = list.filter(c => c.blocked).length;
+  const blockedCount = list.filter(c => cardBlocked(c)).length;
   const n = list.length;
   const limit = wipLimit === undefined ? column.wip : wipLimit;
   const ratio = limit ? n / limit : 0;
   const wipState = !limit ? 'na' : ratio > 1 ? 'over' : ratio >= 0.8 ? 'warn' : 'ok';
   const gate = GATES[column.id];
 
-  // Scroll hint: show a fading down-arrow while the cell can scroll further down.
+  // Scroll hint: show a fading down-arrow ONLY while the cell can actually scroll further down.
   const cardsRef = useRefBoard(null);
   const [scrollHint, setScrollHint] = useStateBoard(false);
   const updateHint = () => {
@@ -204,7 +210,16 @@ function Cell({ lane, column, cards, focused, t, wipLimit, onSetWip, showCodes, 
     if (!el) return;
     setScrollHint(el.scrollHeight - el.clientHeight - el.scrollTop > 4);
   };
-  useEffectBoard(() => { updateHint(); }, [list.length, focused]);
+  useEffectBoard(() => {
+    const el = cardsRef.current;
+    if (!el) return;
+    updateHint();
+    // Recompute whenever the cell or its content is resized (layout settles, board resizes, filters change).
+    const ro = new ResizeObserver(() => updateHint());
+    ro.observe(el);
+    Array.from(el.children).forEach(ch => ro.observe(ch));
+    return () => ro.disconnect();
+  }, [list.length, focused]);
 
   const commit = (e) => {
     const raw = e.target.value.trim();
@@ -253,8 +268,8 @@ function Cell({ lane, column, cards, focused, t, wipLimit, onSetWip, showCodes, 
       <div className="cell-cards" ref={cardsRef} onScroll={updateHint}>
         {list.map(card =>
           focused
-            ? <FocusCard key={card.id} card={card} t={t} showCodes={showCodes} onOpen={onOpen} onDragStart={onDragStart} onDragEnd={onDragEnd} />
-            : <MiniCard key={card.id} card={card} t={t} showCodes={showCodes} onOpen={onOpen} onDragStart={onDragStart} onDragEnd={onDragEnd} />
+            ? <FocusCard key={card.id} card={card} t={t} showCodes={showCodes} onOpen={onOpen} onDragStart={onDragStart} onDragEnd={onDragEnd} onCardOver={onCardOver} onCardDrop={onCardDrop} dropTarget={dropCardId === card.id} />
+            : <MiniCard key={card.id} card={card} t={t} showCodes={showCodes} onOpen={onOpen} onDragStart={onDragStart} onDragEnd={onDragEnd} onCardOver={onCardOver} onCardDrop={onCardDrop} dropTarget={dropCardId === card.id} />
         )}
         {n === 0 && <span className="cell-empty" />}
       </div>

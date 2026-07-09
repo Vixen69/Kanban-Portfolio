@@ -209,14 +209,15 @@ function CustomInput({ field, value, onChange }) {
 function colLabel(id) { return COLUMN_BY_ID[id] ? COLUMN_BY_ID[id].label : (id || 'Entrée'); }
 
 // --- Card detail: read mode by default, toggles to edit. ---
-function CardDetail({ card, allCards, onClose, onSave, onDelete }) {
+function CardDetail({ card, allCards, onClose, onSave, onDelete, onArchive }) {
   const [edit, setEdit] = useStateModal(false);
   const [draft, setDraft] = useStateModal(card);
+  const [comment, setComment] = useStateModal('');
+  const [delaysOpen, setDelaysOpen] = useStateModal(false);
+  const [histOpen, setHistOpen] = useStateModal(false);
   const [blockForm, setBlockForm] = useStateModal(false);
   const [blockText, setBlockText] = useStateModal('');
-  const [comment, setComment] = useStateModal('');
-  const [showDelays, setShowDelays] = useStateModal(false);
-  useEffectModal(() => { setDraft(card); setEdit(false); setBlockForm(false); setBlockText(''); setComment(''); setShowDelays(false); }, [card]);
+  useEffectModal(() => { setDraft(card); setEdit(false); setComment(''); setDelaysOpen(false); setHistOpen(false); setBlockForm(false); setBlockText(''); }, [card]);
   if (!card) return null;
 
   const dom = DOMAIN_BY_ID[draft.rdom];
@@ -256,13 +257,7 @@ function CardDetail({ card, allCards, onClose, onSave, onDelete }) {
   });
   const orderedRoles = ROLE_FAMILIES.filter(f => roleGroups[f.id]);
 
-  // --- Risques & alertes ---
-  const autoAlerts = [];
-  if (card.blocked) autoAlerts.push({ sev: 'eleve', text: 'Bloqué — ' + (card.blockReason || 'raison non précisée') });
-  if (over) autoAlerts.push({ sev: 'eleve', text: 'Dépassement de charge · ' + cons + '/' + est + ' j.h' });
-  if (days > 60) autoAlerts.push({ sev: 'moyen', text: 'Stagnation · ' + days + ' j dans ' + colLabel(card.column) });
-  if (bReal > bRdli) autoAlerts.push({ sev: 'eleve', text: 'Réalisé au-delà de l’enveloppe RDLI' });
-  else if (bEng > bRdli) autoAlerts.push({ sev: 'moyen', text: 'Engagé au-delà de l’enveloppe RDLI' });
+  // --- Risques ---
   const risks = card.risks || [];
 
   // --- Délais kanban (lead time / cycle time, reconstruits depuis l'historique). ---
@@ -274,6 +269,7 @@ function CardDetail({ card, allCards, onClose, onSave, onDelete }) {
     .sort((a, b) => b.jh - a.jh);
   const profMax = Math.max(1, ...profileRows.map(p => p.jh));
   const profTotal = profileRows.reduce((s, p) => s + p.jh, 0);
+  const profDone = profileRows.reduce((s, p) => s + (p.done || 0), 0);
   const [chargeEdit, setChargeEdit] = useStateModal(false);
 
   // --- Risque de contention : profils en tension (checklist) + note libre. ---
@@ -291,13 +287,23 @@ function CardDetail({ card, allCards, onClose, onSave, onDelete }) {
   const rdrFmt = rdrMs == null ? null : new Date(rdrMs).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
   const rdrState = rdrDays == null ? '' : rdrDays < 0 ? 'past' : rdrDays <= 30 ? 'soon' : '';
   const rdrSub = rdrDays == null ? 'non planifiée' : rdrDays < 0 ? 'échue depuis ' + Math.abs(rdrDays) + ' j' : 'dans ' + rdrDays + ' j';
-  const reportBlock = () => { applyPatch({ blocked: true, blockReason: blockText.trim() || 'Blocage signalé' }); setBlockForm(false); setBlockText(''); };
-  const liftBlock = () => applyPatch({ blocked: false, blockReason: '' });
+  // Blocage : commentaire obligatoire ; l'événement est journalisé dans l'historique.
+  const doBlock = () => {
+    const reason = blockText.trim();
+    if (!reason) return;
+    const now = new Date().toISOString();
+    applyPatch({ blocked: true, blockReason: reason, history: [...(card.history || []), { type: 'block', reason, at: now, user: 'vous' }] });
+    setBlockForm(false); setBlockText('');
+  };
+  const doUnblock = () => {
+    const now = new Date().toISOString();
+    applyPatch({ blocked: false, blockReason: '', history: [...(card.history || []), { type: 'unblock', at: now, user: 'vous' }] });
+  };
 
   return (
     <div className="overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <span className="modal-bar" style={{ background: card.blocked ? '#b91c1c' : dom.color }} />
+        <span className="modal-bar" style={{ background: cardBlocked(card) ? '#b91c1c' : dom.color }} />
 
         {!edit ? (
           <div className="modal-body">
@@ -328,13 +334,6 @@ function CardDetail({ card, allCards, onClose, onSave, onDelete }) {
               </div>
             )}
 
-            {card.blocked && (
-              <div className="alert-box">
-                <span className="blk-pulse" /> <b>Bloqué</b> &mdash; {card.blockReason || 'raison non précisée'}
-                <button className="lift-btn" onClick={liftBlock}>Lever</button>
-              </div>
-            )}
-
             {/* Pilote du sujet (chef de projet, sous une forme compacte) */}
             <div className="owner-strip">
               <span className="owner-mono" style={{ background: dom.color }}>{(card.cp || '—').replace(/^(M\.|Mme)\s*/, '').slice(0, 1)}</span>
@@ -355,6 +354,26 @@ function CardDetail({ card, allCards, onClose, onSave, onDelete }) {
               <span className={'rdr-eta ' + rdrState}>{rdrSub}</span>
             </div>
 
+            {/* BUDGET : graphe croisé RDLI / estimé / engagé / réalisé */}
+            <div className="sec">
+              <div className="sec-head"><span className="sec-title">Budget · graphe croisé</span><span className="sec-note">k€</span></div>
+              <div className="bgraph">
+                {budgetRows.map(r => (
+                  <div className="bg-row" key={r.key}>
+                    <span className="bg-label">{r.label}</span>
+                    <div className="bg-track">
+                      <span className="bg-fill" style={{ width: (r.val / bMax * 100) + '%', background: r.color, opacity: r.ref ? 0.5 : 1 }} />
+                      <span className="bg-ref" style={{ left: (bRdli / bMax * 100) + '%' }} />
+                    </div>
+                    <span className="bg-val" style={{ color: r.key === 'real' && bReal > bRdli ? 'var(--danger-strong)' : 'var(--tx-2)' }}>
+                      <InlineEdit value={r.val} type="number" fromInput={(v) => v === '' ? 0 : Math.max(0, +v)} onCommit={(v) => applyPatch({ [{ rdli: 'budgetRdli', est: 'estimeBudget', eng: 'budgetEngage', real: 'consommeBudget' }[r.key]]: v })} />
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div className="bg-legend">Trait vertical = enveloppe RDLI (référence d’arbitrage)</div>
+            </div>
+
             {/* PLAN DE CHARGE : j/h par profil */}
             <div className="sec">
               <div className="sec-head">
@@ -367,7 +386,7 @@ function CardDetail({ card, allCards, onClose, onSave, onDelete }) {
                 <div className="cm-empty" onClick={() => setChargeEdit(true)}>Aucune charge répartie. Cliquer pour renseigner les profils.</div>
               ) : (
                 <>
-                  <div className="prof-sub">{profTotal} j.h · {cons} consommés</div>
+                  <div className="prof-sub">{profTotal} j.h estimés · {profDone} consommés</div>
                   <div className="prof-table">
                     {profileRows.map((p, i) => (
                       <div className="prof-row" key={i}>
@@ -376,7 +395,12 @@ function CardDetail({ card, allCards, onClose, onSave, onDelete }) {
                           <span className="prof-done" style={{ width: (p.jh / profMax * 100) + '%', background: `color-mix(in oklab, ${p.fam.color} 22%, #fff)`, borderColor: `color-mix(in oklab, ${p.fam.color} 35%, transparent)` }} />
                           <span className="prof-fill" style={{ width: ((p.done || 0) / profMax * 100) + '%', background: p.fam.color }} />
                         </div>
-                        <span className="prof-jh"><b>{p.jh}</b> j.h</span>
+                        <span className="prof-jh" title="Consommé / estimé — cliquer le consommé pour modifier">
+                          <InlineEdit value={p.done || 0} type="number" className="prof-done-num" display={String(p.done || 0)}
+                            fromInput={(v) => Math.max(0, Math.min(p.jh, v === '' ? 0 : +v))}
+                            onCommit={(v) => applyPatch({ chargeByProfile: (card.chargeByProfile || []).map(x => x.profil === p.profil ? { ...x, done: v } : x) })} />
+                          <span className="prof-slash">/</span><b>{p.jh}</b> j.h
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -412,41 +436,12 @@ function CardDetail({ card, allCards, onClose, onSave, onDelete }) {
               )}
             </div>
 
-            {/* BUDGET : graphe croisé RDLI / estimé / engagé / réalisé */}
-            <div className="sec">
-              <div className="sec-head"><span className="sec-title">Budget · graphe croisé</span><span className="sec-note">k€</span></div>
-              <div className="bgraph">
-                {budgetRows.map(r => (
-                  <div className="bg-row" key={r.key}>
-                    <span className="bg-label">{r.label}</span>
-                    <div className="bg-track">
-                      <span className="bg-fill" style={{ width: (r.val / bMax * 100) + '%', background: r.color, opacity: r.ref ? 0.5 : 1 }} />
-                      <span className="bg-ref" style={{ left: (bRdli / bMax * 100) + '%' }} />
-                    </div>
-                    <span className="bg-val" style={{ color: r.key === 'real' && bReal > bRdli ? 'var(--danger-strong)' : 'var(--tx-2)' }}>
-                      <InlineEdit value={r.val} type="number" fromInput={(v) => v === '' ? 0 : Math.max(0, +v)} onCommit={(v) => applyPatch({ [{ rdli: 'budgetRdli', est: 'estimeBudget', eng: 'budgetEngage', real: 'consommeBudget' }[r.key]]: v })} />
-                    </span>
-                  </div>
-                ))}
-              </div>
-              <div className="bg-legend">Trait vertical = enveloppe RDLI (référence d’arbitrage)</div>
-            </div>
-
-            {/* RISQUES & ALERTES */}
+            {/* RISQUES */}
             <div className="sec">
               <div className="sec-head">
-                <span className="sec-title">Risques &amp; alertes</span>
+                <span className="sec-title">Risques</span>
                 {!riskEdit && <button className="delay-toggle" onClick={() => setRiskEdit(true)}>Modifier les risques</button>}
               </div>
-
-              {/* Alertes automatiques (signaux dérivés) */}
-              {autoAlerts.map((a, i) => (
-                <div className="risk-item alert" key={'a' + i}>
-                  <span className="risk-sev" style={{ background: RISK_SEVERITY[a.sev].color }} />
-                  <span className="risk-text">{a.text}</span>
-                  <span className="risk-kind">alerte</span>
-                </div>
-              ))}
 
               {/* Risques retenus (par entité porteuse) + description libre */}
               {riskEdit ? (
@@ -469,27 +464,29 @@ function CardDetail({ card, allCards, onClose, onSave, onDelete }) {
                   })}
                 </div>
               )}
+            </div>
 
-              {/* Alertes — champ libre, multiples (+ pour ajouter) */}
-              <div className="sub-block">
-                <div className="sub-head">
-                  <span className="field-label">Alertes</span>
-                  <button className="add-alert" title="Ajouter une alerte" onClick={() => applyPatch({ alerts: [...(card.alerts || []), ''] })}>+</button>
+            {/* BLOCAGE — juste sous les risques ; source des blocages en vue portefeuille. */}
+            <div className={'sec block-sec' + (cardBlocked(card) ? ' on' : '')}>
+              {cardBlocked(card) ? (
+                <div className="blocked-banner">
+                  <span className="blk-pulse" />
+                  <span className="bb-text"><b>Bloqué</b> — {card.blockReason || 'raison non précisée'}</span>
+                  <button className="lift-btn" onClick={doUnblock}>Lever</button>
                 </div>
-                {(card.alerts || []).length === 0 ? (
-                  <div className="cm-empty" onClick={() => applyPatch({ alerts: [''] })}>Aucune alerte. Cliquer ou « + » pour en ajouter.</div>
-                ) : (
-                  <div className="alert-list">
-                    {(card.alerts || []).map((a, i) => (
-                      <div className="alert-row" key={i}>
-                        <span className="alert-bullet" />
-                        <span className="alert-text"><InlineEdit value={a} placeholder="Décrire l’alerte…" onCommit={(v) => { const next = (card.alerts || []).slice(); next[i] = v; applyPatch({ alerts: next }); }} /></span>
-                        <button className="alert-del" title="Supprimer" onClick={() => applyPatch({ alerts: (card.alerts || []).filter((_, j) => j !== i) })}>{'✕'}</button>
-                      </div>
-                    ))}
+              ) : blockForm ? (
+                <div className="block-form">
+                  <span className="field-label">Motif du blocage (obligatoire)</span>
+                  <textarea className="inp" rows="2" autoFocus placeholder="Ex. dépendance équipe Infra non livrée, attente arbitrage…" value={blockText} onChange={(e) => setBlockText(e.target.value)} />
+                  <div className="modal-actions">
+                    <span style={{ flex: 1 }} />
+                    <button className="btn ghost" onClick={() => { setBlockForm(false); setBlockText(''); }}>Annuler</button>
+                    <button className="btn danger" disabled={!blockText.trim()} onClick={doBlock}>Confirmer le blocage</button>
                   </div>
-                )}
-              </div>
+                </div>
+              ) : (
+                <button className="btn block-btn full" onClick={() => setBlockForm(true)}>Signaler un blocage</button>
+              )}
             </div>
 
             {/* Champs personnalisés */}
@@ -498,13 +495,6 @@ function CardDetail({ card, allCards, onClose, onSave, onDelete }) {
                 {(window.FIELDS || []).map(f => <CustomKV key={f.id} field={f} value={(card.custom || {})[f.id]} />)}
               </div>
             )}
-
-            {/* Documents de référence */}
-            <div className="doc-row">
-              <a className="doclink" href="#" onClick={(e) => e.preventDefault()} title="Definition of Ready — à connecter au référentiel">{'📄'} DoR</a>
-              <a className="doclink" href="#" onClick={(e) => e.preventDefault()} title="Definition of Done — à connecter au référentiel">{'📄'} DoD</a>
-              {gate && <span className="doc-gate" style={{ color: gate.color }}>Gate {gate.code} à l’entrée de cette colonne</span>}
-            </div>
 
             {/* Commentaires (ancre de conversation, P5) */}
             <div className="comments">
@@ -522,75 +512,91 @@ function CardDetail({ card, allCards, onClose, onSave, onDelete }) {
               </div>
             </div>
 
-            {/* Historique des mouvements + délais kanban */}
+            {/* Délais kanban (repliable) */}
             <div className="history">
-              <div className="sec-head" style={{ marginBottom: 0 }}>
-                <span className="sec-title">Historique &amp; délais</span>
-                <button className="delay-toggle" onClick={() => setShowDelays(s => !s)}>{showDelays ? 'Masquer les délais' : 'Délais kanban'} {showDelays ? '▾' : '▸'}</button>
-              </div>
+              <button className="hist-head-btn" onClick={() => setDelaysOpen(o => !o)} title={delaysOpen ? 'Replier les délais' : 'Déplier les délais'}>
+                <span className="sec-title">Délais</span>
+                <span className="hist-caret">{delaysOpen ? '▾' : '▸'}</span>
+              </button>
 
-              {/* Âges par étape — vraies métriques de flux, reconstruites depuis l'historique */}
-              <div className="delay-grid">
-                <div className="delay">
-                  <span>Depuis Demandes</span>
-                  <b className={ft.ageDemandes > 120 ? 'hot' : ft.ageDemandes > 60 ? 'warm' : ''}>{ft.ageDemandes != null ? ft.ageDemandes + ' j' : '—'}</b>
-                </div>
-                <div className="delay">
-                  <span>Depuis Qualification</span>
-                  <b className={ft.ageQualif > 90 ? 'hot' : ft.ageQualif > 45 ? 'warm' : ''}>{ft.ageQualif != null ? ft.ageQualif + ' j' : '—'}</b>
-                </div>
-                <div className="delay">
-                  <span>Depuis 1ʳᵉ activation</span>
-                  <b className={ft.ageActif > 90 ? 'hot' : ft.ageActif > 45 ? 'warm' : ''}>{ft.ageActif != null ? ft.ageActif + ' j' : 'non activé'}</b>
-                </div>
-              </div>
+              {delaysOpen && (
+                <>
+                  {/* Âges par étape — vraies métriques de flux, reconstruites depuis l'historique */}
+                  <div className="delay-grid">
+                    <div className="delay">
+                      <span>Depuis Demandes</span>
+                      <b className={ft.ageDemandes > 120 ? 'hot' : ft.ageDemandes > 60 ? 'warm' : ''}>{ft.ageDemandes != null ? ft.ageDemandes + ' j' : '—'}</b>
+                    </div>
+                    <div className="delay">
+                      <span>Depuis Qualification</span>
+                      <b className={ft.ageQualif > 90 ? 'hot' : ft.ageQualif > 45 ? 'warm' : ''}>{ft.ageQualif != null ? ft.ageQualif + ' j' : '—'}</b>
+                    </div>
+                    <div className="delay">
+                      <span>Depuis 1ʳᵉ activation</span>
+                      <b className={ft.ageActif > 90 ? 'hot' : ft.ageActif > 45 ? 'warm' : ''}>{ft.ageActif != null ? ft.ageActif + ' j' : 'non activé'}</b>
+                    </div>
+                  </div>
 
-              {showDelays && (
-                <div className="leadcycle">
-                  <div className="lc">
-                    <span>Lead time {ft.finished ? '' : '(en cours)'}</span>
-                    <b>{ft.leadTime != null ? ft.leadTime + ' j' : '—'}</b>
-                    <em>Demandes → {ft.finished ? 'Done' : 'aujourd’hui'}</em>
+                  <div className="leadcycle">
+                    <div className="lc">
+                      <span>Lead time {ft.finished ? '' : '(en cours)'}</span>
+                      <b>{ft.leadTime != null ? ft.leadTime + ' j' : '—'}</b>
+                      <em>Demandes → {ft.finished ? 'Done' : 'aujourd’hui'}</em>
+                    </div>
+                    <div className="lc">
+                      <span>Cycle time {ft.finished || !ft.tActif ? '' : '(en cours)'}</span>
+                      <b>{ft.cycleTime != null ? ft.cycleTime + ' j' : 'non activé'}</b>
+                      <em>Actifs → {ft.finished ? 'Done' : 'aujourd’hui'}</em>
+                    </div>
                   </div>
-                  <div className="lc">
-                    <span>Cycle time {ft.finished || !ft.tActif ? '' : '(en cours)'}</span>
-                    <b>{ft.cycleTime != null ? ft.cycleTime + ' j' : 'non activé'}</b>
-                    <em>Actifs → {ft.finished ? 'Done' : 'aujourd’hui'}</em>
-                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Historique des mouvements + blocages (repliable) */}
+            <div className="history">
+              <button className="hist-head-btn" onClick={() => setHistOpen(o => !o)} title={histOpen ? 'Replier l’historique' : 'Déplier l’historique'}>
+                <span className="sec-title">Historique</span>
+                <span className="hist-caret">{histOpen ? '▾' : '▸'}</span>
+              </button>
+
+              {histOpen && (
+                <div className="hist-list">
+                  {card.history.slice().reverse().map((h, i) => {
+                    if (h.type === 'block') return (
+                      <div className="hist" key={i}>
+                        <span className="hist-dot blk" />
+                        <span className="hist-move"><b>Bloqué</b>{h.reason ? ' — ' + h.reason : ''}</span>
+                        <span className="hist-meta">{new Date(h.at).toLocaleDateString('fr-FR')} · {h.user}</span>
+                      </div>
+                    );
+                    if (h.type === 'unblock') return (
+                      <div className="hist" key={i}>
+                        <span className="hist-dot okd" />
+                        <span className="hist-move"><b>Blocage levé</b></span>
+                        <span className="hist-meta">{new Date(h.at).toLocaleDateString('fr-FR')} · {h.user}</span>
+                      </div>
+                    );
+                    return (
+                      <div className="hist" key={i}>
+                        <span className="hist-dot" />
+                        <span className="hist-move">{h.from ? colLabel(h.from) + ' → ' : ''}<b>{colLabel(h.to)}</b></span>
+                        <span className="hist-meta">{new Date(h.at).toLocaleDateString('fr-FR')} · {h.user}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
-
-              <div className="hist-list">
-                {card.history.slice().reverse().map((h, i) => (
-                  <div className="hist" key={i}>
-                    <span className="hist-dot" />
-                    <span className="hist-move">{h.from ? colLabel(h.from) + ' → ' : ''}<b>{colLabel(h.to)}</b></span>
-                    <span className="hist-meta">{new Date(h.at).toLocaleDateString('fr-FR')} · {h.user}</span>
-                  </div>
-                ))}
-              </div>
             </div>
 
             {card.sciformaId && <div className="scf">Réf. Sciforma : {card.sciformaId}</div>}
 
             <div className="modal-actions">
-              {!card.blocked && !blockForm && <button className="btn block-btn" onClick={() => setBlockForm(true)}>Signaler un blocage</button>}
+              <button className="btn ghost sm" onClick={() => onArchive(card)} title="Archiver ce sujet">Archiver</button>
               <span style={{ flex: 1 }} />
               <button className="btn ghost" onClick={onClose}>Fermer</button>
               <button className="btn primary" onClick={() => setEdit(true)}>Modifier</button>
             </div>
-
-            {blockForm && (
-              <div className="block-form">
-                <span className="field-label">Décrire le blocage précisément</span>
-                <textarea className="inp" rows="2" autoFocus placeholder="Ex. dépendance équipe Infra non livrée, attente arbitrage…" value={blockText} onChange={(e) => setBlockText(e.target.value)} />
-                <div className="modal-actions">
-                  <span style={{ flex: 1 }} />
-                  <button className="btn ghost" onClick={() => setBlockForm(false)}>Annuler</button>
-                  <button className="btn danger" onClick={reportBlock}>Signaler le blocage</button>
-                </div>
-              </div>
-            )}
           </div>
         ) : (
           <div className="modal-body">
@@ -614,20 +620,13 @@ function CardDetail({ card, allCards, onClose, onSave, onDelete }) {
                 </select>
               </Field>
               <Field label="Canal">
-                <select className="inp" value={draft.canal} onChange={(e) => set('canal', e.target.value)}>
+                <select className="inp" value={draft.canal} onChange={(e) => setDraft({ ...draft, canal: e.target.value, nature: natureOfCanal(e.target.value) })}>
                   {SWIMLANES.map(l => <option key={l.id} value={l.id}>{l.label}</option>)}
                 </select>
               </Field>
               <Field label="Colonne">
                 <select className="inp" value={draft.column} onChange={(e) => set('column', e.target.value)}>
                   {COLUMNS.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
-                </select>
-              </Field>
-              <Field label="Nature">
-                <select className="inp" value={draft.nature} onChange={(e) => set('nature', e.target.value)}>
-                  <option value="simple">Clair</option>
-                  <option value="complicated">Compliqué</option>
-                  <option value="complex">Complexe</option>
                 </select>
               </Field>
               <Field label="Criticité">
@@ -639,11 +638,6 @@ function CardDetail({ card, allCards, onClose, onSave, onDelete }) {
               </Field>
               <Field label="Chef de projet"><input className="inp" value={draft.cp} onChange={(e) => set('cp', e.target.value)} /></Field>
             </div>
-            <label className="toggle-row">
-              <input type="checkbox" checked={draft.blocked} onChange={(e) => set('blocked', e.target.checked)} />
-              <span>Bloqué</span>
-            </label>
-            {draft.blocked && <Field label="Raison du blocage"><input className="inp" value={draft.blockReason} onChange={(e) => set('blockReason', e.target.value)} /></Field>}
             <div className="field-2col">
               <Field label="Meilleur estimé (j.h)"><input className="inp" type="number" min="0" value={draft.estime == null ? '' : draft.estime} onChange={(e) => set('estime', e.target.value === '' ? null : +e.target.value)} /></Field>
               <Field label="Consommé (j.h)"><input className="inp" type="number" min="0" value={draft.consomme == null ? '' : draft.consomme} onChange={(e) => set('consomme', e.target.value === '' ? null : +e.target.value)} /></Field>
@@ -684,7 +678,7 @@ function CardDetail({ card, allCards, onClose, onSave, onDelete }) {
 
 // --- Quick Add: always enters Demandes (opinionated pull flow, all intake on the left). ---
 function QuickAdd({ onClose, onCreate }) {
-  const [d, setD] = useStateModal({ name: '', rdom: 'ingenierie', canal: 'projets', type: 'mise_en_oeuvre', cp: '', nature: 'simple', criticality: 'normal' });
+  const [d, setD] = useStateModal({ name: '', rdom: 'ingenierie', canal: 'projets', type: 'mise_en_oeuvre', cp: '', nature: natureOfCanal('projets'), criticality: 'normal' });
   const set = (k, v) => setD({ ...d, [k]: v });
   const valid = d.name.trim().length > 0;
   return (
@@ -710,15 +704,8 @@ function QuickAdd({ onClose, onCreate }) {
               </select>
             </Field>
             <Field label="Canal">
-              <select className="inp" value={d.canal} onChange={(e) => set('canal', e.target.value)}>
+              <select className="inp" value={d.canal} onChange={(e) => setD({ ...d, canal: e.target.value, nature: natureOfCanal(e.target.value) })}>
                 {SWIMLANES.map(l => <option key={l.id} value={l.id}>{l.label}</option>)}
-              </select>
-            </Field>
-            <Field label="Nature">
-              <select className="inp" value={d.nature} onChange={(e) => set('nature', e.target.value)}>
-                <option value="simple">Clair</option>
-                <option value="complicated">Compliqué</option>
-                <option value="complex">Complexe</option>
               </select>
             </Field>
             <Field label="Criticité">
@@ -740,4 +727,57 @@ function QuickAdd({ onClose, onCreate }) {
   );
 }
 
-Object.assign(window, { CardDetail, QuickAdd });
+// --- Archive view: overlay listing archived subjects, with one-click unarchive. ---
+function ArchiveView({ cards, onUnarchive, onOpen, onClose }) {
+  const [q, setQ] = useStateModal('');
+  const list = cards.filter(c => !q || c.name.toLowerCase().includes(q.toLowerCase()) || (c.codename || '').toLowerCase().includes(q.toLowerCase()));
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="modal archive-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-body">
+          <div className="modal-top">
+            <div>
+              <h2 className="modal-name">Archives</h2>
+              <span className="modal-code">{cards.length} sujet{cards.length > 1 ? 's' : ''} archivé{cards.length > 1 ? 's' : ''}</span>
+            </div>
+            <button className="x" onClick={onClose}>{'✕'}</button>
+          </div>
+
+          {cards.length > 0 && (
+            <div className="arch-search-wrap">
+              <input className="inp" placeholder="Rechercher dans les archives…" value={q} onChange={(e) => setQ(e.target.value)} />
+            </div>
+          )}
+
+          {cards.length === 0 ? (
+            <div className="arch-empty">
+              <div className="arch-empty-title">Aucun sujet archivé</div>
+              <div className="arch-empty-sub">Archivez un sujet depuis sa fiche pour le retirer du tableau sans le supprimer.</div>
+            </div>
+          ) : list.length === 0 ? (
+            <div className="cm-empty" style={{ padding: '18px 0' }}>Aucun résultat.</div>
+          ) : (
+            <div className="arch-list">
+              {list.map(c => {
+                const tp = (window.TYPE_BY_ID || {})[c.type];
+                const dom = DOMAIN_BY_ID[c.rdom];
+                return (
+                  <div className="arch-row" key={c.id}>
+                    <button className="arch-open" onClick={() => onOpen(c)} title="Ouvrir la fiche">
+                      {tp && <span className="cpop-type" style={{ background: tp.color }}>{tp.short}</span>}
+                      <span className="arch-name">{c.name}</span>
+                      <span className="arch-meta">{dom.short} · {LANE_BY_ID[c.canal].label} · {COLUMN_BY_ID[c.column].label}</span>
+                    </button>
+                    <button className="btn ghost sm" onClick={() => onUnarchive(c.id)}>Désarchiver</button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, { CardDetail, QuickAdd, ArchiveView });

@@ -39,9 +39,9 @@ export interface BoardStorage {
    * Upserts base cards (by id) and appends their events in one atomic
    * batch — either everything is persisted, or nothing is. Used by the
    * seed script (Sprint 3) and the sync CLI (Sprint 5).
-   * Failure: throws on storage errors; the whole batch is rolled back.
+   * Failure: rejects on storage errors; the whole batch is rolled back.
    */
-  importCards(cards: Card[], events: CardEventInput[]): void;
+  importCards(cards: Card[], events: CardEventInput[]): Promise<void>;
   /**
    * Inserts one new base card together with its creation event, in one
    * atomic batch — the UI intake path (POST /api/cards). Either both are
@@ -51,27 +51,27 @@ export interface BoardStorage {
    * "created" CardEventInput to append with it.
    * Output: the stored event with its assigned id; the card becomes visible
    * through listBaseCards.
-   * Failure: throws when a card with the same id already exists (never
+   * Failure: rejects when a card with the same id already exists (never
    * overwrites — id allocation is the caller's job), or on storage errors;
    * on failure nothing is persisted.
    */
-  insertCard(card: Card, created: CardEventInput): CardEvent;
+  insertCard(card: Card, created: CardEventInput): Promise<CardEvent>;
   /**
    * Appends one event and returns the stored copy with its assigned id.
-   * Failure: throws on storage errors (store closed, I/O); never partial.
+   * Failure: rejects on storage errors (store closed, I/O); never partial.
    */
-  appendEvent(input: CardEventInput): CardEvent;
+  appendEvent(input: CardEventInput): Promise<CardEvent>;
   /**
    * Returns all events in append order (seq ascending).
-   * Failure: throws on storage errors or an unreadable stored payload.
+   * Failure: rejects on storage errors or an unreadable stored payload.
    */
-  listEvents(): CardEvent[];
+  listEvents(): Promise<CardEvent[]>;
   /**
    * Returns the base card snapshots as imported — never event-derived
    * state: the current board is folded on read (ADR 002).
-   * Failure: throws on storage errors.
+   * Failure: rejects on storage errors.
    */
-  listBaseCards(): Card[];
+  listBaseCards(): Promise<Card[]>;
   /** Releases the underlying resources. Idempotent. Failure: none. */
-  close(): void;
+  close(): Promise<void>;
 }

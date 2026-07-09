@@ -1,47 +1,17 @@
-# App stack for the re-platformed tool (ADR 015).
+# App stack for the re-platformed tool (ADR 015/016).
 #
 #   docker compose --profile app up --build
-#       -> front (nginx :8080) + middle (Express :8787), JSONL store on ./data.
-#          Seed ./data first for local testing (see LIVRAISON.md « Tester en
-#          local avec Docker »); in production the store is populated by the
-#          client's import/sync, not by fixtures.
+#       -> db (PostgreSQL) + middle (Express) + front (nginx :8080).
+#          The middle uses the PostgreSQL back end by default. Seed the db for
+#          a local demo (see LIVRAISON.md « Tester en local avec Docker »); in
+#          production the store is populated by the client's import/sync.
 #
-#   docker compose --profile postgres up db
-#       -> future PostgreSQL back end. INFRA ONLY: the middle uses JSONL until
-#          `pg` is authorised (CLAUDE.md §12 / ADR 011). Not needed to run app.
+#   Set KANBAN_STORAGE_DRIVER=jsonl on the middle to run the file store instead
+#   (single-writer; then mount a durable volume on /data).
 name: portfolio-kanban
 services:
-  middle:
-    profiles: ["app"]
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.middle
-    environment:
-      KANBAN_HOST: 0.0.0.0
-      KANBAN_PORT: "8787"
-      KANBAN_STORAGE_DRIVER: jsonl
-      KANBAN_DATA_PATH: /data/board.jsonl
-    volumes:
-      # Host-seeded JSONL for local testing; the client mounts a real volume.
-      - ./data:/data
-    ports:
-      - "8787:8787"
-
-  front:
-    profiles: ["app"]
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.front
-    environment:
-      MIDDLE_HOST: middle
-      MIDDLE_PORT: "8787"
-    ports:
-      - "8080:80"
-    depends_on:
-      - middle
-
   db:
-    profiles: ["postgres"]
+    profiles: ["app"]
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-kanban}
@@ -57,5 +27,39 @@ services:
       timeout: 3s
       retries: 10
 
+  middle:
+    profiles: ["app"]
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.middle
+    environment:
+      KANBAN_HOST: 0.0.0.0
+      KANBAN_PORT: "8787"
+      KANBAN_STORAGE_DRIVER: postgres
+      DATABASE_URL: postgres://${POSTGRES_USER:-kanban}:${POSTGRES_PASSWORD:-change-me-in-dev}@db:5432/${POSTGRES_DB:-kanban}
+      # dataDir for the admin config override + its history (small, persisted).
+      KANBAN_DATA_PATH: /app/data/board.jsonl
+    volumes:
+      - config-data:/app/data
+    ports:
+      - "8787:8787"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  front:
+    profiles: ["app"]
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.front
+    environment:
+      MIDDLE_HOST: middle
+      MIDDLE_PORT: "8787"
+    ports:
+      - "8080:80"
+    depends_on:
+      - middle
+
 volumes:
   db-data:
+  config-data:

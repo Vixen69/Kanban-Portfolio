@@ -22,17 +22,23 @@ export function stubStorage(cards: Card[] = [testCard({ id: "S001" })]): BoardSt
     return event;
   };
   return {
-    importCards() {
+    async importCards() {
       throw new Error("importCards non utilisé dans ces tests");
     },
-    insertCard(card: Card, created: CardEventInput): CardEvent {
+    async insertCard(card: Card, created: CardEventInput): Promise<CardEvent> {
       if (baseCards.some((c) => c.id === card.id)) throw new Error(`id dupliqué : ${card.id}`);
       baseCards.push({ ...card });
       return append(created);
     },
-    appendEvent: append,
-    listEvents: () => events.slice(),
-    listBaseCards: () => baseCards.map((card) => ({ ...card })),
-    close() {},
+    async appendEvent(input: CardEventInput): Promise<CardEvent> {
+      return append(input);
+    },
+    async listEvents() {
+      return events.slice();
+    },
+    async listBaseCards() {
+      return baseCards.map((card) => ({ ...card }));
+    },
+    async close() {},
   };
 }

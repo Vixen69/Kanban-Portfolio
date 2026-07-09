@@ -4,7 +4,7 @@
 // live read-out of what's on screen — the question a Portfolio Sync actually asks.
 
 // --- Header: identity left, portfolio pulse + legend + actions right. ---
-function Header({ stats, view, filtersActive, onResetFilters, onAdd, onAdmin, onMetrics, onToggleSidebar, focusLabel, onClearFocus }) {
+function Header({ stats, view, filtersActive, onResetFilters, onAdd, onAdmin, onMetrics, onArchive, archivedCount, onToggleSidebar, focusLabel, onClearFocus }) {
   return (
     <header className="header">
       <div className="hd-left">
@@ -42,6 +42,10 @@ function Header({ stats, view, filtersActive, onResetFilters, onAdd, onAdmin, on
           ))}
         </div>
         <button className="icon-btn" onClick={onMetrics} title="Métriques de flux">{'☷'}</button>
+        <button className="icon-btn arch-btn" onClick={onArchive} title="Archives">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="4" rx="1" /><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8" /><path d="M10 12h4" /></svg>
+          {archivedCount > 0 && <span className="arch-count">{archivedCount}</span>}
+        </button>
         <button className="icon-btn" onClick={onAdmin} title="Configuration du tableau">{'⚙'}</button>
         <button className="add-btn" onClick={onAdd} title="Nouveau sujet (N)">+ Sujet</button>
       </div>
@@ -84,7 +88,7 @@ function StatRow({ label, value, total, alert, active }) {
 }
 
 // --- Sidebar: hidden by default, toggled. Filters dim, never remove (spatial truth, P3). ---
-function Sidebar({ open, search, setSearch, filters, toggle, setGroup, stats, view, filtersActive, onReset, searchRef, showCodes, setShowCodes }) {
+function Sidebar({ open, search, setSearch, filters, toggle, setGroup, blockedOnly, setBlockedOnly, stats, view, filtersActive, onReset, searchRef, showCodes, setShowCodes }) {
   const allOn = (g) => Object.values(filters[g]).every(Boolean);
   const noneOn = (g) => Object.values(filters[g]).every(v => !v);
 
@@ -116,19 +120,17 @@ function Sidebar({ open, search, setSearch, filters, toggle, setGroup, stats, vi
       </div>
 
       <div className="sb-section">
-        <CatHead label="Type de projet" allOn={allOn('type')} noneOn={noneOn('type')} onAll={() => setGroup('type', true)} onNone={() => setGroup('type', false)} />
-        <div className="pill-row wrap">
-          {TYPES.map(tp => (
-            <Pill key={tp.id} active={filters.type[tp.id]} onClick={() => toggle('type', tp.id)} color={tp.color}>{tp.label}</Pill>
-          ))}
+        <span className="sb-label">Blocage</span>
+        <div className="pill-row">
+          <Pill active={blockedOnly} onClick={() => setBlockedOnly(v => !v)} color="#dc2626">Bloqués uniquement</Pill>
         </div>
       </div>
 
       <div className="sb-section">
-        <CatHead label="Nature" allOn={allOn('nature')} noneOn={noneOn('nature')} onAll={() => setGroup('nature', true)} onNone={() => setGroup('nature', false)} />
-        <div className="pill-row">
-          {Object.entries(NATURE).map(([k, n]) => (
-            <Pill key={k} active={filters.nature[k]} onClick={() => toggle('nature', k)} color={n.fg}>{n.label}</Pill>
+        <CatHead label="Type de projet" allOn={allOn('type')} noneOn={noneOn('type')} onAll={() => setGroup('type', true)} onNone={() => setGroup('type', false)} />
+        <div className="pill-row wrap">
+          {TYPES.map(tp => (
+            <Pill key={tp.id} active={filters.type[tp.id]} onClick={() => toggle('type', tp.id)} color={tp.color}>{tp.label}</Pill>
           ))}
         </div>
       </div>
@@ -160,10 +162,6 @@ function Sidebar({ open, search, setSearch, filters, toggle, setGroup, stats, vi
         <StatRow label="♛ Top" value={view.top} total={stats.top} active={filtersActive} />
         <StatRow label="★ Major" value={view.major} total={stats.major} active={filtersActive} />
         <StatRow label="Normal" value={view.normal} total={stats.normal} active={filtersActive} />
-        <div className="stat-divider" />
-        <StatRow label={NATURE.simple.label} value={view.simple} total={stats.simple} active={filtersActive} />
-        <StatRow label={NATURE.complicated.label} value={view.complicated} total={stats.complicated} active={filtersActive} />
-        <StatRow label={NATURE.complex.label} value={view.complex} total={stats.complex} active={filtersActive} />
       </div>
 
       <div className="sb-shortcuts">

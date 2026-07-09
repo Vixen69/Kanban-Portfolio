@@ -93,41 +93,34 @@ plateforme.
 - L'image middle **embarque son propre `/app/sbom.json`** (généré pendant la
   construction, depuis son propre lockfile) — auditable dans le conteneur.
 - **Surface réelle** : `core/` est **sans dépendance** ; runtime = **express**
-  (middle) + **react/react-dom** *bundlés* (front, aucun node_modules livré
-  côté front). Le reste du plafond (cors, cookie-parser, jsonwebtoken, dotenv,
-  design-system front…) est **autorisé mais pas encore installé** (auth = RP3).
+  + **`pg`** (middle) + **react/react-dom** *bundlés* (front, aucun node_modules
+  livré côté front). Le reste du plafond (cors, cookie-parser, jsonwebtoken,
+  dotenv, design-system front…) est **autorisé mais pas encore installé**
+  (auth = RP3).
 
-## 6. Stockage : stockage fichier durable (retenu pour la 1re mise en service)
+## 6. Stockage : PostgreSQL (JSONL en repli)
 
-Le middle est **event-sourced** : la vérité est un **journal append-only**. Il
-tourne sur un pilote **JSONL** (fichier append-only, lisible) derrière le port
-`BoardStorage`. **Choix retenu pour démarrer : ce stockage fichier**, sur un
-**volume persistant sauvegardé par la plateforme** — aucune dépendance hors
-plafond ; le fichier *est* la donnée, les snapshots de volume font office de
-sauvegarde.
+Le middle est **event-sourced** : la vérité est un **journal append-only**.
+Back end de livraison : **PostgreSQL** (`pg` autorisé — ADR 016), derrière le
+port `BoardStorage` (`middle/storage/postgres.ts`). Schéma : `cards` + le
+journal **append-only** `card_events` (un trigger interdit UPDATE/DELETE) ; SQL
+paramétré, **pas d'ORM**, données en `jsonb`. Sélection par
+`KANBAN_STORAGE_DRIVER` : `postgres` (défaut en conteneur) ou `jsonl`.
 
-- **Contrainte** : un **middle mono-instance** (écrivain unique du journal).
-  Le fichier append-only n'est pas sûr en écriture concurrente multi-process.
-- **Bascule PostgreSQL** — si un jour il faut scaler le middle horizontalement
-  (plusieurs répliques) ou qu'un SGBD est exigé : **un seul adaptateur** derrière
-  le port `BoardStorage`, sans autre changement, et **là seulement** `pg`
-  (node-postgres) devient la dépendance à faire autoriser. Le service `db`
-  (profil `postgres`) du compose est prêt pour ce jour-là ; aujourd'hui le
-  pilote `postgres` lève une erreur tant que `pg` n'est pas là
-  (`middle/storage/select.ts`).
+- Le compose lance **`db` (PostgreSQL 16) + `middle` + `front`** ; le middle s'y
+  connecte via `DATABASE_URL` (`depends_on: healthy`). Le pilote passe la même
+  suite de conformance que le JSONL, plus le test du trigger append-only.
+- **Repli JSONL** : pilote fichier mono-instance (`KANBAN_STORAGE_DRIVER=jsonl`
+  + volume durable sur `/data`) pour un déploiement simple sans base.
+- Postgres lève la contrainte mono-instance : le middle peut être répliqué.
 
-## 7. À confirmer avec le référent technique (deux points)
+## 7. À confirmer avec le référent technique (un point)
 
-1. **Stockage** : un **volume durable + sauvegardé** pour le fichier JSONL
-   convient-il pour cette 1re mise en service (middle mono-instance), ou
-   PostgreSQL est-il impératif d'emblée ? Le stockage fichier **évite toute
-   dépendance hors plafond** ; PostgreSQL n'ajouterait que `pg`, le jour où il
-   s'impose (§6).
-2. **Le canal de livraison / registre d'images** dans la plateforme (push
-   registre, tarball d'image, Git interne) — encore non fixé.
+- **Le canal de livraison / registre d'images** dans la plateforme (push
+  registre, tarball d'image, Git interne) — encore non fixé.
 
-Avec le stockage fichier, **aucun écart au plafond**. Tout le reste est déjà
-dans les versions autorisées.
+`pg` est autorisé (ADR 016) ; le stockage n'est plus un arbitrage. Tout le
+reste est déjà dans les versions autorisées.
 
 ## 8. Tester en local avec Docker (avant d'en parler au client)
 
@@ -139,31 +132,31 @@ Objectif : construire, lancer et voir les 150 cartes + la fiche v10.
 docker --version && docker compose version
 ```
 
-**b. Semer des données de test** dans le dossier monté par le middle
-(`docker/data/`). Fixtures = uniquement pour ce test local ; en production le
-client peuple le volume par import/sync.
-
-PowerShell :
-```powershell
-$env:KANBAN_ALLOW_SEED="1"; $env:KANBAN_DATA_PATH="docker/data/board.jsonl"; npm run seed
-```
-Bash :
-```bash
-KANBAN_ALLOW_SEED=1 KANBAN_DATA_PATH=docker/data/board.jsonl npm run seed
-```
-Attendu : `seed: 150 cartes, 768 évènements importés.`
-
-**c. Générer le SBOM** (livré à côté des images) :
+**b. Générer le SBOM** (livré à côté des images) :
 ```bash
 npm run sbom
 ```
 
-**d. Construire et lancer** :
+**c. Construire et lancer** (db PostgreSQL + middle + front) :
 ```bash
-docker compose -f docker/compose.yaml --profile app up --build
+docker compose -f docker/compose.yaml --profile app up -d --build
 ```
-Laisser tourner (logs des deux conteneurs). Le middle affiche
-`kanban middle: http://0.0.0.0:8787 (jsonl)`.
+Le middle attend que la base soit *healthy*, puis affiche
+`kanban middle: http://0.0.0.0:8787 (postgres)`.
+
+**d. Semer des données de démonstration dans la base** (fixtures — test local
+uniquement ; en production la base est peuplée par l'import/sync du client ; le
+port 5432 de la base est publié par le compose) :
+
+PowerShell :
+```powershell
+$env:KANBAN_ALLOW_SEED="1"; $env:KANBAN_STORAGE_DRIVER="postgres"; $env:DATABASE_URL="postgres://kanban:change-me-in-dev@localhost:5432/kanban"; npm run seed
+```
+Bash :
+```bash
+KANBAN_ALLOW_SEED=1 KANBAN_STORAGE_DRIVER=postgres DATABASE_URL=postgres://kanban:change-me-in-dev@localhost:5432/kanban npm run seed
+```
+Attendu : `seed: 150 cartes, 768 évènements importés.`
 
 **e. Vérifier dans le navigateur** : ouvrir **http://localhost:8080**
 - Le plateau affiche **150 cartes**, sans défilement.
@@ -171,36 +164,34 @@ Laisser tourner (logs des deux conteneurs). Le middle affiche
   montre les sections v10 : *plan de charge par profil*, *risque de contention*,
   *budget · graphe croisé (RDLI)*, *risques & alertes*.
 - Éditer un champ en ligne (ex. une alerte) → il persiste après rechargement
-  (round-trip par évènement, écrit dans `docker/data/board.jsonl`).
+  (round-trip par évènement, écrit dans PostgreSQL).
 
-Contrôle API direct (optionnel) :
+Contrôle API direct via le proxy (optionnel) :
 ```bash
-curl -s http://localhost:8787/api/board | node -e "process.stdin.once('data',d=>{const b=JSON.parse(d);console.log('cartes',b.cards.length,'évts',b.events.length)})"
+curl -s http://localhost:8080/api/board | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const b=JSON.parse(d);console.log('cartes',b.cards.length,'évts',b.events.length)})"
 ```
 
 **f. Arrêter / nettoyer** :
 ```bash
-docker compose -f docker/compose.yaml --profile app down
+docker compose -f docker/compose.yaml --profile app down       # garde la base
+docker compose -f docker/compose.yaml --profile app down -v    # efface aussi la base
 ```
-Les données de test restent dans `docker/data/` (ignoré par git). Pour repartir
-de zéro : supprimer `docker/data/board.jsonl`.
 
 ### Si ça coince
 - **Page blanche / erreurs `/api`** : le proxy front ne joint pas le middle —
-  vérifier que le service `middle` tourne (`docker compose … ps`) et que
-  `MIDDLE_HOST`/`MIDDLE_PORT` pointent dessus.
-- **Plateau vide** : le volume `docker/data/board.jsonl` n'a pas été semé (b) —
-  le middle sert alors un plateau vide (aucune erreur).
-- **`npm ci` échoue dans l'image** : vérifier que `package-lock.json` est à
-  jour (`npm ci` en local passe) — c'est la même commande.
+  vérifier que `middle` tourne (`docker compose … ps`).
+- **Plateau vide** : la base n'a pas été semée (d) — le middle sert un plateau
+  vide (aucune erreur).
+- **Middle en redémarrage** : il attend la base ; vérifier `db` *healthy*
+  (`docker compose … ps`).
 
 ## 9. Checklist de livraison
 
-- [ ] `bash verify.sh` vert (lint conventions, typecheck ×3, tests, build front, SBOM).
-- [ ] `npm run sbom` régénéré ; `sbom.json` joint à la livraison.
+- [ ] `bash verify.sh` vert (conventions, typecheck ×3, tests, build front, SBOM).
+- [ ] Suite Postgres verte contre une base réelle : `KANBAN_PG_TEST_URL=… node --test middle/storage/postgres.test.ts`.
+- [ ] `npm run sbom` régénéré ; `sbom.json` (incl. l'arbre `pg`) joint à la livraison.
 - [ ] `docker compose --profile app build` réussit sur une machine Docker.
-- [ ] `--profile app up` : front:8080 rend le plateau, `/api` répond en même origine.
+- [ ] `--profile app up` : db *healthy*, front:8080 rend le plateau, `/api` en même origine, stockage `postgres`.
 - [ ] Aucune donnée réelle ni secret dans les images ni le dépôt (fixtures seulement).
-- [ ] Volume **durable + sauvegardé** monté sur `/data` du middle (§6) ; middle mono-instance.
-- [ ] Stockage fichier validé par le référent (§7-1) — sinon PostgreSQL + autorisation `pg`.
-- [ ] Canal de livraison / registre confirmé (§7-2).
+- [ ] Volume `db-data` (PostgreSQL) persistant + sauvegardé côté plateforme.
+- [ ] Canal de livraison / registre confirmé (§7).

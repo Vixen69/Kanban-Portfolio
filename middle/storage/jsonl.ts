@@ -216,28 +216,30 @@ function buildStorage(fd: number, state: State): BoardStorage {
   const assertOpen = (): void => {
     if (!open) throw new Error("Stockage JSONL : opération sur un magasin fermé.");
   };
+  // The port is async (Postgres needs it); JSONL wraps its sync body per
+  // method — a synchronous throw becomes a rejection, matching the contract.
   return {
-    importCards(cards, events) {
+    async importCards(cards, events) {
       assertOpen();
       doImport(fd, state, cards, events);
     },
-    insertCard(card, created) {
+    async insertCard(card, created) {
       assertOpen();
       return doInsert(fd, state, card, created);
     },
-    appendEvent(input) {
+    async appendEvent(input) {
       assertOpen();
       return doAppend(fd, state, input);
     },
-    listEvents() {
+    async listEvents() {
       assertOpen();
       return state.events.slice();
     },
-    listBaseCards() {
+    async listBaseCards() {
       assertOpen();
       return [...state.cards.values()];
     },
-    close() {
+    async close() {
       if (!open) return;
       open = false;
       try {

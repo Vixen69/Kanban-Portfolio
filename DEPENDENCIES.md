@@ -68,11 +68,11 @@ optionnel (le wrapper `fetch` existant suffit).
   (redistribution permise). Auto-hébergées pour respecter le zéro-egress :
   aucune police distante, aucun appel à Google Fonts à l'exécution.
 
-## Hors plafond — non requis pour l'instant
+## Ajout autorisé — `pg` (PostgreSQL)
 
 | Paquet | Rôle | Statut |
 |---|---|---|
-| **`pg`** (node-postgres) | Client PostgreSQL du middle (port `BoardStorage`) | **Non requis pour la 1re mise en service** : le stockage **fichier JSONL durable** (volume persistant sauvegardé, middle mono-instance) est retenu — **zéro écart au plafond**. `pg` ne deviendrait à autoriser que si PostgreSQL s'impose (scaling horizontal du middle / exigence SGBD) ; il se branche alors derrière le port `BoardStorage`, sans autre changement. Client standard, mûr, JS pur (pas de build natif), auditable. |
+| **`pg`** (node-postgres, `^8`) | Client PostgreSQL du middle, derrière le port `BoardStorage` (`middle/storage/postgres.ts`) | **Autorisé par le référent technique (2026-07-07)** et installé. Client standard, mûr, **JS pur** (pas de build natif), auditable. Confiné à son adaptateur (test de frontière `scripts/architecture.test.ts`). PostgreSQL est désormais le back end de livraison ; le pilote **JSONL** reste sélectionnable en repli mono-instance (`KANBAN_STORAGE_DRIVER`). ADR 016. Son arbre de dépendances (~14 paquets) figure au SBOM. |
 
 ## Modules natifs Node (aucune dépendance, dans tout plafond)
 

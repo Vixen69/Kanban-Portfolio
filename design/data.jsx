@@ -225,8 +225,6 @@ function generateCards() {
     c.name = names[i] || (names[i % names.length] + ' (lot ' + (Math.floor(i / names.length) + 1) + ')');
     c.cp = pick(CP_NAMES);
     c.notes = '';
-    c.blocked = false;
-    c.blockReason = '';
     c.sciformaId = rng() < 0.72 ? 'SCF-' + rand(1000, 9999) : null;
     c.type = types[i];
     // Code projet (codename), ex. PX4520155 — recherchable, masquable.
@@ -280,17 +278,17 @@ function generateCards() {
     }
     // Contraintes du projet (checkables) : Légale / Groupe.
     c.projConstraints = shuffle(['legale', 'groupe']).slice(0, rand(0, 2));
-    // Alertes (texte libre, multiples) — 0 à 2.
-    c.alerts = rng() < 0.4 ? shuffle(ALERT_NOTES).slice(0, rand(1, 2)) : [];
+    // Alertes = source de blocage. Vides par défaut ; seuls les sujets bloqués (étape 3) en portent.
+    c.alerts = [];
     // 0 à 2 commentaires de suivi.
     c.commentaires = shuffle(COMMENTS).slice(0, rand(0, 2)).map((text, k) => ({
       user: pick(CP_NAMES), at: new Date(now0 - rand(1, 40) * 86400000).toISOString(), text,
     }));
   });
 
-  // 3) blocked — counts scaled up with the larger portfolio.
+  // 3) blocked — explicit governance flag with a reason.
   function block(column, n) {
-    const pool = shuffle(cards.filter(c => c.column === column));
+    const pool = shuffle(cards.filter(c => c.column === column && !c.blocked));
     for (let i = 0; i < n && i < pool.length; i++) {
       pool[i].blocked = true;
       pool[i].blockReason = pick(BLOCK_REASONS);
@@ -319,6 +317,11 @@ function generateCards() {
       cursor -= rand(sl, sh) * 86400000;
     }
     hist.unshift({ from: null, to: 'demandes', at: new Date(cursor).toISOString(), user: 'sciforma-sync' });
+    // Blocage : événement intégré à l'historique, à une date récente dans la colonne courante.
+    if (c.blocked) {
+      const blkAt = new Date(now0 - rand(2, Math.max(3, Math.floor(days * 0.6))) * 86400000).toISOString();
+      hist.push({ type: 'block', reason: c.blockReason, at: blkAt, user: 'vous' });
+    }
     c.history = hist;
   });
 

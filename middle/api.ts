@@ -68,8 +68,9 @@ export function putConfig(store: ConfigStore, raw: unknown): ApiResult {
  * Input: the storage. Output: 200 with { cards, events }.
  * Failure: propagates storage errors (transport maps to 500).
  */
-export function getBoard(storage: BoardStorage): ApiResult {
-  return { status: 200, body: { cards: storage.listBaseCards(), events: storage.listEvents() } };
+export async function getBoard(storage: BoardStorage): Promise<ApiResult> {
+  const [cards, events] = await Promise.all([storage.listBaseCards(), storage.listEvents()]);
+  return { status: 200, body: { cards, events } };
 }
 
 /**
@@ -80,10 +81,11 @@ export function getBoard(storage: BoardStorage): ApiResult {
  * Failure: throws BadRequest (→ 400) on an invalid intent; propagates storage
  * errors (→ 500).
  */
-export function postEvent(storage: BoardStorage, config: BoardConfig, raw: unknown): ApiResult {
-  const states = foldEvents(storage.listBaseCards(), storage.listEvents());
+export async function postEvent(storage: BoardStorage, config: BoardConfig, raw: unknown): Promise<ApiResult> {
+  const [cards, events] = await Promise.all([storage.listBaseCards(), storage.listEvents()]);
+  const states = foldEvents(cards, events);
   const input = buildValidatedEvent(config, states, raw);
-  return { status: 201, body: storage.appendEvent(input) };
+  return { status: 201, body: await storage.appendEvent(input) };
 }
 
 /**

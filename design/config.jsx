@@ -51,6 +51,14 @@ const TYPE_BY_ID = Object.fromEntries(TYPES.map(t => [t.id, t]));
 const COLUMN_BY_ID = Object.fromEntries(COLUMNS.map(c => [c.id, c]));
 const LANE_BY_ID   = Object.fromEntries(SWIMLANES.map(l => [l.id, l]));
 
+// Nature is positional: it follows the canal (lane), never set independently on a card.
+const NATURE_BY_CANAL = { projets: 'complicated', petits_projets: 'simple', projets_complexes: 'complex' };
+function natureOfCanal(canalId) { return NATURE_BY_CANAL[canalId] || 'complicated'; }
+
+// Blocking is an explicit governance flag with a mandatory reason (see the block control on the card).
+function cardBlocked(c) { return !!(c && c.blocked); }
+function cardBlockReason(c) { return (c && c.blockReason) || ''; }
+
 // --- Quality gates. Not enforced in software (P-gates are human decisions at governance). ---
 const GATES = {
   prets: { code: 'DoR', label: 'Definition of Ready', color: '#1d4ed8' },
@@ -247,7 +255,8 @@ function applyBoardConfig(cfg) {
 
 Object.assign(window, {
   COLUMNS, SWIMLANES, DOMAINS, DOMAIN_BY_ID, TYPES, TYPE_BY_ID, COLUMN_BY_ID, LANE_BY_ID,
-  GATES, AGE, CRITICALITY, NATURE, ageCategory, decayAlpha, ageLabel,
+  GATES, AGE, CRITICALITY, NATURE, ageCategory, decayAlpha, ageLabel, natureOfCanal, NATURE_BY_CANAL,
+  cardBlocked, cardBlockReason,
   GATE_DEFS, defaultBoardConfig, applyBoardConfig, FIELDS: [],
   ROLE_FAMILIES, ROLE_BY_ID, ROLE_OF, roleOf,
   PROFILES, PROFILE_BY_ID,

@@ -45,8 +45,8 @@ test("getConfig returns the given board topology", () => {
   assert.deepEqual(getConfig(config).body, config);
 });
 
-test("getBoard returns base cards and the event log", () => {
-  const result = getBoard(stubStorage());
+test("getBoard returns base cards and the event log", async () => {
+  const result = await getBoard(stubStorage());
   assert.equal(result.status, 200);
   const body = result.body as { cards: unknown[]; events: unknown[] };
   assert.equal(body.cards.length, 1);
@@ -72,9 +72,9 @@ test("putConfig rejects an invalid config with the validator's message", () => {
   assert.equal(store.applied.length, 0);
 });
 
-test("postCard builds the whole card server-side and appends created", () => {
+test("postCard builds the whole card server-side and appends created", async () => {
   const storage = stubStorage();
-  const result = postCard(storage, config, { ...VALID_CARD_BODY, title: "  Nouveau sujet  " });
+  const result = await postCard(storage, config, { ...VALID_CARD_BODY, title: "  Nouveau sujet  " });
   assert.equal(result.status, 201);
   const { card, event } = result.body as { card: Card; event: CardEvent };
   assert.equal(card.id, "S002");
@@ -89,24 +89,24 @@ test("postCard builds the whole card server-side and appends created", () => {
   assert.equal(event.toColumn, "col1");
   assert.equal(event.payload["laneId"], "laneB");
   assert.equal(event.actor, SERVER_ACTOR);
-  assert.equal(storage.listBaseCards().length, 2);
-  assert.equal(storage.listEvents().length, 1);
+  assert.equal((await storage.listBaseCards()).length, 2);
+  assert.equal((await storage.listEvents()).length, 1);
 });
 
-test("postCard assigns the next free S-id, padded to 3 digits", () => {
+test("postCard assigns the next free S-id, padded to 3 digits", async () => {
   const storage = stubStorage([
     testCard({ id: "S001" }),
     testCard({ id: "S007" }),
     testCard({ id: "X99" }),
   ]);
-  const first = postCard(storage, config, VALID_CARD_BODY).body as { card: Card };
+  const first = (await postCard(storage, config, VALID_CARD_BODY)).body as { card: Card };
   assert.equal(first.card.id, "S008");
   const empty = stubStorage([]);
-  const second = postCard(empty, config, VALID_CARD_BODY).body as { card: Card };
+  const second = (await postCard(empty, config, VALID_CARD_BODY)).body as { card: Card };
   assert.equal(second.card.id, "S001");
 });
 
-test("postCard rejects every invalid creation field in French", () => {
+test("postCard rejects every invalid creation field in French", async () => {
   const cases: [Record<string, unknown> | string, RegExp][] = [
     [{ ...VALID_CARD_BODY, title: "   " }, /Titre requis/],
     [{ ...VALID_CARD_BODY, title: "x".repeat(201) }, /Titre trop long/],
@@ -121,16 +121,16 @@ test("postCard rejects every invalid creation field in French", () => {
   ];
   const storage = stubStorage();
   for (const [body, message] of cases) {
-    assert.throws(() => postCard(storage, config, body), BadRequest);
-    assert.throws(() => postCard(storage, config, body), message);
+    await assert.rejects(() => postCard(storage, config, body), BadRequest);
+    await assert.rejects(() => postCard(storage, config, body), message);
   }
-  assert.equal(storage.listBaseCards().length, 1); // nothing was persisted
-  assert.equal(storage.listEvents().length, 0);
+  assert.equal((await storage.listBaseCards()).length, 1); // nothing was persisted
+  assert.equal((await storage.listEvents()).length, 0);
 });
 
-test("a valid move is stamped by the server with the current cell as origin", () => {
+test("a valid move is stamped by the server with the current cell as origin", async () => {
   const storage = stubStorage();
-  const result = postEvent(storage, config, {
+  const result = await postEvent(storage, config, {
     type: "moved",
     cardId: "S001",
     toLaneId: "laneB",
@@ -144,9 +144,9 @@ test("a valid move is stamped by the server with the current cell as origin", ()
   assert.equal(event.toColumn, "col2");
 });
 
-test("the server ignores any client-supplied actor or timestamp", () => {
+test("the server ignores any client-supplied actor or timestamp", async () => {
   const storage = stubStorage();
-  const result = postEvent(storage, config, {
+  const result = await postEvent(storage, config, {
     type: "commented",
     cardId: "S001",
     text: "Point fait au Portfolio Sync.",
@@ -158,55 +158,55 @@ test("the server ignores any client-supplied actor or timestamp", () => {
   assert.notEqual(event.ts, "1999-01-01T00:00:00.000Z");
 });
 
-test("blocked requires a reason, trims it, and caps it at 500 characters", () => {
+test("blocked requires a reason, trims it, and caps it at 500 characters", async () => {
   const storage = stubStorage();
-  const result = postEvent(storage, config, {
+  const result = await postEvent(storage, config, {
     type: "blocked",
     cardId: "S001",
     reason: "  Attente d’arbitrage budget.  ",
   });
   const event = result.body as CardEvent;
   assert.equal(event.payload["reason"], "Attente d’arbitrage budget.");
-  assert.throws(() => postEvent(storage, config, { type: "blocked", cardId: "S001" }), /Motif de blocage requis/);
-  assert.throws(
+  await assert.rejects(() => postEvent(storage, config, { type: "blocked", cardId: "S001" }), /Motif de blocage requis/);
+  await assert.rejects(
     () => postEvent(storage, config, { type: "blocked", cardId: "S001", reason: "x".repeat(501) }),
     /Motif de blocage trop long/,
   );
 });
 
-test("unblocked is only valid on a blocked card", () => {
+test("unblocked is only valid on a blocked card", async () => {
   const storage = stubStorage();
-  assert.throws(() => postEvent(storage, config, { type: "unblocked", cardId: "S001" }), /Carte non bloquée/);
-  postEvent(storage, config, { type: "blocked", cardId: "S001", reason: "Dépendance PLM." });
-  const result = postEvent(storage, config, { type: "unblocked", cardId: "S001" });
+  await assert.rejects(() => postEvent(storage, config, { type: "unblocked", cardId: "S001" }), /Carte non bloquée/);
+  await postEvent(storage, config, { type: "blocked", cardId: "S001", reason: "Dépendance PLM." });
+  const result = await postEvent(storage, config, { type: "unblocked", cardId: "S001" });
   assert.equal(result.status, 201);
 });
 
-test("commented stores the trimmed text and caps it at 2000 characters", () => {
+test("commented stores the trimmed text and caps it at 2000 characters", async () => {
   const storage = stubStorage();
-  const result = postEvent(storage, config, { type: "commented", cardId: "S001", text: "  Vu en comité.  " });
+  const result = await postEvent(storage, config, { type: "commented", cardId: "S001", text: "  Vu en comité.  " });
   const event = result.body as CardEvent;
   assert.equal(event.type, "commented");
   assert.equal(event.payload["text"], "Vu en comité.");
-  assert.throws(() => postEvent(storage, config, { type: "commented", cardId: "S001", text: "  " }), /Commentaire requis/);
-  assert.throws(
+  await assert.rejects(() => postEvent(storage, config, { type: "commented", cardId: "S001", text: "  " }), /Commentaire requis/);
+  await assert.rejects(
     () => postEvent(storage, config, { type: "commented", cardId: "S001", text: "x".repeat(2001) }),
     /Commentaire trop long/,
   );
 });
 
-test("a deleted card disappears from the folded board and rejects intents", () => {
+test("a deleted card disappears from the folded board and rejects intents", async () => {
   const storage = stubStorage();
-  const result = postEvent(storage, config, { type: "deleted", cardId: "S001" });
+  const result = await postEvent(storage, config, { type: "deleted", cardId: "S001" });
   assert.equal(result.status, 201);
   assert.equal((result.body as CardEvent).type, "deleted");
-  assert.throws(
+  await assert.rejects(
     () => postEvent(storage, config, { type: "commented", cardId: "S001", text: "trop tard" }),
     /Carte inconnue/,
   );
 });
 
-test("an edited patch passes with valid v2 fields of every kind", () => {
+test("an edited patch passes with valid v2 fields of every kind", async () => {
   const storage = stubStorage();
   const patch = {
     title: "Titre revu",
@@ -231,12 +231,12 @@ test("an edited patch passes with valid v2 fields of every kind", () => {
     alerts: ["Décision COPROJ attendue"],
     dateRdr: "2026-09-01T00:00:00.000Z",
   };
-  const result = postEvent(storage, config, { type: "edited", cardId: "S001", patch });
+  const result = await postEvent(storage, config, { type: "edited", cardId: "S001", patch });
   assert.equal(result.status, 201);
   assert.deepEqual((result.body as CardEvent).payload["patch"], patch);
 });
 
-test("an edited patch is rejected field by field in French", () => {
+test("an edited patch is rejected field by field in French", async () => {
   const cases: [Record<string, unknown>, RegExp][] = [
     [{ id: "forgé" }, /Champ d’édition non autorisé : « id »/],
     [{ hasOwnProperty: 1 }, /Champ d’édition non autorisé/],
@@ -259,13 +259,13 @@ test("an edited patch is rejected field by field in French", () => {
   ];
   const storage = stubStorage();
   for (const [patch, message] of cases) {
-    assert.throws(() => postEvent(storage, config, { type: "edited", cardId: "S001", patch }), message);
+    await assert.rejects(() => postEvent(storage, config, { type: "edited", cardId: "S001", patch }), message);
   }
-  assert.throws(() => postEvent(storage, config, { type: "edited", cardId: "S001", patch: "nope" }), /Patch d’édition invalide/);
-  assert.equal(storage.listEvents().length, 0);
+  await assert.rejects(() => postEvent(storage, config, { type: "edited", cardId: "S001", patch: "nope" }), /Patch d’édition invalide/);
+  assert.equal((await storage.listEvents()).length, 0);
 });
 
-test("invalid envelopes are rejected with BadRequest", () => {
+test("invalid envelopes are rejected with BadRequest", async () => {
   const cases: [unknown, RegExp][] = [
     [{ type: "moved", cardId: "S001", toLaneId: "laneB", toColumnId: "ghost" }, /Colonne cible inconnue/],
     [{ type: "moved", cardId: "S001", toLaneId: "ghost", toColumnId: "col2" }, /Canal cible inconnu/],
@@ -277,8 +277,8 @@ test("invalid envelopes are rejected with BadRequest", () => {
   ];
   const storage = stubStorage();
   for (const [intent, message] of cases) {
-    assert.throws(() => postEvent(storage, config, intent), BadRequest);
-    assert.throws(() => postEvent(storage, config, intent), message);
+    await assert.rejects(() => postEvent(storage, config, intent), BadRequest);
+    await assert.rejects(() => postEvent(storage, config, intent), message);
   }
-  assert.equal(storage.listEvents().length, 0); // nothing was persisted
+  assert.equal((await storage.listEvents()).length, 0); // nothing was persisted
 });

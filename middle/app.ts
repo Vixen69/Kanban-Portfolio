@@ -73,7 +73,9 @@ function errorHandler(err: unknown, req: Request, res: Response, _next: NextFunc
 }
 
 // Mounts the six API routes. Handlers throw BadRequest on invalid input;
-// Express 5 forwards the synchronous throw to errorHandler (→ 400).
+// Express 5 forwards both a synchronous throw and a rejected promise from an
+// async handler to errorHandler (→ 400/500). The storage-backed routes are
+// async (the BoardStorage port is async — e.g. the Postgres driver).
 function mountRoutes(app: Express, deps: MiddleDeps): void {
   app.get("/api/config", (_req: Request, res: Response) => {
     const result = getConfig(deps.configStore.getRuntime());
@@ -87,16 +89,16 @@ function mountRoutes(app: Express, deps: MiddleDeps): void {
     const result = putConfig(deps.configStore, req.body);
     res.status(result.status).json(result.body);
   });
-  app.get("/api/board", (_req: Request, res: Response) => {
-    const result = getBoard(deps.storage);
+  app.get("/api/board", async (_req: Request, res: Response) => {
+    const result = await getBoard(deps.storage);
     res.status(result.status).json(result.body);
   });
-  app.post("/api/cards", (req: Request, res: Response) => {
-    const result = postCard(deps.storage, deps.configStore.getRuntime(), req.body);
+  app.post("/api/cards", async (req: Request, res: Response) => {
+    const result = await postCard(deps.storage, deps.configStore.getRuntime(), req.body);
     res.status(result.status).json(result.body);
   });
-  app.post("/api/events", (req: Request, res: Response) => {
-    const result = postEvent(deps.storage, deps.configStore.getRuntime(), req.body);
+  app.post("/api/events", async (req: Request, res: Response) => {
+    const result = await postEvent(deps.storage, deps.configStore.getRuntime(), req.body);
     res.status(result.status).json(result.body);
   });
 }

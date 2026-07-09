@@ -367,6 +367,34 @@ de son ADR.
   ARCHITECTURE réaligné (263 tests) ; README/CLAUDE/DEPENDENCIES réconciliés
   v9→v10 et sur la surface de dépendances réellement installée.
 
+### 2026-07-07 — Adaptateur PostgreSQL (pg autorisé) + port de stockage async
+
+- **`pg` autorisé** par le référent (appel PostgreSQL depuis le middle OK). Le
+  back PostgreSQL mandaté devient réel ; le stockage fichier JSONL était un
+  stopgap, conservé en repli mono-instance. ADR 016.
+- **Port `BoardStorage` passé en asynchrone** (pg n'a pas d'API sync) : les
+  méthodes renvoient des `Promise`. JSONL enveloppe son corps sync (throw →
+  rejet) ; `getBoard`/`postEvent`/`postCard`, `app.ts` (routes async, Express 5
+  propage les rejets), `main.ts` (top-level await) et `seed.ts` `await`. `core/`
+  inchangé (le port est une interface). Conversion pilotée par le typecheck.
+- **`middle/storage/postgres.ts`** : un seul fichier derrière le port. Schéma
+  `cards` (upsert par id, ordre par colonne identité) + `card_events`
+  **append-only** (séquence bigint → `evt-<seq>`, **trigger** bloquant
+  UPDATE/DELETE) ; SQL paramétré, pas d'ORM, `jsonb` (mêmes coercitions que le
+  JSONL). Connexion `DATABASE_URL`/`PG*`. `select.ts` : `postgres` + `jsonl`.
+  Test de frontière resserré : `pg` importé **uniquement** par son adaptateur.
+- **Conformance** : le pilote Postgres passe la même suite que le JSONL, contre
+  une **base réelle** (`storage/postgres.test.ts`, gardé par `KANBAN_PG_TEST_URL` ;
+  sinon skip), + le test du trigger append-only. **Vérifié live** : 13/13 verts
+  contre `postgres:16-alpine`.
+- **compose** : `db` (PostgreSQL 16) dans le profil `app` ; middle
+  `KANBAN_STORAGE_DRIVER=postgres` + `DATABASE_URL`, `depends_on: healthy` ;
+  petit volume `config-data` pour l'override de config (fichier). Docs
+  réalignées (LIVRAISON §6/§7/§8/§9, DEPENDENCIES, ADR 015→016) ; lanceur Docker
+  mis à jour (up puis seed Postgres).
+- **Vérifié** : 263 tests verts (+13 Postgres skip sans base), typecheck ×3,
+  conventions ; build + run Docker de la pile Postgres complète.
+
 ### À venir
 - **RP3** : auth JWT-en-cookie (login, rôles viewer/editor/admin, acteur =
   utilisateur authentifié à la place de « anonymous ») ; CLI de comptes ;

@@ -16,7 +16,7 @@ const raw: unknown = JSON.parse(readFileSync(cfg.boardConfigPath, "utf8"));
 const defaults = validateBoardConfig(raw);
 
 mkdirSync(cfg.dataDir, { recursive: true });
-const storage = createStorage(cfg.storageDriver, cfg.dataPath);
+const storage = await createStorage(cfg.storageDriver, cfg.dataPath);
 const configStore = createConfigStore(cfg.dataDir, defaults);
 const app = createApp({ storage, configStore });
 
@@ -33,8 +33,7 @@ function shutdown(): void {
   const force = setTimeout(() => process.exit(0), 5000);
   force.unref();
   server.close(() => {
-    storage.close();
-    process.exit(0);
+    void storage.close().finally(() => process.exit(0));
   });
 }
 

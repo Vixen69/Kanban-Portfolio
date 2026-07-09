@@ -29,11 +29,11 @@ interface NewCardInput {
  * Failure: throws BadRequest (→ 400) on invalid input; propagates storage
  * errors, including a duplicate id (→ 500) — nothing is persisted then.
  */
-export function postCard(storage: BoardStorage, config: BoardConfig, raw: unknown): ApiResult {
+export async function postCard(storage: BoardStorage, config: BoardConfig, raw: unknown): Promise<ApiResult> {
   const input = validateCardInput(config, asObject(raw));
   const ts = new Date().toISOString();
-  const card = buildCard(config, storage.listBaseCards(), input, ts);
-  const event = storage.insertCard(card, {
+  const card = buildCard(config, await storage.listBaseCards(), input, ts);
+  const event = await storage.insertCard(card, {
     ts,
     actor: SERVER_ACTOR,
     cardId: card.id,

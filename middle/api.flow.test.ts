@@ -26,18 +26,24 @@ function stubStorage(cards: Card[] = [testCard({ id: "S001" })]): BoardStorage {
     return event;
   };
   return {
-    importCards() {
+    async importCards() {
       throw new Error("importCards non utilisé dans ces tests");
     },
-    insertCard(card: Card, created: CardEventInput): CardEvent {
+    async insertCard(card: Card, created: CardEventInput): Promise<CardEvent> {
       if (baseCards.some((c) => c.id === card.id)) throw new Error(`id dupliqué : ${card.id}`);
       baseCards.push({ ...card });
       return append(created);
     },
-    appendEvent: append,
-    listEvents: () => events.slice(),
-    listBaseCards: () => baseCards.map((card) => ({ ...card })),
-    close() {},
+    async appendEvent(input: CardEventInput): Promise<CardEvent> {
+      return append(input);
+    },
+    async listEvents() {
+      return events.slice();
+    },
+    async listBaseCards() {
+      return baseCards.map((card) => ({ ...card }));
+    },
+    async close() {},
   };
 }
 
@@ -51,9 +57,9 @@ const CARD_BODY = {
   owner: "Mme Chef",
 };
 
-test("a second move is validated against the folded position, not the snapshot", () => {
+test("a second move is validated against the folded position, not the snapshot", async () => {
   const storage = stubStorage(); // S001 base cell: laneA/col1
-  const first = postEvent(storage, config, {
+  const first = await postEvent(storage, config, {
     type: "moved", cardId: "S001", toLaneId: "laneB", toColumnId: "col2",
   });
   assert.equal(first.status, 201);
@@ -62,21 +68,21 @@ test("a second move is validated against the folded position, not the snapshot",
   assert.equal(firstEvent.payload["laneId"], "laneB");
   // The identical intent must now be a same-cell move — proving the
   // validation reads the folded position, never the import snapshot.
-  assert.throws(
+  await assert.rejects(
     () => postEvent(storage, config, {
       type: "moved", cardId: "S001", toLaneId: "laneB", toColumnId: "col2",
     }),
     /Carte déjà dans cette cellule/,
   );
-  assert.equal(storage.listEvents().length, 1); // the repeat persisted nothing
+  assert.equal((await storage.listEvents()).length, 1); // the repeat persisted nothing
 });
 
-test("a lane-only move (same column, other canal) is legal and round-trips laneId", () => {
+test("a lane-only move (same column, other canal) is legal and round-trips laneId", async () => {
   const storage = stubStorage();
-  postEvent(storage, config, {
+  await postEvent(storage, config, {
     type: "moved", cardId: "S001", toLaneId: "laneB", toColumnId: "col2",
   });
-  const laneOnly = postEvent(storage, config, {
+  const laneOnly = await postEvent(storage, config, {
     type: "moved", cardId: "S001", toLaneId: "laneA", toColumnId: "col2",
   });
   assert.equal(laneOnly.status, 201);
@@ -86,7 +92,7 @@ test("a lane-only move (same column, other canal) is legal and round-trips laneI
   assert.equal(event.payload["laneId"], "laneA");
   // Back in the original cell of the snapshot? No: laneA/col2 ≠ laneA/col1,
   // and a repeat of the lane-only move is a same-cell rejection.
-  assert.throws(
+  await assert.rejects(
     () => postEvent(storage, config, {
       type: "moved", cardId: "S001", toLaneId: "laneA", toColumnId: "col2",
     }),
@@ -94,12 +100,12 @@ test("a lane-only move (same column, other canal) is legal and round-trips laneI
   );
 });
 
-test("a deleted card's id is never reallocated to a new card", () => {
+test("a deleted card's id is never reallocated to a new card", async () => {
   const storage = stubStorage([testCard({ id: "S001" })]);
-  postEvent(storage, config, { type: "deleted", cardId: "S001" });
-  const first = postCard(storage, config, CARD_BODY).body as { card: Card };
+  await postEvent(storage, config, { type: "deleted", cardId: "S001" });
+  const first = (await postCard(storage, config, CARD_BODY)).body as { card: Card };
   assert.equal(first.card.id, "S002"); // never "S001" — snapshots keep the id
   // Consecutive creation: the freshly inserted card feeds the next id.
-  const second = postCard(storage, config, CARD_BODY).body as { card: Card };
+  const second = (await postCard(storage, config, CARD_BODY)).body as { card: Card };
   assert.equal(second.card.id, "S003");
 });

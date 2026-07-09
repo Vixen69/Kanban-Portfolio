@@ -27,9 +27,10 @@ const cfg = loadServerConfig(process.env);
 const boardConfig = validateBoardConfig(JSON.parse(readFileSync(cfg.boardConfigPath, "utf8")));
 mkdirSync(dirname(cfg.dataPath), { recursive: true });
 
-const storage = createStorage(cfg.storageDriver, cfg.dataPath);
+const storage = await createStorage(cfg.storageDriver, cfg.dataPath);
 try {
-  if (storage.listEvents().length > 0 || storage.listBaseCards().length > 0) {
+  const [events, baseCards] = await Promise.all([storage.listEvents(), storage.listBaseCards()]);
+  if (events.length > 0 || baseCards.length > 0) {
     console.log("seed: le stockage contient déjà des données, rien à faire.");
   } else {
     const now = new Date();
@@ -37,9 +38,9 @@ try {
     const cards = dataSource
       .listSubjects()
       .map((subject) => toCard(subject, dataSource.getFinancials(subject.id)));
-    storage.importCards(cards, seedEvents);
+    await storage.importCards(cards, seedEvents);
     console.log(`seed: ${cards.length} cartes, ${seedEvents.length} évènements importés.`);
   }
 } finally {
-  storage.close();
+  await storage.close();
 }

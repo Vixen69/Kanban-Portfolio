@@ -2,7 +2,7 @@
 // Root: state, filtering, drag & drop, focus, collapse, persistence, keyboard, tweaks.
 
 const { useState, useEffect, useRef, useMemo } = React;
-const STORAGE_KEY = 'nmo_portfolio_v11';
+const STORAGE_KEY = 'nmo_portfolio_v14';
 const CONFIG_KEY = 'nmo_board_config_v2';
 const WIP_KEY = 'nmo_wip_v1';
 
@@ -59,7 +59,6 @@ function App() {
   const [cards, setCards] = useState(loadCards);
   const [search, setSearch] = useState('');
   const [filters, setFilters] = useState(() => ({
-    nature: { simple: true, complicated: true, complex: true },
     crit: { normal: true, major: true, top: true },
     rdom: Object.fromEntries(DOMAINS.map(d => [d.id, true])),
     type: Object.fromEntries(TYPES.map(t => [t.id, true])),
@@ -73,6 +72,9 @@ function App() {
   const [adding, setAdding] = useState(false);
   const [admin, setAdmin] = useState(false);
   const [metrics, setMetrics] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [blockedOnly, setBlockedOnly] = useState(false);
+  const [dropCardId, setDropCardId] = useState(null);
   const [cfg, setCfg] = useState(INITIAL_CFG);
   const [wipLimits, setWipLimits] = useState(loadWipLimits);
   const [dragOver, setDragOver] = useState(null);
@@ -92,8 +94,8 @@ function App() {
   // Back to the full portfolio: clear search and re-enable every filter.
   const resetFilters = () => {
     setSearch('');
+    setBlockedOnly(false);
     setFilters({
-      nature: { simple: true, complicated: true, complex: true },
       crit: { normal: true, major: true, top: true },
       rdom: Object.fromEntries(DOMAINS.map(d => [d.id, true])),
       type: Object.fromEntries(TYPES.map(t => [t.id, true])),
@@ -101,39 +103,42 @@ function App() {
   };
 
   // Dim (never remove) filtered/non-matching cards — spatial structure is always truth (P3).
+  // Archived subjects leave the board entirely (kept only in the archive view).
   const q = search.trim().toLowerCase();
-  const decorated = useMemo(() => cards.map(c => {
+  const activeCards = useMemo(() => cards.filter(c => !c.archived), [cards]);
+  const archivedCards = useMemo(() => cards.filter(c => c.archived), [cards]);
+  const decorated = useMemo(() => activeCards.map(c => {
     const match = !q || c.name.toLowerCase().includes(q) || (c.codename || '').toLowerCase().includes(q);
-    const pass = filters.nature[c.nature] && filters.crit[c.criticality] && filters.rdom[c.rdom] && (filters.type[c.type] !== false);
+    const pass = filters.crit[c.criticality] && filters.rdom[c.rdom] && (filters.type[c.type] !== false) && (!blockedOnly || cardBlocked(c));
     return { ...c, dimmed: !(match && pass) };
-  }), [cards, q, filters]);
+  }), [activeCards, q, filters, blockedOnly]);
 
   // Is the board currently narrowed by search or any filter category?
   const allOn = (g) => Object.values(filters[g]).every(Boolean);
-  const filtersActive = !!q || !allOn('nature') || !allOn('crit') || !allOn('rdom') || !allOn('type');
+  const filtersActive = !!q || blockedOnly || !allOn('crit') || !allOn('rdom') || !allOn('type');
 
   const stats = useMemo(() => {
-    const s = { total: cards.length, blocked: 0, stale: 0, top: 0, major: 0, normal: 0, simple: 0, complicated: 0, complex: 0 };
-    cards.forEach(c => { if (c.blocked) s.blocked++; if (daysInColumn(c) > 60) s.stale++; s[c.criticality]++; s[c.nature]++; });
+    const s = { total: activeCards.length, blocked: 0, stale: 0, top: 0, major: 0, normal: 0, simple: 0, complicated: 0, complex: 0 };
+    activeCards.forEach(c => { if (cardBlocked(c)) s.blocked++; if (daysInColumn(c) > 60) s.stale++; s[c.criticality]++; s[c.nature]++; });
     return s;
-  }, [cards]);
+  }, [activeCards]);
 
   // Live read-out of the VISIBLE subset (what the filters/search currently show).
   const view = useMemo(() => {
-    const v = { shown: 0, total: cards.length, blocked: 0, stale: 0, top: 0, major: 0, normal: 0, simple: 0, complicated: 0, complex: 0 };
+    const v = { shown: 0, total: activeCards.length, blocked: 0, stale: 0, top: 0, major: 0, normal: 0, simple: 0, complicated: 0, complex: 0 };
     decorated.forEach(c => {
       if (c.dimmed) return;
       v.shown++;
-      if (c.blocked) v.blocked++;
+      if (cardBlocked(c)) v.blocked++;
       if (daysInColumn(c) > 60) v.stale++;
       v[c.criticality]++; v[c.nature]++;
     });
     return v;
-  }, [decorated, cards.length]);
+  }, [decorated, activeCards.length]);
 
   // --- Drag & drop: moving a card IS the governance decision (P2). Records history. ---
   const onDragStart = (e, card) => { dragId.current = card.id; e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', card.id); } catch (_) {} };
-  const onDragEnd = () => { dragId.current = null; setDragOver(null); };
+  const onDragEnd = () => { dragId.current = null; setDragOver(null); setDropCardId(null); };
   const onDragOverCell = (e, lane, col) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOver(d => (d && d.lane === lane.id && d.column === col.id) ? d : { lane: lane.id, column: col.id }); };
   const onDragLeaveCell = () => {};
   const onDrop = (e, lane, col) => {
@@ -148,8 +153,39 @@ function App() {
     }));
   };
 
+  // Reorder within (or across) a cell by dropping a card ONTO another card: inserts before it.
+  const onCardOver = (e, target) => {
+    const id = dragId.current;
+    if (!id || id === target.id) return;
+    e.preventDefault(); e.stopPropagation();
+    setDropCardId(d => d === target.id ? d : target.id);
+  };
+  const onCardDrop = (e, target) => {
+    e.preventDefault(); e.stopPropagation();
+    const id = dragId.current || e.dataTransfer.getData('text/plain');
+    setDropCardId(null); setDragOver(null);
+    if (!id || id === target.id) return;
+    setCards(cs => {
+      const arr = cs.slice();
+      const from = arr.findIndex(c => c.id === id);
+      if (from < 0) return cs;
+      const moved = { ...arr[from] };
+      if (moved.column !== target.column || moved.canal !== target.canal) {
+        const now = new Date().toISOString();
+        moved.history = [...moved.history, { from: moved.column, to: target.column, at: now, user: 'vous' }];
+        moved.column = target.column; moved.canal = target.canal; moved.movedAt = now;
+      }
+      arr.splice(from, 1);
+      const ti = arr.findIndex(c => c.id === target.id);
+      arr.splice(ti, 0, moved);
+      return arr;
+    });
+  };
+
   const onSave = (d) => { setCards(cs => cs.map(c => c.id === d.id ? { ...d } : c)); setDetail(d); };
   const onDelete = (id) => { setCards(cs => cs.filter(c => c.id !== id)); setDetail(null); };
+  const onArchive = (card) => { setCards(cs => cs.map(c => c.id === card.id ? { ...c, archived: true } : c)); setDetail(null); };
+  const onUnarchive = (id) => setCards(cs => cs.map(c => c.id === id ? { ...c, archived: false } : c));
   const onCreate = (d) => {
     const now = new Date().toISOString();
     const card = {
@@ -168,10 +204,7 @@ function App() {
 
   // Two-stage card click (P5): first click on a card in a non-focused column
   // expands that stage; a second click (now a focus card) opens the full detail.
-  const onCardClick = (card) => {
-    if (focusCol !== card.column) setFocusCol(card.column);
-    else setDetail(card);
-  };
+  const onCardClick = (card) => setDetail(card);
 
   // Apply an admin config: push to globals, persist, and reconcile cards/filters
   // whose column/lane/domain may have been deleted.
@@ -194,7 +227,14 @@ function App() {
     if (focusCol && !next.columns.some(x => x.id === focusCol)) setFocusCol(null);
     setAdmin(false);
   };
-  const onToggleLane = (id) => setCollapsed(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const onToggleLane = (id) => setCollapsed(s => {
+    const n = new Set(s);
+    if (n.has(id)) { n.delete(id); return n; }
+    // Toujours garder au moins une ligne dépliée : refuser de replier la dernière.
+    if (n.size >= SWIMLANES.length - 1) return s;
+    n.add(id);
+    return n;
+  });
   // Collapse a column to a narrow strip (e.g. Pause when not steering the flow).
   const onToggleColumnCollapse = (id) => {
     setCollapsedCols(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -208,7 +248,7 @@ function App() {
       const tag = (e.target.tagName || '').toLowerCase();
       const typing = tag === 'input' || tag === 'textarea' || tag === 'select';
       if (e.key === 'Escape') {
-        if (detail) setDetail(null); else if (adding) setAdding(false); else if (sidebar) setSidebar(false);
+        if (detail) setDetail(null); else if (adding) setAdding(false); else if (archiveOpen) setArchiveOpen(false); else if (sidebar) setSidebar(false);
         else if (focusCol) setFocusCol(null); else if (collapsed.size) setCollapsed(new Set());
         return;
       }
@@ -239,11 +279,13 @@ function App() {
         onAdd={() => setAdding(true)}
         onAdmin={() => setAdmin(true)}
         onMetrics={() => setMetrics(true)}
+        onArchive={() => setArchiveOpen(true)}
+        archivedCount={archivedCards.length}
         onToggleSidebar={() => setSidebar(s => !s)}
         focusLabel={focusLabel}
         onClearFocus={() => setFocusCol(null)}
       />
-      <Sidebar open={sidebar} search={search} setSearch={setSearch} filters={filters} toggle={toggle} setGroup={setGroup} stats={stats} view={view} filtersActive={filtersActive} onReset={resetFilters} searchRef={searchRef} showCodes={showCodes} setShowCodes={setShowCodes} />
+      <Sidebar open={sidebar} search={search} setSearch={setSearch} filters={filters} toggle={toggle} setGroup={setGroup} blockedOnly={blockedOnly} setBlockedOnly={setBlockedOnly} stats={stats} view={view} filtersActive={filtersActive} onReset={resetFilters} searchRef={searchRef} showCodes={showCodes} setShowCodes={setShowCodes} />
       <div className="board-area">
         <BoardGrid
           cards={decorated}
@@ -259,11 +301,15 @@ function App() {
           onToggleLane={onToggleLane}
           onToggleColumnCollapse={onToggleColumnCollapse}
           onOpen={onCardClick}
+          onOpenDirect={setDetail}
           onDragStart={onDragStart}
           onDragEnd={onDragEnd}
           onDrop={onDrop}
           onDragOverCell={onDragOverCell}
           onDragLeaveCell={onDragLeaveCell}
+          onCardOver={onCardOver}
+          onCardDrop={onCardDrop}
+          dropCardId={dropCardId}
         />
         {view.shown === 0 && (
           <div className="empty-overlay">
@@ -276,10 +322,11 @@ function App() {
         )}
       </div>
 
-      {detail && <CardDetail card={detail} allCards={cards} onClose={() => setDetail(null)} onSave={onSave} onDelete={onDelete} />}
+      {detail && <CardDetail card={detail} allCards={cards} onClose={() => setDetail(null)} onSave={onSave} onDelete={onDelete} onArchive={onArchive} />}
       {adding && <QuickAdd onClose={() => setAdding(false)} onCreate={onCreate} />}
       {admin && <AdminPanel cfg={cfg} onApply={onApplyConfig} onClose={() => setAdmin(false)} />}
       {metrics && <MetricsView cards={cards} onClose={() => setMetrics(false)} />}
+      {archiveOpen && <ArchiveView cards={archivedCards} onUnarchive={onUnarchive} onOpen={(c) => { setArchiveOpen(false); setDetail(c); }} onClose={() => setArchiveOpen(false)} />}
 
       <TweaksPanel>
         <TweakSection label="Densité du radiateur" />

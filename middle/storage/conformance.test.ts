@@ -1,8 +1,10 @@
-// Conformance suite for BoardStorage drivers (ADR 008/011): every driver must
-// satisfy the same observable contract — append-only ids, atomic imports,
-// persistence across reopen, fold parity with the in-memory store. The
-// PostgreSQL driver (`pg`) joins DRIVERS below once authorized, re-proving
-// parity unchanged. (node:sqlite was retired with the Node-22 re-platform.)
+// Conformance suite for BoardStorage drivers (ADR 008/011/016): every driver
+// must satisfy the same observable contract — append-only ids, atomic imports,
+// persistence across reopen, fold parity with the in-memory store. This file
+// runs the JSONL driver; the Postgres driver proves the same contract against
+// a live database in storage/postgres.test.ts (env-guarded). Storage
+// operations are async (the BoardStorage port); open stays synchronous (JSONL
+// header validation throws there).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -38,48 +40,46 @@ const DRIVERS: Driver[] = [
 
 // Fresh temp dir per test; the store must be closed before cleanup or
 // Windows keeps the database file locked.
-function withTempDir(work: (dir: string) => void): void {
+async function withTempDir(work: (dir: string) => Promise<void>): Promise<void> {
   const dir = mkdtempSync(join(tmpdir(), "kanban-storage-"));
   try {
-    work(dir);
+    await work(dir);
   } finally {
     rmSync(dir, { recursive: true, force: true, maxRetries: 5 });
   }
 }
 
-function withStore(driver: Driver, work: (store: BoardStorage, dir: string) => void): void {
-  withTempDir((dir) => {
+async function withStore(driver: Driver, work: (store: BoardStorage, dir: string) => Promise<void>): Promise<void> {
+  await withTempDir(async (dir) => {
     const store = driver.open(dir);
     try {
-      work(store, dir);
+      await work(store, dir);
     } finally {
-      store.close();
+      await store.close();
     }
   });
 }
 
 for (const driver of DRIVERS) {
-  test(`[${driver.name}] a fresh store is empty`, () => {
-    withStore(driver, (store) => {
-      assert.deepEqual(store.listEvents(), []);
-      assert.deepEqual(store.listBaseCards(), []);
-    });
-  });
+  test(`[${driver.name}] a fresh store is empty`, () =>
+    withStore(driver, async (store) => {
+      assert.deepEqual(await store.listEvents(), []);
+      assert.deepEqual(await store.listBaseCards(), []);
+    }));
 
-  test(`[${driver.name}] appendEvent assigns sequential evt-<seq> ids`, () => {
-    withStore(driver, (store) => {
-      const first = store.appendEvent(lifecycleEvent("created", "S001", "local", TS));
-      const second = store.appendEvent(
+  test(`[${driver.name}] appendEvent assigns sequential evt-<seq> ids`, () =>
+    withStore(driver, async (store) => {
+      const first = await store.appendEvent(lifecycleEvent("created", "S001", "local", TS));
+      const second = await store.appendEvent(
         lifecycleEvent("blocked", "S001", "local", TS, { reason: "attente" }),
       );
       assert.equal(first.id, "evt-1");
       assert.equal(second.id, "evt-2");
-      assert.deepEqual(store.listEvents().map((event) => event.id), ["evt-1", "evt-2"]);
-    });
-  });
+      assert.deepEqual((await store.listEvents()).map((event) => event.id), ["evt-1", "evt-2"]);
+    }));
 
-  test(`[${driver.name}] events round-trip exactly, payload included`, () => {
-    withStore(driver, (store) => {
+  test(`[${driver.name}] events round-trip exactly, payload included`, () =>
+    withStore(driver, async (store) => {
       const input = movedEvent(
         "S042",
         { laneId: "laneA", columnId: "col1" },
@@ -87,14 +87,13 @@ for (const driver of DRIVERS) {
         "local",
         TS,
       );
-      const stored = store.appendEvent(input);
-      assert.deepEqual(store.listEvents(), [stored]);
+      const stored = await store.appendEvent(input);
+      assert.deepEqual(await store.listEvents(), [stored]);
       assert.deepEqual(stored.payload, { fromLaneId: "laneA", laneId: "laneB" });
-    });
-  });
+    }));
 
-  test(`[${driver.name}] appendEvent's return mirrors the persisted payload`, () => {
-    withStore(driver, (store) => {
+  test(`[${driver.name}] appendEvent's return mirrors the persisted payload`, () =>
+    withStore(driver, async (store) => {
       // JSON.stringify drops undefined keys and coerces NaN/Infinity to
       // null; the returned event must reflect the stored row, not the raw
       // input payload — otherwise the caller's cache diverges from a reload.
@@ -103,35 +102,33 @@ for (const driver of DRIVERS) {
         dropped: undefined,
         coerced: NaN,
       });
-      const returned = store.appendEvent(input);
-      assert.deepEqual(store.listEvents(), [returned]);
+      const returned = await store.appendEvent(input);
+      assert.deepEqual(await store.listEvents(), [returned]);
       assert.equal("dropped" in returned.payload, false);
       assert.equal(returned.payload["coerced"], null);
-    });
-  });
+    }));
 
-  test(`[${driver.name}] seq stays monotonic across close and reopen`, () => {
-    withTempDir((dir) => {
+  test(`[${driver.name}] seq stays monotonic across close and reopen`, () =>
+    withTempDir(async (dir) => {
       const store = driver.open(dir);
       try {
-        store.appendEvent(lifecycleEvent("created", "S001", "local", TS));
-        store.appendEvent(lifecycleEvent("created", "S002", "local", TS));
+        await store.appendEvent(lifecycleEvent("created", "S001", "local", TS));
+        await store.appendEvent(lifecycleEvent("created", "S002", "local", TS));
       } finally {
-        store.close();
+        await store.close();
       }
       const reopened = driver.open(dir);
       try {
-        const third = reopened.appendEvent(lifecycleEvent("created", "S003", "local", TS));
+        const third = await reopened.appendEvent(lifecycleEvent("created", "S003", "local", TS));
         assert.equal(third.id, "evt-3");
-        assert.equal(reopened.listEvents().length, 3);
+        assert.equal((await reopened.listEvents()).length, 3);
       } finally {
-        reopened.close();
+        await reopened.close();
       }
-    });
-  });
+    }));
 
-  test(`[${driver.name}] importCards round-trips full cards and their events`, () => {
-    withStore(driver, (store) => {
+  test(`[${driver.name}] importCards round-trips full cards and their events`, () =>
+    withStore(driver, async (store) => {
       const cardA = testCard({
         id: "S100",
         tags: ["erp", "priorite"],
@@ -145,60 +142,56 @@ for (const driver of DRIVERS) {
         blockedSince: TS,
       });
       const cardB = testCard({ id: "S101", typeId: null, codename: null, owner: "" });
-      store.importCards(
+      await store.importCards(
         [cardA, cardB],
         [
           lifecycleEvent("imported", "S100", "sync", TS),
           lifecycleEvent("imported", "S101", "sync", TS),
         ],
       );
-      assert.deepEqual(store.listBaseCards(), [cardA, cardB]);
-      assert.deepEqual(store.listEvents().map((event) => event.id), ["evt-1", "evt-2"]);
-    });
-  });
+      assert.deepEqual(await store.listBaseCards(), [cardA, cardB]);
+      assert.deepEqual((await store.listEvents()).map((event) => event.id), ["evt-1", "evt-2"]);
+    }));
 
-  test(`[${driver.name}] importCards upserts base cards by id`, () => {
-    withStore(driver, (store) => {
-      store.importCards([testCard({ id: "S100", title: "Avant" })], []);
-      store.importCards([testCard({ id: "S100", title: "Après" })], []);
-      const cards = store.listBaseCards();
+  test(`[${driver.name}] importCards upserts base cards by id`, () =>
+    withStore(driver, async (store) => {
+      await store.importCards([testCard({ id: "S100", title: "Avant" })], []);
+      await store.importCards([testCard({ id: "S100", title: "Après" })], []);
+      const cards = await store.listBaseCards();
       assert.equal(cards.length, 1);
       assert.equal(cards[0]?.title, "Après");
-    });
-  });
+    }));
 
-  test(`[${driver.name}] a failed import leaves nothing behind`, () => {
-    withStore(driver, (store) => {
+  test(`[${driver.name}] a failed import leaves nothing behind`, () =>
+    withStore(driver, async (store) => {
       const circular: Record<string, unknown> = {};
       circular["self"] = circular; // not JSON-serializable: the append throws
-      assert.throws(() =>
+      await assert.rejects(() =>
         store.importCards(
           [testCard({ id: "S100" })],
           [lifecycleEvent("imported", "S100", "sync", TS, circular)],
         ),
       );
-      assert.deepEqual(store.listBaseCards(), []);
-      assert.deepEqual(store.listEvents(), []);
-    });
-  });
+      assert.deepEqual(await store.listBaseCards(), []);
+      assert.deepEqual(await store.listEvents(), []);
+    }));
 
-  test(`[${driver.name}] insertCard stores the card AND its created event`, () => {
-    withStore(driver, (store) => {
+  test(`[${driver.name}] insertCard stores the card AND its created event`, () =>
+    withStore(driver, async (store) => {
       const card = testCard({ id: "S151", title: "Sujet saisi", source: "manual" });
-      const stored = store.insertCard(card, lifecycleEvent("created", "S151", "local", TS));
-      assert.deepEqual(store.listBaseCards(), [card]);
+      const stored = await store.insertCard(card, lifecycleEvent("created", "S151", "local", TS));
+      assert.deepEqual(await store.listBaseCards(), [card]);
       assert.equal(stored.id, "evt-1");
-      assert.deepEqual(store.listEvents(), [stored]);
-    });
-  });
+      assert.deepEqual(await store.listEvents(), [stored]);
+    }));
 
-  test(`[${driver.name}] insertCard refuses a duplicate id, in French`, () => {
-    withStore(driver, (store) => {
-      store.insertCard(
+  test(`[${driver.name}] insertCard refuses a duplicate id, in French`, () =>
+    withStore(driver, async (store) => {
+      await store.insertCard(
         testCard({ id: "S151", title: "Original" }),
         lifecycleEvent("created", "S151", "local", TS),
       );
-      assert.throws(
+      await assert.rejects(
         () =>
           store.insertCard(
             testCard({ id: "S151", title: "Doublon" }),
@@ -207,37 +200,35 @@ for (const driver of DRIVERS) {
         /existe déjà/,
       );
       // The refused insert must not have persisted anything, event included.
-      const cards = store.listBaseCards();
+      const cards = await store.listBaseCards();
       assert.equal(cards.length, 1);
       assert.equal(cards[0]?.title, "Original");
-      assert.equal(store.listEvents().length, 1);
-    });
-  });
+      assert.equal((await store.listEvents()).length, 1);
+    }));
 
-  test(`[${driver.name}] insertCard refuses an id already taken by an import`, () => {
-    withStore(driver, (store) => {
-      store.importCards([testCard({ id: "S100" })], []);
+  test(`[${driver.name}] insertCard refuses an id already taken by an import`, () =>
+    withStore(driver, async (store) => {
+      await store.importCards([testCard({ id: "S100" })], []);
       const created = lifecycleEvent("created", "S100", "local", TS);
-      assert.throws(() => store.insertCard(testCard({ id: "S100" }), created), /existe déjà/);
-      assert.equal(store.listEvents().length, 0);
-    });
-  });
+      await assert.rejects(() => store.insertCard(testCard({ id: "S100" }), created), /existe déjà/);
+      assert.equal((await store.listEvents()).length, 0);
+    }));
 
-  test(`[${driver.name}] an inserted card survives close and reopen`, () => {
-    withTempDir((dir) => {
+  test(`[${driver.name}] an inserted card survives close and reopen`, () =>
+    withTempDir(async (dir) => {
       const card = testCard({ id: "S151", title: "Sujet saisi", source: "manual" });
       const store = driver.open(dir);
       try {
-        store.insertCard(card, lifecycleEvent("created", "S151", "local", TS));
+        await store.insertCard(card, lifecycleEvent("created", "S151", "local", TS));
       } finally {
-        store.close();
+        await store.close();
       }
       const reopened = driver.open(dir);
       try {
-        assert.deepEqual(reopened.listBaseCards(), [card]);
-        assert.equal(reopened.listEvents().length, 1);
+        assert.deepEqual(await reopened.listBaseCards(), [card]);
+        assert.equal((await reopened.listEvents()).length, 1);
         // The duplicate guard also holds against the reloaded snapshot.
-        assert.throws(
+        await assert.rejects(
           () =>
             reopened.insertCard(
               testCard({ id: "S151" }),
@@ -246,20 +237,19 @@ for (const driver of DRIVERS) {
           /existe déjà/,
         );
       } finally {
-        reopened.close();
+        await reopened.close();
       }
-    });
-  });
+    }));
 
-  test(`[${driver.name}] a pre-v9 data file is refused on open, telling to reseed`, () => {
-    withTempDir((dir) => {
+  test(`[${driver.name}] a pre-v9 data file is refused on open, telling to reseed`, () =>
+    withTempDir(async (dir) => {
       driver.writeLegacyData(dir);
+      // open is synchronous — a legacy file throws immediately.
       assert.throws(() => driver.open(dir), /supprimez le fichier de données.*seed/is);
-    });
-  });
+    }));
 
-  test(`[${driver.name}] folds identically to the in-memory store`, () => {
-    withStore(driver, (store) => {
+  test(`[${driver.name}] folds identically to the in-memory store`, () =>
+    withStore(driver, async (store) => {
       const base = [testCard({ id: "S001" }), testCard({ id: "S002", columnId: "col2" })];
       const inputs = [
         movedEvent(
@@ -279,20 +269,18 @@ for (const driver of DRIVERS) {
       const memory = new InMemoryEventStore();
       for (const input of inputs) {
         memory.append(input);
-        store.appendEvent(input);
+        await store.appendEvent(input);
       }
-      assert.deepEqual(foldEvents(base, store.listEvents()), foldEvents(base, memory.list()));
-    });
-  });
+      assert.deepEqual(foldEvents(base, await store.listEvents()), foldEvents(base, memory.list()));
+    }));
 
-  test(`[${driver.name}] close is idempotent, methods then throw`, () => {
-    withTempDir((dir) => {
+  test(`[${driver.name}] close is idempotent, methods then reject`, () =>
+    withTempDir(async (dir) => {
       const store = driver.open(dir);
-      store.close();
-      store.close();
-      assert.throws(() => store.appendEvent(lifecycleEvent("created", "S001", "local", TS)));
-      assert.throws(() => store.insertCard(testCard(), lifecycleEvent("created", "S001", "local", TS)));
-      assert.throws(() => store.listEvents());
-    });
-  });
+      await store.close();
+      await store.close();
+      await assert.rejects(() => store.appendEvent(lifecycleEvent("created", "S001", "local", TS)));
+      await assert.rejects(() => store.insertCard(testCard(), lifecycleEvent("created", "S001", "local", TS)));
+      await assert.rejects(() => store.listEvents());
+    }));
 }

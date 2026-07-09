@@ -1,7 +1,8 @@
 @echo off
-rem Double-click launcher (Docker) : construit et lance les conteneurs
-rem front (nginx) + middle (Express), puis ouvre le navigateur.
-rem Necessite Docker Desktop demarre. Arreter avec "Arreter Docker.cmd".
+rem Double-click launcher (Docker) : construit et lance la base PostgreSQL, le
+rem middle (Express) et le front (nginx), sème des donnees de demonstration,
+rem puis ouvre le navigateur. Necessite Docker Desktop demarre.
+rem Arreter avec "Arreter Docker.cmd".
 title Portefeuille DSI - Kanban NMO (Docker)
 cd /d "%~dp0"
 
@@ -19,20 +20,8 @@ if errorlevel 1 (
   exit /b 1
 )
 
-if not exist "docker\data\board.jsonl" (
-  echo Premiere utilisation : donnees de demonstration...
-  where node >nul 2>nul
-  if errorlevel 1 (
-    echo Node.js introuvable pour semer les donnees ^: le tableau demarrera vide.
-  ) else (
-    set KANBAN_ALLOW_SEED=1
-    set KANBAN_DATA_PATH=docker/data/board.jsonl
-    call node scripts/seed.ts
-  )
-)
-
 echo.
-echo Construction et demarrage des conteneurs ^(quelques minutes la 1re fois^)...
+echo Construction et demarrage ^(base PostgreSQL + middle + front, quelques minutes la 1re fois^)...
 docker compose -f docker/compose.yaml --profile app up -d --build
 if errorlevel 1 (
   echo Le demarrage a echoue. Voir les messages ci-dessus.
@@ -40,8 +29,20 @@ if errorlevel 1 (
   exit /b 1
 )
 
+echo Attente de la base et du middle...
+timeout /t 8 /nobreak >nul
+
+where node >nul 2>nul
+if not errorlevel 1 (
+  echo Donnees de demonstration ^(idempotent^)...
+  set KANBAN_ALLOW_SEED=1
+  set KANBAN_STORAGE_DRIVER=postgres
+  set DATABASE_URL=postgres://kanban:change-me-in-dev@localhost:5432/kanban
+  call node scripts/seed.ts
+)
+
 echo Ouverture du navigateur sur http://localhost:8080 ...
-timeout /t 4 /nobreak >nul
+timeout /t 2 /nobreak >nul
 start "" http://localhost:8080
 
 echo.

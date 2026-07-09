@@ -354,10 +354,15 @@ run on the platform). Every internal design decision is the author's.
 - `core/` shared via an **npm workspace** across `front/` and `middle/`.
 - Runtime Node `>=22.18 <24`, containerized; lint = the client's ESLint.
 
-**To clear with the tech lead (runtime additions to their platform):**
+**Cleared with the tech lead:**
 
-- Authorize **`pg`** (node-postgres) on the system — not in the reference
-  SBOM. (The only hard external ask; everything else fits the ceiling.)
+- **`pg`** (node-postgres) **authorized (2026-07-07)** and installed — PostgreSQL
+  is the delivery back end, behind the `BoardStorage` port
+  (`middle/storage/postgres.ts`, ADR 016); JSONL stays as a selectable file
+  fallback. The `BoardStorage` port went async (pg has no sync API).
+
+**Still to clear with the tech lead:**
+
 - The exact delivery channel / image registry into the platform.
 
 **Still open (product):**

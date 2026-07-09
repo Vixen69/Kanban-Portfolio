@@ -1,31 +1,31 @@
-// Explicit storage driver selection (ADR 008/011): the operator names the
+// Explicit storage driver selection (ADR 008/011/016): the operator names the
 // driver in the configuration; nothing is probed, nothing falls back silently.
-// JSONL is the Node-22-safe driver used now; the PostgreSQL driver (`pg`)
-// joins behind the same port once the tech lead authorizes `pg` (ADR 011).
+// PostgreSQL is the delivery back end; JSONL stays as a zero-dependency,
+// single-writer file store for local/simple deployments. Both satisfy the same
+// BoardStorage contract (storage/conformance).
 
 import type { BoardStorage } from "../../core/ports.ts";
 import { createJsonlStorage } from "./jsonl.ts";
+import { createPostgresStorage } from "./postgres.ts";
 
 /** Driver identifiers accepted by the configuration. */
-export const STORAGE_DRIVERS = ["jsonl"] as const;
+export const STORAGE_DRIVERS = ["jsonl", "postgres"] as const;
 
-/** One of STORAGE_DRIVERS. "postgres" is reserved (pending `pg`, ADR 011). */
+/** One of STORAGE_DRIVERS. */
 export type StorageDriverId = (typeof STORAGE_DRIVERS)[number];
 
 /**
  * Creates the BoardStorage named by the configuration.
- * Inputs: the driver id as written in the config (unvalidated string),
- * the data file path handed to the driver.
- * Output: an open BoardStorage.
- * Failure: throws Error (French, operator-facing) when the driver is unknown,
- * or "postgres" before `pg` is authorized/implemented; propagates the driver's
- * own open errors.
+ * Inputs: the driver id as written in the config (unvalidated string), and a
+ * target — a data file path for "jsonl"; ignored for "postgres", which reads
+ * its connection from DATABASE_URL (else the standard PG* env vars).
+ * Output: a Promise of an open BoardStorage.
+ * Failure: rejects when the driver is unknown; propagates the driver's own
+ * open errors (a torn/foreign JSONL file, an unreachable database).
  */
-export function createStorage(driver: string, path: string): BoardStorage {
+export async function createStorage(driver: string, path: string): Promise<BoardStorage> {
   if (driver === "jsonl") return createJsonlStorage(path);
-  if (driver === "postgres") {
-    throw new Error("Pilote « postgres » pas encore disponible : « pg » reste à autoriser (ADR 011).");
-  }
+  if (driver === "postgres") return createPostgresStorage(process.env["DATABASE_URL"]);
   throw new Error(
     `Pilote de stockage inconnu : « ${driver} ». Pilotes disponibles : ${STORAGE_DRIVERS.join(", ")}.`,
   );

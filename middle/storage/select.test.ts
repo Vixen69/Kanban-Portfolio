@@ -9,31 +9,33 @@ import { createStorage, STORAGE_DRIVERS } from "./select.ts";
 
 const TS = "2026-06-01T10:00:00.000Z";
 
-test("an unknown driver fails loudly, naming the available drivers", () => {
-  assert.throws(
+test("an unknown driver fails loudly, naming the available drivers", async () => {
+  await assert.rejects(
     () => createStorage("better-sqlite3", "x"),
-    /Pilote de stockage inconnu.*better-sqlite3.*jsonl/s,
+    /Pilote de stockage inconnu.*better-sqlite3.*jsonl.*postgres/s,
   );
 });
 
-test("postgres is reserved and refuses until pg is authorized", () => {
-  assert.throws(() => createStorage("postgres", "x"), /pas encore disponible.*pg/s);
+test("postgres is a selectable driver id", () => {
+  // Behavior against a live database is covered by storage/postgres.test.ts
+  // (env-guarded); here we only assert the driver is offered.
+  assert.ok((STORAGE_DRIVERS as readonly string[]).includes("postgres"));
 });
 
-test("jsonl is selectable and returns a working storage", () => {
+test("jsonl is selectable and returns a working storage", async () => {
   assert.ok((STORAGE_DRIVERS as readonly string[]).includes("jsonl"));
   const dir = mkdtempSync(join(tmpdir(), "kanban-select-"));
   try {
-    const store = createStorage("jsonl", join(dir, "board.jsonl"));
+    const store = await createStorage("jsonl", join(dir, "board.jsonl"));
     try {
-      const stored = store.appendEvent(lifecycleEvent("created", "S001", "local", TS));
+      const stored = await store.appendEvent(lifecycleEvent("created", "S001", "local", TS));
       assert.equal(stored.id, "evt-1");
-      assert.equal(store.listEvents().length, 1);
-      store.insertCard(testCard({ id: "S002" }), lifecycleEvent("created", "S002", "local", TS));
-      assert.equal(store.listBaseCards().length, 1);
-      assert.equal(store.listEvents().length, 2);
+      assert.equal((await store.listEvents()).length, 1);
+      await store.insertCard(testCard({ id: "S002" }), lifecycleEvent("created", "S002", "local", TS));
+      assert.equal((await store.listBaseCards()).length, 1);
+      assert.equal((await store.listEvents()).length, 2);
     } finally {
-      store.close();
+      await store.close();
     }
   } finally {
     rmSync(dir, { recursive: true, force: true, maxRetries: 5 });

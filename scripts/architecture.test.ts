@@ -76,10 +76,17 @@ test("middle/ is server-side only (no React, no front/ imports)", () => {
   assert.deepEqual(bad, [], `middle/ must not import the front or React:\n${bad.join("\n")}`);
 });
 
-test("the Postgres client (pg) is imported nowhere yet (deferred, ADR 011)", () => {
-  const bad: string[] = [];
+test("the Postgres client (pg) is confined to its adapter (ADR 016)", () => {
+  const importers: string[] = [];
   for (const dir of ["core", "front", "middle", "adapters", "scripts", "sync"]) {
-    bad.push(...offenders(dir, (spec) => spec === "pg" || spec.startsWith("pg/")));
+    importers.push(...offenders(dir, (spec) => spec === "pg" || spec.startsWith("pg/")));
   }
-  assert.deepEqual(bad, [], `pg must not be imported until authorized:\n${bad.join("\n")}`);
+  // pg lives behind the BoardStorage port: only the Postgres driver may import
+  // it, so swapping the back end never leaks the client into core/front/etc.
+  const paths = [...new Set(importers.map((entry) => entry.split(" → ")[0]))];
+  assert.deepEqual(
+    paths,
+    ["middle/storage/postgres.ts"],
+    `pg may only be imported by its adapter; found: ${importers.join(", ")}`,
+  );
 });
