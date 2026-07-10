@@ -479,6 +479,35 @@ de son ADR.
   l'âge restant à droite (`card-fill` élastique entre picto et âge).
 - CLAUDE.md §5 mis à jour. Front seul (cards.tsx + cards.css).
 
+### 2026-07-10 — Adminer démo : édition structurée des cartes et évènements
+- **Problème** : les tables `cards` et `card_events` stockent le document
+  entier dans une colonne `data jsonb` — dans Adminer, éditer une carte
+  revenait à modifier un gros bloc JSON brut (pénible, risqué).
+- **Solution** : plugin Adminer maison `docker/adminer/card-boxes.php`
+  (mécanisme officiel `plugins-enabled/*.php` de l'image, hooks
+  `editInput`/`processInput` vérifiés sur l'Adminer 4.17.1 embarqué),
+  monté en lecture seule par compose (image épinglée `adminer:4.17.1`).
+  L'écran d'édition éclate `data` en boîtes typées par champ : selects pour
+  les enums (criticité, nature, source, type d'évènement), case pour
+  `blocked`, nombres nullables, dates ISO, listes une-entrée-par-ligne
+  (tags, ressources…), mini-JSON pour les structures imbriquées
+  (chargeByProfile, risks, custom, payload) ; `id` verrouillé (= PK).
+  Repli « JSON brut » repliable qui GAGNE quand sa case est cochée (ajout/
+  retrait de clés).
+- **Intégrité** : réassemblage à partir du document original — clés
+  inconnues préservées (boîte mini-JSON générique), types respectés
+  (décodage stdClass : `{}` reste un objet), valeur illisible ⇒ valeur
+  d'origine conservée ; ensemble de clés prouvé identique avant/après.
+- **Vérifié sans navigateur** (session curl + psql) : login, rendu des
+  34 boîtes carte + 7 boîtes évènement, édition mixte (texte/nombre
+  décimal/liste) persistée avec les bons types jsonb, repli brut (clé
+  ajoutée, boîtes ignorées), sous-JSON invalide ⇒ base conservée,
+  antidatage d'un `ts` d'évènement (garde OFF) et refus propre du trigger
+  (garde ON), `/api/board` replie toujours (784 évènements). Données démo
+  restaurées après test.
+- Outillage démo uniquement (profil compose `tools`) : aucun code produit,
+  aucune dépendance, rien de livré à la plateforme.
+
 ### À venir
 - **RP3** : auth JWT-en-cookie (login, rôles viewer/editor/admin, acteur =
   utilisateur authentifié à la place de « anonymous ») ; CLI de comptes ;

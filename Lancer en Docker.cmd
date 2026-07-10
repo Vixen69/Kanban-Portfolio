@@ -53,6 +53,7 @@ start "" http://localhost:8080
 echo.
 echo   Tableau     : http://localhost:8080
 echo   Editeur BD  : http://localhost:8081   ^(Systeme PostgreSQL, Serveur db, kanban / thuglife, base kanban^)
+echo                 edition par champs des cartes et evenements ^(repli JSON brut dans la fiche^)
 echo.
 echo Conteneurs lances. Pour arreter : double-cliquer "Arreter Docker.cmd".
 pause

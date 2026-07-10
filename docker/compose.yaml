@@ -66,13 +66,17 @@ services:
   # Web DB editor for DEMO/DEV only (profil `tools`, jamais en production).
   #   docker compose --profile app --profile tools up
   #   -> http://localhost:8081  (Système PostgreSQL · Serveur db · kanban / thuglife · base kanban)
+  # Le plugin card-boxes éclate la colonne jsonb `data` (cards, card_events)
+  # en boîtes typées par champ — repli JSON brut inclus (docker/adminer/).
   adminer:
     profiles: ["tools"]
-    image: adminer:4
+    image: adminer:4.17.1
     environment:
       ADMINER_DEFAULT_SERVER: db
     ports:
       - "8081:8080"
+    volumes:
+      - ./adminer/card-boxes.php:/var/www/html/plugins-enabled/card-boxes.php:ro
     depends_on:
       - db
 
