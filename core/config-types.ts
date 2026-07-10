@@ -13,6 +13,12 @@ export interface Lane {
   name: string;
   /** Subtitle under the lane name (e.g. "Compliqué"). Display as-is. */
   nature: string;
+  /**
+   * The nature this canal confers to its cards (design v11: nature is
+   * positional — a card's nature IS its canal; requalifying a subject means
+   * moving it to another canal, never editing a tag).
+   */
+  natureKey: NatureKey;
   /** One-line description of the canal's governance (tooltips/admin). */
   detail: string;
 }

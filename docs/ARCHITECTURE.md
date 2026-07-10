@@ -395,6 +395,81 @@ de son ADR.
 - **Vérifié** : 263 tests verts (+13 Postgres skip sans base), typecheck ×3,
   conventions ; build + run Docker de la pile Postgres complète.
 
+### 2026-07-09 — Adoption du design v11 (archivage, blocage gouverné, nature positionnelle, réordonnancement)
+- **Analyse préalable** : delta v10→v11 du dossier `design/` cartographié par
+  revue multi-agents (7 fichiers, ~25 changements produits), chaque écart
+  classé implémenté / partiel / manquant contre le code réel. Quatre
+  décisions d'auteur actées : réordonnancement adopté (event-sourcé),
+  archivage par évènements, **la nature EST le canal** (pas une étiquette),
+  ancres des Délais résolues depuis la config.
+- **Archivage** (ADR 017) : évènements `archived`/`unarchived` (append-only,
+  validés par le middle) ; le repli garde la carte (`archived: true`), le
+  front l'exclut du plateau et de tous les compteurs ; vue « Archives »
+  (recherche, désarchiver, ouvrir la fiche) + badge compteur en en-tête ;
+  Escape déroule fiche → ajout → archives → panneau → focus → canaux.
+- **Blocage gouverné** (design v11) : section BLOCAGE dédiée sous Risques —
+  motif **obligatoire** (bouton désactivé sans texte), bannière + « Lever » ;
+  la case « Bloqué » du formulaire d'édition disparaît (c'était le dernier
+  chemin qui bloquait avec un motif par défaut). Alertes auto et liste
+  d'alertes libres retirées de la fiche (« Risques & alertes » → « Risques » ;
+  le champ `alerts` reste au modèle pour le replay, fixtures à vide).
+- **Historique & Délais** : deux sections repliables (fermées par défaut).
+  Historique raconte aussi les blocages/déblocages (points rouge/vert, motif)
+  — projection des évènements réels. Délais : âges par étape + lead/cycle
+  time par carte (`core/flow.ts`), ancres résolues depuis la config runtime
+  (ids NMO puis repli structurel : gates, positions) — jamais codées en dur.
+- **Nature positionnelle** (ADR 018) : `lanes[].natureKey` en config (défaut
+  `complicated`, éditable au panneau admin) ; nature retirée de `CardPatch`
+  et du whitelist d'édition (un patch historique est ignoré au replay) ;
+  dérivée du canal à la création (serveur) et à l'affichage — déplacer une
+  carte vers un autre canal la requalifie immédiatement. Sélecteur Nature
+  retiré des formulaires ; filtre Nature retiré de la sidebar, remplacé par
+  « Bloqués uniquement » (dans le FilterState core).
+- **Interactions plateau** : un seul clic ouvre la fiche (fin du clic en deux
+  temps) ; cellules repliées cliquables avec **popover tickets** (ouverture
+  en un clic) ; la dernière ligne dépliée refuse de se replier (garde
+  config-aware) ; indice de défilement par `ResizeObserver` ; lavis rouge des
+  cellules au-delà du WIP ; étiquette de canal replié en pastille
+  horizontale.
+- **Réordonnancement manuel** (ADR 019) : dépôt d'une carte SUR une autre —
+  `payload.beforeId` sur l'évènement `moved`, ordre rejoué au repli ;
+  même-cellule accepté **uniquement** comme réordonnancement, sans remise à
+  zéro de l'horloge d'âge, non narré dans l'historique, ignoré des métriques
+  d'étape. Indicateur d'insertion bleu pendant le survol.
+- **Découpes 300 lignes** : `middle/validation.ts` (validateurs de patch),
+  `core/config-derive.ts` (laneNature + reconcileCardRefs), `core/flow.ts`,
+  `core/state.order.test.ts` et `middle/api.moved.test.ts` créés.
+- **Vérifié** : 282 tests verts (+19), typecheck ×3, conventions ; chaque lot
+  vérifié en direct dans l'app (blocage bout-en-bout, archive/désarchive,
+  requalification par changement de canal, réordonnancement persistant avec
+  âge conservé, popover, garde du dernier canal) contre la pile Docker
+  Postgres (middle reconstruit). CLAUDE.md §4/§5 réalignés (encart v11).
+- **Revue adversariale post-implémentation** (5 dimensions, trouvailles
+  contre-vérifiées) — correctifs appliqués : (1) le repli classe désormais
+  les réordonnancements par l'ÉVÈNEMENT enregistré (`isReorder`), le même
+  prédicat que l'historique/Délais/métriques — plus de divergence possible
+  entre plateau et projections sur un journal issu d'une course ; (2) les
+  écritures du middle (évènements + créations) sont **sérialisées** en
+  processus (`serializedWrite`) — la fenêtre valider-puis-écrire ne laisse
+  plus deux intentions concurrentes se valider contre le même repli périmé
+  (sain pour le modèle mono-instance ; un middle multi-instances exigerait
+  un verrou côté base) ; (3) gardes ajoutées : déplacer une carte archivée
+  → 400, re-bloquer une carte bloquée → 400 (l'horloge andon ne repart plus
+  en silence), `beforeId` vers une carte archivée → 400, patch d'édition
+  vide → 400, textes libres d'édition **bornés** (titre 200, owner 120,
+  notes 5000, etc. — le journal est permanent) ; (4) suppression : l'ordre
+  du repli oublie la carte (plus de cible fantôme pour `beforeId`) ; (5)
+  front : fiche archivée → « Désarchiver » (fin du 400 assuré), tag Nature
+  retiré de la fiche (v11), Échap contenu dans le motif de blocage et les
+  éditions en ligne (n'emporte plus la fiche), glyphes de criticité de la
+  sidebar alignés (★ Major / ♛ Top), formulaire d'édition complété (Date
+  RDR, Enveloppe RDLI, Budget engagé), surbrillance de glisser rafraîchie
+  au survol des cartes. **286 tests verts** (+4 tests de régression).
+  Écarts hérités du design, non corrigés (assumés) : popover de cellule
+  repliée fermé au survol du popover seulement ; brouillon de commentaire
+  vidé avant confirmation serveur ; bord admin « références périmées »
+  (dépôt-sur-carte remappée → 400 propre).
+
 ### À venir
 - **RP3** : auth JWT-en-cookie (login, rôles viewer/editor/admin, acteur =
   utilisateur authentifié à la place de « anonymous ») ; CLI de comptes ;

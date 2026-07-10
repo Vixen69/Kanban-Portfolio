@@ -85,8 +85,13 @@ function ColumnRows({ columns, onChange }: { columns: Column[]; onChange: (colum
   );
 }
 
-// Lane rows: reorder, rename, nature subtitle, delete (min 1 kept).
-function LaneRows({ lanes, onChange }: { lanes: Lane[]; onChange: (lanes: Lane[]) => void }) {
+// Lane rows: reorder, rename, nature subtitle + natureKey (the nature the
+// canal confers to its cards, ADR 018), delete (min 1 kept).
+function LaneRows({ lanes, natures, onChange }: {
+  lanes: Lane[];
+  natures: BoardConfig["natures"];
+  onChange: (lanes: Lane[]) => void;
+}) {
   const upd = (i: number, part: Partial<Lane>) => onChange(lanes.map((l, idx) => (idx === i ? { ...l, ...part } : l)));
   return (
     <>
@@ -98,10 +103,14 @@ function LaneRows({ lanes, onChange }: { lanes: Lane[]; onChange: (lanes: Lane[]
           </span>
           <input className="ainp grow" value={l.name} onChange={(e) => upd(i, { name: e.target.value })} />
           <input className="ainp nature-inp" title="Sous-titre (nature)" value={l.nature} onChange={(e) => upd(i, { nature: e.target.value })} />
+          <select className="ainp" title="Nature conférée par le canal" value={l.natureKey}
+            onChange={(e) => upd(i, { natureKey: e.target.value as NatureKey })}>
+            {NATURE_KEYS.map((key) => <option key={key} value={key}>{natures[key].label}</option>)}
+          </select>
           <button className="abtn del" disabled={lanes.length <= 1} title="Supprimer (les sujets seront déplacés)" onClick={() => onChange(lanes.filter((_, idx) => idx !== i))}>✕</button>
         </div>
       ))}
-      <button className="a-add" onClick={() => onChange([...lanes, { id: slugId("canal"), name: "Nouveau canal", nature: "", detail: "" }])}>+ Ajouter un canal</button>
+      <button className="a-add" onClick={() => onChange([...lanes, { id: slugId("canal"), name: "Nouveau canal", nature: "", natureKey: "complicated", detail: "" }])}>+ Ajouter un canal</button>
     </>
   );
 }
@@ -119,7 +128,7 @@ export function StructureTab({ draft, patch }: TabProps) {
       <div className="asection-label">Colonnes (flux, de gauche à droite)</div>
       <ColumnRows columns={draft.columns} onChange={(columns) => patch({ columns })} />
       <div className="asection-label">Canaux (couloirs, de haut en bas)</div>
-      <LaneRows lanes={draft.lanes} onChange={(lanes) => patch({ lanes })} />
+      <LaneRows lanes={draft.lanes} natures={draft.natures} onChange={(lanes) => patch({ lanes })} />
     </div>
   );
 }

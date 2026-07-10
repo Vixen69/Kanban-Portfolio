@@ -20,6 +20,7 @@ function state(overrides: Parameters<typeof testCard>[0] = {}, daysHere = 1): Ca
     ...testCard(overrides),
     enteredColumnAt: new Date(NOW.getTime() - daysHere * 86_400_000).toISOString(),
     comments: [],
+    archived: false,
   };
 }
 
@@ -53,12 +54,12 @@ const PORTFOLIO: CardState[] = [
   ),
 ];
 
-test("default filters are neutral: every key true, nothing dimmed, not active", () => {
+test("default filters are neutral: every key true, blockedOnly off, nothing dimmed", () => {
   const filters = defaultFilters(CONFIG);
   assert.deepEqual(filters.type, { t1: true, t2: true });
   assert.deepEqual(filters.domain, { alpha: true, beta: true });
-  assert.deepEqual(filters.nature, { simple: true, complicated: true, complex: true });
   assert.deepEqual(filters.crit, { top: true, major: true, normal: true });
+  assert.equal(filters.blockedOnly, false);
   assert.equal(isFilterActive(filters), false);
   assert.equal(dimmedCardIds(PORTFOLIO, filters).size, 0);
 });
@@ -79,8 +80,7 @@ test("each filter dimension dims the right cards (table)", () => {
     { name: "type off (null typeId passes)", mutate: (f) => (f.type["t1"] = false), dimmed: ["S001", "S004"] },
     { name: "crit top off", mutate: (f) => (f.crit.top = false), dimmed: ["S001"] },
     { name: "crit normal off", mutate: (f) => (f.crit.normal = false), dimmed: ["S002", "S004"] },
-    { name: "nature simple off", mutate: (f) => (f.nature.simple = false), dimmed: ["S001", "S004"] },
-    { name: "nature complex off", mutate: (f) => (f.nature.complex = false), dimmed: ["S003"] },
+    { name: "bloqués uniquement dims every unblocked card", mutate: (f) => (f.blockedOnly = true), dimmed: ["S001", "S002", "S004"] },
   ];
   for (const c of cases) {
     const filters = defaultFilters(CONFIG);
@@ -101,7 +101,6 @@ test("a key missing from a group map counts as enabled", () => {
   const filters = defaultFilters(CONFIG);
   delete filters.domain["alpha"];
   delete (filters.crit as Record<string, boolean>)["top"];
-  delete (filters.nature as Record<string, boolean>)["simple"];
   assert.equal(cardMatches(PORTFOLIO[0] as CardState, filters), true);
 });
 
@@ -117,9 +116,6 @@ test("viewCounts tallies only non-dimmed cards against the portfolio total", () 
     top: 1,
     major: 1,
     normal: 0,
-    simple: 1,
-    complicated: 0,
-    complex: 1,
   });
 });
 
@@ -132,9 +128,6 @@ test("portfolioCounts ignores filters: shown equals total", () => {
     top: 1,
     major: 1,
     normal: 2,
-    simple: 2,
-    complicated: 1,
-    complex: 1,
   });
 });
 

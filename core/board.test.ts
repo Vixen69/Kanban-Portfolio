@@ -13,6 +13,7 @@ function state(overrides: Parameters<typeof testCard>[0] = {}, daysHere = 1): Ca
     ...testCard(overrides),
     enteredColumnAt: new Date(NOW.getTime() - daysHere * 86_400_000).toISOString(),
     comments: [],
+    archived: false,
   };
 }
 

@@ -4,6 +4,7 @@
 
 import type { Card, CardEvent, CardState, Financials } from "./types.ts";
 import type { Subject } from "./ports.ts";
+import { isReorder } from "./events.ts";
 
 // Validators of the fields an "edited" event may patch (CardPatch, v2).
 // Anything else in the payload is silently ignored — replays must never
@@ -51,7 +52,8 @@ const EDITABLE: Record<string, (value: unknown) => boolean> = {
   criticality: (value) => value === "top" || value === "major" || value === "normal",
   typeId: isStringOrNull,
   codename: isStringOrNull,
-  nature: (value) => value === "simple" || value === "complicated" || value === "complex",
+  // nature is deliberately absent (design v11): positional, carried by the
+  // canal — a historic "edited" patch touching it is silently ignored.
   tags: isStringArray,
   effortEstimated: isNumberOrNull,
   effortConsumed: isNumberOrNull,
@@ -94,8 +96,14 @@ export function toCard(subject: Subject, financials: Financials | null): Card {
 
 // Applies a position-setting event (created / imported / moved): column from
 // toColumn (when present), lane from payload.laneId (unchanged when absent),
-// aging clock reset to the event timestamp.
+// aging clock reset to the event timestamp — EXCEPT a recorded reorder
+// (ADR 019): rank change, not a stage change, so position and clock are
+// left alone entirely. Classifying by the RECORDED transition (isReorder,
+// same predicate as history/Délais/metrics) keeps every projection
+// consistent even when a raced log holds a reorder whose replayed state
+// diverged from its record.
 function applyPosition(state: CardState, event: CardEvent): void {
+  if (isReorder(event)) return;
   if (event.toColumn !== null) state.columnId = event.toColumn;
   const laneId = event.payload["laneId"];
   if (typeof laneId === "string") state.laneId = laneId;
@@ -168,6 +176,12 @@ function applyEvent(state: CardState, event: CardEvent): void {
     case "commented":
       applyCommented(state, event);
       break;
+    case "archived":
+      state.archived = true;
+      break;
+    case "unarchived":
+      state.archived = false;
+      break;
     // "deleted" is handled by foldEvents itself: it removes the whole card.
   }
 }
@@ -179,23 +193,40 @@ function eventSequence(id: string): number {
   return Number.isNaN(sequence) ? 0 : sequence;
 }
 
+// Manual ordering (ADR 019): a "moved" event may carry payload.beforeId —
+// the card is re-inserted just before that card in the global fold order
+// (cells read the order through cellCards). Unknown or self target: the
+// order is unchanged.
+function applyReorder(order: string[], event: CardEvent): void {
+  const beforeId = event.payload["beforeId"];
+  if (typeof beforeId !== "string" || beforeId === event.cardId) return;
+  const from = order.indexOf(event.cardId);
+  if (from === -1) return;
+  order.splice(from, 1);
+  const to = order.indexOf(beforeId);
+  order.splice(to === -1 ? from : to, 0, event.cardId);
+}
+
 /**
  * Folds the event log over the imported cards to get the current board.
  * Inputs: the cards as imported, the full event list (any order — sorted
  * here by timestamp, then numeric insertion sequence for same-instant
  * events).
- * Output: one CardState per surviving card, in the input card order, with
- * comments accumulated in chronological order. A card with a "deleted"
- * event is excluded from the output entirely (the log remains) and its
- * later events are ignored, like events for unknown card ids (a sync may
- * reference retired cards).
+ * Output: one CardState per surviving card, in the input card order —
+ * repositioned by "moved" events carrying a beforeId (manual ordering,
+ * ADR 019) — with comments accumulated in chronological order. A card with
+ * a "deleted" event is excluded from the output entirely (the log remains)
+ * and its later events are ignored, like events for unknown card ids (a
+ * sync may reference retired cards). An archived card STAYS in the output
+ * with archived=true — the archive view lists it; the board excludes it.
  * Failure: none — folding is total.
  */
 export function foldEvents(cards: Card[], events: CardEvent[]): CardState[] {
   const byId = new Map<string, CardState>();
   for (const card of cards) {
-    byId.set(card.id, { ...card, enteredColumnAt: card.createdAt, comments: [] });
+    byId.set(card.id, { ...card, enteredColumnAt: card.createdAt, comments: [], archived: false });
   }
+  const order = cards.map((card) => card.id);
   const ordered = events
     .slice()
     .sort((a, b) =>
@@ -203,11 +234,19 @@ export function foldEvents(cards: Card[], events: CardEvent[]): CardState[] {
     );
   for (const event of ordered) {
     if (event.type === "deleted") {
+      // Keep order and byId in lockstep: a later beforeId naming this card
+      // must fall into applyReorder's unknown-target no-op, not a ghost slot.
       byId.delete(event.cardId);
+      const at = order.indexOf(event.cardId);
+      if (at !== -1) order.splice(at, 1);
       continue;
     }
     const state = byId.get(event.cardId);
-    if (state) applyEvent(state, event);
+    if (!state) continue;
+    applyEvent(state, event);
+    if (event.type === "moved") applyReorder(order, event);
   }
-  return [...byId.values()];
+  return order
+    .map((id) => byId.get(id))
+    .filter((state): state is CardState => state !== undefined);
 }

@@ -44,8 +44,8 @@ function testVocabularies(): Vocabularies {
 export function testConfig(): BoardConfig {
   return {
     lanes: [
-      { id: "laneA", name: "Lane A", nature: "Clair", detail: "Canal simple" },
-      { id: "laneB", name: "Lane B", nature: "Complexe", detail: "Canal complexe" },
+      { id: "laneA", name: "Lane A", nature: "Clair", natureKey: "simple", detail: "Canal simple" },
+      { id: "laneB", name: "Lane B", nature: "Complexe", natureKey: "complex", detail: "Canal complexe" },
     ],
     columns: [
       { id: "col1", name: "Colonne 1", wip: null, gate: null, note: "Entrée" },

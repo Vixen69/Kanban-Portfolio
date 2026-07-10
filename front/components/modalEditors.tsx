@@ -43,7 +43,8 @@ export function InlineEdit<T = string>({
         onClick={(event) => event.stopPropagation()} onChange={(event) => setDraft(event.target.value)} onBlur={commit}
         onKeyDown={(event) => {
           if (event.key === "Enter") event.currentTarget.blur();
-          else if (event.key === "Escape") setEditing(false);
+          // Contained: cancels this edit only, never the whole modal.
+          else if (event.key === "Escape") { event.stopPropagation(); setEditing(false); }
         }}
       />
     );
@@ -88,8 +89,10 @@ function EditorFoot({ summary, onSave, onCancel }: { summary: ReactNode; onSave:
 }
 
 /**
- * Plan de charge editor: check profiles and set j.h per checked profile;
- * `done` is derived from the card's overall consumed/estimated ratio.
+ * Plan de charge editor: check profiles and set j.h per checked profile.
+ * An existing profile keeps its user-maintained `done` (clamped to the new
+ * jh — design v11 edits it inline in read mode); only a newly added profile
+ * derives `done` from the card's overall consumed/estimated ratio.
  * Inputs: the config (profile typology), the card's charge rows, est/cons
  * effort totals, save/cancel callbacks. Output: the editor DOM.
  */
@@ -112,7 +115,8 @@ export function ChargeEditor({ config, charge, est, cons, onSave, onCancel }: {
   const total = config.profiles.filter((p) => p.id in rows).reduce((sum, p) => sum + (parseInt(rows[p.id] as string, 10) || 0), 0);
   const save = () => onSave(config.profiles.filter((p) => p.id in rows).map((p) => {
     const jh = Math.max(0, parseInt(rows[p.id] as string, 10) || 0);
-    const done = est ? Math.round((jh * cons) / est) : 0;
+    const existing = charge.find((entry) => entry.profileId === p.id);
+    const done = existing ? existing.done : est ? Math.round((jh * cons) / est) : 0;
     return { profileId: p.id, jh, done: Math.min(jh, done) };
   }));
   return (

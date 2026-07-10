@@ -14,10 +14,12 @@ import {
 /** Filter state + the actions the sidebar binds to its controls. */
 export interface Filters {
   state: FilterState;
-  /** True when a search or any toggled-off pill narrows the board. */
+  /** True when a search, blockedOnly or a toggled-off pill narrows the board. */
   active: boolean;
   setSearch(search: string): void;
-  /** Toggles one pill of a group (type / nature / crit / domain). */
+  /** Flips the « Bloqués uniquement » toggle (design v11). */
+  toggleBlockedOnly(): void;
+  /** Toggles one pill of a group (type / crit / domain). */
   toggle(group: FilterGroup, key: string): void;
   /** Sets every pill of a group at once (the tout / rien quick actions). */
   setGroup(group: FilterGroup, value: boolean): void;
@@ -26,8 +28,8 @@ export interface Filters {
 }
 
 // The group maps, read and written under their common shape. The cast is
-// sound: NatureKey/Criticality keys are strings, and cardMatches treats a
-// missing key as enabled (the design's `!== false` convention).
+// sound: Criticality keys are strings, and cardMatches treats a missing
+// key as enabled (the design's `!== false` convention).
 function groupOf(state: FilterState, group: FilterGroup): Record<string, boolean> {
   return state[group] as Record<string, boolean>;
 }
@@ -59,6 +61,9 @@ export function useFilters(config: BoardConfig): Filters {
   const setSearch = useCallback((search: string) => {
     setState((current) => ({ ...current, search }));
   }, []);
+  const toggleBlockedOnly = useCallback(() => {
+    setState((current) => ({ ...current, blockedOnly: !current.blockedOnly }));
+  }, []);
   const toggle = useCallback((group: FilterGroup, key: string) => {
     setState((current) => {
       const pills = groupOf(current, group);
@@ -74,5 +79,5 @@ export function useFilters(config: BoardConfig): Filters {
   const reset = useCallback(() => setState(defaultFilters(config)), [config]);
 
   const active = useMemo(() => isFilterActive(state), [state]);
-  return { state, active, setSearch, toggle, setGroup, reset };
+  return { state, active, setSearch, toggleBlockedOnly, toggle, setGroup, reset };
 }

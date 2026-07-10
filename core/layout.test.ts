@@ -20,6 +20,7 @@ function fill(laneId: string, columnId: string, count: number): CardState[] {
     ...testCard({ id: `${laneId}-${columnId}-${i}`, laneId, columnId }),
     enteredColumnAt: "2026-06-01T00:00:00.000Z",
     comments: [],
+    archived: false,
   }));
 }
 
@@ -92,6 +93,7 @@ function boardShapedConfig(): BoardConfig {
     id: `lane${i}`,
     name: `Lane ${i}`,
     nature: "",
+    natureKey: "complicated" as const,
     detail: "",
   }));
   config.columns = Array.from({ length: 8 }, (_, i) => ({

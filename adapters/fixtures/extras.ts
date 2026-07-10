@@ -6,7 +6,7 @@
 import type { BoardConfig, ChargeEntry, Financials, Risk } from "../../core/types.ts";
 import type { Subject } from "../../core/ports.ts";
 import type { SeededRandom } from "./random.ts";
-import { ALERT_NOTES, CONTENTION_NOTES, RISK_DESC } from "../../fixtures/dataset.ts";
+import { CONTENTION_NOTES, RISK_DESC } from "../../fixtures/dataset.ts";
 import { RDR_HORIZON } from "./distributions.ts";
 
 const DAY_MS = 86_400_000;
@@ -57,5 +57,7 @@ export function seedExtras(
   s.dateRdr = new Date(nowMs + rng.int(hl, hh) * DAY_MS).toISOString();
   s.risks = rollRisks(rng, config.riskTypes.map((r) => r.id));
   s.projectConstraints = rng.shuffle(config.projectConstraints.map((c) => c.id)).slice(0, rng.int(0, 2));
-  s.alerts = rng.next() < 0.4 ? rng.shuffle(ALERT_NOTES).slice(0, rng.int(1, 2)) : [];
+  // Alerts are the source of blockage (design v11): empty by default, only
+  // blocked subjects carry one — the field stays on the card for replay.
+  s.alerts = [];
 }

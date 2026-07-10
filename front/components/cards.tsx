@@ -19,10 +19,16 @@ export interface CardItemProps {
   config: BoardConfig;
   /** Show the code projet on the card (sidebar toggle). */
   showCodes: boolean;
-  /** Two-stage click: the App focuses the column first, then opens the detail. */
+  /** One click opens the card detail (design v11). */
   onOpen: (card: CardState) => void;
   onDragStart: (e: DragEvent, card: CardState) => void;
   onDragEnd: () => void;
+  /** A dragged card hovers this one (drop-before indicator, ADR 019). */
+  onCardOver: (e: DragEvent, card: CardState) => void;
+  /** A dragged card was dropped on this one (insert before it, ADR 019). */
+  onCardDrop: (e: DragEvent, card: CardState) => void;
+  /** True while this card is the insertion target of the current drag. */
+  dropTarget: boolean;
 }
 
 // Blocked cards override the domain accent with the validated red wash +
@@ -68,11 +74,13 @@ export function MiniCard(props: CardItemProps) {
   const domain = domainById(config)[card.domain];
   return (
     <div
-      className={"mini" + (props.dimmed ? " dimmed" : "")}
+      className={"mini" + (props.dimmed ? " dimmed" : "") + (props.dropTarget ? " drop-before" : "")}
       draggable
       onClick={() => props.onOpen(card)}
       onDragStart={(e) => props.onDragStart(e, card)}
       onDragEnd={props.onDragEnd}
+      onDragOver={(e) => props.onCardOver(e, card)}
+      onDrop={(e) => props.onCardDrop(e, card)}
       style={{ height: "var(--card-h)", ...acc.root }}
       title={`${card.title}  ·  ${type !== null ? type.name : ""}  ·  ${domain !== undefined ? domain.name : ""}  ·  ${card.owner}  ·  ${days}j`}
     >
@@ -101,11 +109,13 @@ export function FocusCard(props: CardItemProps) {
   const acc = cardAccent(card, config);
   return (
     <div
-      className={"focus-card" + (props.dimmed ? " dimmed" : "")}
+      className={"focus-card" + (props.dimmed ? " dimmed" : "") + (props.dropTarget ? " drop-before" : "")}
       draggable
       onClick={() => props.onOpen(card)}
       onDragStart={(e) => props.onDragStart(e, card)}
       onDragEnd={props.onDragEnd}
+      onDragOver={(e) => props.onCardOver(e, card)}
+      onDrop={(e) => props.onCardDrop(e, card)}
       style={acc.root}
     >
       <span className="focus-accent" style={acc.accent} />

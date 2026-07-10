@@ -53,12 +53,40 @@ export function RdrStrip({ card, now, onPatch }: { card: CardState; now: number;
   );
 }
 
-/** Plan de charge · j.h par profil (bars per profile, editable). */
+// One plan-de-charge row: profile bar + « consommé / estimé » where the
+// consumed is click-to-edit inline (design v11), clamped to [0, jh].
+function ProfRow({ p, max, onCommitDone }: { p: ReturnType<typeof profileRows>["rows"][number]; max: number; onCommitDone: (v: number) => void }) {
+  return (
+    <div className="prof-row">
+      <span className="prof-name"><i className="prof-dot" style={{ background: p.color }} />{p.name}</span>
+      <div className="prof-track" title={`${p.done} consommés · ${p.raf} restants`}>
+        <span className="prof-done" style={{ width: `${(p.jh / max) * 100}%`, background: `color-mix(in oklab, ${p.color} 22%, #fff)`, borderColor: `color-mix(in oklab, ${p.color} 35%, transparent)` }} />
+        <span className="prof-fill" style={{ width: `${(p.done / max) * 100}%`, background: p.color }} />
+      </div>
+      <span className="prof-jh" title="Consommé / estimé — cliquer le consommé pour modifier">
+        <InlineEdit<number>
+          value={p.done} type="number" className="prof-done-num" display={String(p.done)}
+          fromInput={(v) => { const n = v === "" ? 0 : Number(v); return Number.isFinite(n) ? Math.round(n) : 0; }}
+          onCommit={onCommitDone}
+        />
+        <span className="prof-slash">/</span><b>{p.jh}</b> j.h
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Plan de charge · j.h par profil (bars per profile, editable). The
+ * subtitle sums the per-profile done values (design v11), not the
+ * card-level effortConsumed.
+ */
 export function PlanDeCharge({ card, config, onPatch }: { card: CardState; config: BoardConfig; onPatch: (patch: CardPatch) => void }) {
   const [edit, setEdit] = useState(false);
-  const { rows, max, total } = profileRows(card, config);
+  const { rows, max, total, done } = profileRows(card, config);
   const est = card.effortEstimated ?? 0;
   const cons = card.effortConsumed ?? 0;
+  const commitDone = (profileId: string, jh: number) => (v: number) =>
+    onPatch({ chargeByProfile: card.chargeByProfile.map((x) => (x.profileId === profileId ? { ...x, done: Math.max(0, Math.min(jh, v)) } : x)) });
   return (
     <div className="sec">
       <div className="sec-head">
@@ -72,18 +100,9 @@ export function PlanDeCharge({ card, config, onPatch }: { card: CardState; confi
         <div className="cm-empty" onClick={() => setEdit(true)}>Aucune charge répartie. Cliquer pour renseigner les profils.</div>
       ) : (
         <>
-          <div className="prof-sub">{total} j.h · {cons} consommés</div>
+          <div className="prof-sub">{total} j.h estimés · {done} consommés</div>
           <div className="prof-table">
-            {rows.map((p, i) => (
-              <div className="prof-row" key={i}>
-                <span className="prof-name"><i className="prof-dot" style={{ background: p.color }} />{p.name}</span>
-                <div className="prof-track" title={`${p.done} consommés · ${p.raf} restants`}>
-                  <span className="prof-done" style={{ width: `${(p.jh / max) * 100}%`, background: `color-mix(in oklab, ${p.color} 22%, #fff)`, borderColor: `color-mix(in oklab, ${p.color} 35%, transparent)` }} />
-                  <span className="prof-fill" style={{ width: `${(p.done / max) * 100}%`, background: p.color }} />
-                </div>
-                <span className="prof-jh"><b>{p.jh}</b> j.h</span>
-              </div>
-            ))}
+            {rows.map((p, i) => <ProfRow key={i} p={p} max={max} onCommitDone={commitDone(p.profileId, p.jh)} />)}
           </div>
           <div className="prof-legend"><span><i className="pl-sw filled" /> consommé</span><span><i className="pl-sw" /> charge totale estimée</span></div>
           {cons > est && <div className="cs-warn">Consommé global au-delà du meilleur estimé · reste à faire à réévaluer</div>}

@@ -36,7 +36,6 @@ const VALID_CARD_BODY = {
   domain: "beta",
   laneId: "laneB",
   typeId: "t2",
-  nature: "complex",
   criticality: "top",
   owner: "Mme Chef",
 };
@@ -80,6 +79,7 @@ test("postCard builds the whole card server-side and appends created", async () 
   assert.equal(card.id, "S002");
   assert.equal(card.title, "Nouveau sujet"); // trimmed
   assert.equal(card.columnId, "col1"); // first column of the runtime config
+  assert.equal(card.nature, "complex"); // derived from laneB's natureKey (ADR 018)
   assert.equal(card.source, "manual");
   assert.match(card.codename ?? "", /^PX\d{7}$/);
   assert.equal(card.blocked, false);
@@ -113,7 +113,6 @@ test("postCard rejects every invalid creation field in French", async () => {
     [{ ...VALID_CARD_BODY, domain: "ghost" }, /Domaine inconnu/],
     [{ ...VALID_CARD_BODY, laneId: "ghost" }, /Canal inconnu/],
     [{ ...VALID_CARD_BODY, typeId: "ghost" }, /Type de projet inconnu/],
-    [{ ...VALID_CARD_BODY, nature: "bizarre" }, /Nature invalide/],
     [{ ...VALID_CARD_BODY, criticality: "mega" }, /Criticité invalide/],
     [{ ...VALID_CARD_BODY, owner: 42 }, /Chef de projet invalide/],
     [{ ...VALID_CARD_BODY, owner: "x".repeat(121) }, /Chef de projet trop long/],
@@ -128,21 +127,8 @@ test("postCard rejects every invalid creation field in French", async () => {
   assert.equal((await storage.listEvents()).length, 0);
 });
 
-test("a valid move is stamped by the server with the current cell as origin", async () => {
-  const storage = stubStorage();
-  const result = await postEvent(storage, config, {
-    type: "moved",
-    cardId: "S001",
-    toLaneId: "laneB",
-    toColumnId: "col2",
-  });
-  assert.equal(result.status, 201);
-  const event = result.body as CardEvent;
-  assert.equal(event.id, "evt-1");
-  assert.equal(event.actor, SERVER_ACTOR);
-  assert.equal(event.fromColumn, "col1"); // server-derived from folded state
-  assert.equal(event.toColumn, "col2");
-});
+// The "moved" intent (origin stamping, ADR 019 reorders) is covered in
+// api.moved.test.ts — split to respect the 300-line file cap.
 
 test("the server ignores any client-supplied actor or timestamp", async () => {
   const storage = stubStorage();
@@ -174,10 +160,15 @@ test("blocked requires a reason, trims it, and caps it at 500 characters", async
   );
 });
 
-test("unblocked is only valid on a blocked card", async () => {
+test("unblocked is only valid on a blocked card, blocked only on an unblocked one", async () => {
   const storage = stubStorage();
   await assert.rejects(() => postEvent(storage, config, { type: "unblocked", cardId: "S001" }), /Carte non bloquée/);
   await postEvent(storage, config, { type: "blocked", cardId: "S001", reason: "Dépendance PLM." });
+  // Re-blocking would silently restart the andon clock and shadow the motif.
+  await assert.rejects(
+    () => postEvent(storage, config, { type: "blocked", cardId: "S001", reason: "Autre motif." }),
+    /Carte déjà bloquée/,
+  );
   const result = await postEvent(storage, config, { type: "unblocked", cardId: "S001" });
   assert.equal(result.status, 201);
 });
@@ -206,6 +197,18 @@ test("a deleted card disappears from the folded board and rejects intents", asyn
   );
 });
 
+test("archived / unarchived guard the current state (design v11 archives)", async () => {
+  const storage = stubStorage();
+  await assert.rejects(() => postEvent(storage, config, { type: "unarchived", cardId: "S001" }), /Carte non archivée/);
+  const result = await postEvent(storage, config, { type: "archived", cardId: "S001" });
+  assert.equal(result.status, 201);
+  assert.equal((result.body as CardEvent).type, "archived");
+  await assert.rejects(() => postEvent(storage, config, { type: "archived", cardId: "S001" }), /Carte déjà archivée/);
+  const restored = await postEvent(storage, config, { type: "unarchived", cardId: "S001" });
+  assert.equal(restored.status, 201);
+  assert.equal((restored.body as CardEvent).type, "unarchived");
+});
+
 test("an edited patch passes with valid v2 fields of every kind", async () => {
   const storage = stubStorage();
   const patch = {
@@ -217,7 +220,6 @@ test("an edited patch passes with valid v2 fields of every kind", async () => {
     custom: { risque: "élevé", chiffré: true, revue: null, score: 3 },
     domain: "beta",
     typeId: null,
-    nature: "simple",
     criticality: "major",
     loadPlan: "1,5 ETP",
     notes: "",
@@ -248,7 +250,7 @@ test("an edited patch is rejected field by field in French", async () => {
     [{ custom: { a: {} } }, /Valeur invalide pour le champ « custom »/],
     [{ domain: "ghost" }, /Valeur invalide pour le champ « domain »/],
     [{ typeId: "ghost" }, /Valeur invalide pour le champ « typeId »/],
-    [{ nature: "bizarre" }, /Valeur invalide pour le champ « nature »/],
+    [{ nature: "complex" }, /Champ d’édition non autorisé/],
     [{ criticality: "mega" }, /Valeur invalide pour le champ « criticality »/],
     [{ chargeByProfile: [{ profileId: "ghost", jh: 1, done: 0 }] }, /Valeur invalide pour le champ « chargeByProfile »/],
     [{ chargeByProfile: [{ profileId: "pA", jh: -1, done: 0 }] }, /Valeur invalide pour le champ « chargeByProfile »/],
@@ -256,6 +258,12 @@ test("an edited patch is rejected field by field in French", async () => {
     [{ contentionProfiles: ["ghost"] }, /Valeur invalide pour le champ « contentionProfiles »/],
     [{ projectConstraints: ["ghost"] }, /Valeur invalide pour le champ « projectConstraints »/],
     [{ dateRdr: 42 }, /Valeur invalide pour le champ « dateRdr »/],
+    // The log is permanent: free text is capped (mirrors the creation caps).
+    [{}, /Patch d’édition vide/],
+    [{ title: "x".repeat(201) }, /Valeur invalide pour le champ « title »/],
+    [{ owner: "x".repeat(121) }, /Valeur invalide pour le champ « owner »/],
+    [{ notes: "x".repeat(5001) }, /Valeur invalide pour le champ « notes »/],
+    [{ tags: ["x".repeat(201)] }, /Valeur invalide pour le champ « tags »/],
   ];
   const storage = stubStorage();
   for (const [patch, message] of cases) {

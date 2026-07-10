@@ -1,18 +1,20 @@
 // Card detail modal, read mode (design/modals.jsx CardDetail read branch).
 // A projection of the folded card + its event history; edits flow up as
 // patches (onPatch → editCard); block/unblock/comment/switch-to-edit are
-// their own intents. No local board mutation.
+// their own intents. No local board mutation. Blocking is governed by the
+// BLOCAGE section (design v11): mandatory reason, « Lever » to lift.
 
 import { useEffect, useState } from "react";
 import type { BoardConfig, CardPatch, CardState } from "../../core/types.ts";
 import { reconcileCardRefs } from "../../core/config.ts";
 import type { HistoryEntry } from "../../core/history.ts";
+import type { FlowAnchors, FlowTimes } from "../../core/flow.ts";
 import { TypeTag } from "./cardParts.tsx";
 import { CustomKV, Tag } from "./modalParts.tsx";
-import { CommentList, DocRow, HistoryList } from "./DetailSections.tsx";
+import { CommentList, DelaysSection, HistoryList } from "./DetailSections.tsx";
 import { ConstraintEditor, InlineEdit } from "./modalEditors.tsx";
 import { ContentionSection, OwnerStrip, PlanDeCharge, RdrStrip } from "./DetailPlan.tsx";
-import { BudgetGraph, RisksAlerts } from "./DetailRisk.tsx";
+import { BudgetGraph, RisksSection } from "./DetailRisk.tsx";
 
 /** Props of the card detail modal — all intents flow up to App. */
 export interface CardDetailProps {
@@ -20,8 +22,12 @@ export interface CardDetailProps {
   config: BoardConfig;
   /** Epoch milliseconds of the shared 1 s ticker. */
   now: number;
-  /** Movement history of this card, most recent first (core/history). */
+  /** History of this card (movements + blockages), most recent first. */
   history: HistoryEntry[];
+  /** Flow times of this card, projected from the event log (core/flow). */
+  flow: FlowTimes;
+  /** Stage anchors resolved from the config (labels of the Délais grid). */
+  anchors: FlowAnchors | null;
   onClose: () => void;
   /** Switches App to the edit form (CardEdit). */
   onEdit: () => void;
@@ -30,6 +36,10 @@ export interface CardDetailProps {
   onBlock: (reason: string) => void;
   onUnblock: () => void;
   onComment: (text: string) => void;
+  /** Archives the subject (event intent) and closes the modal. */
+  onArchive: () => void;
+  /** Restores an archived subject to the board (fiche opened from Archives). */
+  onUnarchive: () => void;
 }
 
 // Title and code projet, both inline-editable, plus the close button.
@@ -45,23 +55,22 @@ function TopBar({ card, onClose, onPatch }: { card: CardState; onClose: () => vo
   );
 }
 
-// Tag row: type (big), domain, canal, colonne, nature, criticality crown/star,
+// Tag row: type (big), domain, canal, colonne, criticality crown/star,
 // project-constraint tags and the + button opening the constraint editor.
-// Stale config references are remapped for display only (never an event).
+// No nature tag (design v11): the canal IS the nature. Stale config
+// references are remapped for display only (never an event).
 function TagRow({ card, config, onToggleConstraints }: { card: CardState; config: BoardConfig; onToggleConstraints: () => void }) {
   const refs = reconcileCardRefs(card, config);
   const domain = config.domains.find((entry) => entry.id === refs.domain)!;
   const lane = config.lanes.find((entry) => entry.id === refs.laneId)!;
   const column = config.columns.find((entry) => entry.id === refs.columnId)!;
   const type = refs.typeId === null ? null : (config.types.find((entry) => entry.id === refs.typeId) ?? null);
-  const nature = config.natures[card.nature];
   return (
     <div className="tag-row">
       <TypeTag type={type} big />
       <Tag color={domain.color}>{domain.name}</Tag>
       <Tag color="#94a3b8">{lane.name}</Tag>
       <Tag color="#94a3b8">{column.name}</Tag>
-      <Tag color={nature.fg}>{nature.label}</Tag>
       {card.criticality === "top" && <Tag color="#d4a017" solid>♛ TOP</Tag>}
       {card.criticality === "major" && <Tag color="#d4a017">★ MAJOR</Tag>}
       {card.projectConstraints.map((id) => {
@@ -73,40 +82,15 @@ function TagRow({ card, config, onToggleConstraints }: { card: CardState; config
   );
 }
 
-// Blocked banner with the reason and the "Lever" action.
-function BlockedAlert({ reason, onUnblock }: { reason: string | null; onUnblock: () => void }) {
-  return (
-    <div className="alert-box">
-      <span className="blk-pulse" /> <b>Bloqué</b> — {reason || "raison non précisée"}
-      <button className="lift-btn" onClick={onUnblock}>Lever</button>
-    </div>
-  );
-}
-
-// Actions row; the block button hides while blocked or while the form shows.
-function Actions({ blocked, blockForm, onOpenBlock, onClose, onEdit }: {
-  blocked: boolean;
-  blockForm: boolean;
-  onOpenBlock: () => void;
-  onClose: () => void;
-  onEdit: () => void;
-}) {
-  return (
-    <div className="modal-actions">
-      {!blocked && !blockForm && <button className="btn block-btn" onClick={onOpenBlock}>Signaler un blocage</button>}
-      <span style={{ flex: 1 }} />
-      <button className="btn ghost" onClick={onClose}>Fermer</button>
-      <button className="btn primary" onClick={onEdit}>Modifier</button>
-    </div>
-  );
-}
-
-// Inline form to describe and signal a blockage (textarea autofocus).
-function BlockForm({ onCancel, onSubmit }: { onCancel: () => void; onSubmit: (reason: string) => void }) {
+// Mandatory-reason form of the BLOCAGE section: the confirm button stays
+// disabled until a motif is typed (design v11 — no default reason). Escape
+// cancels the FORM only (contained — it must not bubble into the global
+// unwind and close the whole fiche while a motif is being typed).
+function BlockForm({ onCancel, onConfirm }: { onCancel: () => void; onConfirm: (reason: string) => void }) {
   const [text, setText] = useState("");
   return (
     <div className="block-form">
-      <span className="field-label">Décrire le blocage précisément</span>
+      <span className="field-label">Motif du blocage (obligatoire)</span>
       <textarea
         className="inp"
         rows={2}
@@ -114,18 +98,81 @@ function BlockForm({ onCancel, onSubmit }: { onCancel: () => void; onSubmit: (re
         placeholder="Ex. dépendance équipe Infra non livrée, attente arbitrage…"
         value={text}
         onChange={(event) => setText(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") { event.stopPropagation(); onCancel(); }
+        }}
       />
       <div className="modal-actions">
         <span style={{ flex: 1 }} />
         <button className="btn ghost" onClick={onCancel}>Annuler</button>
-        <button className="btn danger" onClick={() => onSubmit(text.trim() || "Blocage signalé")}>Signaler le blocage</button>
+        <button className="btn danger" disabled={!text.trim()} onClick={() => onConfirm(text.trim())}>Confirmer le blocage</button>
       </div>
     </div>
   );
 }
 
-// The stacked detail sections (owner → risks) plus any custom fields.
-function MidSections({ card, config, now, onPatch }: { card: CardState; config: BoardConfig; now: number; onPatch: (patch: CardPatch) => void }) {
+// BLOCAGE section, right under Risques — the single place blocking is
+// governed (design v11): banner + « Lever » when blocked, otherwise the
+// full-width « Signaler un blocage » button opening the mandatory form.
+function BlockSection({ blocked, reason, onBlock, onUnblock }: {
+  blocked: boolean;
+  reason: string | null;
+  onBlock: (reason: string) => void;
+  onUnblock: () => void;
+}) {
+  const [form, setForm] = useState(false);
+  if (blocked) {
+    return (
+      <div className="sec block-sec on">
+        <div className="blocked-banner">
+          <span className="blk-pulse" />
+          <span className="bb-text"><b>Bloqué</b> — {reason || "raison non précisée"}</span>
+          <button className="lift-btn" onClick={onUnblock}>Lever</button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="sec block-sec">
+      {form
+        ? <BlockForm onCancel={() => setForm(false)} onConfirm={(text) => { onBlock(text); setForm(false); }} />
+        : <button className="btn block-btn full" onClick={() => setForm(true)}>Signaler un blocage</button>}
+    </div>
+  );
+}
+
+// Footer actions of the read mode (design v11: Archiver on the left). An
+// archived fiche (opened from the Archives view) offers « Désarchiver »
+// instead — re-archiving would only earn a 400.
+function Actions({ archived, onArchive, onUnarchive, onClose, onEdit }: {
+  archived: boolean;
+  onArchive: () => void;
+  onUnarchive: () => void;
+  onClose: () => void;
+  onEdit: () => void;
+}) {
+  return (
+    <div className="modal-actions">
+      {archived
+        ? <button className="btn ghost sm" onClick={onUnarchive} title="Rendre ce sujet au tableau">Désarchiver</button>
+        : <button className="btn ghost sm" onClick={onArchive} title="Archiver ce sujet">Archiver</button>}
+      <span style={{ flex: 1 }} />
+      <button className="btn ghost" onClick={onClose}>Fermer</button>
+      <button className="btn primary" onClick={onEdit}>Modifier</button>
+    </div>
+  );
+}
+
+// The stacked detail sections in design-v11 order (budget before plan de
+// charge, BLOCAGE after Risques) plus any custom fields.
+function MidSections({ card, config, now, onPatch, onBlock, onUnblock }: {
+  card: CardState;
+  config: BoardConfig;
+  now: number;
+  onPatch: (patch: CardPatch) => void;
+  onBlock: (reason: string) => void;
+  onUnblock: () => void;
+}) {
   const hasCustom = config.fields.some((field) => {
     const value = card.custom[field.id];
     return value != null && value !== "" && value !== false;
@@ -134,10 +181,11 @@ function MidSections({ card, config, now, onPatch }: { card: CardState; config: 
     <>
       <OwnerStrip card={card} config={config} now={now} onPatch={onPatch} />
       <RdrStrip card={card} now={now} onPatch={onPatch} />
+      <BudgetGraph card={card} onPatch={onPatch} />
       <PlanDeCharge key={"pc" + card.id} card={card} config={config} onPatch={onPatch} />
       <ContentionSection key={"co" + card.id} card={card} config={config} onPatch={onPatch} />
-      <BudgetGraph card={card} onPatch={onPatch} />
-      <RisksAlerts key={"ra" + card.id} card={card} config={config} now={now} onPatch={onPatch} />
+      <RisksSection key={"ra" + card.id} card={card} config={config} onPatch={onPatch} />
+      <BlockSection key={"bk" + card.id} blocked={card.blocked} reason={card.blockedReason} onBlock={onBlock} onUnblock={onUnblock} />
       {hasCustom && (
         <div className="kv-grid">
           {config.fields.map((field) => <CustomKV key={field.id} field={field} value={card.custom[field.id]} />)}
@@ -169,12 +217,10 @@ function ConstraintPop({ card, config, onPatch, onClose }: { card: CardState; co
  */
 export function CardDetail(props: CardDetailProps) {
   const { card, config, onPatch } = props;
-  const [blockForm, setBlockForm] = useState(false);
   const [constraintEdit, setConstraintEdit] = useState(false);
-  useEffect(() => { setBlockForm(false); setConstraintEdit(false); }, [card.id]);
+  useEffect(() => { setConstraintEdit(false); }, [card.id]);
   const refs = reconcileCardRefs(card, config);
   const domain = config.domains.find((entry) => entry.id === refs.domain)!;
-  const column = config.columns.find((entry) => entry.id === refs.columnId)!;
   return (
     <div className="overlay" onClick={props.onClose}>
       <div className="modal" onClick={(event) => event.stopPropagation()}>
@@ -183,16 +229,14 @@ export function CardDetail(props: CardDetailProps) {
           <TopBar card={card} onClose={props.onClose} onPatch={onPatch} />
           <TagRow card={card} config={config} onToggleConstraints={() => setConstraintEdit((open) => !open)} />
           {constraintEdit && <ConstraintPop card={card} config={config} onPatch={onPatch} onClose={() => setConstraintEdit(false)} />}
-          {card.blocked && <BlockedAlert reason={card.blockedReason} onUnblock={props.onUnblock} />}
-          <MidSections card={card} config={config} now={props.now} onPatch={onPatch} />
-          <DocRow gate={column.gate} gateDef={column.gate === null ? null : config.gateDefs[column.gate]} />
+          <MidSections card={card} config={config} now={props.now} onPatch={onPatch}
+            onBlock={props.onBlock} onUnblock={props.onUnblock} />
           <CommentList key={card.id} comments={card.comments} onAdd={props.onComment} />
-          <HistoryList entries={props.history} />
+          <DelaysSection key={"dl" + card.id} flow={props.flow} anchors={props.anchors} />
+          <HistoryList key={"hi" + card.id} entries={props.history} />
           {card.sciformaId && <div className="scf">Réf. Sciforma : {card.sciformaId}</div>}
-          <Actions blocked={card.blocked} blockForm={blockForm} onOpenBlock={() => setBlockForm(true)} onClose={props.onClose} onEdit={props.onEdit} />
-          {blockForm && (
-            <BlockForm onCancel={() => setBlockForm(false)} onSubmit={(reason) => { props.onBlock(reason); setBlockForm(false); }} />
-          )}
+          <Actions archived={card.archived} onArchive={props.onArchive} onUnarchive={props.onUnarchive}
+            onClose={props.onClose} onEdit={props.onEdit} />
         </div>
       </div>
     </div>

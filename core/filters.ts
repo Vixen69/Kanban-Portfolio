@@ -1,13 +1,14 @@
-// Sidebar filters (design v9): search plus four pill groups — project
-// type, nature, criticality, domain. Filters DIM cards, they never remove
-// them: the spatial structure of the board is always the truth. Pure
-// logic, rendered by front/components/Sidebar.tsx.
+// Sidebar filters (design v11): search, the « Bloqués uniquement » toggle
+// and three pill groups — project type, criticality, domain. (The nature
+// group left in v11: nature is positional, carried by the canal.) Filters
+// DIM cards, they never remove them: the spatial structure of the board is
+// always the truth. Pure logic, rendered by front/components/Sidebar.tsx.
 
-import type { BoardConfig, Card, CardState, Criticality, NatureKey } from "./types.ts";
+import type { BoardConfig, Card, CardState, Criticality } from "./types.ts";
 import { isStale } from "./aging.ts";
 
-/** The togglable pill groups of FilterState (everything except search). */
-export type FilterGroup = "type" | "nature" | "crit" | "domain";
+/** The togglable pill groups of FilterState (search/blockedOnly excluded). */
+export type FilterGroup = "type" | "crit" | "domain";
 
 /**
  * The filter state driven by the sidebar. Group maps record key ->
@@ -17,16 +18,17 @@ export type FilterGroup = "type" | "nature" | "crit" | "domain";
 export interface FilterState {
   /** Matches title or codename, trimmed, case-insensitive. Empty = all. */
   search: string;
+  /** « Bloqués uniquement » — dims every card that is not blocked. */
+  blockedOnly: boolean;
   type: Record<string, boolean>;
-  nature: Record<NatureKey, boolean>;
   crit: Record<Criticality, boolean>;
   domain: Record<string, boolean>;
 }
 
 /**
  * The live read-out of the sidebar and header: how many cards are shown
- * (non-dimmed) and how the shown subset splits by state, criticality and
- * nature. `total` is always the whole portfolio.
+ * (non-dimmed) and how the shown subset splits by state and criticality.
+ * `total` is always the whole portfolio.
  */
 export interface ViewCounts {
   shown: number;
@@ -36,14 +38,11 @@ export interface ViewCounts {
   top: number;
   major: number;
   normal: number;
-  simple: number;
-  complicated: number;
-  complex: number;
 }
 
 /**
- * The neutral filter state: empty search, every key of every group true.
- * Input: the board config (type/domain id lists).
+ * The neutral filter state: empty search, blockedOnly off, every key of
+ * every group true. Input: the board config (type/domain id lists).
  * Output: a fresh FilterState (safe to mutate). Failure: none.
  */
 export function defaultFilters(config: BoardConfig): FilterState {
@@ -51,25 +50,26 @@ export function defaultFilters(config: BoardConfig): FilterState {
     Object.fromEntries(keys.map((key) => [key, true]));
   return {
     search: "",
+    blockedOnly: false,
     type: on(config.types.map((type) => type.id)),
-    nature: { simple: true, complicated: true, complex: true },
     crit: { top: true, major: true, normal: true },
     domain: on(config.domains.map((domain) => domain.id)),
   };
 }
 
 /**
- * True when the board is currently narrowed: a non-blank search or any
- * group key toggled off (drives the "Filtré : x/y" chip and the reset
- * buttons). Input: a FilterState. Output: boolean. Failure: none.
+ * True when the board is currently narrowed: a non-blank search, the
+ * blocked-only toggle, or any group key toggled off (drives the
+ * "Filtré : x/y" chip and the reset buttons).
+ * Input: a FilterState. Output: boolean. Failure: none.
  */
 export function isFilterActive(filters: FilterState): boolean {
   const groupOff = (group: Record<string, boolean>) =>
     Object.values(group).some((enabled) => enabled === false);
   return (
     filters.search.trim() !== "" ||
+    filters.blockedOnly ||
     groupOff(filters.type) ||
-    groupOff(filters.nature) ||
     groupOff(filters.crit) ||
     groupOff(filters.domain)
   );
@@ -77,9 +77,9 @@ export function isFilterActive(filters: FilterState): boolean {
 
 /**
  * Whether one card stays lit: the search matches its title OR codename
- * (trimmed, case-insensitive) AND every group passes. A group passes when
- * the card's key is missing from the map or mapped to true; a null typeId
- * always passes the type group.
+ * (trimmed, case-insensitive) AND it is blocked when blockedOnly is on AND
+ * every group passes. A group passes when the card's key is missing from
+ * the map or mapped to true; a null typeId always passes the type group.
  * Inputs: a Card (CardState included), the filters.
  * Output: true when the card passes everything. Failure: none.
  */
@@ -90,7 +90,7 @@ export function cardMatches(card: Card, filters: FilterState): boolean {
     card.title.toLowerCase().includes(query) ||
     (card.codename ?? "").toLowerCase().includes(query);
   if (!matchesSearch) return false;
-  if (filters.nature[card.nature] === false) return false;
+  if (filters.blockedOnly && !card.blocked) return false;
   if (filters.crit[card.criticality] === false) return false;
   if (filters.domain[card.domain] === false) return false;
   if (card.typeId !== null && filters.type[card.typeId] === false) return false;
@@ -112,18 +112,7 @@ export function dimmedCardIds(cards: CardState[], filters: FilterState): Set<str
 }
 
 function emptyCounts(total: number): ViewCounts {
-  return {
-    shown: 0,
-    total,
-    blocked: 0,
-    stale: 0,
-    top: 0,
-    major: 0,
-    normal: 0,
-    simple: 0,
-    complicated: 0,
-    complex: 0,
-  };
+  return { shown: 0, total, blocked: 0, stale: 0, top: 0, major: 0, normal: 0 };
 }
 
 function tally(counts: ViewCounts, card: CardState, config: BoardConfig, now: Date): void {
@@ -131,13 +120,12 @@ function tally(counts: ViewCounts, card: CardState, config: BoardConfig, now: Da
   if (card.blocked) counts.blocked++;
   if (isStale(card, config, now)) counts.stale++;
   counts[card.criticality]++;
-  counts[card.nature]++;
 }
 
 /**
  * Counts over the VISIBLE subset: only non-dimmed cards are tallied
- * (shown, blocked, stale, per-criticality, per-nature); total is the
- * whole portfolio size.
+ * (shown, blocked, stale, per-criticality); total is the whole portfolio
+ * size.
  * Inputs: all card states, the dimmed id set, the board config (stale
  * threshold), now. Output: a ViewCounts. Failure: none.
  */

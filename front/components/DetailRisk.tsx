@@ -1,11 +1,10 @@
 // Read-mode detail sections (design/modals.jsx): the budget cross-graph
-// (RDLI · estimé · engagé · réalisé, all inline-editable) and the risks &
-// alertes block (derived auto-alerts + retained risks + free alerts). Each
-// saves through onPatch (editCard).
+// (RDLI · estimé · engagé · réalisé, all inline-editable) and the Risques
+// section (retained risks, editable). Each saves through onPatch (editCard).
 
 import { useState } from "react";
 import type { BoardConfig, CardPatch, CardState } from "../../core/types.ts";
-import { autoAlerts, budgetModel } from "../detailModel.ts";
+import { budgetModel } from "../detailModel.ts";
 import { InlineEdit, RiskEditor } from "./modalEditors.tsx";
 
 /** Budget cross-graph: one bar per figure, the RDLI envelope as a ref line. */
@@ -37,35 +36,6 @@ export function BudgetGraph({ card, onPatch }: { card: CardState; onPatch: (patc
   );
 }
 
-// Free-text alerts list (add with +, edit inline, remove with ✕).
-function AlertsBlock({ card, onPatch }: { card: CardState; onPatch: (patch: CardPatch) => void }) {
-  const alerts = card.alerts;
-  return (
-    <div className="sub-block">
-      <div className="sub-head">
-        <span className="field-label">Alertes</span>
-        <button className="add-alert" title="Ajouter une alerte" onClick={() => onPatch({ alerts: [...alerts, ""] })}>+</button>
-      </div>
-      {alerts.length === 0 ? (
-        <div className="cm-empty" onClick={() => onPatch({ alerts: [""] })}>Aucune alerte. Cliquer ou « + » pour en ajouter.</div>
-      ) : (
-        <div className="alert-list">
-          {alerts.map((a, i) => (
-            <div className="alert-row" key={i}>
-              <span className="alert-bullet" />
-              <span className="alert-text">
-                <InlineEdit value={a} placeholder="Décrire l’alerte…"
-                  onCommit={(v) => { const next = alerts.slice(); next[i] = v; onPatch({ alerts: next }); }} />
-              </span>
-              <button className="alert-del" title="Supprimer" onClick={() => onPatch({ alerts: alerts.filter((_, j) => j !== i) })}>{"✕"}</button>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // The retained-risk rows: severity dot, type tag, inline-editable description.
 function RiskRows({ risks, config, onPatch }: { risks: CardState["risks"]; config: BoardConfig; onPatch: (patch: CardPatch) => void }) {
   return (
@@ -87,29 +57,20 @@ function RiskRows({ risks, config, onPatch }: { risks: CardState["risks"]; confi
   );
 }
 
-/** Risques & alertes: derived alerts, retained risks (editable), free alerts. */
-export function RisksAlerts({ card, config, now, onPatch }: {
+/** Risques: the retained risks (per bearing entity), editable checklist. */
+export function RisksSection({ card, config, onPatch }: {
   card: CardState;
   config: BoardConfig;
-  now: number;
   onPatch: (patch: CardPatch) => void;
 }) {
   const [riskEdit, setRiskEdit] = useState(false);
-  const alerts = autoAlerts(card, config, now);
   const risks = card.risks;
   return (
     <div className="sec">
       <div className="sec-head">
-        <span className="sec-title">Risques &amp; alertes</span>
+        <span className="sec-title">Risques</span>
         {!riskEdit && <button className="delay-toggle" onClick={() => setRiskEdit(true)}>Modifier les risques</button>}
       </div>
-      {alerts.map((a, i) => (
-        <div className="risk-item alert" key={"a" + i}>
-          <span className="risk-sev" style={{ background: config.riskSeverity[a.sev].color }} />
-          <span className="risk-text">{a.text}</span>
-          <span className="risk-kind">alerte</span>
-        </div>
-      ))}
       {riskEdit ? (
         <RiskEditor config={config} risks={risks} onSave={(rs) => { onPatch({ risks: rs }); setRiskEdit(false); }} onCancel={() => setRiskEdit(false)} />
       ) : risks.length === 0 ? (
@@ -117,7 +78,6 @@ export function RisksAlerts({ card, config, now, onPatch }: {
       ) : (
         <RiskRows risks={risks} config={config} onPatch={onPatch} />
       )}
-      <AlertsBlock card={card} onPatch={onPatch} />
     </div>
   );
 }

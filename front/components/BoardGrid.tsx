@@ -1,15 +1,18 @@
 // Board assembly (design grid.jsx): column headers (click to focus a
 // stage, caret to collapse it to a strip), vertical lane labels (click to
-// collapse a canal), collapsed summary cells, and the grid itself. The
-// grid templates come from core/layout — the single source of truth for
-// the focus/collapse geometry.
+// collapse a canal — the last expanded lane refuses), collapsed summary
+// cells with their one-click ticket popover (design v11), and the grid
+// itself. The grid templates come from core/layout — the single source of
+// truth for the focus/collapse geometry.
 
+import { useState } from "react";
 import type { CSSProperties, DragEvent } from "react";
 import type { BoardConfig, CardState, Column, GateDef, Lane } from "../../core/types.ts";
 import { isStale } from "../../core/aging.ts";
 import { cellCards } from "../../core/board.ts";
 import { columnTemplate, rowTemplate } from "../../core/layout.ts";
 import { Cell } from "./Cell.tsx";
+import { CollapsedTicketList } from "./CollapsedTicketList.tsx";
 
 // The gate definition of a column, or null when the column has no gate.
 function gateDefOf(config: BoardConfig, column: Column): GateDef | null {
@@ -66,56 +69,88 @@ export function ColumnHeader({ col, gateDef, focused, colCollapsed, onFocus, onT
 
 /**
  * Vertical lane label; clicking collapses the canal to a summary strip.
- * Inputs: the lane, its collapsed state, the toggle callback.
+ * The last expanded lane is not collapsible (design v11): its label loses
+ * the caret, the click and the hover affordance.
+ * Inputs: the lane, its collapsed state, the disabled guard, the toggle.
  * Output: the rotated label with caret, lane name and nature subtitle
  * (the nature is hidden by CSS when collapsed). Failure modes: none.
  */
-export function LaneLabel({ lane, collapsed, onToggle }: { lane: Lane; collapsed: boolean; onToggle: () => void }) {
+export function LaneLabel({ lane, collapsed, disabled, onToggle }: {
+  lane: Lane;
+  collapsed: boolean;
+  disabled: boolean;
+  onToggle: () => void;
+}) {
   return (
     <div
-      className={"lane-label" + (collapsed ? " collapsed" : "")}
-      onClick={onToggle}
-      title="Cliquer pour replier ce canal"
+      className={"lane-label" + (collapsed ? " collapsed" : "") + (disabled ? " no-collapse" : "")}
+      onClick={disabled ? undefined : onToggle}
+      title={disabled ? "Au moins une ligne doit rester dépliée" : (collapsed ? "Déplier " : "Replier ") + lane.name}
     >
-      <span className="collapse-caret">{collapsed ? "▸" : "▾"}</span>
+      {!disabled && <span className="collapse-caret">{collapsed ? "▸" : "▾"}</span>}
       <span className="lane-name">{lane.name}</span>
       <span className="lane-nature">{lane.nature}</span>
     </div>
   );
 }
 
+// Rect state + open handler shared by the two collapsed-cell variants:
+// hover or click anchors the ticket popover on the cell (design v11).
+function useCellPopover(count: number) {
+  const [rect, setRect] = useState<DOMRect | null>(null);
+  const open = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (count > 0) setRect(event.currentTarget.getBoundingClientRect());
+  };
+  return { rect, open, close: () => setRect(null) };
+}
+
 /**
- * Collapsed-lane summary cell: just the signals that matter at a glance.
- * Inputs: the cards of this cell (pre-filtered), the board config (stale
- * threshold), now in epoch milliseconds.
+ * Collapsed-lane summary cell: the signals that matter at a glance, plus
+ * the one-click ticket popover on hover/click (design v11).
+ * Inputs: the cards of this cell (pre-filtered), the config (stale
+ * threshold + type badges), now in epoch ms, the open-card callback.
  * Output: count (empty when zero), blocked badge, stagnation dot.
  * Failure modes: none.
  */
-export function CollapsedCell({ cards, config, now }: { cards: CardState[]; config: BoardConfig; now: number }) {
+export function CollapsedCell({ cards, config, now, onOpen }: {
+  cards: CardState[];
+  config: BoardConfig;
+  now: number;
+  onOpen: (card: CardState) => void;
+}) {
   const date = new Date(now);
   const blocked = cards.filter((card) => card.blocked).length;
   const stale = cards.filter((card) => isStale(card, config, date)).length;
+  const pop = useCellPopover(cards.length);
   return (
-    <div className="ccell">
+    <div className={"ccell" + (cards.length ? " has" : "")} onMouseEnter={pop.open} onClick={pop.open}>
       <span className="ccount">{cards.length || ""}</span>
       {blocked > 0 && <span className="cblk">{blocked}</span>}
       {stale > 0 && <span className="cstale" title={stale + " stagnant(s)"} />}
+      {pop.rect && <CollapsedTicketList anchorRect={pop.rect} list={cards} config={config} onOpen={onOpen} onClose={pop.close} />}
     </div>
   );
 }
 
 /**
- * Collapsed-column strip cell: count and blocked badge only.
- * Input: the cards of this cell (pre-filtered).
- * Output: the narrow strip content (count empty when zero).
+ * Collapsed-column strip cell: count and blocked badge, plus the same
+ * one-click ticket popover (design v11).
+ * Inputs: the cards of this cell (pre-filtered), the config, the
+ * open-card callback. Output: the narrow strip content.
  * Failure modes: none.
  */
-export function CollapsedColCell({ cards }: { cards: CardState[] }) {
+export function CollapsedColCell({ cards, config, onOpen }: {
+  cards: CardState[];
+  config: BoardConfig;
+  onOpen: (card: CardState) => void;
+}) {
   const blocked = cards.filter((card) => card.blocked).length;
+  const pop = useCellPopover(cards.length);
   return (
-    <div className="ccol-cell">
+    <div className={"ccol-cell" + (cards.length ? " has" : "")} onMouseEnter={pop.open} onClick={pop.open}>
       <span className="ccount">{cards.length || ""}</span>
       {blocked > 0 && <span className="cblk">{blocked}</span>}
+      {pop.rect && <CollapsedTicketList anchorRect={pop.rect} list={cards} config={config} onOpen={onOpen} onClose={pop.close} />}
     </div>
   );
 }
@@ -143,6 +178,11 @@ export interface BoardGridProps {
   onDrop: (e: DragEvent, laneId: string, columnId: string) => void;
   onDragOverCell: (e: DragEvent, laneId: string, columnId: string) => void;
   onDragLeaveCell: () => void;
+  /** Card-level drag plumbing (insert-before reorder, ADR 019). */
+  onCardOver: (e: DragEvent, card: CardState) => void;
+  onCardDrop: (e: DragEvent, card: CardState) => void;
+  /** Id of the card currently marked as the insertion target, or null. */
+  dropCardId: string | null;
 }
 
 // The expanded cell of one lane-column pair, wired to the grid callbacks.
@@ -166,24 +206,31 @@ function BoardCell({ lane, col, cards, props }: { lane: Lane; col: Column; cards
       onDrop={props.onDrop}
       onDragOverCell={props.onDragOverCell}
       onDragLeaveCell={props.onDragLeaveCell}
+      onCardOver={props.onCardOver}
+      onCardDrop={props.onCardDrop}
+      dropCardId={props.dropCardId}
     />
   );
 }
 
 // One board row: the lane label plus one cell per column. Lane collapse
-// wins over column collapse (design grid.jsx render order).
+// wins over column collapse (design grid.jsx render order). The label of
+// the last expanded lane is disabled (counted against the CURRENT config
+// lanes — collapsedLanes may hold stale ids after an admin edit).
 function LaneRow({ lane, props }: { lane: Lane; props: BoardGridProps }) {
   const laneCollapsed = props.collapsedLanes.has(lane.id);
+  const expandedCount = props.config.lanes.filter((entry) => !props.collapsedLanes.has(entry.id)).length;
   return (
     <>
-      <LaneLabel lane={lane} collapsed={laneCollapsed} onToggle={() => props.onToggleLane(lane.id)} />
+      <LaneLabel lane={lane} collapsed={laneCollapsed} disabled={!laneCollapsed && expandedCount <= 1}
+        onToggle={() => props.onToggleLane(lane.id)} />
       {props.config.columns.map((col) => {
         const inCell = cellCards(props.cards, lane.id, col.id);
         if (laneCollapsed) {
-          return <CollapsedCell key={col.id} cards={inCell} config={props.config} now={props.now} />;
+          return <CollapsedCell key={col.id} cards={inCell} config={props.config} now={props.now} onOpen={props.onOpen} />;
         }
         if (props.collapsedCols.has(col.id)) {
-          return <CollapsedColCell key={col.id} cards={inCell} />;
+          return <CollapsedColCell key={col.id} cards={inCell} config={props.config} onOpen={props.onOpen} />;
         }
         return <BoardCell key={col.id} lane={lane} col={col} cards={inCell} props={props} />;
       })}

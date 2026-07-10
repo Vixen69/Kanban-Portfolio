@@ -13,6 +13,7 @@ function state(overrides: Parameters<typeof testCard>[0] = {}, daysHere = 1): Ca
     ...testCard(overrides),
     enteredColumnAt: new Date(NOW.getTime() - daysHere * DAY_MS).toISOString(),
     comments: [],
+    archived: false,
   };
 }
 
@@ -39,6 +40,20 @@ test("stageDurations averages completed stays per column", () => {
   assert.equal(averages["col1"], 15); // (10 + 20) / 2
   assert.equal(averages["col2"], 4);
   assert.equal(averages["col3"], 0); // open stay, never closed
+});
+
+test("stageDurations ignores same-cell reorders: a stay is never split (ADR 019)", () => {
+  const events: CardEvent[] = [
+    entry("S001", "col1", "2026-01-01T00:00:00.000Z", "created"),
+    // A reorder in col1 five days in — must NOT close the col1 stay.
+    {
+      id: "evt-900", ts: "2026-01-06T00:00:00.000Z", actor: "test", cardId: "S001",
+      type: "moved", fromColumn: "col1", toColumn: "col1",
+      payload: { fromLaneId: "laneA", laneId: "laneA", beforeId: "S099" },
+    },
+    entry("S001", "col2", "2026-01-11T00:00:00.000Z"), // closes the 10-day stay
+  ];
+  assert.equal(stageDurations(events, CONFIG)["col1"], 10);
 });
 
 test("stageDurations orders same-instant events by numeric id suffix, not lexicographically", () => {

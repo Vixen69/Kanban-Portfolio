@@ -26,7 +26,7 @@ test("EDITABLE_FIELDS is exactly the v2 CardPatch key set", () => {
       "alerts", "budgetConsumed", "budgetEngaged", "budgetEstimated", "budgetRdli",
       "chargeByProfile", "codename", "contentionNote", "contentionProfiles",
       "criticality", "custom", "dateRdr", "domain", "effortConsumed",
-      "effortEstimated", "loadPlan", "nature", "notes", "owner",
+      "effortEstimated", "loadPlan", "notes", "owner",
       "projectConstraints", "resources", "risks", "tags", "title", "typeId",
     ].sort(),
   );
@@ -240,6 +240,28 @@ test("deleted excludes the card from folded output, other cards remain", () => {
     [event({ id: "evt-1", ts: "2026-03-01T00:00:00.000Z", type: "deleted", cardId: "S001" })],
   );
   assert.deepEqual(states.map((s) => s.id), ["S002"]);
+});
+
+// The fold-order semantics of manual reordering (ADR 019) live in
+// state.order.test.ts — split to respect the 300-line file cap.
+
+test("archived keeps the card in the fold with archived=true; unarchived reverses it", () => {
+  const card = testCard();
+  assert.equal(foldEvents([card], [])[0]?.archived, false);
+  const archived = foldEvents(
+    [card],
+    [event({ id: "evt-1", ts: "2026-03-01T00:00:00.000Z", type: "archived", cardId: "S001" })],
+  );
+  assert.equal(archived.length, 1);
+  assert.equal(archived[0]?.archived, true);
+  const restored = foldEvents(
+    [card],
+    [
+      event({ id: "evt-1", ts: "2026-03-01T00:00:00.000Z", type: "archived", cardId: "S001" }),
+      event({ id: "evt-2", ts: "2026-03-02T00:00:00.000Z", type: "unarchived", cardId: "S001" }),
+    ],
+  );
+  assert.equal(restored[0]?.archived, false);
 });
 
 test("deletion mid-stream: earlier events apply, later ones are ignored", () => {

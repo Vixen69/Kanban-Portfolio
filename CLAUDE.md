@@ -26,6 +26,22 @@ information is listed under "Open decisions", ask rather than assume.
 > configuration panel** exists (runtime override + append-only history;
 > `config/board.json` stays the versioned default model).
 
+> **2026-07-09 — Design v11 adopted** (ADR 017/018/019, author's decisions).
+> Archiving is a reversible card lifecycle (`archived`/`unarchived` events,
+> Archives view + header badge). Blocking is governed by a dedicated BLOCAGE
+> section with a **mandatory motif** (no Bloqué toggle in the edit form).
+> **Nature is positional** — the card's nature IS its canal
+> (`lanes[].natureKey`); requalification = moving lanes; no Nature select,
+> no nature sidebar filter (a « Bloqués uniquement » toggle instead).
+> **One click on a card opens its detail** (column-header click focuses a
+> stage; collapsed cells open a one-click ticket popover). Cards can be
+> dropped **onto other cards** (manual order in the `moved` event via
+> `beforeId`; same-cell reorders never reset the aging clock). The card
+> detail loses the DoR/DoD doc links, gains collapsible Délais (per-stage
+> ages + lead/cycle from the log) and Historique (incl. block/unblock
+> lines), per-profile consumed editing, and Budget before Plan de charge.
+> The scroll-hint bob is an accepted exception to the no-animation rule.
+
 ## 1. What this project is
 
 An opinionated portfolio kanban instrument: a single-page board that makes a
@@ -150,11 +166,15 @@ fields, append-only enforced by table grants/triggers):
   constraint/severity typologies live in the board config (ADR 014), not on
   the card.
 - `card_events` : append-only. seq (bigint sequence, ordering), id
-  (evt-<seq>), ts, actor, card_id, type
-  (created/moved/blocked/unblocked/edited/commented/deleted/imported),
-  from_column, to_column, payload (jsonb). Never updated, never deleted.
-  Comments are a projection of `commented` events; deletion is a `deleted`
-  event (the fold excludes the card, the log keeps everything — ADR 012).
+  (evt-<seq>), ts, actor, card_id, type (created/moved/blocked/unblocked/
+  edited/commented/archived/unarchived/deleted/imported), from_column,
+  to_column, payload (jsonb). Never updated, never deleted. Comments are a
+  projection of `commented` events; deletion is a `deleted` event (the fold
+  excludes the card, the log keeps everything — ADR 012); archiving is a
+  reversible `archived`/`unarchived` pair (the fold keeps the card flagged,
+  the board excludes it — ADR 017); manual order rides in the `moved`
+  payload (`beforeId` — same-cell reorders never reset the aging clock and
+  never count as stage entries, ADR 019).
 - `users`: id, login, scrypt_hash, role (viewer/editor/admin), created_at,
   disabled.
 
@@ -167,7 +187,8 @@ INSERT/SELECT. Courtesy heads-up to the tech lead: the schema is append-only
 (no UPDATE/DELETE), in case their DB tooling assumes mutable rows.
 
 Config (`config/board.json`, versioned in git — the NMO default model):
-lanes (name, nature, detail), columns (name, `wip`, `gate` DoR/DoD, note),
+lanes (name, nature subtitle, `natureKey` — the nature the canal confers to
+its cards, ADR 018 — detail), columns (name, `wip`, `gate` DoR/DoD, note),
 domains and types (name, short, color), nature/criticality labels, custom
 field definitions, `age` thresholds (fresh/recent/aging/stale), and
 `andonThresholdDays`. `wip: null` shows the bare count and enforces nothing;
@@ -179,8 +200,9 @@ append-only history; « Réinitialiser le modèle » returns to board.json
 ## 5. UI specification (carries over)
 
 Aesthetic: industrial control panel. Dense, sober, professional. No
-decoration, no gradients-for-style, no animation except the blocked pulse.
-(Implemented in hand-written CSS now; adapted to Tailwind/Radix later.)
+decoration, no gradients-for-style, no animation except the blocked pulse
+and the scroll-hint bob (accepted v11 exception). (Implemented in
+hand-written CSS now; adapted to Tailwind/Radix later.)
 
 - Grid: lanes as horizontal swimlanes (canaux), columns as vertical stages;
   gate badges (DoR/DoD) on their columns.
@@ -188,24 +210,35 @@ decoration, no gradients-for-style, no animation except the blocked pulse.
   danger ≥ aging thresholds). No background darkening by default.
 - Blocked: pulsing red dot + blocked card wash, reason on the card in focus
   and in the detail; per-cell blocked count badge.
-- Radiator bars (~16px) are THE default view; clicking a column (or a card
-  in a non-focused column) focuses that stage (2.6fr, expanded cards);
-  second click on a card opens the detail. Lanes collapse to summary rows;
-  columns collapse to 30px strips (Pause starts collapsed).
+- Radiator bars (~16px) are THE default view; **one click on a card opens
+  its detail** (v11); clicking a column header focuses that stage (2.6fr,
+  expanded cards). Lanes collapse to summary rows (the last expanded lane
+  refuses); columns collapse to 30px strips (Pause starts collapsed);
+  collapsed cells open a one-click ticket popover. Over-WIP cells wear a
+  red wash; overflowing cells a scroll-hint arrow.
 - Hard acceptance criterion: at 1920x1080 with 150 cards, the full board is
   visible with zero scrolling; never any horizontal scroll.
-- Sidebar: search (title + codename), codes-projet toggle, filters by type /
-  nature / criticality / domain with tout·rien; live shown/total counts.
-  Filters dim, never remove (spatial truth).
+- Sidebar: search (title + codename), codes-projet toggle, « Bloqués
+  uniquement » toggle, filters by type / criticality / domain with
+  tout·rien; live shown/total counts. Filters dim, never remove (spatial
+  truth). No nature filter (v11): nature is the canal.
 - All UI strings in French, exactly as written in config.
 - Card movement: drag and drop plus keyboard fallback. Every move POSTs an
   intent; the middle writes the event with server-assigned actor/ts.
-- Card detail: charge j.h + budget k€ bars, plan de charge, ressources,
-  commentaires (event-backed), historique (event-backed), DoR/DoD doc links,
-  signaler/lever un blocage, full edit, delete (as `deleted` event).
-- QuickAdd (« + Sujet », touche N): always enters the first column.
-- Admin panel (⚙): topology/vocabulary only (ADR 013). Metrics view (☷):
-  flow metrics computed from cards + events (core/metrics).
+  Dropping a card ON another card inserts it just before it (ADR 019).
+- Card detail: charge j.h + budget k€ bars (budget before plan de charge),
+  per-profile consumed editing, ressources, commentaires (event-backed),
+  BLOCAGE section (mandatory motif, « Lever »), Délais + Historique
+  (collapsible, event-backed, incl. block/unblock lines), full edit
+  (no Nature select, no Bloqué toggle), archive (« Archiver »), delete
+  (as `deleted` event).
+- Archives (header icon + count badge): searchable list, « Désarchiver »,
+  open-the-fiche (ADR 017).
+- QuickAdd (« + Sujet », touche N): always enters the first column; the
+  canal confers the nature.
+- Admin panel (⚙): topology/vocabulary only (ADR 013), incl. per-lane
+  natureKey. Metrics view (☷): flow metrics computed from cards + events
+  (core/metrics), reorders excluded.
 
 ## 6. Security posture (shapes every choice)
 

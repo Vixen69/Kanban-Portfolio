@@ -68,6 +68,18 @@ test("absent optional fields are normalized (wip/gate null, texts empty, fields 
   assert.deepEqual(config.fields, []);
 });
 
+test("lane natureKey: parsed when valid, defaults to complicated, rejected otherwise (ADR 018)", () => {
+  const raw = rawConfig();
+  raw.lanes[0].natureKey = "simple";
+  delete raw.lanes[1].natureKey;
+  const config = validateBoardConfig(raw);
+  assert.equal(config.lanes[0]?.natureKey, "simple");
+  assert.equal(config.lanes[1]?.natureKey, "complicated");
+  const bad = rawConfig();
+  bad.lanes[0].natureKey = "chaotique";
+  assert.throws(() => validateBoardConfig(bad), ConfigError);
+});
+
 test("fields: select keeps options, other types drop them, showOnCard defaults to false", () => {
   const raw = rawConfig();
   raw.fields = [

@@ -60,11 +60,13 @@ export class InMemoryEventStore {
 
 /**
  * Builds a "moved" event input.
- * Inputs: card id, lane/column before and after, actor, timestamp.
+ * Inputs: card id, lane/column before and after, actor, timestamp, and an
+ * optional beforeId (ADR 019: insert the card just before that one in the
+ * fold order — a drop onto a card rather than onto a cell).
  * Output: a CardEventInput recording the move. Columns travel first-class
  * (fromColumn/toColumn); lanes travel in the payload — "laneId" is the
  * destination lane read back by foldEvents, "fromLaneId" is kept for the
- * audit trail only.
+ * audit trail only; "beforeId" (when present) drives the fold ordering.
  * Failure: none.
  */
 export function movedEvent(
@@ -73,6 +75,7 @@ export function movedEvent(
   to: { laneId: string; columnId: string },
   actor: string,
   ts: string,
+  beforeId?: string,
 ): CardEventInput {
   return {
     ts,
@@ -81,17 +84,38 @@ export function movedEvent(
     type: "moved",
     fromColumn: from.columnId,
     toColumn: to.columnId,
-    payload: { fromLaneId: from.laneId, laneId: to.laneId },
+    payload: {
+      fromLaneId: from.laneId,
+      laneId: to.laneId,
+      ...(beforeId === undefined ? {} : { beforeId }),
+    },
   };
 }
 
 /**
+ * True when a "moved" event is a same-cell manual reorder (ADR 019): the
+ * column AND the lane are unchanged — the card changed rank in its cell,
+ * it did not move stages. Reorders never reset the aging clock, are not
+ * narrated in the card history and never open/close metric stays.
+ * Input: any CardEvent. Output: boolean. Failure: none.
+ */
+export function isReorder(event: CardEvent): boolean {
+  return (
+    event.type === "moved" &&
+    event.fromColumn === event.toColumn &&
+    event.payload["fromLaneId"] === event.payload["laneId"]
+  );
+}
+
+/**
  * Builds a lifecycle event input (created / imported / blocked / unblocked /
- * edited / commented / deleted) without column transition.
+ * edited / commented / archived / unarchived / deleted) without column
+ * transition.
  * Inputs: event type (any type but "moved"), card id, actor, timestamp, and
  * an optional payload — { reason } for blocked, { patch } for edited,
  * { text } for commented, { laneId } (plus a toColumn set by the caller on
- * the stored input) for created/imported, {} for unblocked/deleted.
+ * the stored input) for created/imported, {} for unblocked/archived/
+ * unarchived/deleted.
  * Output: a CardEventInput with fromColumn/toColumn set to null.
  * Failure: none.
  */

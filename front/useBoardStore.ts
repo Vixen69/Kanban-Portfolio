@@ -11,12 +11,14 @@ import {
   fetchBoard,
   fetchConfig,
   fetchDefaultConfig,
+  postArchive,
   postBlock,
   postCard,
   postComment,
   postDelete,
   postEdit,
   postMove,
+  postUnarchive,
   postUnblock,
   putConfig,
   type BoardData,
@@ -53,6 +55,8 @@ export interface BoardStore {
   unblockCard(cardId: string): Promise<boolean>;
   editCard(cardId: string, patch: CardPatch): Promise<boolean>;
   commentCard(cardId: string, text: string): Promise<boolean>;
+  archiveCard(cardId: string): Promise<boolean>;
+  unarchiveCard(cardId: string): Promise<boolean>;
   deleteCard(cardId: string): Promise<boolean>;
   /** Config writes resolve null on success, the French message on failure. */
   saveConfig(next: BoardConfig): Promise<string | null>;
@@ -126,7 +130,7 @@ function useReload(
   }, [setBoard, setLastError]);
 }
 
-// The seven card actions: await the API call, then refetch the board. A
+// The card actions: await the API call, then refetch the board. A
 // failed write simply did not happen (logged, ids only — no titles) — the
 // French message lands in lastError so the shell can show it.
 function useCardActions(reload: () => Promise<void>, setLastError: (m: string | null) => void) {
@@ -154,6 +158,8 @@ function useCardActions(reload: () => Promise<void>, setLastError: (m: string | 
       unblockCard: (cardId: string) => perform(() => postUnblock(cardId)),
       editCard: (cardId: string, patch: CardPatch) => perform(() => postEdit(cardId, patch)),
       commentCard: (cardId: string, text: string) => perform(() => postComment(cardId, text)),
+      archiveCard: (cardId: string) => perform(() => postArchive(cardId)),
+      unarchiveCard: (cardId: string) => perform(() => postUnarchive(cardId)),
       deleteCard: (cardId: string) => perform(() => postDelete(cardId)),
     }),
     [perform],

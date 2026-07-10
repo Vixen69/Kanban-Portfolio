@@ -6,6 +6,7 @@
 
 import type { BoardConfig, CardEvent, CardState } from "./types.ts";
 import { ageCategory, daysInColumn } from "./aging.ts";
+import { isReorder } from "./events.ts";
 
 const DAY_MS = 86_400_000;
 
@@ -61,10 +62,13 @@ export interface FlowMetrics {
 }
 
 // An event that opens a stay in a column (created/imported/moved chains).
+// Same-cell reorders (ADR 019) are rank changes, not stage entries: they
+// must never close a running stay nor open a new one.
 function isEntryEvent(event: CardEvent): boolean {
   return (
     (event.type === "created" || event.type === "imported" || event.type === "moved") &&
-    event.toColumn !== null
+    event.toColumn !== null &&
+    !isReorder(event)
   );
 }
 
