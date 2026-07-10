@@ -84,12 +84,16 @@ export function MiniCard(props: CardItemProps) {
       style={{ height: "var(--card-h)", ...acc.root }}
       title={`${card.title}  ·  ${type !== null ? type.name : ""}  ·  ${domain !== undefined ? domain.name : ""}  ·  ${card.owner}  ·  ${days}j`}
     >
+      {/* Blocked = the red wash alone; no pulse dot on tickets (one signal
+          per information — the dot stays in the fiche's BLOCAGE banner).
+          Type first, then the name (aligned across tickets), the criticality
+          picto AFTER the name. */}
       <span className="mini-accent" style={acc.accent} />
-      {card.blocked && <span className="blk-pulse" />}
-      <CritMark c={card.criticality} />
       <TypeTag type={type} />
       {props.showCodes && card.codename !== null && <span className="mini-code">{card.codename}</span>}
       <span className="mini-name">{card.title}</span>
+      <CritMark c={card.criticality} />
+      <span className="card-fill" />
       <AgeText days={days} age={config.age} />
     </div>
   );
@@ -121,9 +125,9 @@ export function FocusCard(props: CardItemProps) {
       <span className="focus-accent" style={acc.accent} />
       <div className="focus-body">
         <div className="focus-line1">
-          {card.blocked && <span className="blk-pulse" />}
-          <CritMark c={card.criticality} big />
           <span className="focus-name">{card.title}</span>
+          <CritMark c={card.criticality} big />
+          <span className="card-fill" />
           <AgeText days={days} age={config.age} />
         </div>
         <FocusMeta card={card} config={config} showCodes={props.showCodes} />

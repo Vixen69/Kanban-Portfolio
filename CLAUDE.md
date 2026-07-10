@@ -208,8 +208,13 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
   gate badges (DoR/DoD) on their columns.
 - Aging (design v9): age is worn as a text pill (3j/2s/4m; warn ≥ recent,
   danger ≥ aging thresholds). No background darkening by default.
-- Blocked: pulsing red dot + blocked card wash, reason on the card in focus
-  and in the detail; per-cell blocked count badge.
+- Blocked: red card wash alone on tickets (one signal per information —
+  author's call, 2026-07-10; the pulsing dot stays in the fiche's BLOCAGE
+  banner), reason on the card in focus and in the detail; per-cell blocked
+  count badge.
+- Ticket layout: type tag first, then the name (aligned across tickets),
+  the criticality picto (♛/★) AFTER the name, age pill on the right
+  (author's call, 2026-07-10).
 - Radiator bars (~16px) are THE default view; **one click on a card opens
   its detail** (v11); clicking a column header focuses that stage (2.6fr,
   expanded cards). Lanes collapse to summary rows (the last expanded lane

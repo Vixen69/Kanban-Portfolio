@@ -470,6 +470,15 @@ de son ADR.
   vidé avant confirmation serveur ; bord admin « références périmées »
   (dépôt-sur-carte remappée → 400 propre).
 
+### 2026-07-10 — Micro-refonte des tickets (décision auteur)
+- **Un signal par information** : le point rouge pulsé disparaît des tickets
+  bloqués — le lavis rouge suffit ; la pulsation reste dans la bannière
+  BLOCAGE de la fiche (`blk-pulse` conservé là).
+- **Lisibilité** : les pictos de criticité (♛ Top / ★ Majeur) passent APRÈS
+  le nom du projet ; les tickets alignent désormais type de projet puis nom,
+  l'âge restant à droite (`card-fill` élastique entre picto et âge).
+- CLAUDE.md §5 mis à jour. Front seul (cards.tsx + cards.css).
+
 ### À venir
 - **RP3** : auth JWT-en-cookie (login, rôles viewer/editor/admin, acteur =
   utilisateur authentifié à la place de « anonymous ») ; CLI de comptes ;
