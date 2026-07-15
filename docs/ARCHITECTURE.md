@@ -23,17 +23,22 @@ de son ADR.
   front **React 18 / Vite**, middle **Node / Express**, back **PostgreSQL**,
   Docker. Authentification **JWT en cookie httpOnly** + **scrypt**.
   Dépendances bornées au **plafond SBOM** autorisé par le client.
-- **Référence produit** : design **v10** (ADR 014) — couche risques /
-  contraintes / contention / plan de charge par profil dans la fiche détail,
-  au-dessus de la v9 (ADR 012/013).
-- **État live** : monorepo `core/` + `middle/` (Express, pilote JSONL — `pg`
-  différé) + `front/` (React 18) ; **263 tests** `node:test` (dont les
-  frontières d'architecture). Lancement dev : `npm run serve` (middle :8787)
-  + `npm run dev` (front :5173, proxy `/api`) ; données via
-  `KANBAN_ALLOW_SEED=1 npm run seed`. Cf. README « Démarrer ».
+- **Référence produit** : design **v11** (ADR 017/018/019) — archivage
+  réversible, blocage gouverné (motif obligatoire), nature positionnelle
+  (= canal), un clic ouvre la fiche, réordonnancement manuel — au-dessus de la
+  v10 (risques / contraintes / contention / plan de charge, ADR 014) et de la
+  v9 (ADR 012/013).
+- **État live** : monorepo `core/` + `middle/` (Express, pilote **PostgreSQL**
+  `pg` — défaut conteneur, JSONL en repli) + `front/` (React 18) ; **318 tests**
+  `node:test` (dont les frontières d'architecture et le scanner de conventions).
+  Lancement dev : `npm run serve` (middle :8787) + `npm run dev` (front :5173,
+  proxy `/api`) ; données via `KANBAN_ALLOW_SEED=1 npm run seed`. Cf. README
+  « Démarrer ».
 - **Livraison** : conteneurisée (images front nginx + middle Express, même
-  origine, JSONL sur volume ; SBOM CycloneDX), ADR 015 — dossier
-  `LIVRAISON.md` (construire / lancer / vérifier / test local Docker).
+  origine, **PostgreSQL** par défaut ; SBOM CycloneDX), ADR 015/016 —
+  conteneurs durcis (en-têtes page + API, middle non-root, digests épinglés,
+  ports loopback). Dossier `LIVRAISON.md` (construire / lancer / vérifier /
+  test local Docker).
 
 ## Journal des changements
 
@@ -508,6 +513,27 @@ de son ADR.
 - Outillage démo uniquement (profil compose `tools`) : aucun code produit,
   aucune dépendance, rien de livré à la plateforme.
 
+### 2026-07-15 — Passe de polissage : tests, durcissement conteneurs, docs
+- **Couverture de tests +32** (286 → 318) : `front/detailModel.ts` (dérivations
+  budget / RDR / plan de charge), chemin d'erreur 500 du middle (non-fuite des
+  erreurs internes dans la réponse), interrupteur append-only Postgres OFF puis
+  restauration au réouverture par défaut, et scanner de conventions extrait en
+  module testable (`scripts/conventions.ts` + `conventions.test.ts`).
+- **Durcissement des conteneurs** (audit vérifié, tous S) : en-têtes de sécurité
+  sur la **page** nginx (et plus seulement l'API Express) ; middle en
+  utilisateur `node` **non-root** ; écouteur `error` sur le Pool `pg` (un
+  incident de base au repos ne fait plus tomber le process) ; images de base
+  **épinglées par digest** ; ports publiés **liés à la loopback** (l'API non
+  authentifiée et la base de dev ne sortent pas de la machine). Pile Docker
+  durcie reconstruite et vérifiée de bout en bout : 150 cartes servies, en-têtes
+  présents sur la page, rendu sans violation CSP, `whoami`=`node`, stockage
+  `postgres`.
+- **Documentation remise en cohérence** : README, SECURITY, DEPENDENCIES,
+  middle/README, sync/README, `core/ports.ts`, ce résumé et la liste « À venir »
+  — alignés sur l'état réel (design v11, PostgreSQL livré, `pg` autorisé,
+  durcissement fait, métriques faites). Auth (RP3) toujours différée : décision
+  assumée de l'auteur (un seul utilisateur de confiance pour l'instant).
+
 ### À venir
 - **RP3** : auth JWT-en-cookie (login, rôles viewer/editor/admin, acteur =
   utilisateur authentifié à la place de « anonymous ») ; CLI de comptes ;
@@ -520,6 +546,8 @@ de son ADR.
   "anonymous"` dans `middle/api.ts`, passée à chaque constructeur d'évènement ;
   `postEvent` ne prend pas d'identité — RP3 doit faire transiter l'identité
   authentifiée requête → route `app.ts` → `postEvent` → builders.
-- RP4 csv-import/sciforma + sync ; RP5 métriques ; RP6 conteneurisation + CI
-  plateforme (build TS→JS du middle, nginx du front, adaptateur `pg` une fois
-  autorisé). Chaque phase : une entrée datée ici.
+- RP4 csv-import / sciforma + sync ; RP5 métriques (**vue implémentée**,
+  ADR 007) ; RP6 **CI plateforme** — la conteneurisation (ADR 015) et
+  l'adaptateur `pg` (ADR 016) sont **faits**, et il n'y a **pas** de build
+  TS→JS (exécution TypeScript directe sous Node 22) ; reste l'intégration CI
+  dans la plateforme du client. Chaque phase : une entrée datée ici.

@@ -314,8 +314,12 @@ front/       React 18 + Vite + TS; thin view over core/
 sync/        CLI/job: active adapter -> PostgreSQL, exits
 config/      board.json (+ example configs)
 fixtures/    synthetic dataset
+scripts/     dev/seed/sbom/conventions tooling + architecture boundary test
+design/      validated design mockup (product reference, ADR 012-019)
+data/        dev JSONL store + runtime config override (git-ignored)
 docker/      Dockerfiles (front, middle) + compose (with dev PostgreSQL)
 docs/adr/    decision records (French)
+docs/ARCHITECTURE.md  dated plain-language running record
 SECURITY.md  (French)
 DEPENDENCIES.md (French)
 README.md    (French)

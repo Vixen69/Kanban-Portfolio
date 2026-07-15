@@ -15,32 +15,39 @@ peut appliquer une surcharge à chaud, historisée en append-only (ADR 013).
 Architecture en couches et historique : voir `docs/ARCHITECTURE.md` (journal
 vivant) et `docs/adr/` (décisions). Le contrat de travail est `CLAUDE.md`.
 
-## Fonctionnalités (design v10, ADR 012/013/014)
+## Fonctionnalités (design v11, ADR 017/018/019)
 
 - **Radiateur par défaut** : barres fines (~16 px), tout le portefeuille d'un
-  coup. Cliquer une colonne (ou une carte hors focus) **focalise ce stade**
-  (cartes étendues) ; second clic sur une carte → fiche détaillée. Canaux
-  repliables en ligne de synthèse ; colonnes repliables en bandeau (« Pause »
-  démarre repliée). Gates **DoR/DoD** en badge + liseré sur leurs colonnes.
+  coup. **Un clic sur une carte ouvre sa fiche** ; cliquer une colonne
+  **focalise ce stade** (cartes étendues). Canaux repliables en ligne de
+  synthèse ; colonnes repliables en bandeau (« Pause » démarre repliée). Gates
+  **DoR/DoD** en badge + liseré sur leurs colonnes. Déposer une carte **sur une
+  autre** l'insère juste avant (ordre manuel, ADR 019).
 - Âge porté par la **pastille texte** (3j/2s/4m ; orange dès « récent »
   dépassé, rouge dès « vieillit » dépassé — seuils 7/28/60 en config).
-  Bloqué : point rouge pulsant + fond rosé + raison ; badge de comptage des
-  bloqués par cellule. WIP : n/limite, avertit à ≥ 80 %, rougit au-delà de
-  100 % — signale, ne bloque jamais.
+  Bloqué : **lavis rouge** sur la carte (un seul signal) + raison ; le point
+  pulsant ne subsiste que dans le bandeau BLOCAGE de la fiche ; badge de
+  comptage des bloqués par cellule. WIP : n/limite, avertit à ≥ 80 %, rougit
+  au-delà de 100 % — signale, ne bloque jamais.
 - Panneau latéral (`S`) : recherche titre + code projet (`/`), interrupteur
-  codes projet, filtres type / nature / criticité / domaine avec tout·rien.
-  Les filtres **estompent**, ne retirent jamais (ADR 005). Compteurs
-  affichés/total et stats en direct ; état vide avec réinitialisation.
-- Fiche détaillée (design v10, ADR 014) : **plan de charge par profil DSI**
-  (j.h répartis, barres consommé/estimé), **risque de contention** (profils
-  en tension + note), **budget · graphe croisé** (enveloppe RDLI / estimé /
-  engagé / réalisé), **risques & alertes** (alertes dérivées + risques typés
-  éditables + alertes libres), **contraintes du projet**, **date RDR**
-  (livraison projetée) — tous éditables en ligne. Plus : commentaires
-  (`commented`), historique (journal), liens DoR/DoD, signalement/levée de
-  blocage, édition complète (`edited`), suppression (`deleted` — le journal
-  garde tout). **« + Sujet »** (`N`) : création locale, entre toujours dans
-  la première colonne (flux tiré).
+  codes projet, interrupteur **« Bloqués uniquement »**, filtres type /
+  criticité / domaine avec tout·rien (pas de filtre nature — la nature est le
+  canal, ADR 018). Les filtres **estompent**, ne retirent jamais (ADR 005).
+  Compteurs affichés/total et stats en direct ; état vide avec réinitialisation.
+- Fiche détaillée (design v11, ADR 017/018/019) : **budget · graphe croisé**
+  (enveloppe RDLI / estimé / engagé / réalisé) **avant** le **plan de charge
+  par profil DSI** (j.h répartis, consommé éditable par profil), **risque de
+  contention** (profils en tension + note), **risques & alertes** (alertes
+  dérivées + risques typés éditables + alertes libres), **contraintes du
+  projet**, **date RDR** (livraison projetée) — tous éditables en ligne. Plus :
+  commentaires (`commented`), section **BLOCAGE** à motif obligatoire
+  (« Lever »), **Délais** (âges par étape + lead/cycle) et **Historique**
+  (repliables, incl. blocage/déblocage), édition complète (`edited`, sans
+  sélecteur nature ni bascule Bloqué), **archivage** (`archived`/`unarchived`),
+  suppression (`deleted` — le journal garde tout). **« + Sujet »** (`N`) :
+  création locale, entre toujours dans la première colonne (flux tiré). Vue
+  **Archives** (icône + badge) : liste cherchable, « Désarchiver », ouverture
+  de la fiche (ADR 017).
 - **Panneau d'administration** (⚙) : topologie/vocabulaire uniquement —
   colonnes (ordre, WIP, gate), canaux, domaines, types, libellés natures/
   criticités, champs de carte personnalisés. Surcharge persistée côté
@@ -53,9 +60,10 @@ vivant) et `docs/adr/` (décisions). Le contrat de travail est `CLAUDE.md`.
   déterministes, seed 20260609) derrière le port `PortfolioDataSource`.
   csv-import / sciforma à venir (RP4).
 - Persistance : le middle écrit chaque action dans le journal append-only
-  `card_events` via le port `BoardStorage` (pilote **JSONL** ; **PostgreSQL**
-  via `pg` à venir, ADR 011). L'état (position, blocage, âge) est replié à la
-  lecture, jamais stocké (ADR 002). Le serveur fait autorité sur
+  `card_events` via le port `BoardStorage`. Back end de livraison :
+  **PostgreSQL** (`pg`, ADR 016 — défaut en conteneur) ; pilote **JSONL**
+  sélectionnable en repli mono-instance. L'état (position, blocage, âge) est
+  replié à la lecture, jamais stocké (ADR 002). Le serveur fait autorité sur
   id/horodatage/acteur.
 - Critère d'acceptation : à 1920×1080 avec 100+ cartes, tout le tableau est
   visible sans défilement en mode radiateur — vérifié par un test.
@@ -131,12 +139,14 @@ installation hors-ligne.
 ## Livrer (conteneurs)
 
 Deux images — **front** (nginx, statique + proxy `/api`) et **middle**
-(Express, JSONL sur volume) — construites depuis ce dépôt, même origine, zéro
-egress, dans le plafond SBOM. Le dossier de remise **[`LIVRAISON.md`](LIVRAISON.md)**
-détaille : construire, lancer, config/env, le SBOM, les deux points à trancher
-avec le référent (`pg`, canal de livraison), la checklist, et un **runbook de
-test local Docker** (`docker compose -f docker/compose.yaml --profile app up
---build`).
+(Express, **PostgreSQL** par défaut, JSONL en repli) — construites depuis ce
+dépôt, même origine, zéro egress, dans le plafond SBOM. Conteneurs durcis :
+en-têtes de sécurité sur la page (nginx) comme sur l'API (Express), middle en
+utilisateur non-root, images de base épinglées par digest, ports publiés liés à
+la loopback. Le dossier de remise **[`LIVRAISON.md`](LIVRAISON.md)** détaille :
+construire, lancer, config/env, le SBOM, le point restant à trancher avec le
+référent (canal de livraison), la checklist, et un **runbook de test local
+Docker** (`docker compose -f docker/compose.yaml --profile app up --build`).
 
 ## Disposition du dépôt
 
@@ -151,7 +161,7 @@ fixtures/    jeux de données synthétiques
 docker/      Dockerfiles (front nginx, middle Express) + compose — ADR 015
 docs/adr/    décisions d'architecture (français)
 docs/ARCHITECTURE.md  journal vivant des changements d'architecture
-design/      maquette validée v10 (référence produit, ADR 012/014)
+design/      maquette validée v11 (référence produit, ADR 012-019)
 ```
 
 ## Documents
@@ -159,6 +169,6 @@ design/      maquette validée v10 (référence produit, ADR 012/014)
 - `CLAUDE.md` — le contrat de travail du projet.
 - `LIVRAISON.md` — dossier de remise conteneurisée (construire / livrer / tester).
 - `docs/ARCHITECTURE.md` — journal des changements d'architecture.
-- `docs/adr/` — une décision par fichier (001-015).
+- `docs/adr/` — une décision par fichier (001-019).
 - `SECURITY.md` — posture de sécurité.
 - `DEPENDENCIES.md` — gouvernance des dépendances (plafond SBOM).

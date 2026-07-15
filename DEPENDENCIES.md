@@ -37,17 +37,18 @@ plateforme) exige l'accord du référent technique, une ligne ici **et** un ADR.
 
 ## Ce qui est réellement installé aujourd'hui (sous-ensemble du plafond)
 
-À ce jour, **seuls `express` (+ `@types/express`), `react`/`react-dom` et la
-chaîne de build (`vite`, `@vitejs/plugin-react`, `typescript`, `@types/*`) sont
-installés** (voir les `package.json` + `package-lock.json`). `core/` est **sans
-dépendance**. Les paquets d'authentification et de config sont autorisés mais
-**pas encore installés** (l'auth est RP3).
+À ce jour, **`express` (+ `@types/express`), `pg` (+ `@types/pg`),
+`react`/`react-dom` et la chaîne de build (`vite`, `@vitejs/plugin-react`,
+`typescript`, `@types/*`) sont installés** (voir les `package.json` +
+`package-lock.json`). `core/` est **sans dépendance**. Les paquets
+d'authentification et de config restent autorisés mais **pas encore installés**
+(l'auth est RP3).
 
 | Paquet | Rôle | Statut |
 |---|---|---|
 | react, react-dom 18 | Front (couche de vue, CLAUDE.md §3) | **installé** ; *bundlé* au build (aucun node_modules livré côté front) |
 | vite + @vitejs/plugin-react | Build front | **installé** (dev) |
-| express (+ @types/express) | Middle — serveur HTTP ; la logique d'API existante s'y branche sans changement | **installé** (seule dépendance runtime du middle) |
+| express (+ @types/express) | Middle — serveur HTTP ; la logique d'API existante s'y branche sans changement | **installé** (avec `pg`, dépendance runtime du middle) |
 | cookie-parser, cors | Middle — cookie JWT httpOnly ; CORS same-origin | **différé (RP3)** — pas installé (même-origine géré sans `cors` ; cf. `middle/app.ts`) |
 | jsonwebtoken | Middle — jeton de session JWT | **différé (RP3)** — pas installé |
 | dotenv (+ expand) | Middle — secrets (BD, sync) hors dépôt | **différé** — arrive avec `pg`/l'auth |
