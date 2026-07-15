@@ -9,6 +9,24 @@ server {
     root   /usr/share/nginx/html;
     index  index.html;
 
+    # Don't advertise the nginx version on responses/errors.
+    server_tokens off;
+
+    # Security headers on the DOCUMENT itself: the browser enforces CSP,
+    # frame-ancestors, Referrer-Policy etc. on the page that loads and runs the
+    # scripts — served here by nginx, not by the middle. These MUST stay in step
+    # with SECURITY_HEADERS in middle/app.ts (same policy on /api responses); the
+    # page additionally allows data: URIs for the Vite build's inlined assets
+    # (fonts / small images). `always` so error responses (404…) carry them too.
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "no-referrer" always;
+    add_header Cross-Origin-Opener-Policy "same-origin" always;
+    add_header Permissions-Policy "geolocation=(), camera=(), microphone=(), payment=(), usb=()" always;
+
+    # Match the middle's 64 KB JSON body cap at the edge.
+    client_max_body_size 64k;
+
     # SPA history fallback: unknown client routes render index.html.
     location / {
         try_files $uri $uri/ /index.html;
