@@ -99,6 +99,9 @@ part et d'autre (à garder en phase : `docker/nginx.default.conf.template` et
 - **Ports publiés liés à la loopback** (`127.0.0.1`) dans le compose : l'API
   non authentifiée (auth = RP3) et la base (mot de passe de dev) ne sont pas
   joignables au-delà de la machine ; l'accès passe par le front en même origine.
+  L'exposition réseau est un **opt-in explicite** (`FRONT_BIND=0.0.0.0`, lanceur
+  « Lancer en Docker (reseau).cmd ») qui n'ouvre que le front — à réserver à un
+  segment réseau restreint tant que l'auth (RP3) n'est pas livrée.
 - **`pg` Pool** : un écouteur `error` empêche qu'un incident de base au repos
   (redémarrage, bascule) ne fasse tomber le process middle.
 

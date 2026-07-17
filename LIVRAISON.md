@@ -87,6 +87,30 @@ docker compose -f docker/compose.yaml --profile app up
 **Secrets** : aucun n'est dans l'image (CLAUDE.md §6). Les identifiants (DB,
 sync) arriveront par fichier/secret monté hors dépôt, référencés par chemin.
 
+### Exposer aux autres postes (mode réseau, opt-in explicite)
+
+Par défaut, **rien n'est joignable depuis le réseau** (tous les ports publiés
+sont liés à `127.0.0.1`). Pour servir d'autres postes, on ouvre **uniquement le
+front** (nginx) — le middle, la base et Adminer restent en loopback, tout accès
+passe par le front en même origine :
+
+- **Le plus simple** : double-cliquer **« Lancer en Docker (reseau).cmd »** —
+  il relance la pile avec le front sur toutes les interfaces, tente d'ajouter
+  la règle de pare-feu entrante (port 8080), et affiche les adresses à
+  communiquer (`http://<ip-du-poste>:8080`).
+- En ligne de commande : `FRONT_BIND=0.0.0.0 docker compose -f
+  docker/compose.yaml --profile app up -d` (+ règle de pare-feu entrante
+  TCP 8080 si besoin).
+- Retour en local seul : relancer sans `FRONT_BIND` (ou via
+  « Lancer en Docker.cmd »).
+
+> ⚠️ **Pas d'authentification avant RP3** : tout poste qui joint le port 8080
+> peut lire **et modifier** le tableau. À réserver à un segment réseau
+> restreint/maîtrisé (c'est la posture documentée : contrôle d'accès réseau,
+> l'auth applicative arrive en RP3). Sur la plateforme du client, l'équivalent
+> propre est l'ingress/reverse-proxy de la plateforme routant vers le port 80
+> du conteneur front, sans publier d'autre port.
+
 Proxy front (`docker/Dockerfile.front`) : `MIDDLE_HOST` / `MIDDLE_PORT` (défaut
 `middle` / `8787`) — à ajuster si le service middle porte un autre nom sur la
 plateforme.

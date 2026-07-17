@@ -534,6 +534,16 @@ de son ADR.
   durcissement fait, métriques faites). Auth (RP3) toujours différée : décision
   assumée de l'auteur (un seul utilisateur de confiance pour l'instant).
 
+### 2026-07-16 — Mode réseau opt-in (FRONT_BIND)
+- L'adresse d'écoute du **seul point d'entrée publié** (front nginx :8080) est
+  paramétrée : `${FRONT_BIND:-127.0.0.1}` dans le compose. Défaut inchangé =
+  loopback (rien de joignable depuis le réseau). Nouveau lanceur
+  **« Lancer en Docker (reseau).cmd »** : met `FRONT_BIND=0.0.0.0`, tente la
+  règle de pare-feu entrante (TCP 8080), affiche les URL à communiquer.
+  Middle/db/Adminer restent câblés en loopback — tout accès passe par le front
+  en même origine. Consigné dans LIVRAISON.md et SECURITY.md avec
+  l'avertissement : pas d'auth avant RP3 → segment réseau restreint seulement.
+
 ### À venir
 - **RP3** : auth JWT-en-cookie (login, rôles viewer/editor/admin, acteur =
   utilisateur authentifié à la place de « anonymous ») ; CLI de comptes ;

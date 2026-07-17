@@ -63,10 +63,13 @@ services:
     environment:
       MIDDLE_HOST: middle
       MIDDLE_PORT: "8787"
-    # Loopback-bound (single-user local tool). Open to the LAN by dropping the
-    # 127.0.0.1 prefix once the deployment is deliberately multi-user.
+    # Bind address of the ONLY published entry point. Default: loopback —
+    # nothing reachable from the network. « Lancer en Docker (reseau).cmd »
+    # sets FRONT_BIND=0.0.0.0 to serve other machines through nginx (explicit
+    # opt-in; no auth before RP3 → restricted network segments only). middle,
+    # db and adminer ALWAYS stay loopback: every access goes through the front.
     ports:
-      - "127.0.0.1:8080:80"
+      - "${FRONT_BIND:-127.0.0.1}:8080:80"
     depends_on:
       - middle
 
