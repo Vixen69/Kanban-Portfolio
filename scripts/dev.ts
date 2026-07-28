@@ -53,7 +53,13 @@ function openBrowser(url: string): void {
     : process.platform === "darwin"
       ? { cmd: "open", args: [url] }
       : { cmd: "xdg-open", args: [url] };
-  spawn(opener.cmd, opener.args, { stdio: "ignore", detached: true }).unref();
+  const child = spawn(opener.cmd, opener.args, { stdio: "ignore", detached: true });
+  // Minimal VMs may lack xdg-open: the failure used to be silent, leaving the
+  // user staring at a running server with no window. Say what to do instead.
+  child.on("error", () => {
+    console.log(`· ouverture automatique impossible — ouvrir ${url} dans le navigateur.`);
+  });
+  child.unref();
 }
 
 function shutdown(code = 0): void {
