@@ -34,6 +34,13 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.middle
+      # Proxy d'entreprise : transmis au conteneur de BUILD (le npm ci interne
+      # n'hérite ni du shell ni du démon — vu sur la VM client). Vide ailleurs,
+      # donc sans effet hors proxy ; BuildKit les exclut du cache.
+      args:
+        HTTP_PROXY: ${http_proxy:-}
+        HTTPS_PROXY: ${https_proxy:-}
+        NO_PROXY: ${no_proxy:-}
     environment:
       KANBAN_HOST: 0.0.0.0
       KANBAN_PORT: "8787"
@@ -60,6 +67,11 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.front
+      # Même transmission de proxy que le middle (npm ci du build front).
+      args:
+        HTTP_PROXY: ${http_proxy:-}
+        HTTPS_PROXY: ${https_proxy:-}
+        NO_PROXY: ${no_proxy:-}
     environment:
       MIDDLE_HOST: middle
       MIDDLE_PORT: "8787"
