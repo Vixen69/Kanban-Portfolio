@@ -16,7 +16,6 @@ export function OwnerStrip({ card, config, now, onPatch }: {
   onPatch: (patch: CardPatch) => void;
 }) {
   const domain = config.domains.find((d) => d.id === card.domain) ?? config.domains[0]!;
-  const lane = config.lanes.find((l) => l.id === card.laneId) ?? config.lanes[0]!;
   const days = daysInColumn(card, new Date(now));
   const initial = (card.owner || "—").replace(/^(M\.|Mme)\s*/, "").slice(0, 1);
   return (
@@ -24,7 +23,7 @@ export function OwnerStrip({ card, config, now, onPatch }: {
       <span className="owner-mono" style={{ background: domain.color }}>{initial}</span>
       <div className="owner-meta">
         <b><InlineEdit value={card.owner} placeholder="Chef de projet non assigné" onCommit={(v) => onPatch({ owner: v.trim() })} /></b>
-        <span>{lane.name} · {card.loadPlan || "plan de charge n.c."}</span>
+        <span>{card.loadPlan || "plan de charge n.c."}</span>
       </div>
       <span className="owner-since">{days} j dans {colLabel(config, card.columnId)}</span>
     </div>

@@ -42,6 +42,21 @@ information is listed under "Open decisions", ask rather than assume.
 > lines), per-profile consumed editing, and Budget before Plan de charge.
 > The scroll-hint bob is an accepted exception to the no-animation rule.
 
+> **2026-07-28 — Design v12 adopted** (ADR 020, author's decisions). The board
+> now carries **money and capacity**, not only flow: column headers and canal
+> labels wear the aggregated totals of the VISIBLE cards (enveloppe RDLI,
+> estimé, engagé, réalisé, plan de charge + per-profile RAF), folded or
+> unfolded by two Σ toggles remembered in `localStorage` — the product's first
+> and only client-side storage. The one-screen criterion is measured in the
+> **compact default** state. The Metrics view is **entirely rewritten** as a
+> governance read-out (« Metrics »); the v11 flow diagnostics — temps moyen
+> par étape, composition d'âge, **goulot principal** — are dropped. A
+> **« Contrainte »** sidebar filter arrives (OR-shaped, with a synthetic
+> « Aucune »). The fiche loses the canal tag and the focused card trades its
+> progress bar for « est. k€ · RAF j.h ». WIP limits stay per-column topology:
+> the cumulated limit is `lanes × column.wip`, and terminal stages are always
+> derived from the config, never hardcoded.
+
 ## 1. What this project is
 
 An opinionated portfolio kanban instrument: a single-page board that makes a
@@ -221,17 +236,28 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
   refuses); columns collapse to 30px strips (Pause starts collapsed);
   collapsed cells open a one-click ticket popover. Over-WIP cells wear a
   red wash; overflowing cells a scroll-hint arrow.
+- Column headers and canal labels wear the aggregated totals of the VISIBLE
+  cards (design v12, ADR 020): folded = estimé k€ + charge RAF j.h; unfolded
+  = enveloppe RDLI / estimé / engagé / réalisé + plan de charge + a capped,
+  scrollable per-profile breakdown. Two Σ toggles in the grid corner, each
+  remembered per browser (localStorage — the only client-side storage).
+  The column note moved to the header tooltip.
 - Hard acceptance criterion: at 1920x1080 with 150 cards, the full board is
-  visible with zero scrolling; never any horizontal scroll.
-- Sidebar: search (title + codename), codes-projet toggle, « Bloqués
-  uniquement » toggle, filters by type / criticality / domain with
-  tout·rien; live shown/total counts. Filters dim, never remove (spatial
-  truth). No nature filter (v11): nature is the canal.
+  visible with zero scrolling; never any horizontal scroll. Measured in the
+  COMPACT default state (v12): unfolded totals and the 176px canal gutter
+  are a deliberate zoom that may scroll.
+- Sidebar: search (title + codename), codes-projet toggle, « Contrainte »
+  pills (config-driven + a synthetic « Aucune »; OR-shaped — a card stays
+  lit while ANY of its constraints is on), « Bloqués uniquement » toggle,
+  filters by type / criticality / domain with tout·rien; live shown/total
+  counts. Filters dim, never remove (spatial truth). No nature filter (v11):
+  nature is the canal.
 - All UI strings in French, exactly as written in config.
 - Card movement: drag and drop plus keyboard fallback. Every move POSTs an
   intent; the middle writes the event with server-assigned actor/ts.
   Dropping a card ON another card inserts it just before it (ADR 019).
 - Card detail: charge j.h + budget k€ bars (budget before plan de charge),
+  no canal tag (v12: the canal is read spatially from the board row),
   per-profile consumed editing, ressources, commentaires (event-backed),
   BLOCAGE section (mandatory motif, « Lever »), Délais + Historique
   (collapsible, event-backed, incl. block/unblock lines), full edit
@@ -242,8 +268,13 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
 - QuickAdd (« + Sujet », touche N): always enters the first column; the
   canal confers the nature.
 - Admin panel (⚙): topology/vocabulary only (ADR 013), incl. per-lane
-  natureKey. Metrics view (☷): flow metrics computed from cards + events
-  (core/metrics), reorders excluded.
+  natureKey. Metrics view (☷, « Metrics », design v12/ADR 020): a governance
+  read-out computed from cards + events — 6 KPIs then budget croisé, risque
+  de contention, charge restante par rôle, flux (débit 30/90 j + lead/cycle),
+  encours vs limites (limit = lanes × column.wip), risques par entité +
+  contraintes, blocages. Terminal stages are derived from the config, never
+  hardcoded. Reorders excluded. The v11 flow diagnostics (temps moyen par
+  étape, composition d'âge, goulot) were dropped — author's call.
 
 ## 6. Security posture (shapes every choice)
 

@@ -41,6 +41,23 @@ export function resolveFlowAnchors(config: BoardConfig): FlowAnchors | null {
   return { entry, qualification, activation, terminal };
 }
 
+/**
+ * The columns that count as delivered: the terminal anchor and every column
+ * after it in board order. Derived from the config, never hardcoded — the
+ * topology is admin-editable (ADR 013), so renaming « Done » must not
+ * silently zero the throughput. Same anchor as flowTimes, so the Délais
+ * section and the Metrics view can never disagree on what "finished" means.
+ * Inputs: the board config. Output: the set of terminal column ids (empty
+ * when no terminal anchor resolves). Failure: none.
+ */
+export function terminalColumnIds(config: BoardConfig): Set<string> {
+  const anchors = resolveFlowAnchors(config);
+  if (anchors === null || anchors.terminal === null) return new Set<string>();
+  const terminalIndex = config.columns.findIndex((c) => c.id === anchors.terminal?.id);
+  if (terminalIndex < 0) return new Set<string>();
+  return new Set(config.columns.slice(terminalIndex).map((c) => c.id));
+}
+
 /** Per-card flow times, in whole days (null = the stage was never entered). */
 export interface FlowTimes {
   /** Days since the first entry into the entry column (creation fallback). */

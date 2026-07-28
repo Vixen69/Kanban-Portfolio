@@ -8,7 +8,7 @@ import type { BoardConfig, Card, CardState, Criticality } from "./types.ts";
 import { isStale } from "./aging.ts";
 
 /** The togglable pill groups of FilterState (search/blockedOnly excluded). */
-export type FilterGroup = "type" | "crit" | "domain";
+export type FilterGroup = "type" | "crit" | "domain" | "constraint";
 
 /**
  * The filter state driven by the sidebar. Group maps record key ->
@@ -23,6 +23,15 @@ export interface FilterState {
   type: Record<string, boolean>;
   crit: Record<Criticality, boolean>;
   domain: Record<string, boolean>;
+  /** Project-constraint ids (design v12). OR-shaped — see cardMatches. */
+  constraint: Record<string, boolean>;
+  /**
+   * The « Aucune » pill: keeps cards carrying NO project constraint. It is
+   * deliberately NOT a key of `constraint` — the absence of a constraint is
+   * not a constraint, and a separate field cannot collide with an admin-
+   * defined id (config vocabulary is editable, ADR 013).
+   */
+  noConstraint: boolean;
 }
 
 /**
@@ -54,6 +63,8 @@ export function defaultFilters(config: BoardConfig): FilterState {
     type: on(config.types.map((type) => type.id)),
     crit: { top: true, major: true, normal: true },
     domain: on(config.domains.map((domain) => domain.id)),
+    constraint: on(config.projectConstraints.map((constraint) => constraint.id)),
+    noConstraint: true,
   };
 }
 
@@ -71,8 +82,18 @@ export function isFilterActive(filters: FilterState): boolean {
     filters.blockedOnly ||
     groupOff(filters.type) ||
     groupOff(filters.crit) ||
-    groupOff(filters.domain)
+    groupOff(filters.domain) ||
+    groupOff(filters.constraint) ||
+    !filters.noConstraint
   );
+}
+
+// The constraint group, unlike every other one, is OR-shaped: a card wears
+// several constraints at once, so it stays lit as long as ONE of them is
+// still enabled. A card wearing none is governed by the « Aucune » pill.
+function constraintPasses(card: Card, filters: FilterState): boolean {
+  if (card.projectConstraints.length === 0) return filters.noConstraint;
+  return card.projectConstraints.some((id) => filters.constraint[id] !== false);
 }
 
 /**
@@ -80,6 +101,7 @@ export function isFilterActive(filters: FilterState): boolean {
  * (trimmed, case-insensitive) AND it is blocked when blockedOnly is on AND
  * every group passes. A group passes when the card's key is missing from
  * the map or mapped to true; a null typeId always passes the type group.
+ * The constraint group is OR-shaped (see constraintPasses).
  * Inputs: a Card (CardState included), the filters.
  * Output: true when the card passes everything. Failure: none.
  */
@@ -94,6 +116,7 @@ export function cardMatches(card: Card, filters: FilterState): boolean {
   if (filters.crit[card.criticality] === false) return false;
   if (filters.domain[card.domain] === false) return false;
   if (card.typeId !== null && filters.type[card.typeId] === false) return false;
+  if (!constraintPasses(card, filters)) return false;
   return true;
 }
 

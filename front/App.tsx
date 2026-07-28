@@ -211,6 +211,7 @@ function Screen({ ctx }: { ctx: Ctx }) {
       <Sidebar open={ui.sidebar} config={config} search={filters.state.search}
         setSearch={filters.setSearch} filters={filters.state} onToggle={filters.toggle}
         onToggleBlockedOnly={filters.toggleBlockedOnly}
+        onToggleNoConstraint={filters.toggleNoConstraint}
         onSetGroup={filters.setGroup} stats={derived.all} view={derived.view}
         filtersActive={filters.active} onReset={filters.reset} searchRef={ctx.searchRef}
         showCodes={ui.showCodes} setShowCodes={ui.setShowCodes} />

@@ -41,7 +41,7 @@ function Header({ stats, view, filtersActive, onResetFilters, onAdd, onAdmin, on
             </span>
           ))}
         </div>
-        <button className="icon-btn" onClick={onMetrics} title="Métriques de flux">{'☷'}</button>
+        <button className="icon-btn" onClick={onMetrics} title="Metrics">{'☷'}</button>
         <button className="icon-btn arch-btn" onClick={onArchive} title="Archives">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="4" rx="1" /><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8" /><path d="M10 12h4" /></svg>
           {archivedCount > 0 && <span className="arch-count">{archivedCount}</span>}
@@ -117,6 +117,15 @@ function Sidebar({ open, search, setSearch, filters, toggle, setGroup, blockedOn
           <span className={'switch' + (showCodes ? ' on' : '')} onClick={() => setShowCodes(v => !v)}><span className="knob" /></span>
         </label>
         <div className="code-hint">{showCodes ? 'Affichés sur les cartes (ex. PX4520155)' : 'Masqués — recherchables dans la barre ci-dessus'}</div>
+      </div>
+
+      <div className="sb-section">
+        <span className="sb-label">Contrainte</span>
+        <div className="pill-row">
+          <Pill active={filters.constraint.legale} onClick={() => toggle('constraint', 'legale')} color="#dc2626">Légale / réglementaire</Pill>
+          <Pill active={filters.constraint.groupe} onClick={() => toggle('constraint', 'groupe')} color="#7c3aed">Groupe</Pill>
+          <Pill active={filters.constraint.aucune} onClick={() => toggle('constraint', 'aucune')} color="#94a3b8">Aucune</Pill>
+        </div>
       </div>
 
       <div className="sb-section">

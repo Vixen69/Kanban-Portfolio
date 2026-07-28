@@ -16,6 +16,8 @@ export interface SidebarProps {
   filters: FilterState;
   onToggle: (group: FilterGroup, key: string) => void;
   onToggleBlockedOnly: () => void;
+  /** Flips the « Aucune » pill of the Contrainte group (design v12). */
+  onToggleNoConstraint: () => void;
   onSetGroup: (group: FilterGroup, value: boolean) => void;
   /** Whole-portfolio counts (the muted reference totals). */
   stats: ViewCounts;
@@ -154,6 +156,34 @@ function TypeSection(props: SidebarProps) {
   );
 }
 
+// Contrainte (design v12): the configured project constraints plus a
+// synthetic « Aucune » pill. The group is OR-shaped — a card wearing
+// several constraints stays lit while any of them is on (core/filters) —
+// so it gets no tout/rien header. Labels and colors come from the config:
+// the typology is admin-editable vocabulary (ADR 013), never hard-coded.
+function ConstraintSection(props: SidebarProps) {
+  return (
+    <div className="sb-section">
+      <span className="sb-label">Contrainte</span>
+      <div className="pill-row">
+        {props.config.projectConstraints.map((constraint) => (
+          <Pill
+            key={constraint.id}
+            active={props.filters.constraint[constraint.id] !== false}
+            onClick={() => props.onToggle("constraint", constraint.id)}
+            color={constraint.color}
+          >
+            {constraint.name}
+          </Pill>
+        ))}
+        <Pill active={props.filters.noConstraint} onClick={props.onToggleNoConstraint} color="#94a3b8">
+          Aucune
+        </Pill>
+      </div>
+    </div>
+  );
+}
+
 // Blocage (design v11): a single toggle pill, no tout/rien header.
 function BlocageSection(props: SidebarProps) {
   return (
@@ -240,6 +270,7 @@ export function Sidebar(props: SidebarProps) {
       <SearchSection {...props} />
       <ResultRow {...props} />
       <CodesSection {...props} />
+      <ConstraintSection {...props} />
       <BlocageSection {...props} />
       <TypeSection {...props} />
       <CritSection {...props} />

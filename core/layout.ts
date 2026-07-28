@@ -13,8 +13,13 @@ export const LAYOUT = {
   headerHeight: 44,
   /** Bottom margin kept free (former hints footer; now a safety margin). */
   footerHeight: 22,
-  /** Column header row of the grid. */
-  columnHeadHeight: 38,
+  /**
+   * Column header row of the grid, measured in the COMPACT default state
+   * (title + gate + the two-figure totals block of design v12). Unfolding
+   * the totals takes it to ~230px — a deliberate zoom that may scroll, and
+   * NOT the state the one-screen criterion is measured in (ADR 020).
+   */
+  columnHeadHeight: 65,
   /** One mini card bar (the static --card-h of the design). */
   radiatorBarHeight: 16,
   /** Vertical gap between mini card bars. */
@@ -26,19 +31,34 @@ export const LAYOUT = {
 } as const;
 
 /**
+ * The two widths of the lane-label gutter (design v12). Compact is the
+ * vertical strip; expanded turns the label horizontal to hold the per-canal
+ * totals. The one-screen acceptance criterion is measured in the COMPACT
+ * default state — unfolding the totals is a deliberate zoom-in that may
+ * scroll (author's decision, ADR 020).
+ */
+export const LANE_GUTTER = {
+  compact: "var(--lane-w)",
+  expanded: "176px",
+} as const;
+
+/**
  * CSS grid-template-columns for the board: the lane-label gutter followed
  * by one weight per column. A collapsed column is a fixed 30px strip; the
  * focused column takes 2.6fr while the other expanded columns shrink to
  * 0.62fr; with no focus every expanded column gets 1fr. Collapse wins
  * over focus.
  * Inputs: columns in board order, the focused column id (or null), the
- * set of collapsed column ids.
+ * set of collapsed column ids, and the lane gutter width — the default
+ * `var(--lane-w)` narrow strip, widened by the caller when the per-canal
+ * totals are unfolded (design v12).
  * Output: the grid-template-columns string. Failure: none.
  */
 export function columnTemplate(
   columns: Column[],
   focusedColumnId: string | null,
   collapsedColumnIds: ReadonlySet<string>,
+  laneWidth: string = LANE_GUTTER.compact,
 ): string {
   const weights = columns.map((column) =>
     collapsedColumnIds.has(column.id)
@@ -49,7 +69,7 @@ export function columnTemplate(
           ? "0.62fr"
           : "1fr",
   );
-  return `var(--lane-w) ${weights.join(" ")}`;
+  return `${laneWidth} ${weights.join(" ")}`;
 }
 
 /**

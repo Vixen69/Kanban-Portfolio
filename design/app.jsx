@@ -2,7 +2,7 @@
 // Root: state, filtering, drag & drop, focus, collapse, persistence, keyboard, tweaks.
 
 const { useState, useEffect, useRef, useMemo } = React;
-const STORAGE_KEY = 'nmo_portfolio_v14';
+const STORAGE_KEY = 'nmo_portfolio_v15';
 const CONFIG_KEY = 'nmo_board_config_v2';
 const WIP_KEY = 'nmo_wip_v1';
 
@@ -60,6 +60,7 @@ function App() {
   const [search, setSearch] = useState('');
   const [filters, setFilters] = useState(() => ({
     crit: { normal: true, major: true, top: true },
+    constraint: { legale: true, groupe: true, aucune: true },
     rdom: Object.fromEntries(DOMAINS.map(d => [d.id, true])),
     type: Object.fromEntries(TYPES.map(t => [t.id, true])),
   }));
@@ -97,6 +98,7 @@ function App() {
     setBlockedOnly(false);
     setFilters({
       crit: { normal: true, major: true, top: true },
+      constraint: { legale: true, groupe: true, aucune: true },
       rdom: Object.fromEntries(DOMAINS.map(d => [d.id, true])),
       type: Object.fromEntries(TYPES.map(t => [t.id, true])),
     });
@@ -109,13 +111,15 @@ function App() {
   const archivedCards = useMemo(() => cards.filter(c => c.archived), [cards]);
   const decorated = useMemo(() => activeCards.map(c => {
     const match = !q || c.name.toLowerCase().includes(q) || (c.codename || '').toLowerCase().includes(q);
-    const pass = filters.crit[c.criticality] && filters.rdom[c.rdom] && (filters.type[c.type] !== false) && (!blockedOnly || cardBlocked(c));
+    const cons = (c.projConstraints || []);
+    const conPass = cons.length ? cons.some(x => filters.constraint[x]) : filters.constraint.aucune;
+    const pass = filters.crit[c.criticality] && conPass && filters.rdom[c.rdom] && (filters.type[c.type] !== false) && (!blockedOnly || cardBlocked(c));
     return { ...c, dimmed: !(match && pass) };
   }), [activeCards, q, filters, blockedOnly]);
 
   // Is the board currently narrowed by search or any filter category?
   const allOn = (g) => Object.values(filters[g]).every(Boolean);
-  const filtersActive = !!q || blockedOnly || !allOn('crit') || !allOn('rdom') || !allOn('type');
+  const filtersActive = !!q || blockedOnly || !allOn('crit') || !allOn('constraint') || !allOn('rdom') || !allOn('type');
 
   const stats = useMemo(() => {
     const s = { total: activeCards.length, blocked: 0, stale: 0, top: 0, major: 0, normal: 0, simple: 0, complicated: 0, complex: 0 };
@@ -325,7 +329,7 @@ function App() {
       {detail && <CardDetail card={detail} allCards={cards} onClose={() => setDetail(null)} onSave={onSave} onDelete={onDelete} onArchive={onArchive} />}
       {adding && <QuickAdd onClose={() => setAdding(false)} onCreate={onCreate} />}
       {admin && <AdminPanel cfg={cfg} onApply={onApplyConfig} onClose={() => setAdmin(false)} />}
-      {metrics && <MetricsView cards={cards} onClose={() => setMetrics(false)} />}
+      {metrics && <MetricsView cards={cards} wipLimits={wipLimits} onClose={() => setMetrics(false)} />}
       {archiveOpen && <ArchiveView cards={archivedCards} onUnarchive={onUnarchive} onOpen={(c) => { setArchiveOpen(false); setDetail(c); }} onClose={() => setArchiveOpen(false)} />}
 
       <TweaksPanel>

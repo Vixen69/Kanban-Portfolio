@@ -544,6 +544,58 @@ de son ADR.
   en même origine. Consigné dans LIVRAISON.md et SECURITY.md avec
   l'avertissement : pas d'auth avant RP3 → segment réseau restreint seulement.
 
+### 2026-07-28 — Design v12 : totaux d'agrégats et lecture de gouvernance
+- **Le tableau porte l'argent et la capacité, pas seulement le flux.** Nouveau
+  module d'agrégation `core/totals.ts` (enveloppe RDLI / estimé / engagé /
+  réalisé en k€, plan de charge et consommé en j.h, ventilés par profil) :
+  **une seule arithmétique** lue par l'en-tête de colonne, l'étiquette de canal
+  et la vue Metrics, donc aucune divergence possible. L'agrégat porte sur les
+  cartes **visibles** (les estompées sont exclues) ; l'archivage reste au
+  soin de l'appelant, contrat écrit dans la doc du module.
+- **Deux bascules Σ dans le coin du tableau**, mémorisées par navigateur.
+  C'est la **première persistance côté client** du produit
+  (`front/useUiPrefs.ts`) : deux booléens de confort, jamais de donnée de
+  portefeuille, chaque accès protégé, interdit à `core/`.
+- **Critère « une seule page » : mesuré en mode compact**, l'état par défaut.
+  `LAYOUT.columnHeadHeight` 38 → **65 px**, valeur mesurée dans l'application.
+  Vérifié à 1920×1080 avec 150 cartes : `scrollX = 0`, `scrollY = 0`, aucune
+  cellule en débordement. Les totaux dépliés (~230 px) et la gouttière élargie
+  (176 px) sont un zoom volontaire qui peut défiler ; liste des profils
+  plafonnée. Conséquence assumée : les totaux de colonne sont **repliés par
+  défaut**, alors que la maquette les ouvrait. **Coût mesuré** : 27 px
+  d'en-tête = une barre visible en moins par ligne (17 → 16), donc la cellule
+  la plus pleine (19 sujets) écrête 3 barres au lieu de 2 ; borne du test
+  d'acceptation recalibrée 2 → 3, raison inscrite dans le fichier. La borne
+  « le contenu tient dans l'écran » est inchangée.
+- **Vue Metrics entièrement réécrite** (« Métriques de flux » → « Metrics ») :
+  6 KPI puis budget croisé, risque de contention, charge restante par rôle,
+  flux (débit 30/90 j + lead/cycle), encours vs limites, risques par entité +
+  contraintes, blocages. `core/metrics.ts` réécrit et scindé
+  (`core/metrics-flow.ts`) ; la vue scindée en `metricsPanels.tsx`.
+  **Abandonnés** (décision auteur) : temps moyen par étape, composition d'âge,
+  goulot principal — `computeFlowMetrics` et `stageDurations` supprimés. Le
+  principe de l'ADR 007 est intact (métriques = requêtes sur le journal).
+- **Limite d'encours cumulée = nb de canaux × `colonne.wip`** : le produit n'a
+  pas de limite par canal (topologie par colonne, ADR 013), et ce produit est
+  exactement la limite de la colonne entière.
+- **Étapes terminales dérivées de la config** (`terminalColumnIds`,
+  `core/flow.ts`) — même ancrage que les Délais de la fiche. La maquette les
+  codait en dur, ce qui aurait mis le débit à zéro au premier renommage.
+- **Filtre « Contrainte »** (OU-formé) : une carte reste allumée tant qu'une de
+  ses contraintes est active ; la pastille « Aucune » filtre l'absence et vit
+  dans son propre champ (`noConstraint`), jamais comme clé — aucun identifiant
+  admin ne peut la percuter. Libellés et couleurs issus de la config.
+- **Allègements** : la fiche perd le canal (déjà lu spatialement), la carte en
+  focus troque sa barre de progression contre « est. k€ · RAF j.h ».
+- **Fixtures** : contrainte projet en jet pondéré (28/24/8/40 %). Déterminisme
+  préservé, mais un tirage de moins ⇒ les extras des sujets suivants changent.
+  Visible seulement après réamorçage du magasin.
+- Aucun changement de schéma, de migration ni de code `middle/`.
+- ADR 020. Vérifié en application : 340 tests verts, conventions vertes,
+  typecheck vert, 7 panneaux rendus, filtre contrainte 150→122→119→104→0→150,
+  aucun artefact de rendu (sondage DOM : seuls les 6 `.gate-line` DoR/DoD
+  attendus, tous confinés).
+
 ### À venir
 - **RP3** : auth JWT-en-cookie (login, rôles viewer/editor/admin, acteur =
   utilisateur authentifié à la place de « anonymous ») ; CLI de comptes ;

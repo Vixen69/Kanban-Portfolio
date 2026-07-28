@@ -4,50 +4,65 @@
 // cells with their one-click ticket popover (design v11), and the grid
 // itself. The grid templates come from core/layout — the single source of
 // truth for the focus/collapse geometry.
+//
+// Design v12: headers and canal labels wear the money/charge totals of the
+// VISIBLE cards, folded or unfolded by the two Σ toggles in the corner.
+// The column note moved to the header tooltip — the totals took its row,
+// but the note stays configurable and admin-editable (ADR 020).
 
-import { useState } from "react";
+import { useMemo } from "react";
 import type { CSSProperties, DragEvent } from "react";
 import type { BoardConfig, CardState, Column, GateDef, Lane } from "../../core/types.ts";
-import { isStale } from "../../core/aging.ts";
 import { cellCards } from "../../core/board.ts";
-import { columnTemplate, rowTemplate } from "../../core/layout.ts";
+import { LANE_GUTTER, columnTemplate, rowTemplate } from "../../core/layout.ts";
+import { columnTotals, emptyTotals, laneTotals, type GroupTotals } from "../../core/totals.ts";
+import { COLUMN_TOTALS_KEY, LANE_TOTALS_KEY, useStoredFlag } from "../useUiPrefs.ts";
 import { Cell } from "./Cell.tsx";
-import { CollapsedTicketList } from "./CollapsedTicketList.tsx";
+import { ColumnTotals, LaneTotals, TotalsToggles } from "./BoardTotals.tsx";
+import { CollapsedCell, CollapsedColCell } from "./CollapsedCells.tsx";
 
 // The gate definition of a column, or null when the column has no gate.
 function gateDefOf(config: BoardConfig, column: Column): GateDef | null {
   return column.gate === null ? null : config.gateDefs[column.gate];
 }
 
+// Collapsed column: a 30px vertical strip, one click to unfold it again.
+function CollapsedColumnHead({ col, onToggleCollapse }: { col: Column; onToggleCollapse: (id: string) => void }) {
+  return (
+    <div className="col-head col-collapsed" onClick={() => onToggleCollapse(col.id)} title={"Déplier " + col.name}>
+      <span className="collapse-caret">{"›"}</span>
+      <span className="col-label-v">{col.name}</span>
+    </div>
+  );
+}
+
 /**
  * Column header. Clicking the body focuses the stage; the caret button
- * collapses the column to a 30px strip (design grid.jsx).
+ * collapses the column to a 30px strip (design grid.jsx). The functional
+ * note is carried by the tooltip since v12 gave its row to the totals.
  * Inputs: the column, its gate definition (null when ungated), focus and
- * collapse state, and the callbacks (both receive the column id).
+ * collapse state, the visible totals of the column and whether they are
+ * unfolded, and the callbacks (both receive the column id).
  * Output: the header element — a vertical label variant when collapsed.
  * Failure modes: none.
  */
-export function ColumnHeader({ col, gateDef, focused, colCollapsed, onFocus, onToggleCollapse }: {
+export function ColumnHeader({ col, gateDef, focused, colCollapsed, totals, totalsOpen, config, onFocus, onToggleCollapse }: {
   col: Column;
   gateDef: GateDef | null;
   focused: boolean;
   colCollapsed: boolean;
+  totals: GroupTotals;
+  totalsOpen: boolean;
+  config: BoardConfig;
   onFocus: (id: string) => void;
   onToggleCollapse: (id: string) => void;
 }) {
-  if (colCollapsed) {
-    return (
-      <div className="col-head col-collapsed" onClick={() => onToggleCollapse(col.id)} title={"Déplier " + col.name}>
-        <span className="collapse-caret">{"›"}</span>
-        <span className="col-label-v">{col.name}</span>
-      </div>
-    );
-  }
+  if (colCollapsed) return <CollapsedColumnHead col={col} onToggleCollapse={onToggleCollapse} />;
   return (
     <div
       className={"col-head" + (focused ? " focused" : "")}
       onClick={() => onFocus(col.id)}
-      title="Cliquer pour focaliser ce stade"
+      title={col.note === "" ? "Cliquer pour focaliser ce stade" : col.note}
     >
       <div className="col-head-top">
         <span className="col-label">{col.name}</span>
@@ -62,7 +77,7 @@ export function ColumnHeader({ col, gateDef, focused, colCollapsed, onFocus, onT
           {"‹"}
         </button>
       </div>
-      <span className="col-note">{col.note}</span>
+      <ColumnTotals totals={totals} config={config} open={totalsOpen} />
     </div>
   );
 }
@@ -70,87 +85,34 @@ export function ColumnHeader({ col, gateDef, focused, colCollapsed, onFocus, onT
 /**
  * Vertical lane label; clicking collapses the canal to a summary strip.
  * The last expanded lane is not collapsible (design v11): its label loses
- * the caret, the click and the hover affordance.
- * Inputs: the lane, its collapsed state, the disabled guard, the toggle.
- * Output: the rotated label with caret, lane name and nature subtitle
- * (the nature is hidden by CSS when collapsed). Failure modes: none.
+ * the caret, the click and the hover affordance. When the per-canal totals
+ * are unfolded the label turns horizontal and widens (design v12).
+ * Inputs: the lane, its collapsed state, the disabled guard, the visible
+ * totals of the canal and whether they are unfolded, the config, the
+ * toggle. Output: the label. Failure modes: none.
  */
-export function LaneLabel({ lane, collapsed, disabled, onToggle }: {
+export function LaneLabel({ lane, collapsed, disabled, totals, totalsOpen, config, onToggle }: {
   lane: Lane;
   collapsed: boolean;
   disabled: boolean;
+  totals: GroupTotals;
+  totalsOpen: boolean;
+  config: BoardConfig;
   onToggle: () => void;
 }) {
+  const expanded = !collapsed && totalsOpen;
   return (
     <div
-      className={"lane-label" + (collapsed ? " collapsed" : "") + (disabled ? " no-collapse" : "")}
+      className={"lane-label" + (collapsed ? " collapsed" : "") + (disabled ? " no-collapse" : "") + (expanded ? " expanded" : "")}
       onClick={disabled ? undefined : onToggle}
       title={disabled ? "Au moins une ligne doit rester dépliée" : (collapsed ? "Déplier " : "Replier ") + lane.name}
     >
       {!disabled && <span className="collapse-caret">{collapsed ? "▸" : "▾"}</span>}
       <span className="lane-name">{lane.name}</span>
-      <span className="lane-nature">{lane.nature}</span>
-    </div>
-  );
-}
-
-// Rect state + open handler shared by the two collapsed-cell variants:
-// hover or click anchors the ticket popover on the cell (design v11).
-function useCellPopover(count: number) {
-  const [rect, setRect] = useState<DOMRect | null>(null);
-  const open = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (count > 0) setRect(event.currentTarget.getBoundingClientRect());
-  };
-  return { rect, open, close: () => setRect(null) };
-}
-
-/**
- * Collapsed-lane summary cell: the signals that matter at a glance, plus
- * the one-click ticket popover on hover/click (design v11).
- * Inputs: the cards of this cell (pre-filtered), the config (stale
- * threshold + type badges), now in epoch ms, the open-card callback.
- * Output: count (empty when zero), blocked badge, stagnation dot.
- * Failure modes: none.
- */
-export function CollapsedCell({ cards, config, now, onOpen }: {
-  cards: CardState[];
-  config: BoardConfig;
-  now: number;
-  onOpen: (card: CardState) => void;
-}) {
-  const date = new Date(now);
-  const blocked = cards.filter((card) => card.blocked).length;
-  const stale = cards.filter((card) => isStale(card, config, date)).length;
-  const pop = useCellPopover(cards.length);
-  return (
-    <div className={"ccell" + (cards.length ? " has" : "")} onMouseEnter={pop.open} onClick={pop.open}>
-      <span className="ccount">{cards.length || ""}</span>
-      {blocked > 0 && <span className="cblk">{blocked}</span>}
-      {stale > 0 && <span className="cstale" title={stale + " stagnant(s)"} />}
-      {pop.rect && <CollapsedTicketList anchorRect={pop.rect} list={cards} config={config} onOpen={onOpen} onClose={pop.close} />}
-    </div>
-  );
-}
-
-/**
- * Collapsed-column strip cell: count and blocked badge, plus the same
- * one-click ticket popover (design v11).
- * Inputs: the cards of this cell (pre-filtered), the config, the
- * open-card callback. Output: the narrow strip content.
- * Failure modes: none.
- */
-export function CollapsedColCell({ cards, config, onOpen }: {
-  cards: CardState[];
-  config: BoardConfig;
-  onOpen: (card: CardState) => void;
-}) {
-  const blocked = cards.filter((card) => card.blocked).length;
-  const pop = useCellPopover(cards.length);
-  return (
-    <div className={"ccol-cell" + (cards.length ? " has" : "")} onMouseEnter={pop.open} onClick={pop.open}>
-      <span className="ccount">{cards.length || ""}</span>
-      {blocked > 0 && <span className="cblk">{blocked}</span>}
-      {pop.rect && <CollapsedTicketList anchorRect={pop.rect} list={cards} config={config} onOpen={onOpen} onClose={pop.close} />}
+      {!collapsed && !totalsOpen && <span className="lane-nature">{lane.nature}</span>}
+      {!collapsed && (
+        <LaneTotals totals={totals} config={config} open={totalsOpen} laneName={lane.name} />
+      )}
     </div>
   );
 }
@@ -217,12 +179,18 @@ function BoardCell({ lane, col, cards, props }: { lane: Lane; col: Column; cards
 // wins over column collapse (design grid.jsx render order). The label of
 // the last expanded lane is disabled (counted against the CURRENT config
 // lanes — collapsedLanes may hold stale ids after an admin edit).
-function LaneRow({ lane, props }: { lane: Lane; props: BoardGridProps }) {
+function LaneRow({ lane, props, totals, totalsOpen }: {
+  lane: Lane;
+  props: BoardGridProps;
+  totals: GroupTotals;
+  totalsOpen: boolean;
+}) {
   const laneCollapsed = props.collapsedLanes.has(lane.id);
   const expandedCount = props.config.lanes.filter((entry) => !props.collapsedLanes.has(entry.id)).length;
   return (
     <>
       <LaneLabel lane={lane} collapsed={laneCollapsed} disabled={!laneCollapsed && expandedCount <= 1}
+        totals={totals} totalsOpen={totalsOpen} config={props.config}
         onToggle={() => props.onToggleLane(lane.id)} />
       {props.config.columns.map((col) => {
         const inCell = cellCards(props.cards, lane.id, col.id);
@@ -238,26 +206,44 @@ function LaneRow({ lane, props }: { lane: Lane; props: BoardGridProps }) {
   );
 }
 
+// Per-column and per-canal aggregates of the VISIBLE cards. Recomputed on
+// every filter keystroke (dimmedIds changes) but NOT on the one-second now
+// tick — the totals carry no time-dependent figure, so `now` is absent
+// from the deps on purpose.
+function useVisibleTotals(cards: CardState[], dimmed: Set<string>, config: BoardConfig) {
+  const byColumn = useMemo(() => columnTotals(cards, dimmed, config), [cards, dimmed, config]);
+  const byLane = useMemo(() => laneTotals(cards, dimmed, config), [cards, dimmed, config]);
+  return { byColumn, byLane };
+}
+
 /**
  * The whole board: one CSS grid of column headers, lane labels and cells.
  * Focus widens a column (2.6fr), collapse shrinks a column to a 30px
  * strip or a lane to a 26px summary row — the grid templates come from
- * core/layout columnTemplate/rowTemplate.
+ * core/layout columnTemplate/rowTemplate. Unfolding the per-canal totals
+ * widens the lane gutter to LANE_GUTTER.expanded.
  * Inputs: BoardGridProps (config, folded cards, dim/focus/collapse/drag
  * state and the interaction callbacks).
  * Output: the .board grid element. Failure modes: none.
  */
 export function BoardGrid(props: BoardGridProps) {
   const { config } = props;
+  const [columnsOpen, toggleColumns] = useStoredFlag(COLUMN_TOTALS_KEY, false);
+  const [lanesOpen, toggleLanes] = useStoredFlag(LANE_TOTALS_KEY, false);
+  const totals = useVisibleTotals(props.cards, props.dimmedIds, config);
+  const laneWidth = lanesOpen ? LANE_GUTTER.expanded : LANE_GUTTER.compact;
   return (
     <div
       className="board"
       style={{
-        gridTemplateColumns: columnTemplate(config.columns, props.focusedColumn, props.collapsedCols),
+        gridTemplateColumns: columnTemplate(config.columns, props.focusedColumn, props.collapsedCols, laneWidth),
         gridTemplateRows: rowTemplate(config.lanes, props.collapsedLanes),
       }}
     >
-      <div className="corner" />
+      <div className="corner">
+        <TotalsToggles columnsOpen={columnsOpen} lanesOpen={lanesOpen}
+          onToggleColumns={toggleColumns} onToggleLanes={toggleLanes} />
+      </div>
       {config.columns.map((col) => (
         <ColumnHeader
           key={col.id}
@@ -265,12 +251,16 @@ export function BoardGrid(props: BoardGridProps) {
           gateDef={gateDefOf(config, col)}
           focused={props.focusedColumn === col.id}
           colCollapsed={props.collapsedCols.has(col.id)}
+          totals={totals.byColumn[col.id] ?? emptyTotals()}
+          totalsOpen={columnsOpen}
+          config={config}
           onFocus={props.onFocusColumn}
           onToggleCollapse={props.onToggleColumnCollapse}
         />
       ))}
       {config.lanes.map((lane) => (
-        <LaneRow key={lane.id} lane={lane} props={props} />
+        <LaneRow key={lane.id} lane={lane} props={props}
+          totals={totals.byLane[lane.id] ?? emptyTotals()} totalsOpen={lanesOpen} />
       ))}
     </div>
   );

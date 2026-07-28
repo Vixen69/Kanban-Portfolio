@@ -41,7 +41,8 @@
 .focus-block { font-size: 9px; color: var(--danger-strong); font-weight: 500; }
 
 /* ---------- Focus card: estimé / consommé mini-bar ---------- */
-.ec-row { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
-.ec-label { font-size: 8px; color: var(--tx-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.ec-track { flex: 1; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden; }
-.ec-fill { display: block; height: 100%; border-radius: 2px; }
+/* Carte en focus : estimé k€ · RAF j.h (design v12, remplace la barre). */
+.ec-row { display: flex; align-items: center; gap: 8px; margin-top: 3px; }
+.ec-stat { font-size: 9px; color: var(--tx-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ec-stat b { color: var(--tx-1); font-weight: 700; }
+.ec-sep { width: 1px; height: 9px; background: var(--bd-sub); }

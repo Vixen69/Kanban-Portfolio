@@ -30,7 +30,9 @@ vivant) et `docs/adr/` (décisions). Le contrat de travail est `CLAUDE.md`.
   comptage des bloqués par cellule. WIP : n/limite, avertit à ≥ 80 %, rougit
   au-delà de 100 % — signale, ne bloque jamais.
 - Panneau latéral (`S`) : recherche titre + code projet (`/`), interrupteur
-  codes projet, interrupteur **« Bloqués uniquement »**, filtres type /
+  codes projet, filtre **« Contrainte »** (contraintes de la config +
+  « Aucune » ; une carte reste allumée tant qu'**une** de ses contraintes est
+  active, ADR 020), interrupteur **« Bloqués uniquement »**, filtres type /
   criticité / domaine avec tout·rien (pas de filtre nature — la nature est le
   canal, ADR 018). Les filtres **estompent**, ne retirent jamais (ADR 005).
   Compteurs affichés/total et stats en direct ; état vide avec réinitialisation.
@@ -53,9 +55,16 @@ vivant) et `docs/adr/` (décisions). Le contrat de travail est `CLAUDE.md`.
   criticités, champs de carte personnalisés. Surcharge persistée côté
   middle avec historique append-only ; « Réinitialiser le modèle » revient
   à `config/board.json` (ADR 013).
-- **Métriques de flux** (☷, ADR 007) : flux/temps par étape, composition
-  d'âge, blocages, charge par canal, goulot — calculés exclusivement depuis
-  cartes + journal d'événements.
+- **Totaux d'agrégats** (design v12, ADR 020) : les en-têtes de colonne et
+  les étiquettes de canal portent les totaux des sujets **visibles** —
+  repliés : estimé k€ + charge RAF j.h ; dépliés : enveloppe RDLI, meilleur
+  estimé, engagé, réalisé, plan de charge et ventilation par profil. Deux
+  bascules Σ dans le coin du tableau, mémorisées par navigateur.
+- **Metrics** (☷, ADR 007 et 020) : lecture de gouvernance calculée
+  exclusivement depuis cartes + journal d'événements — 6 indicateurs, puis
+  budget croisé, risque de contention, charge restante par rôle, flux (débit
+  30/90 j, lead/cycle moyens), encours vs limites, risques par entité et
+  contraintes, blocages.
 - Source des données : adaptateur `fixtures` (150 sujets synthétiques
   déterministes, seed 20260609) derrière le port `PortfolioDataSource`.
   csv-import / sciforma à venir (RP4).

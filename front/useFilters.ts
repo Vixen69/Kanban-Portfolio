@@ -19,6 +19,8 @@ export interface Filters {
   setSearch(search: string): void;
   /** Flips the « Bloqués uniquement » toggle (design v11). */
   toggleBlockedOnly(): void;
+  /** Flips the « Aucune » pill of the Contrainte group (design v12). */
+  toggleNoConstraint(): void;
   /** Toggles one pill of a group (type / crit / domain). */
   toggle(group: FilterGroup, key: string): void;
   /** Sets every pill of a group at once (the tout / rien quick actions). */
@@ -34,8 +36,10 @@ function groupOf(state: FilterState, group: FilterGroup): Record<string, boolean
   return state[group] as Record<string, boolean>;
 }
 
-// Rebuilds the config-derived groups (type, domain) after an admin config
-// change: known keys keep their state, new keys start enabled.
+// Rebuilds the config-derived groups (type, domain, constraint) after an
+// admin config change: known keys keep their state, new keys start enabled.
+// `noConstraint` is deliberately untouched — it is not config data, so no
+// topology edit can invalidate it.
 function reconcile(state: FilterState, config: BoardConfig): FilterState {
   const keep = (ids: string[], previous: Record<string, boolean>) =>
     Object.fromEntries(ids.map((id) => [id, previous[id] !== false]));
@@ -43,6 +47,7 @@ function reconcile(state: FilterState, config: BoardConfig): FilterState {
     ...state,
     type: keep(config.types.map((type) => type.id), state.type),
     domain: keep(config.domains.map((domain) => domain.id), state.domain),
+    constraint: keep(config.projectConstraints.map((entry) => entry.id), state.constraint),
   };
 }
 
@@ -64,6 +69,9 @@ export function useFilters(config: BoardConfig): Filters {
   const toggleBlockedOnly = useCallback(() => {
     setState((current) => ({ ...current, blockedOnly: !current.blockedOnly }));
   }, []);
+  const toggleNoConstraint = useCallback(() => {
+    setState((current) => ({ ...current, noConstraint: !current.noConstraint }));
+  }, []);
   const toggle = useCallback((group: FilterGroup, key: string) => {
     setState((current) => {
       const pills = groupOf(current, group);
@@ -79,5 +87,5 @@ export function useFilters(config: BoardConfig): Filters {
   const reset = useCallback(() => setState(defaultFilters(config)), [config]);
 
   const active = useMemo(() => isFilterActive(state), [state]);
-  return { state, active, setSearch, toggleBlockedOnly, toggle, setGroup, reset };
+  return { state, active, setSearch, toggleBlockedOnly, toggleNoConstraint, toggle, setGroup, reset };
 }

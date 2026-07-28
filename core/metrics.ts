@@ -1,207 +1,159 @@
-// Flow metrics (port of design/metrics.jsx computeFlowMetrics) — computed
-// EXCLUSIVELY from the event log and the event-derived card states, per the
-// contract: no separate metrics store, metrics are queries on events.
-// Answers the governance questions: where does work pile up, where does it
-// stagnate, what is blocked, and how much load is committed vs consumed.
+// Portfolio metrics (design v12, « Metrics ») — the governance read-out a
+// portfolio committee acts on: l'argent (budget croisé), la capacité (RAF
+// par rôle et contention), le flux (débit, délais) et la santé (blocages,
+// risques, encours). Computed EXCLUSIVELY from the event-derived card
+// states and the event log: no separate metrics store, metrics are queries
+// on events (ADR 002/007).
+//
+// v12 supersedes the v11 flow diagnostics (temps moyen par étape,
+// composition d'âge, goulot) — see ADR 020. The flow/health half lives in
+// ./metrics-flow.ts to hold the 300-line file cap.
 
 import type { BoardConfig, CardEvent, CardState } from "./types.ts";
-import { ageCategory, daysInColumn } from "./aging.ts";
-import { isReorder } from "./events.ts";
+import { terminalColumnIds } from "./flow.ts";
+import { profileLoadRows, remainingLoad, totalsOf, type GroupTotals } from "./totals.ts";
+import {
+  blockages,
+  constraintCounts,
+  flowSummary,
+  riskCounts,
+  wipRows,
+  type Blockage,
+  type FlowSummary,
+  type LabelledCount,
+  type WipRow,
+} from "./metrics-flow.ts";
 
-const DAY_MS = 86_400_000;
-
-/** Flow snapshot of one column: count, blockages and age composition. */
-export interface ColumnFlow {
+/** Charge restante et tension d'un profil DSI sur tout le portefeuille. */
+export interface RoleLoad {
   id: string;
   name: string;
-  wip: number | null;
-  count: number;
-  blocked: number;
-  fresh: number;
-  recent: number;
-  aging: number;
-  stale: number;
+  color: string;
+  /** Plan de charge total, j.h. */
+  jh: number;
+  /** Consommé, j.h. */
+  done: number;
+  /** Reste à faire = max(0, jh - done), j.h. */
+  remaining: number;
+  /** Nombre de sujets signalant ce profil « en tension ». */
+  contention: number;
 }
 
-/** Committed vs consumed effort of one lane (jours-homme). */
-export interface LaneLoad {
-  id: string;
-  name: string;
-  /** Sum of effortEstimated over the lane's cards. */
-  est: number;
-  /** Sum of effortConsumed over the lane's cards. */
-  cons: number;
-  count: number;
+/** Everything the Metrics view renders. */
+export interface PortfolioMetrics {
+  /** Sujets non archivés. */
+  activeCount: number;
+  /** Sujets hors étapes terminales. */
+  inFlowCount: number;
+  /** Sujets en étape terminale. */
+  finishedCount: number;
+  blockedCount: number;
+  /** Budget croisé agrégé (k€) et plan de charge (j.h) du portefeuille. */
+  budget: GroupTotals;
+  /** Reste à faire cumulé, j.h. */
+  remainingTotal: number;
+  /** Engagé / enveloppe RDLI, en %. 0 quand l'enveloppe est inconnue. */
+  engagedPct: number;
+  /** Réalisé / enveloppe RDLI, en %. 0 quand l'enveloppe est inconnue. */
+  consumedPct: number;
+  /** Profils porteurs de charge ou signalés en tension. */
+  roles: RoleLoad[];
+  /** Sous-ensemble des profils en tension, du plus signalé au moins. */
+  contention: RoleLoad[];
+  flow: FlowSummary;
+  wip: WipRow[];
+  blockages: Blockage[];
+  risks: LabelledCount[];
+  constraints: LabelledCount[];
 }
 
-/** Portfolio head-line numbers of the metrics view. */
-export interface FlowTotals {
-  total: number;
-  /** Cards sitting in the last two (terminal) columns. */
-  delivered: number;
-  blocked: number;
-  /** Cards past the agingMaxDays threshold in their current column. */
-  stale: number;
+// Sujets signalant chaque profil « en tension », comptés une fois par carte.
+function contentionCounts(cards: readonly CardState[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const card of cards) {
+    for (const id of new Set(card.contentionProfiles)) {
+      counts.set(id, (counts.get(id) ?? 0) + 1);
+    }
+  }
+  return counts;
 }
 
-/** Everything the metrics view renders. */
-export interface FlowMetrics {
-  /** Column ids in board order — the iteration order of the panels. */
-  order: string[];
-  perColumn: Record<string, ColumnFlow>;
-  /** Average days spent in a column, from completed stays in the log. */
-  avgStageDays: Record<string, number>;
-  laneLoads: Record<string, LaneLoad>;
-  totals: FlowTotals;
-  /**
-   * Non-terminal column where the most waiting accumulates (highest
-   * avgStageDays x max(1, count); earliest column wins ties). Null only
-   * when the board has no non-terminal column.
-   */
-  bottleneck: string | null;
-}
-
-// An event that opens a stay in a column (created/imported/moved chains).
-// Same-cell reorders (ADR 019) are rank changes, not stage entries: they
-// must never close a running stay nor open a new one.
-function isEntryEvent(event: CardEvent): boolean {
-  return (
-    (event.type === "created" || event.type === "imported" || event.type === "moved") &&
-    event.toColumn !== null &&
-    !isReorder(event)
+// Merges the charge breakdown with the contention flags: a profile appears
+// as soon as it carries charge OR is flagged, so a profile signalled en
+// tension with nothing planned is still visible (that IS the warning).
+function capacityRoles(
+  totals: GroupTotals,
+  counts: Map<string, number>,
+  config: BoardConfig,
+): RoleLoad[] {
+  const rows = new Map<string, RoleLoad>();
+  for (const row of profileLoadRows(totals, config)) {
+    rows.set(row.id, { ...row, contention: counts.get(row.id) ?? 0 });
+  }
+  for (const [id, contention] of counts) {
+    if (rows.has(id)) continue;
+    const profile = config.profiles.find((candidate) => candidate.id === id);
+    rows.set(id, {
+      id,
+      name: profile?.name ?? id,
+      color: profile?.color ?? "#64748b",
+      jh: 0,
+      done: 0,
+      remaining: 0,
+      contention,
+    });
+  }
+  return [...rows.values()].sort(
+    (a, b) => b.contention - a.contention || b.remaining - a.remaining || a.name.localeCompare(b.name, "fr"),
   );
 }
 
-// Numeric suffix of an event id ("evt-12" -> 12). Lexicographic comparison
-// would order "evt-10" before "evt-9" and break same-instant replays.
-function eventSequence(id: string): number {
-  const sequence = Number(id.slice(id.lastIndexOf("-") + 1));
-  return Number.isNaN(sequence) ? 0 : sequence;
-}
-
-// The fold ordering: timestamp first, numeric insertion sequence on ties.
-function byTsThenSequence(a: CardEvent, b: CardEvent): number {
-  return a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : eventSequence(a.id) - eventSequence(b.id);
+// Percentage of the RDLI envelope, rounded. A zero/unknown envelope yields
+// 0 rather than Infinity: « pas d'enveloppe » is not « dépassement ».
+function percentOfEnvelope(value: number, envelope: number): number {
+  return envelope === 0 ? 0 : Math.round((value / envelope) * 100);
 }
 
 /**
- * Average days spent per column, from COMPLETED stays only: within one
- * card's chain of entry events (created/imported/moved, ordered by ts
- * then numeric id suffix), each event closes the stay opened by the
- * previous one.
- * Inputs: the full event log, the board config.
- * Output: columnId -> rounded average days (0 when no completed stay).
- * Failure: none — negative, unparseable or absurd (>= 1000 days) spans
- * are discarded, as are stays in columns absent from the config.
- */
-export function stageDurations(events: CardEvent[], config: BoardConfig): Record<string, number> {
-  const chains = new Map<string, CardEvent[]>();
-  for (const event of events) {
-    if (!isEntryEvent(event)) continue;
-    const chain = chains.get(event.cardId);
-    if (chain) chain.push(event);
-    else chains.set(event.cardId, [event]);
-  }
-  const stays = new Map<string, number[]>(config.columns.map((column) => [column.id, []]));
-  for (const chain of chains.values()) {
-    chain.sort(byTsThenSequence);
-    for (let i = 0; i < chain.length - 1; i++) {
-      const entry = chain[i] as CardEvent;
-      const next = chain[i + 1] as CardEvent;
-      const days = (Date.parse(next.ts) - Date.parse(entry.ts)) / DAY_MS;
-      if (days >= 0 && days < 1000) stays.get(entry.toColumn as string)?.push(days);
-    }
-  }
-  const averages: Record<string, number> = {};
-  for (const [columnId, list] of stays) {
-    averages[columnId] = list.length ? Math.round(list.reduce((a, b) => a + b, 0) / list.length) : 0;
-  }
-  return averages;
-}
-
-function emptyColumnFlows(config: BoardConfig): Record<string, ColumnFlow> {
-  const flows: Record<string, ColumnFlow> = {};
-  for (const column of config.columns) {
-    flows[column.id] = {
-      id: column.id,
-      name: column.name,
-      wip: column.wip,
-      count: 0,
-      blocked: 0,
-      fresh: 0,
-      recent: 0,
-      aging: 0,
-      stale: 0,
-    };
-  }
-  return flows;
-}
-
-function emptyLaneLoads(config: BoardConfig): Record<string, LaneLoad> {
-  const loads: Record<string, LaneLoad> = {};
-  for (const lane of config.lanes) {
-    loads[lane.id] = { id: lane.id, name: lane.name, est: 0, cons: 0, count: 0 };
-  }
-  return loads;
-}
-
-// Bottleneck = active/study stage with the most accumulated waiting. A
-// strictly-greater comparison keeps the earliest column on ties, matching
-// the design's stable descending sort.
-function findBottleneck(
-  order: string[],
-  terminal: ReadonlySet<string>,
-  perColumn: Record<string, ColumnFlow>,
-  avgStageDays: Record<string, number>,
-): string | null {
-  let best: { id: string; score: number } | null = null;
-  for (const id of order) {
-    if (terminal.has(id)) continue;
-    const score = (avgStageDays[id] ?? 0) * Math.max(1, perColumn[id]?.count ?? 0);
-    if (best === null || score > best.score) best = { id, score };
-  }
-  return best === null ? null : best.id;
-}
-
-/**
- * Computes every metric of the flow view in one pass over the portfolio.
- * Cards in a column or lane unknown to the config are skipped by the
- * per-column / per-lane aggregates (they still count in totals.total).
- * Inputs: the event-derived card states, the raw event log, the board
+ * Computes the whole Metrics read-out.
+ * Inputs: the folded card states (archived ones are filtered out HERE, so
+ * callers may hand over the full portfolio), the raw event log, the board
  * config and now.
- * Output: a FlowMetrics — see the interface doc for each part.
- * Failure: none — an empty portfolio yields zeroed metrics.
+ * Output: a PortfolioMetrics — see the interface doc for each part.
+ * Failure: none — an empty portfolio yields zeroed metrics, null averages
+ * and empty lists.
  */
-export function computeFlowMetrics(
-  cards: CardState[],
+export function computePortfolioMetrics(
+  cards: readonly CardState[],
   events: CardEvent[],
   config: BoardConfig,
   now: Date,
-): FlowMetrics {
-  const order = config.columns.map((column) => column.id);
-  const terminal = new Set(order.slice(-2));
-  const perColumn = emptyColumnFlows(config);
-  const laneLoads = emptyLaneLoads(config);
-  const totals: FlowTotals = { total: cards.length, delivered: 0, blocked: 0, stale: 0 };
-  for (const card of cards) {
-    const category = ageCategory(daysInColumn(card, now), config.age);
-    if (card.blocked) totals.blocked++;
-    if (category === "stale") totals.stale++;
-    if (terminal.has(card.columnId)) totals.delivered++;
-    const column = perColumn[card.columnId];
-    if (column) {
-      column.count++;
-      if (card.blocked) column.blocked++;
-      column[category]++;
-    }
-    const lane = laneLoads[card.laneId];
-    if (lane) {
-      lane.count++;
-      lane.est += card.effortEstimated ?? 0;
-      lane.cons += card.effortConsumed ?? 0;
-    }
+): PortfolioMetrics {
+  const active = cards.filter((card) => !card.archived);
+  const terminal = terminalColumnIds(config);
+  const budget = totalsOf(active);
+  const roles = capacityRoles(budget, contentionCounts(active), config);
+  let inFlowCount = 0;
+  let blockedCount = 0;
+  for (const card of active) {
+    if (!terminal.has(card.columnId)) inFlowCount++;
+    if (card.blocked) blockedCount++;
   }
-  const avgStageDays = stageDurations(events, config);
-  const bottleneck = findBottleneck(order, terminal, perColumn, avgStageDays);
-  return { order, perColumn, avgStageDays, laneLoads, totals, bottleneck };
+  return {
+    activeCount: active.length,
+    inFlowCount,
+    finishedCount: active.length - inFlowCount,
+    blockedCount,
+    budget,
+    remainingTotal: remainingLoad(budget),
+    engagedPct: percentOfEnvelope(budget.engaged, budget.rdli),
+    consumedPct: percentOfEnvelope(budget.consumed, budget.rdli),
+    roles,
+    contention: roles.filter((role) => role.contention > 0),
+    flow: flowSummary(active, events, config, now),
+    wip: wipRows(active, config),
+    blockages: blockages(active, config, now),
+    risks: riskCounts(active, config),
+    constraints: constraintCounts(active, config),
+  };
 }

@@ -27,6 +27,21 @@ function splitCharge(rng: SeededRandom, profileIds: string[], est: number, cons:
   return { entries, profs };
 }
 
+// Contrainte du projet (design v12): a weighted single roll rather than a
+// uniform shuffle — most subjects carry one constraint or none, few carry
+// both. Ids come from the config, so a renamed or extended typology keeps
+// producing resolvable cards; an empty typology yields no constraint.
+function rollConstraints(rng: SeededRandom, constraintIds: string[]): string[] {
+  const [legal, group] = constraintIds;
+  if (legal === undefined) return [];
+  if (group === undefined) return rng.next() < 0.4 ? [legal] : [];
+  const roll = rng.next();
+  if (roll < 0.28) return [legal];
+  if (roll < 0.52) return [group];
+  if (roll < 0.6) return [legal, group];
+  return [];
+}
+
 // 0-2 retained risks, each a bearing entity (riskType id) + a pooled description.
 function rollRisks(rng: SeededRandom, riskTypeIds: string[]): Risk[] {
   const chosen = rng.shuffle(riskTypeIds).slice(0, rng.int(0, 2));
@@ -56,7 +71,7 @@ export function seedExtras(
   const [hl, hh] = RDR_HORIZON[s.columnId] ?? [30, 180];
   s.dateRdr = new Date(nowMs + rng.int(hl, hh) * DAY_MS).toISOString();
   s.risks = rollRisks(rng, config.riskTypes.map((r) => r.id));
-  s.projectConstraints = rng.shuffle(config.projectConstraints.map((c) => c.id)).slice(0, rng.int(0, 2));
+  s.projectConstraints = rollConstraints(rng, config.projectConstraints.map((c) => c.id));
   // Alerts are the source of blockage (design v11): empty by default, only
   // blocked subjects carry one — the field stays on the card for replay.
   s.alerts = [];

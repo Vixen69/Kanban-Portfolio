@@ -5,7 +5,14 @@
 // strip keeps the truth on screen), so the bound checked here is the
 // design's: the portfolio's content fits the viewport when lanes size to
 // content, and equal-share clipping stays confined to the single fullest
-// cell, at most two bars deep (the state of the validated prototype).
+// cell, at most THREE bars deep.
+// The bound was two bars until design v12 (ADR 020): the compact totals
+// block took the column header from 38 to 65 px, which costs exactly one
+// visible bar per lane under equal shares (17 -> 16). The fullest cell of
+// the pinned dataset holds 19 cards, so it now clips 3 instead of 2. The
+// content-fit bound below is UNCHANGED and still passes — only the
+// equal-share clipping margin moved, and an overfull cell wears the
+// scroll-hint arrow by design.
 // NOTE: core/layout fitsOneScreen models "every bar visible under equal
 // shares" (laneCount x tallest lane = 1187px for this pinned dataset) and is
 // deterministically false at 1080 — kept out of this test, flagged upstream.
@@ -74,7 +81,7 @@ test("acceptance: zero scroll at 1080px — content fits, clipping bounded", () 
     }
   }
   assert.ok(clippedCells <= 1, `cellules écrêtées : ${clippedCells} (max 1)`);
-  assert.ok(clippedBars <= 2, `barres écrêtées : ${clippedBars} (max 2)`);
+  assert.ok(clippedBars <= 3, `barres écrêtées : ${clippedBars} (max 3, design v12)`);
 });
 
 test("the portfolio exercises the full visual vocabulary", () => {
