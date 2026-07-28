@@ -33,6 +33,26 @@ source** et construire/auditer lui-même — la construction est reproductible
 - Pour construire depuis la source sans Docker (ou pour semer les données de
   test) : **Node ≥ 22.18** (voir `.nvmrc`) et `npm ci` à la racine.
 
+### Réception sur un poste Linux verrouillé (VM client, sans droits admin)
+
+Constats faits sur la VM `DVPZ-KANBAN-VD1` (Ubuntu 22.04, 2026-07-28) :
+
+1. **Le ZIP GitHub ne conserve pas le bit d'exécution** : après extraction,
+   `chmod +x *.sh verify.sh` une fois, sinon le double-clic ouvre l'éditeur.
+2. **Node sans droits admin** : télécharger `node-v22.x-linux-x64.tar.xz`
+   (`nodejs.org` peut être bloqué par le proxy — passer par le poste connecté
+   et le canal de transfert), puis `tar -xf … -C "$HOME"` et ajouter
+   `$HOME/node-v22.x-linux-x64/bin` au PATH dans `~/.bashrc`. Aucun `sudo`.
+3. **Le double-clic ne lit pas `~/.bashrc`** : « Lancer le tableau.sh »
+   cherche donc lui-même Node dans `$HOME/node-v*/bin` (dernière version).
+   En dépannage, lancer depuis un terminal : `bash "Lancer le tableau.sh"`.
+4. **Proxy d'entreprise** : `http(s)_proxy` déjà posés dans l'environnement ;
+   npm les lit tout seul. En cas d'erreur de certificat (interception TLS),
+   `npm config set cafile /etc/ssl/certs/ca-certificates.crt` — ne JAMAIS
+   désactiver `strict-ssl`.
+5. **Pas de `xdg-open`** sur l'image minimale : le navigateur ne s'ouvre pas
+   tout seul ; ouvrir `http://127.0.0.1:5173` à la main (l'URL est affichée).
+
 ## 3. Construire les images
 
 Depuis la racine du dépôt :
