@@ -10,6 +10,14 @@ cd "$(dirname "$0")"
 
 fail() { echo "$1"; [ -t 0 ] && read -rp "Appuyer sur Entrée pour fermer... "; exit 1; }
 
+# VM sans droits admin : Node peut vivre dans le HOME (node-v22.x/bin) — même
+# complément de PATH que « Lancer le tableau.sh » (le double-clic ne lit pas
+# ~/.bashrc). Node ne sert ici qu'au semis de démonstration.
+if ! command -v node >/dev/null 2>&1; then
+  NODE_HOME="$(ls -d "$HOME"/node-v*/bin 2>/dev/null | sort -V | tail -1)"
+  [ -n "${NODE_HOME:-}" ] && export PATH="$NODE_HOME:$PATH"
+fi
+
 # --- MODE DEMO : autorise l'édition directe de la base ---
 export KANBAN_PG_APPEND_ONLY=0
 
@@ -27,10 +35,21 @@ echo "Attente de la base et du middle..."
 sleep 8
 
 if command -v node >/dev/null 2>&1; then
-  echo "Données de démonstration (idempotent)..."
-  KANBAN_ALLOW_SEED=1 KANBAN_STORAGE_DRIVER=postgres \
-  DATABASE_URL=postgres://kanban:thuglife@localhost:5432/kanban \
-  node scripts/seed.ts
+  # Le semis tourne sur l'HÔTE : il lui faut les dépendances locales (pg).
+  # Un dossier utilisé uniquement en mode Docker ne les a jamais installées
+  # (vu sur la VM client : ERR_MODULE_NOT_FOUND 'pg' après un dézippage neuf).
+  if [ ! -d node_modules ]; then
+    echo "Dépendances du semis absentes : npm ci (une fois)..."
+    npm ci || echo "npm ci a échoué — pile lancée, base laissée vide. Corriger puis relancer pour semer."
+  fi
+  if [ -d node_modules ]; then
+    echo "Données de démonstration (idempotent)..."
+    KANBAN_ALLOW_SEED=1 KANBAN_STORAGE_DRIVER=postgres \
+    DATABASE_URL=postgres://kanban:thuglife@localhost:5432/kanban \
+    node scripts/seed.ts
+  fi
+else
+  echo "Node.js introuvable : pile lancée, base laissée vide (installer Node 22 puis relancer pour semer la démo)."
 fi
 
 echo "Ouverture du navigateur..."
