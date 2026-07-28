@@ -25,9 +25,28 @@ function seed(): void {
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 
-// Spawns a long-lived child and prefixes its output with the label.
+// Refuses to start over an already-running instance. Without this check the
+// readiness polls below can be answered by a FOREIGN process (seen on the
+// client VM: an orphan Vite on 5173 made the launcher claim "front prêt"
+// and open the wrong app while the real one hopped ports).
+async function failIfAlreadyRunning(): Promise<void> {
+  for (const [url, name] of [[MIDDLE, "middle (8787)"], [FRONT, "front (5173)"]] as const) {
+    try {
+      await fetch(url, { signal: AbortSignal.timeout(1500) });
+    } catch {
+      continue; // nothing listening — the port is ours
+    }
+    console.error(`Une instance du tableau tourne déjà — ${name} répond.`);
+    console.error("La fermer (Ctrl+C dans sa fenêtre) ou l'utiliser telle quelle, puis relancer.");
+    process.exit(1);
+  }
+}
+
+// Spawns a long-lived child and prefixes its output with the label. On POSIX
+// the child gets its own process group so shutdown can kill the whole tree —
+// killing bare npm leaves its Vite grandchild alive (the 5173 orphan above).
 function launch(label: string, cmd: string, args: string[]): void {
-  const child = spawn(cmd, args, { cwd: ROOT, shell: true, env: process.env });
+  const child = spawn(cmd, args, { cwd: ROOT, shell: true, env: process.env, detached: !WIN });
   children.push(child);
   const pipe = (chunk: Buffer) => process.stdout.write(`[${label}] ${chunk}`);
   child.stdout?.on("data", pipe);
@@ -65,8 +84,17 @@ function openBrowser(url: string): void {
 function shutdown(code = 0): void {
   for (const child of children) {
     if (!child.pid) continue;
-    if (WIN) spawnSync("taskkill", ["/pid", String(child.pid), "/t", "/f"], { stdio: "ignore" });
-    else child.kill("SIGTERM");
+    if (WIN) {
+      spawnSync("taskkill", ["/pid", String(child.pid), "/t", "/f"], { stdio: "ignore" });
+      continue;
+    }
+    // Negative pid = the whole process group (shell + npm + vite), so no
+    // orphan survives a Ctrl+C or a closed window.
+    try {
+      process.kill(-child.pid, "SIGTERM");
+    } catch {
+      child.kill("SIGTERM");
+    }
   }
   process.exit(code);
 }
@@ -75,6 +103,7 @@ process.on("SIGINT", () => shutdown(0));
 process.on("SIGTERM", () => shutdown(0));
 
 try {
+  await failIfAlreadyRunning();
   seed();
   launch("middle", "node", ["middle/main.ts"]);
   await waitFor(MIDDLE, "middle");

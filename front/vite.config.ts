@@ -9,12 +9,17 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: "127.0.0.1",
+    // Fail loudly when 5173 is taken instead of hopping to 5174: a silent
+    // hop desynchronizes every printed/opened URL (seen on the client VM —
+    // an orphan Vite squatted 5173 and the launcher opened the wrong app).
+    strictPort: true,
     // "^/api/" (regex, trailing slash) — a bare "/api" prefix would also
     // capture the front's own /api.ts module request and 404 it.
     proxy: { "^/api/": "http://127.0.0.1:8787" },
   },
   preview: {
     host: "127.0.0.1",
+    strictPort: true,
     proxy: { "^/api/": "http://127.0.0.1:8787" },
   },
   build: {
