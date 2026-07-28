@@ -1,0 +1,5 @@
+# Shell scripts must cross to Linux with LF endings (bash rejects CRLF);
+# Windows launchers keep CRLF for cmd.exe. Scoped on purpose — no global
+# renormalization of the existing tree.
+*.sh text eol=lf
+*.cmd text eol=crlf

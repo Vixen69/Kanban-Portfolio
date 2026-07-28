@@ -21,10 +21,12 @@ const EVENTS: CardEvent[] = [
   event({ id: "evt-8", ts: "2026-04-01T00:00:00.000Z", type: "moved", cardId: "GHOST", toColumn: "col3" }),
 ];
 
-test("history keeps only this card's movements, most recent first", () => {
+test("history narrates movements and blockages, most recent first (design v11)", () => {
   assert.deepEqual(cardHistory(EVENTS, "S001", CONFIG), [
-    { fromName: "Colonne 1", toName: "Colonne 2", ts: "2026-02-01T00:00:00.000Z", actor: "anonymous" },
-    { fromName: null, toName: "Colonne 1", ts: "2026-01-01T00:00:00.000Z", actor: "sciforma-sync" },
+    { kind: "unblock", fromName: null, toName: null, reason: null, ts: "2026-03-05T00:00:00.000Z", actor: "sciforma-sync" },
+    { kind: "block", fromName: null, toName: null, reason: "attente", ts: "2026-03-01T00:00:00.000Z", actor: "sciforma-sync" },
+    { kind: "move", fromName: "Colonne 1", toName: "Colonne 2", reason: null, ts: "2026-02-01T00:00:00.000Z", actor: "anonymous" },
+    { kind: "move", fromName: null, toName: "Colonne 1", reason: null, ts: "2026-01-01T00:00:00.000Z", actor: "sciforma-sync" },
   ]);
 });
 
@@ -35,7 +37,18 @@ test("created behaves like imported: fromName null, destination named", () => {
     CONFIG,
   );
   assert.deepEqual(history, [
-    { fromName: null, toName: "Colonne 2", ts: "2026-05-01T00:00:00.000Z", actor: "anonymous" },
+    { kind: "move", fromName: null, toName: "Colonne 2", reason: null, ts: "2026-05-01T00:00:00.000Z", actor: "anonymous" },
+  ]);
+});
+
+test("a blocked event without a string reason yields reason null", () => {
+  const history = cardHistory(
+    [event({ id: "evt-1", ts: "2026-05-01T00:00:00.000Z", type: "blocked", payload: {} })],
+    "S001",
+    CONFIG,
+  );
+  assert.deepEqual(history, [
+    { kind: "block", fromName: null, toName: null, reason: null, ts: "2026-05-01T00:00:00.000Z", actor: "sciforma-sync" },
   ]);
 });
 
@@ -66,6 +79,23 @@ test("equal timestamps order by the numeric suffix of the event id, newest first
   assert.deepEqual(history.map((entry) => entry.toName), ["Colonne 3", "Colonne 2"]);
 });
 
-test("a card with no movement events yields an empty history", () => {
+test("a same-cell reorder is not narrated (ADR 019)", () => {
+  const history = cardHistory(
+    [
+      event({ id: "evt-1", ts: "2026-01-01T00:00:00.000Z", type: "created", toColumn: "col1", payload: { laneId: "laneA" } }),
+      event({
+        id: "evt-2", ts: "2026-01-05T00:00:00.000Z", type: "moved",
+        fromColumn: "col1", toColumn: "col1",
+        payload: { fromLaneId: "laneA", laneId: "laneA", beforeId: "S099" },
+      }),
+    ],
+    "S001",
+    CONFIG,
+  );
+  assert.equal(history.length, 1);
+  assert.equal(history[0]?.toName, "Colonne 1");
+});
+
+test("a card with no narrated events yields an empty history", () => {
   assert.deepEqual(cardHistory(EVENTS, "S999", CONFIG), []);
 });

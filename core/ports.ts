@@ -1,8 +1,9 @@
 // The ports of the hexagon (CLAUDE.md section 4).
 // PortfolioDataSource — read-only PPM access, implemented by adapters/
 // (fixtures, csv-import, sciforma, planisware later).
-// BoardStorage — persistence, implemented by middle/storage/ drivers
-// (JSONL now; PostgreSQL via pg later — ADR 008/009/011).
+// BoardStorage — persistence, implemented by middle/storage/ drivers: the
+// PostgreSQL driver (pg, the delivery default — ADR 016) and the JSONL file
+// driver (selectable single-writer fallback — ADR 008/009).
 
 import type { Card, CardEvent, Financials } from "./types.ts";
 import type { CardEventInput } from "./events.ts";

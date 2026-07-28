@@ -276,8 +276,8 @@ function generateCards() {
       const types = shuffle(['ssg', 'infra', 'metier', 'achat', 'fournisseur', 'ad']).slice(0, rand(0, 2));
       c.risks = types.map(t => ({ type: t, desc: pick(RISK_DESC[t] || ['']) }));
     }
-    // Contraintes du projet (checkables) : Légale / Groupe.
-    c.projConstraints = shuffle(['legale', 'groupe']).slice(0, rand(0, 2));
+    // Contrainte du projet (obligatoire) : Légale/réglementaire, Groupe, ou aucune.
+    { const roll = rng(); c.projConstraints = roll < 0.28 ? ['legale'] : roll < 0.52 ? ['groupe'] : roll < 0.6 ? ['legale', 'groupe'] : []; }
     // Alertes = source de blocage. Vides par défaut ; seuls les sujets bloqués (étape 3) en portent.
     c.alerts = [];
     // 0 à 2 commentaires de suivi.

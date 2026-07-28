@@ -3,11 +3,16 @@
    Ported verbatim from design/Portefeuille DSI - Kanban NMO.html (design v9);
    tweak-variant-only rules (dot accent, age edge) are omitted. */
 
-.mini { position: relative; display: flex; align-items: center; gap: 5px; padding: 0 6px 0 10px; border-radius: 2px; background: var(--bg-card); cursor: grab; overflow: hidden; flex: 0 0 auto; box-shadow: 0 1px 1.5px rgba(15,23,42,.06); }
+.mini { position: relative; display: flex; align-items: center; gap: 5px; padding: 0 6px 0 10px; border-radius: 2px; background: var(--bg-card); cursor: pointer; overflow: hidden; flex: 0 0 auto; box-shadow: 0 0 0 1px rgba(15,23,42,.05); }
 .mini:hover { box-shadow: 0 1px 4px rgba(15,23,42,.16); }
 .mini:active { cursor: grabbing; }
+/* Indicateur d'insertion au survol d'une carte pendant un glisser (design v11) */
+.mini.drop-before { box-shadow: inset 0 3px 0 var(--accent), 0 1px 4px rgba(15,23,42,.16); }
+.focus-card.drop-before { box-shadow: inset 0 3px 0 var(--accent), 0 2px 7px rgba(15,23,42,.14); }
 .mini-accent { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
-.mini-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 9px; color: var(--tx-1); font-weight: 500; }
+.mini-name { flex: 0 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 9px; color: var(--tx-1); font-weight: 500; }
+/* Espace élastique après le picto de criticité : nom + picto restent collés, l'âge reste à droite. */
+.card-fill { flex: 1 1 0; min-width: 0; }
 .age { font-size: 8px; color: var(--tx-3); flex: 0 0 auto; font-variant-numeric: tabular-nums; }
 .age.aging { color: var(--warn); font-weight: 600; } .age.stale { color: var(--danger-strong); font-weight: 700; }
 .blk-pulse { width: 5px; height: 5px; border-radius: 50%; background: var(--danger); flex: 0 0 auto; box-shadow: 0 0 0 0 rgba(220,38,38,.5); animation: pulse 1.6s ease-in-out infinite; }
@@ -26,7 +31,7 @@
 .focus-accent { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
 .focus-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .focus-line1 { display: flex; align-items: center; gap: 6px; }
-.focus-name { flex: 1; min-width: 0; font-size: 11px; font-weight: 600; color: var(--tx-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.focus-name { flex: 0 1 auto; min-width: 0; font-size: 11px; font-weight: 600; color: var(--tx-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .focus-line2 { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .dom-pill { font-size: 8px; font-weight: 700; letter-spacing: .05em; padding: 1px 5px; border: 1px solid; border-radius: 3px; }
 .muted { color: var(--tx-3); font-size: 9px; }
@@ -36,7 +41,8 @@
 .focus-block { font-size: 9px; color: var(--danger-strong); font-weight: 500; }
 
 /* ---------- Focus card: estimé / consommé mini-bar ---------- */
-.ec-row { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
-.ec-label { font-size: 8px; color: var(--tx-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.ec-track { flex: 1; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden; }
-.ec-fill { display: block; height: 100%; border-radius: 2px; }
+/* Carte en focus : estimé k€ · RAF j.h (design v12, remplace la barre). */
+.ec-row { display: flex; align-items: center; gap: 8px; margin-top: 3px; }
+.ec-stat { font-size: 9px; color: var(--tx-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ec-stat b { color: var(--tx-1); font-weight: 700; }
+.ec-sep { width: 1px; height: 9px; background: var(--bd-sub); }

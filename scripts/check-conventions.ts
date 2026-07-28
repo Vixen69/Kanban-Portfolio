@@ -5,22 +5,11 @@
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { functionLengths, MAX_FILE_LINES, MAX_FUNCTION_LINES } from "./conventions.ts";
 
 const ROOT = new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
 const SCANNED_DIRS = ["core", "adapters", "fixtures", "front", "scripts", "middle", "sync"];
 const EXTENSIONS = [".ts", ".tsx", ".mjs"];
-const MAX_FILE_LINES = 300;
-const MAX_FUNCTION_LINES = 40;
-// Named function declarations, plus ANY line ending with "=> {": const
-// arrows, object-literal methods and anonymous callbacks (test bodies) are
-// all measured. Arrows with multi-line parameter lists are measured from
-// the "=> {" line (a slight undercount — acceptable for a heuristic).
-const FUNCTION_START = /^\s*(?:export\s+)?(?:async\s+)?function\s+\w+|=>\s*\{\s*$/;
-
-interface Finding {
-  line: number;
-  length: number;
-}
 
 function* walk(dir: string): Generator<string> {
   for (const entry of readdirSync(dir)) {
@@ -29,29 +18,6 @@ function* walk(dir: string): Generator<string> {
     if (statSync(path).isDirectory()) yield* walk(path);
     else if (EXTENSIONS.some((ext) => entry.endsWith(ext))) yield path;
   }
-}
-
-function functionLengths(lines: string[]): Finding[] {
-  const findings: Finding[] = [];
-  for (let i = 0; i < lines.length; i++) {
-    if (!FUNCTION_START.test(lines[i] ?? "")) continue;
-    let depth = 0;
-    let started = false;
-    for (let j = i; j < lines.length; j++) {
-      for (const char of lines[j] ?? "") {
-        if (char === "{") {
-          depth++;
-          started = true;
-        } else if (char === "}") depth--;
-      }
-      if (started && depth <= 0) {
-        const length = j - i + 1;
-        if (length > MAX_FUNCTION_LINES) findings.push({ line: i + 1, length });
-        break;
-      }
-    }
-  }
-  return findings;
 }
 
 let failed = false;

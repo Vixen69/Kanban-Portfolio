@@ -317,7 +317,6 @@ function CardDetail({ card, allCards, onClose, onSave, onDelete, onArchive }) {
             <div className="tag-row">
               {tp && <span className="type-tag big" style={{ background: tp.color }}>{tp.label}</span>}
               <Tag color={dom.color}>{dom.label}</Tag>
-              <Tag color="#94a3b8">{LANE_BY_ID[card.canal].label}</Tag>
               <Tag color="#94a3b8">{COLUMN_BY_ID[card.column].label}</Tag>
               {card.criticality === 'top' && <Tag color="#d4a017" solid>{'♛'} TOP</Tag>}
               {card.criticality === 'major' && <Tag color="#d4a017">{'★'} MAJOR</Tag>}
@@ -339,7 +338,7 @@ function CardDetail({ card, allCards, onClose, onSave, onDelete, onArchive }) {
               <span className="owner-mono" style={{ background: dom.color }}>{(card.cp || '—').replace(/^(M\.|Mme)\s*/, '').slice(0, 1)}</span>
               <div className="owner-meta">
                 <b><InlineEdit value={card.cp} placeholder="Chef de projet non assigné" onCommit={(v) => applyPatch({ cp: v.trim() })} /></b>
-                <span>{LANE_BY_ID[card.canal].label} · {card.planCharge || 'plan de charge n.c.'}</span>
+                <span>{card.planCharge || 'plan de charge n.c.'}</span>
               </div>
               <span className="owner-since">{days} j dans {colLabel(card.column)}</span>
             </div>

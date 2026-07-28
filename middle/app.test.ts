@@ -52,11 +52,15 @@ function stubStorage(cards: Card[] = [testCard({ id: "S001" })]): BoardStorage {
 }
 
 // Boots the app on port 0, runs the body against its base URL, tears it all
-// down (server, then temp dir) regardless of outcome.
-async function withServer(work: (base: string) => Promise<void>): Promise<void> {
+// down (server, then temp dir) regardless of outcome. An alternate storage
+// (e.g. one that rejects) can be injected to exercise the error paths.
+async function withServer(
+  work: (base: string) => Promise<void>,
+  storage: BoardStorage = stubStorage(),
+): Promise<void> {
   const dir = mkdtempSync(join(tmpdir(), "kanban-middle-"));
   const configStore = createConfigStore(dir, testConfig());
-  const app = createApp({ storage: stubStorage(), configStore });
+  const app = createApp({ storage, configStore });
   const server: Server = await new Promise((resolve) => {
     const s = app.listen(0, "127.0.0.1", () => resolve(s));
   });
@@ -254,4 +258,25 @@ test("an unknown API route is a 404", async () => {
   await withServer(async (base) => {
     assert.equal((await fetch(`${base}/api/nope`)).status, 404);
   });
+});
+
+test("a storage failure is a 500 whose body never leaks the internal error", async () => {
+  // The §6 guarantee: an internal error (which may carry paths/SQL/titles) is
+  // logged but the client sees only the generic French message.
+  const marker = "TITRE_SECRET_Projet_Chimère · /var/lib/pg/secret.sql";
+  const failing: BoardStorage = {
+    ...stubStorage(),
+    async listBaseCards(): Promise<never> {
+      throw new Error(marker);
+    },
+  };
+  await withServer(async (base) => {
+    const res = await fetch(`${base}/api/board`);
+    assert.equal(res.status, 500);
+    // Security headers still present on the error response.
+    assert.match(res.headers.get("content-security-policy") ?? "", /default-src 'self'/);
+    const text = await res.text();
+    assert.doesNotMatch(text, /TITRE_SECRET|secret\.sql/);
+    assert.equal((JSON.parse(text) as { error: string }).error, "Erreur interne.");
+  }, failing);
 });

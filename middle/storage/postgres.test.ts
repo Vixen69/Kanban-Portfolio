@@ -192,3 +192,44 @@ test("[pg] card_events is append-only (UPDATE and DELETE are blocked)", { skip: 
       await pool.end();
     }
   }));
+
+test("[pg] append-only OFF (demo switch) drops the guard — UPDATE succeeds", { skip: SKIP }, async () => {
+  await reset();
+  const s = await createPostgresStorage(URL, false);
+  try {
+    await s.appendEvent(lifecycleEvent("created", "S001", "local", TS));
+    const pool = new Pool({ connectionString: URL });
+    try {
+      await assert.doesNotReject(() => pool.query("UPDATE card_events SET data = '{}'::jsonb"));
+    } finally {
+      await pool.end();
+    }
+  } finally {
+    await s.close();
+  }
+});
+
+test("[pg] reopening with the default RESTORES the append-only guard after a demo session", { skip: SKIP }, async () => {
+  // The load-bearing inverse: a demo session dropped the trigger; the next
+  // default open must recreate it, or « the event log is the truth » silently
+  // dies in delivery (Lancer en Docker.cmd sets KANBAN_PG_APPEND_ONLY=0).
+  await reset();
+  const demo = await createPostgresStorage(URL, false);
+  try {
+    await demo.appendEvent(lifecycleEvent("created", "S001", "local", TS));
+  } finally {
+    await demo.close();
+  }
+  const restored = await createPostgresStorage(URL); // default appendOnly=true
+  try {
+    const pool = new Pool({ connectionString: URL });
+    try {
+      await assert.rejects(() => pool.query("UPDATE card_events SET data = '{}'::jsonb"), /append-only/);
+      await assert.rejects(() => pool.query("DELETE FROM card_events"), /append-only/);
+    } finally {
+      await pool.end();
+    }
+  } finally {
+    await restored.close();
+  }
+});

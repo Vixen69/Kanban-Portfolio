@@ -24,7 +24,7 @@ function foldPatched(patch: Record<string, unknown>): CardState | undefined {
 test("edited applies every whitelisted v2 field", () => {
   const state = foldPatched({
     title: "Nouveau titre", owner: "Mme Nouvelle", domain: "beta",
-    criticality: "top", typeId: "t2", codename: "PX9999999", nature: "complex",
+    criticality: "top", typeId: "t2", codename: "PX9999999",
     tags: ["a", "b"], effortEstimated: 120, effortConsumed: 45,
     budgetEstimated: 200, budgetConsumed: 80, loadPlan: "1,5 ETP",
     resources: ["Data", "Infra"], notes: "vu au Sync", custom: { risque: "haut" },
@@ -35,7 +35,6 @@ test("edited applies every whitelisted v2 field", () => {
   assert.equal(state?.criticality, "top");
   assert.equal(state?.typeId, "t2");
   assert.equal(state?.codename, "PX9999999");
-  assert.equal(state?.nature, "complex");
   assert.deepEqual(state?.tags, ["a", "b"]);
   assert.equal(state?.effortEstimated, 120);
   assert.equal(state?.effortConsumed, 45);

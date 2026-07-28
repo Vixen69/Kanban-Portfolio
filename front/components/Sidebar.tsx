@@ -1,10 +1,10 @@
-// The sidebar (design v9 chrome.jsx): search, live read-out, codes-projet
-// toggle, four filter pill groups, the stats block and the keyboard hints.
-// Filters dim cards on the board, they never remove them (spatial truth).
-// Pure view over core/filters state owned by App — no context, no fetch.
+// The sidebar (design v11 chrome.jsx): search, live read-out, codes-projet
+// toggle, the Blocage toggle, three filter pill groups, the stats block and
+// the keyboard hints. Filters dim cards on the board, they never remove
+// them (spatial truth). Pure view over core/filters state owned by App.
 
 import type { ReactNode, Ref } from "react";
-import type { BoardConfig, NatureKey } from "../../core/types.ts";
+import type { BoardConfig } from "../../core/types.ts";
 import type { FilterGroup, FilterState, ViewCounts } from "../../core/filters.ts";
 
 /** Props of the sidebar. All state and callbacks are owned by App. */
@@ -15,6 +15,9 @@ export interface SidebarProps {
   setSearch: (value: string) => void;
   filters: FilterState;
   onToggle: (group: FilterGroup, key: string) => void;
+  onToggleBlockedOnly: () => void;
+  /** Flips the « Aucune » pill of the Contrainte group (design v12). */
+  onToggleNoConstraint: () => void;
   onSetGroup: (group: FilterGroup, value: boolean) => void;
   /** Whole-portfolio counts (the muted reference totals). */
   stats: ViewCounts;
@@ -27,9 +30,6 @@ export interface SidebarProps {
   showCodes: boolean;
   setShowCodes: (value: boolean) => void;
 }
-
-/** Display order of the nature pills (fixed keys, labels from config). */
-const NATURE_KEYS: NatureKey[] = ["simple", "complicated", "complex"];
 
 // One filter pill: optional colored dot + label, lit when active.
 function Pill(props: { active: boolean; onClick: () => void; color?: string; children: ReactNode }) {
@@ -156,31 +156,57 @@ function TypeSection(props: SidebarProps) {
   );
 }
 
-function NatureSection(props: SidebarProps) {
+// Contrainte (design v12): the configured project constraints plus a
+// synthetic « Aucune » pill. The group is OR-shaped — a card wearing
+// several constraints stays lit while any of them is on (core/filters) —
+// so it gets no tout/rien header. Labels and colors come from the config:
+// the typology is admin-editable vocabulary (ADR 013), never hard-coded.
+function ConstraintSection(props: SidebarProps) {
   return (
-    <GroupSection label="Nature" group="nature" filters={props.filters} onSetGroup={props.onSetGroup}>
-      {NATURE_KEYS.map((key) => (
-        <Pill
-          key={key}
-          active={props.filters.nature[key] !== false}
-          onClick={() => props.onToggle("nature", key)}
-          color={props.config.natures[key].fg}
-        >
-          {props.config.natures[key].label}
+    <div className="sb-section">
+      <span className="sb-label">Contrainte</span>
+      <div className="pill-row">
+        {props.config.projectConstraints.map((constraint) => (
+          <Pill
+            key={constraint.id}
+            active={props.filters.constraint[constraint.id] !== false}
+            onClick={() => props.onToggle("constraint", constraint.id)}
+            color={constraint.color}
+          >
+            {constraint.name}
+          </Pill>
+        ))}
+        <Pill active={props.filters.noConstraint} onClick={props.onToggleNoConstraint} color="#94a3b8">
+          Aucune
         </Pill>
-      ))}
-    </GroupSection>
+      </div>
+    </div>
   );
 }
 
+// Blocage (design v11): a single toggle pill, no tout/rien header.
+function BlocageSection(props: SidebarProps) {
+  return (
+    <div className="sb-section">
+      <span className="sb-label">Blocage</span>
+      <div className="pill-row">
+        <Pill active={props.filters.blockedOnly} onClick={props.onToggleBlockedOnly} color="#dc2626">
+          Bloqués uniquement
+        </Pill>
+      </div>
+    </div>
+  );
+}
+
+// Glyphs match the cards' iconography (design chrome.jsx): ★ = Major, ♛ = Top.
 function CritSection(props: SidebarProps) {
   const { crit } = props.filters;
   const crits = props.config.criticalities;
   return (
     <GroupSection label="Criticité" group="crit" filters={props.filters} onSetGroup={props.onSetGroup}>
       <Pill active={crit.normal !== false} onClick={() => props.onToggle("crit", "normal")}>{crits.normal.label}</Pill>
-      <Pill active={crit.major !== false} onClick={() => props.onToggle("crit", "major")} color="#94a3b8">{crits.major.label}</Pill>
-      <Pill active={crit.top !== false} onClick={() => props.onToggle("crit", "top")} color="#eab308">★ {crits.top.label}</Pill>
+      <Pill active={crit.major !== false} onClick={() => props.onToggle("crit", "major")} color="#d4a017">★ {crits.major.label}</Pill>
+      <Pill active={crit.top !== false} onClick={() => props.onToggle("crit", "top")} color="#d4a017">♛ {crits.top.label}</Pill>
     </GroupSection>
   );
 }
@@ -204,7 +230,6 @@ function DomainSection(props: SidebarProps) {
 
 function StatsBlock(props: SidebarProps) {
   const { view, stats, filtersActive: active, config } = props;
-  const natures = config.natures;
   return (
     <div className="sb-stats">
       <div className="sb-label">{active ? "Sélection · total" : "Vue d’ensemble"}</div>
@@ -212,13 +237,9 @@ function StatsBlock(props: SidebarProps) {
       <StatRow label="Bloqués" value={view.blocked} total={stats.blocked} alert active={active} />
       <StatRow label={`Stagnants (> ${config.age.agingMaxDays}j)`} value={view.stale} total={stats.stale} active={active} />
       <div className="stat-divider" />
-      <StatRow label={`★ ${config.criticalities.top.label}`} value={view.top} total={stats.top} active={active} />
-      <StatRow label={config.criticalities.major.label} value={view.major} total={stats.major} active={active} />
+      <StatRow label={`♛ ${config.criticalities.top.label}`} value={view.top} total={stats.top} active={active} />
+      <StatRow label={`★ ${config.criticalities.major.label}`} value={view.major} total={stats.major} active={active} />
       <StatRow label={config.criticalities.normal.label} value={view.normal} total={stats.normal} active={active} />
-      <div className="stat-divider" />
-      <StatRow label={natures.simple.label} value={view.simple} total={stats.simple} active={active} />
-      <StatRow label={natures.complicated.label} value={view.complicated} total={stats.complicated} active={active} />
-      <StatRow label={natures.complex.label} value={view.complex} total={stats.complex} active={active} />
     </div>
   );
 }
@@ -236,9 +257,9 @@ function Shortcuts() {
 
 /**
  * The sidebar. Hidden (zero width) when closed; S or the ≡ button toggles
- * it, "/" opens it and focuses the search box. Sections in design order:
- * search, live result row, codes-projet switch, Type de projet, Nature,
- * Criticité, Domaine RDOM, the stats block, keyboard shortcuts.
+ * it, "/" opens it and focuses the search box. Sections in design-v11
+ * order: search, live result row, codes-projet switch, Blocage, Type de
+ * projet, Criticité, Domaine RDOM, the stats block, keyboard shortcuts.
  * Inputs: SidebarProps (open flag, config, filter state + callbacks,
  * portfolio/visible counts, codes toggle, search ref).
  * Output: the aside element. Failure: none.
@@ -249,8 +270,9 @@ export function Sidebar(props: SidebarProps) {
       <SearchSection {...props} />
       <ResultRow {...props} />
       <CodesSection {...props} />
+      <ConstraintSection {...props} />
+      <BlocageSection {...props} />
       <TypeSection {...props} />
-      <NatureSection {...props} />
       <CritSection {...props} />
       <DomainSection {...props} />
       <StatsBlock {...props} />

@@ -23,17 +23,22 @@ de son ADR.
   front **React 18 / Vite**, middle **Node / Express**, back **PostgreSQL**,
   Docker. Authentification **JWT en cookie httpOnly** + **scrypt**.
   Dépendances bornées au **plafond SBOM** autorisé par le client.
-- **Référence produit** : design **v10** (ADR 014) — couche risques /
-  contraintes / contention / plan de charge par profil dans la fiche détail,
-  au-dessus de la v9 (ADR 012/013).
-- **État live** : monorepo `core/` + `middle/` (Express, pilote JSONL — `pg`
-  différé) + `front/` (React 18) ; **263 tests** `node:test` (dont les
-  frontières d'architecture). Lancement dev : `npm run serve` (middle :8787)
-  + `npm run dev` (front :5173, proxy `/api`) ; données via
-  `KANBAN_ALLOW_SEED=1 npm run seed`. Cf. README « Démarrer ».
+- **Référence produit** : design **v11** (ADR 017/018/019) — archivage
+  réversible, blocage gouverné (motif obligatoire), nature positionnelle
+  (= canal), un clic ouvre la fiche, réordonnancement manuel — au-dessus de la
+  v10 (risques / contraintes / contention / plan de charge, ADR 014) et de la
+  v9 (ADR 012/013).
+- **État live** : monorepo `core/` + `middle/` (Express, pilote **PostgreSQL**
+  `pg` — défaut conteneur, JSONL en repli) + `front/` (React 18) ; **318 tests**
+  `node:test` (dont les frontières d'architecture et le scanner de conventions).
+  Lancement dev : `npm run serve` (middle :8787) + `npm run dev` (front :5173,
+  proxy `/api`) ; données via `KANBAN_ALLOW_SEED=1 npm run seed`. Cf. README
+  « Démarrer ».
 - **Livraison** : conteneurisée (images front nginx + middle Express, même
-  origine, JSONL sur volume ; SBOM CycloneDX), ADR 015 — dossier
-  `LIVRAISON.md` (construire / lancer / vérifier / test local Docker).
+  origine, **PostgreSQL** par défaut ; SBOM CycloneDX), ADR 015/016 —
+  conteneurs durcis (en-têtes page + API, middle non-root, digests épinglés,
+  ports loopback). Dossier `LIVRAISON.md` (construire / lancer / vérifier /
+  test local Docker).
 
 ## Journal des changements
 
@@ -395,6 +400,202 @@ de son ADR.
 - **Vérifié** : 263 tests verts (+13 Postgres skip sans base), typecheck ×3,
   conventions ; build + run Docker de la pile Postgres complète.
 
+### 2026-07-09 — Adoption du design v11 (archivage, blocage gouverné, nature positionnelle, réordonnancement)
+- **Analyse préalable** : delta v10→v11 du dossier `design/` cartographié par
+  revue multi-agents (7 fichiers, ~25 changements produits), chaque écart
+  classé implémenté / partiel / manquant contre le code réel. Quatre
+  décisions d'auteur actées : réordonnancement adopté (event-sourcé),
+  archivage par évènements, **la nature EST le canal** (pas une étiquette),
+  ancres des Délais résolues depuis la config.
+- **Archivage** (ADR 017) : évènements `archived`/`unarchived` (append-only,
+  validés par le middle) ; le repli garde la carte (`archived: true`), le
+  front l'exclut du plateau et de tous les compteurs ; vue « Archives »
+  (recherche, désarchiver, ouvrir la fiche) + badge compteur en en-tête ;
+  Escape déroule fiche → ajout → archives → panneau → focus → canaux.
+- **Blocage gouverné** (design v11) : section BLOCAGE dédiée sous Risques —
+  motif **obligatoire** (bouton désactivé sans texte), bannière + « Lever » ;
+  la case « Bloqué » du formulaire d'édition disparaît (c'était le dernier
+  chemin qui bloquait avec un motif par défaut). Alertes auto et liste
+  d'alertes libres retirées de la fiche (« Risques & alertes » → « Risques » ;
+  le champ `alerts` reste au modèle pour le replay, fixtures à vide).
+- **Historique & Délais** : deux sections repliables (fermées par défaut).
+  Historique raconte aussi les blocages/déblocages (points rouge/vert, motif)
+  — projection des évènements réels. Délais : âges par étape + lead/cycle
+  time par carte (`core/flow.ts`), ancres résolues depuis la config runtime
+  (ids NMO puis repli structurel : gates, positions) — jamais codées en dur.
+- **Nature positionnelle** (ADR 018) : `lanes[].natureKey` en config (défaut
+  `complicated`, éditable au panneau admin) ; nature retirée de `CardPatch`
+  et du whitelist d'édition (un patch historique est ignoré au replay) ;
+  dérivée du canal à la création (serveur) et à l'affichage — déplacer une
+  carte vers un autre canal la requalifie immédiatement. Sélecteur Nature
+  retiré des formulaires ; filtre Nature retiré de la sidebar, remplacé par
+  « Bloqués uniquement » (dans le FilterState core).
+- **Interactions plateau** : un seul clic ouvre la fiche (fin du clic en deux
+  temps) ; cellules repliées cliquables avec **popover tickets** (ouverture
+  en un clic) ; la dernière ligne dépliée refuse de se replier (garde
+  config-aware) ; indice de défilement par `ResizeObserver` ; lavis rouge des
+  cellules au-delà du WIP ; étiquette de canal replié en pastille
+  horizontale.
+- **Réordonnancement manuel** (ADR 019) : dépôt d'une carte SUR une autre —
+  `payload.beforeId` sur l'évènement `moved`, ordre rejoué au repli ;
+  même-cellule accepté **uniquement** comme réordonnancement, sans remise à
+  zéro de l'horloge d'âge, non narré dans l'historique, ignoré des métriques
+  d'étape. Indicateur d'insertion bleu pendant le survol.
+- **Découpes 300 lignes** : `middle/validation.ts` (validateurs de patch),
+  `core/config-derive.ts` (laneNature + reconcileCardRefs), `core/flow.ts`,
+  `core/state.order.test.ts` et `middle/api.moved.test.ts` créés.
+- **Vérifié** : 282 tests verts (+19), typecheck ×3, conventions ; chaque lot
+  vérifié en direct dans l'app (blocage bout-en-bout, archive/désarchive,
+  requalification par changement de canal, réordonnancement persistant avec
+  âge conservé, popover, garde du dernier canal) contre la pile Docker
+  Postgres (middle reconstruit). CLAUDE.md §4/§5 réalignés (encart v11).
+- **Revue adversariale post-implémentation** (5 dimensions, trouvailles
+  contre-vérifiées) — correctifs appliqués : (1) le repli classe désormais
+  les réordonnancements par l'ÉVÈNEMENT enregistré (`isReorder`), le même
+  prédicat que l'historique/Délais/métriques — plus de divergence possible
+  entre plateau et projections sur un journal issu d'une course ; (2) les
+  écritures du middle (évènements + créations) sont **sérialisées** en
+  processus (`serializedWrite`) — la fenêtre valider-puis-écrire ne laisse
+  plus deux intentions concurrentes se valider contre le même repli périmé
+  (sain pour le modèle mono-instance ; un middle multi-instances exigerait
+  un verrou côté base) ; (3) gardes ajoutées : déplacer une carte archivée
+  → 400, re-bloquer une carte bloquée → 400 (l'horloge andon ne repart plus
+  en silence), `beforeId` vers une carte archivée → 400, patch d'édition
+  vide → 400, textes libres d'édition **bornés** (titre 200, owner 120,
+  notes 5000, etc. — le journal est permanent) ; (4) suppression : l'ordre
+  du repli oublie la carte (plus de cible fantôme pour `beforeId`) ; (5)
+  front : fiche archivée → « Désarchiver » (fin du 400 assuré), tag Nature
+  retiré de la fiche (v11), Échap contenu dans le motif de blocage et les
+  éditions en ligne (n'emporte plus la fiche), glyphes de criticité de la
+  sidebar alignés (★ Major / ♛ Top), formulaire d'édition complété (Date
+  RDR, Enveloppe RDLI, Budget engagé), surbrillance de glisser rafraîchie
+  au survol des cartes. **286 tests verts** (+4 tests de régression).
+  Écarts hérités du design, non corrigés (assumés) : popover de cellule
+  repliée fermé au survol du popover seulement ; brouillon de commentaire
+  vidé avant confirmation serveur ; bord admin « références périmées »
+  (dépôt-sur-carte remappée → 400 propre).
+
+### 2026-07-10 — Micro-refonte des tickets (décision auteur)
+- **Un signal par information** : le point rouge pulsé disparaît des tickets
+  bloqués — le lavis rouge suffit ; la pulsation reste dans la bannière
+  BLOCAGE de la fiche (`blk-pulse` conservé là).
+- **Lisibilité** : les pictos de criticité (♛ Top / ★ Majeur) passent APRÈS
+  le nom du projet ; les tickets alignent désormais type de projet puis nom,
+  l'âge restant à droite (`card-fill` élastique entre picto et âge).
+- CLAUDE.md §5 mis à jour. Front seul (cards.tsx + cards.css).
+
+### 2026-07-10 — Adminer démo : édition structurée des cartes et évènements
+- **Problème** : les tables `cards` et `card_events` stockent le document
+  entier dans une colonne `data jsonb` — dans Adminer, éditer une carte
+  revenait à modifier un gros bloc JSON brut (pénible, risqué).
+- **Solution** : plugin Adminer maison `docker/adminer/card-boxes.php`
+  (mécanisme officiel `plugins-enabled/*.php` de l'image, hooks
+  `editInput`/`processInput` vérifiés sur l'Adminer 4.17.1 embarqué),
+  monté en lecture seule par compose (image épinglée `adminer:4.17.1`).
+  L'écran d'édition éclate `data` en boîtes typées par champ : selects pour
+  les enums (criticité, nature, source, type d'évènement), case pour
+  `blocked`, nombres nullables, dates ISO, listes une-entrée-par-ligne
+  (tags, ressources…), mini-JSON pour les structures imbriquées
+  (chargeByProfile, risks, custom, payload) ; `id` verrouillé (= PK).
+  Repli « JSON brut » repliable qui GAGNE quand sa case est cochée (ajout/
+  retrait de clés).
+- **Intégrité** : réassemblage à partir du document original — clés
+  inconnues préservées (boîte mini-JSON générique), types respectés
+  (décodage stdClass : `{}` reste un objet), valeur illisible ⇒ valeur
+  d'origine conservée ; ensemble de clés prouvé identique avant/après.
+- **Vérifié sans navigateur** (session curl + psql) : login, rendu des
+  34 boîtes carte + 7 boîtes évènement, édition mixte (texte/nombre
+  décimal/liste) persistée avec les bons types jsonb, repli brut (clé
+  ajoutée, boîtes ignorées), sous-JSON invalide ⇒ base conservée,
+  antidatage d'un `ts` d'évènement (garde OFF) et refus propre du trigger
+  (garde ON), `/api/board` replie toujours (784 évènements). Données démo
+  restaurées après test.
+- Outillage démo uniquement (profil compose `tools`) : aucun code produit,
+  aucune dépendance, rien de livré à la plateforme.
+
+### 2026-07-15 — Passe de polissage : tests, durcissement conteneurs, docs
+- **Couverture de tests +32** (286 → 318) : `front/detailModel.ts` (dérivations
+  budget / RDR / plan de charge), chemin d'erreur 500 du middle (non-fuite des
+  erreurs internes dans la réponse), interrupteur append-only Postgres OFF puis
+  restauration au réouverture par défaut, et scanner de conventions extrait en
+  module testable (`scripts/conventions.ts` + `conventions.test.ts`).
+- **Durcissement des conteneurs** (audit vérifié, tous S) : en-têtes de sécurité
+  sur la **page** nginx (et plus seulement l'API Express) ; middle en
+  utilisateur `node` **non-root** ; écouteur `error` sur le Pool `pg` (un
+  incident de base au repos ne fait plus tomber le process) ; images de base
+  **épinglées par digest** ; ports publiés **liés à la loopback** (l'API non
+  authentifiée et la base de dev ne sortent pas de la machine). Pile Docker
+  durcie reconstruite et vérifiée de bout en bout : 150 cartes servies, en-têtes
+  présents sur la page, rendu sans violation CSP, `whoami`=`node`, stockage
+  `postgres`.
+- **Documentation remise en cohérence** : README, SECURITY, DEPENDENCIES,
+  middle/README, sync/README, `core/ports.ts`, ce résumé et la liste « À venir »
+  — alignés sur l'état réel (design v11, PostgreSQL livré, `pg` autorisé,
+  durcissement fait, métriques faites). Auth (RP3) toujours différée : décision
+  assumée de l'auteur (un seul utilisateur de confiance pour l'instant).
+
+### 2026-07-16 — Mode réseau opt-in (FRONT_BIND)
+- L'adresse d'écoute du **seul point d'entrée publié** (front nginx :8080) est
+  paramétrée : `${FRONT_BIND:-127.0.0.1}` dans le compose. Défaut inchangé =
+  loopback (rien de joignable depuis le réseau). Nouveau lanceur
+  **« Lancer en Docker (reseau).cmd »** : met `FRONT_BIND=0.0.0.0`, tente la
+  règle de pare-feu entrante (TCP 8080), affiche les URL à communiquer.
+  Middle/db/Adminer restent câblés en loopback — tout accès passe par le front
+  en même origine. Consigné dans LIVRAISON.md et SECURITY.md avec
+  l'avertissement : pas d'auth avant RP3 → segment réseau restreint seulement.
+
+### 2026-07-28 — Design v12 : totaux d'agrégats et lecture de gouvernance
+- **Le tableau porte l'argent et la capacité, pas seulement le flux.** Nouveau
+  module d'agrégation `core/totals.ts` (enveloppe RDLI / estimé / engagé /
+  réalisé en k€, plan de charge et consommé en j.h, ventilés par profil) :
+  **une seule arithmétique** lue par l'en-tête de colonne, l'étiquette de canal
+  et la vue Metrics, donc aucune divergence possible. L'agrégat porte sur les
+  cartes **visibles** (les estompées sont exclues) ; l'archivage reste au
+  soin de l'appelant, contrat écrit dans la doc du module.
+- **Deux bascules Σ dans le coin du tableau**, mémorisées par navigateur.
+  C'est la **première persistance côté client** du produit
+  (`front/useUiPrefs.ts`) : deux booléens de confort, jamais de donnée de
+  portefeuille, chaque accès protégé, interdit à `core/`.
+- **Critère « une seule page » : mesuré en mode compact**, l'état par défaut.
+  `LAYOUT.columnHeadHeight` 38 → **65 px**, valeur mesurée dans l'application.
+  Vérifié à 1920×1080 avec 150 cartes : `scrollX = 0`, `scrollY = 0`, aucune
+  cellule en débordement. Les totaux dépliés (~230 px) et la gouttière élargie
+  (176 px) sont un zoom volontaire qui peut défiler ; liste des profils
+  plafonnée. Conséquence assumée : les totaux de colonne sont **repliés par
+  défaut**, alors que la maquette les ouvrait. **Coût mesuré** : 27 px
+  d'en-tête = une barre visible en moins par ligne (17 → 16), donc la cellule
+  la plus pleine (19 sujets) écrête 3 barres au lieu de 2 ; borne du test
+  d'acceptation recalibrée 2 → 3, raison inscrite dans le fichier. La borne
+  « le contenu tient dans l'écran » est inchangée.
+- **Vue Metrics entièrement réécrite** (« Métriques de flux » → « Metrics ») :
+  6 KPI puis budget croisé, risque de contention, charge restante par rôle,
+  flux (débit 30/90 j + lead/cycle), encours vs limites, risques par entité +
+  contraintes, blocages. `core/metrics.ts` réécrit et scindé
+  (`core/metrics-flow.ts`) ; la vue scindée en `metricsPanels.tsx`.
+  **Abandonnés** (décision auteur) : temps moyen par étape, composition d'âge,
+  goulot principal — `computeFlowMetrics` et `stageDurations` supprimés. Le
+  principe de l'ADR 007 est intact (métriques = requêtes sur le journal).
+- **Limite d'encours cumulée = nb de canaux × `colonne.wip`** : le produit n'a
+  pas de limite par canal (topologie par colonne, ADR 013), et ce produit est
+  exactement la limite de la colonne entière.
+- **Étapes terminales dérivées de la config** (`terminalColumnIds`,
+  `core/flow.ts`) — même ancrage que les Délais de la fiche. La maquette les
+  codait en dur, ce qui aurait mis le débit à zéro au premier renommage.
+- **Filtre « Contrainte »** (OU-formé) : une carte reste allumée tant qu'une de
+  ses contraintes est active ; la pastille « Aucune » filtre l'absence et vit
+  dans son propre champ (`noConstraint`), jamais comme clé — aucun identifiant
+  admin ne peut la percuter. Libellés et couleurs issus de la config.
+- **Allègements** : la fiche perd le canal (déjà lu spatialement), la carte en
+  focus troque sa barre de progression contre « est. k€ · RAF j.h ».
+- **Fixtures** : contrainte projet en jet pondéré (28/24/8/40 %). Déterminisme
+  préservé, mais un tirage de moins ⇒ les extras des sujets suivants changent.
+  Visible seulement après réamorçage du magasin.
+- Aucun changement de schéma, de migration ni de code `middle/`.
+- ADR 020. Vérifié en application : 340 tests verts, conventions vertes,
+  typecheck vert, 7 panneaux rendus, filtre contrainte 150→122→119→104→0→150,
+  aucun artefact de rendu (sondage DOM : seuls les 6 `.gate-line` DoR/DoD
+  attendus, tous confinés).
+
 ### À venir
 - **RP3** : auth JWT-en-cookie (login, rôles viewer/editor/admin, acteur =
   utilisateur authentifié à la place de « anonymous ») ; CLI de comptes ;
@@ -407,6 +608,8 @@ de son ADR.
   "anonymous"` dans `middle/api.ts`, passée à chaque constructeur d'évènement ;
   `postEvent` ne prend pas d'identité — RP3 doit faire transiter l'identité
   authentifiée requête → route `app.ts` → `postEvent` → builders.
-- RP4 csv-import/sciforma + sync ; RP5 métriques ; RP6 conteneurisation + CI
-  plateforme (build TS→JS du middle, nginx du front, adaptateur `pg` une fois
-  autorisé). Chaque phase : une entrée datée ici.
+- RP4 csv-import / sciforma + sync ; RP5 métriques (**vue implémentée**,
+  ADR 007) ; RP6 **CI plateforme** — la conteneurisation (ADR 015) et
+  l'adaptateur `pg` (ADR 016) sont **faits**, et il n'y a **pas** de build
+  TS→JS (exécution TypeScript directe sous Node 22) ; reste l'intégration CI
+  dans la plateforme du client. Chaque phase : une entrée datée ici.

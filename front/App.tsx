@@ -5,8 +5,9 @@
 import { useEffect, useMemo, useRef } from "react";
 import type { BoardConfig, CardPatch, CardState } from "../core/types.ts";
 import { portfolioStats } from "../core/board.ts";
-import { reconcileCardRefs } from "../core/config.ts";
+import { laneNature, reconcileCardRefs } from "../core/config.ts";
 import { dimmedCardIds, portfolioCounts, viewCounts } from "../core/filters.ts";
+import { flowTimes, resolveFlowAnchors } from "../core/flow.ts";
 import { cardHistory } from "../core/history.ts";
 import type { MoveTarget } from "./api.ts";
 import { columnById } from "./lookup.ts";
@@ -21,6 +22,7 @@ import {
 } from "./useInteractions.ts";
 import { useNow } from "./useNow.ts";
 import { AdminPanel } from "./components/AdminPanel.tsx";
+import { ArchiveView } from "./components/ArchiveView.tsx";
 import { BoardGrid } from "./components/BoardGrid.tsx";
 import { CardDetail } from "./components/CardDetail.tsx";
 import { CardEdit } from "./components/CardEdit.tsx";
@@ -30,12 +32,6 @@ import { MetricsView } from "./components/MetricsView.tsx";
 import { QuickAdd } from "./components/QuickAdd.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
 
-/** The blocked-state change a CardEdit save may carry (null = untouched). */
-export interface BlockIntent {
-  blocked: boolean;
-  reason: string;
-}
-
 // Everything the screen pieces read, built once per render in Shell.
 interface Ctx {
   store: BoardStore;
@@ -43,8 +39,10 @@ interface Ctx {
   ui: UiState;
   nowMs: number;
   filters: Filters;
-  /** Folded cards remapped for display (reconcileCardRefs) — what renders. */
+  /** The active (non-archived) cards, remapped for display — the board. */
   cards: CardState[];
+  /** The archived cards (design v11 Archives view), remapped for display. */
+  archivedCards: CardState[];
   derived: ReturnType<typeof useDerived>;
   drag: ReturnType<typeof useDragHandlers>;
   handlers: ReturnType<typeof useBoardHandlers>;
@@ -56,16 +54,20 @@ interface Ctx {
 // Display-level remap (ADR 013): a card whose lane/column/domain/type was
 // removed by an admin edit is shown against the first config entry, so the
 // whole portfolio stays visible. Never writes an event — the fold keeps the
-// original references (reconcileCardRefs is display-only).
+// original references (reconcileCardRefs is display-only). The nature is
+// derived from the (remapped) canal here (ADR 018: nature is positional —
+// a card requalifies by moving lanes, so the stored snapshot never wins).
 function useDisplayCards(cards: CardState[], config: BoardConfig): CardState[] {
   return useMemo(
     () =>
       cards.map((card) => {
         const refs = reconcileCardRefs(card, config);
+        const nature = laneNature(config, refs.laneId);
         const unchanged =
           refs.laneId === card.laneId && refs.columnId === card.columnId &&
-          refs.domain === card.domain && refs.typeId === card.typeId;
-        return unchanged ? card : { ...card, ...refs };
+          refs.domain === card.domain && refs.typeId === card.typeId &&
+          nature === card.nature;
+        return unchanged ? card : { ...card, ...refs, nature };
       }),
     [cards, config],
   );
@@ -84,22 +86,18 @@ function useDerived(cards: CardState[], config: BoardConfig, filters: Filters, n
 }
 
 // One edit-form save, decomposed into its API intents in order: field
-// patch, then move, then the blocked-state delta (a flag flip, or a fresh
-// blocked intent when only the reason changed — CardEdit builds it). The
-// sequence stops at the first refused intent so a failed patch never lets
-// the move/block half-apply; the store surfaces the failure via lastError.
+// patch, then move. The sequence stops at the first refused intent so a
+// failed patch never lets the move half-apply; the store surfaces the
+// failure via lastError. (Blocked state is not part of the edit form —
+// design v11 governs it through the BLOCAGE section of the detail.)
 async function saveEdit(
   store: BoardStore,
   card: CardState,
   patch: CardPatch,
   move: MoveTarget | null,
-  block: BlockIntent | null,
 ): Promise<void> {
   if (Object.keys(patch).length > 0 && !(await store.editCard(card.id, patch))) return;
-  if (move && !(await store.moveCard(card.id, move))) return;
-  if (!block) return;
-  if (block.blocked) await store.blockCard(card.id, block.reason);
-  else if (card.blocked) await store.unblockCard(card.id);
+  if (move) await store.moveCard(card.id, move);
 }
 
 function CardModals({ ctx }: { ctx: Ctx }) {
@@ -108,6 +106,11 @@ function CardModals({ ctx }: { ctx: Ctx }) {
     () => (detailCard ? cardHistory(store.events, detailCard.id, config) : []),
     [store.events, detailCard, config],
   );
+  const flow = useMemo(
+    () => flowTimes(store.events, detailCard?.id ?? "", config, new Date(ctx.nowMs)),
+    [store.events, detailCard, config, ctx.nowMs],
+  );
+  const anchors = useMemo(() => resolveFlowAnchors(config), [config]);
   if (!detailCard) return null;
   const closeAll = () => { ui.setDetailId(null); ui.setEditing(false); };
   if (ui.editing) {
@@ -115,8 +118,8 @@ function CardModals({ ctx }: { ctx: Ctx }) {
       <CardEdit card={detailCard} config={config}
         onClose={closeAll}
         onCancel={() => ui.setEditing(false)}
-        onSave={(patch: CardPatch, move: MoveTarget | null, block?: BlockIntent | null) => {
-          void saveEdit(store, detailCard, patch, move, block ?? null);
+        onSave={(patch: CardPatch, move: MoveTarget | null) => {
+          void saveEdit(store, detailCard, patch, move);
           ui.setEditing(false);
         }}
         onDelete={(id: string) => { void store.deleteCard(id); closeAll(); }} />
@@ -124,12 +127,15 @@ function CardModals({ ctx }: { ctx: Ctx }) {
   }
   return (
     <CardDetail card={detailCard} config={config} now={ctx.nowMs} history={history}
+      flow={flow} anchors={anchors}
       onClose={closeAll}
       onEdit={() => ui.setEditing(true)}
       onPatch={(patch: CardPatch) => void store.editCard(detailCard.id, patch)}
       onBlock={(reason: string) => void store.blockCard(detailCard.id, reason)}
       onUnblock={() => void store.unblockCard(detailCard.id)}
-      onComment={(text: string) => void store.commentCard(detailCard.id, text)} />
+      onComment={(text: string) => void store.commentCard(detailCard.id, text)}
+      onArchive={() => { void store.archiveCard(detailCard.id); closeAll(); }}
+      onUnarchive={() => void store.unarchiveCard(detailCard.id)} />
   );
 }
 
@@ -159,6 +165,12 @@ function ShellModals({ ctx }: { ctx: Ctx }) {
         <MetricsView cards={ctx.cards} events={store.events} config={config}
           now={ctx.nowMs} onClose={() => ui.setMetrics(false)} />
       )}
+      {ui.archive && (
+        <ArchiveView cards={ctx.archivedCards} config={config}
+          onUnarchive={(id: string) => void store.unarchiveCard(id)}
+          onOpen={(card: CardState) => { ui.setArchive(false); ui.setDetailId(card.id); }}
+          onClose={() => ui.setArchive(false)} />
+      )}
     </>
   );
 }
@@ -176,7 +188,9 @@ function BoardArea({ ctx }: { ctx: Ctx }) {
         onOpen={handlers.onOpenCard}
         onDragStart={drag.onDragStart} onDragEnd={drag.onDragEnd}
         onDrop={drag.onDrop} onDragOverCell={drag.onDragOverCell}
-        onDragLeaveCell={drag.onDragLeaveCell} />
+        onDragLeaveCell={drag.onDragLeaveCell}
+        onCardOver={drag.onCardOver} onCardDrop={drag.onCardDrop}
+        dropCardId={ui.dropCardId} />
       {derived.view.shown === 0 && <EmptyOverlay onReset={ctx.filters.reset} />}
     </div>
   );
@@ -192,9 +206,12 @@ function Screen({ ctx }: { ctx: Ctx }) {
         onResetFilters={filters.reset} onClearFocus={() => ui.setFocusCol(null)}
         onToggleSidebar={() => ui.setSidebar((open) => !open)}
         onMetrics={() => ui.setMetrics(true)} onAdmin={() => ui.setAdmin(true)}
+        onArchive={() => ui.setArchive(true)} archivedCount={ctx.archivedCards.length}
         onAdd={() => ui.setAdding(true)} />
       <Sidebar open={ui.sidebar} config={config} search={filters.state.search}
         setSearch={filters.setSearch} filters={filters.state} onToggle={filters.toggle}
+        onToggleBlockedOnly={filters.toggleBlockedOnly}
+        onToggleNoConstraint={filters.toggleNoConstraint}
         onSetGroup={filters.setGroup} stats={derived.all} view={derived.view}
         filtersActive={filters.active} onReset={filters.reset} searchRef={ctx.searchRef}
         showCodes={ui.showCodes} setShowCodes={ui.setShowCodes} />
@@ -219,11 +236,16 @@ function Shell({ store, config }: { store: BoardStore; config: BoardConfig }) {
   const searchRef = useRef<HTMLInputElement>(null);
   const filters = useFilters(config);
   const drag = useDragHandlers(store, ui);
-  const handlers = useBoardHandlers(ui);
+  const handlers = useBoardHandlers(ui, config.lanes);
   useShortcuts(ui, searchRef);
-  const cards = useDisplayCards(store.cards, config);
+  const allCards = useDisplayCards(store.cards, config);
+  // Archived subjects leave the board and every count entirely; they are
+  // listed only by the Archives view (design v11, ADR 017). The detail
+  // lookup searches ALL cards so an archived fiche opens from the archive.
+  const cards = useMemo(() => allCards.filter((card) => !card.archived), [allCards]);
+  const archivedCards = useMemo(() => allCards.filter((card) => card.archived), [allCards]);
   const derived = useDerived(cards, config, filters, now);
-  const detailCard = cards.find((card) => card.id === ui.detailId) ?? null;
+  const detailCard = allCards.find((card) => card.id === ui.detailId) ?? null;
   // A card removed from the fold (deleted elsewhere) leaves detailId
   // dangling: clear it so Escape acts on the visible context again.
   const { detailId, setDetailId, setEditing } = ui;
@@ -235,8 +257,8 @@ function Shell({ store, config }: { store: BoardStore; config: BoardConfig }) {
   }, [detailId, setDetailId, setEditing, store.cards]);
   const focusLabel = ui.focusCol ? (columnById(config)[ui.focusCol]?.name ?? null) : null;
   const ctx: Ctx = {
-    store, config, ui, nowMs, filters, cards, derived, drag, handlers,
-    searchRef, detailCard, focusLabel,
+    store, config, ui, nowMs, filters, cards, archivedCards, derived, drag,
+    handlers, searchRef, detailCard, focusLabel,
   };
   return <Screen ctx={ctx} />;
 }

@@ -4,18 +4,21 @@
       "id": "projets",
       "name": "Projets",
       "nature": "Compliqué",
+      "natureKey": "complicated",
       "detail": "Séquence de gates complète · architecture obligatoire"
     },
     {
       "id": "petits_projets",
       "name": "Petits Projets",
       "nature": "Clair",
+      "natureKey": "simple",
       "detail": "RTM-lite · 1 équipe · ≤ 3 mois"
     },
     {
       "id": "projets_complexes",
       "name": "Projets Complexes",
       "nature": "Complexe",
+      "natureKey": "complex",
       "detail": "RDLI incrémental · MVP avant engagement"
     }
   ],

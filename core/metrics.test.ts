@@ -1,159 +1,234 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { BoardConfig, CardEvent, CardState } from "./types.ts";
-import { computeFlowMetrics, stageDurations } from "./metrics.ts";
+import { computePortfolioMetrics } from "./metrics.ts";
+import { blockages, constraintCounts, riskCounts, wipRows } from "./metrics-flow.ts";
+import { terminalColumnIds } from "./flow.ts";
 import { testCard, testConfig } from "./test-helpers.ts";
 
 const NOW = new Date("2026-06-11T12:00:00.000Z");
-const CONFIG = testConfig(); // col1, col2, col3 — col2 and col3 are terminal
 const DAY_MS = 86_400_000;
+
+// A 4-stage topology so the activation anchor (right after the DoR gate)
+// and the terminal anchor (the DoD gate) do not collapse onto one column —
+// otherwise every cycle time would trivially read 0.
+function metricsConfig(): BoardConfig {
+  const config = testConfig();
+  config.columns = [
+    { id: "col1", name: "Demandes", wip: null, gate: null, note: "" },
+    { id: "col2", name: "Prêts", wip: 3, gate: "DoR", note: "" },
+    { id: "col3", name: "Actifs", wip: 2, gate: null, note: "" },
+    { id: "col4", name: "Done", wip: null, gate: "DoD", note: "" },
+  ];
+  return config;
+}
+
+const CONFIG = metricsConfig(); // 2 lanes (laneA, laneB), 4 columns
+
+function ago(days: number): string {
+  return new Date(NOW.getTime() - days * DAY_MS).toISOString();
+}
 
 function state(overrides: Parameters<typeof testCard>[0] = {}, daysHere = 1): CardState {
   return {
     ...testCard(overrides),
-    enteredColumnAt: new Date(NOW.getTime() - daysHere * DAY_MS).toISOString(),
+    enteredColumnAt: ago(daysHere),
     comments: [],
+    archived: false,
   };
 }
 
 let seq = 0;
-function entry(
-  cardId: string,
-  toColumn: string,
-  ts: string,
-  type: CardEvent["type"] = "moved",
-  id?: string,
-): CardEvent {
-  return { id: id ?? `evt-${++seq}`, ts, actor: "test", cardId, type, fromColumn: null, toColumn, payload: {} };
+function entry(cardId: string, toColumn: string, daysAgo: number, type: CardEvent["type"] = "moved"): CardEvent {
+  return {
+    id: `evt-${++seq}`,
+    ts: ago(daysAgo),
+    actor: "test",
+    cardId,
+    type,
+    fromColumn: null,
+    toColumn,
+    payload: {},
+  };
 }
 
-test("stageDurations averages completed stays per column", () => {
-  const events: CardEvent[] = [
-    entry("S001", "col1", "2026-01-01T00:00:00.000Z", "created"),
-    entry("S001", "col2", "2026-01-11T00:00:00.000Z"), // 10 days in col1
-    entry("S001", "col3", "2026-01-15T00:00:00.000Z"), // 4 days in col2
-    entry("S002", "col1", "2026-02-01T00:00:00.000Z", "created"),
-    entry("S002", "col2", "2026-02-21T00:00:00.000Z"), // 20 days in col1
-  ];
-  const averages = stageDurations(events, CONFIG);
-  assert.equal(averages["col1"], 15); // (10 + 20) / 2
-  assert.equal(averages["col2"], 4);
-  assert.equal(averages["col3"], 0); // open stay, never closed
+const CARDS: CardState[] = [
+  state(
+    {
+      id: "S001",
+      columnId: "col4",
+      budgetRdli: 100, budgetEstimated: 90, budgetEngaged: 70, budgetConsumed: 30,
+      chargeByProfile: [{ profileId: "pA", jh: 100, done: 40 }],
+      risks: [{ type: "rSSG", desc: "" }],
+      projectConstraints: ["legale"],
+    },
+    10,
+  ),
+  state(
+    {
+      id: "S002",
+      columnId: "col4",
+      budgetRdli: 100, budgetEstimated: 60, budgetEngaged: 50, budgetConsumed: 20,
+      chargeByProfile: [{ profileId: "pB", jh: 50, done: 10 }],
+      risks: [{ type: "rSSG", desc: "" }, { type: "rInfra", desc: "" }],
+      projectConstraints: ["legale", "groupe"],
+    },
+    50,
+  ),
+  state(
+    { id: "S003", columnId: "col3", blocked: true, blockedReason: "Attente arbitrage", contentionProfiles: ["pA"] },
+    12,
+  ),
+  state({ id: "S004", columnId: "col1", contentionProfiles: ["pGhost"] }, 3),
+  { ...state({ id: "S005", columnId: "col4", budgetRdli: 9999 }, 1), archived: true },
+];
+
+const EVENTS: CardEvent[] = [
+  entry("S001", "col1", 40, "created"),
+  entry("S001", "col3", 30),
+  entry("S001", "col4", 10),
+  entry("S002", "col1", 100, "created"),
+  entry("S002", "col3", 90),
+  entry("S002", "col4", 50),
+  entry("S003", "col1", 30, "created"),
+  entry("S003", "col3", 12),
+  entry("S004", "col1", 3, "created"),
+];
+
+test("terminal columns are derived from the config, never hardcoded", () => {
+  assert.deepEqual([...terminalColumnIds(CONFIG)].sort(), ["col4"]);
+  // Renaming the gated column moves the anchor instead of zeroing the view.
+  const renamed = metricsConfig();
+  renamed.columns = renamed.columns.map((c) => (c.id === "col4" ? { ...c, id: "livre" } : c));
+  assert.deepEqual([...terminalColumnIds(renamed)].sort(), ["livre"]);
 });
 
-test("stageDurations orders same-instant events by numeric id suffix, not lexicographically", () => {
-  const ts = "2026-03-01T00:00:00.000Z";
-  const events: CardEvent[] = [
-    entry("S010", "col2", ts, "moved", "evt-10"), // second: 6-day stay in col2
-    entry("S010", "col1", ts, "imported", "evt-9"), // first: 0-day stay in col1
-    entry("S010", "col3", "2026-03-07T00:00:00.000Z", "moved", "evt-11"),
-  ];
-  const averages = stageDurations(events, CONFIG);
-  assert.equal(averages["col2"], 6);
-  assert.equal(averages["col1"], 0);
+test("archived cards are excluded from every aggregate", () => {
+  const metrics = computePortfolioMetrics(CARDS, EVENTS, CONFIG, NOW);
+  assert.equal(metrics.activeCount, 4);
+  // S005 carries an RDLI of 9999 — if it leaked, the envelope would explode.
+  assert.equal(metrics.budget.rdli, 200);
 });
 
-test("stageDurations ignores non-entry events, unknown columns, absurd spans", () => {
-  const events: CardEvent[] = [
-    // A blocked event between two entries must not split the stay.
-    entry("S001", "col1", "2026-01-01T00:00:00.000Z", "created"),
-    { ...entry("S001", "col1", "2026-01-03T00:00:00.000Z"), type: "blocked", toColumn: null },
-    entry("S001", "col2", "2026-01-11T00:00:00.000Z"), // 10 days in col1
-    // A >= 1000-day span is discarded as absurd.
-    entry("S002", "col1", "2020-01-01T00:00:00.000Z", "created"),
-    entry("S002", "col2", "2023-06-01T00:00:00.000Z"),
-    // A stay in a column unknown to the config is dropped silently.
-    entry("S003", "ghost", "2026-02-01T00:00:00.000Z", "created"),
-    entry("S003", "col1", "2026-02-04T00:00:00.000Z"),
-  ];
-  const averages = stageDurations(events, CONFIG);
-  assert.equal(averages["col1"], 10);
-  assert.equal("ghost" in averages, false);
+test("head-line counts split in-flow, finished and blocked", () => {
+  const metrics = computePortfolioMetrics(CARDS, EVENTS, CONFIG, NOW);
+  assert.equal(metrics.inFlowCount, 2); // S003 (col3), S004 (col1)
+  assert.equal(metrics.finishedCount, 2); // S001, S002 (col4)
+  assert.equal(metrics.blockedCount, 1); // S003
 });
 
-test("computeFlowMetrics: per-column counts and age buckets, lane loads, totals", () => {
-  const cards: CardState[] = [
-    state({ id: "A", columnId: "col1", laneId: "laneA", effortEstimated: 10, effortConsumed: 4 }, 2), // fresh
-    state({ id: "B", columnId: "col1", laneId: "laneA", effortEstimated: 5, blocked: true, blockedSince: NOW.toISOString() }, 30), // aging
-    state({ id: "C", columnId: "col1", laneId: "laneA" }, 70), // stale
-    state({ id: "D", columnId: "col1", laneId: "laneA" }, 10), // recent
-    state({ id: "E", columnId: "col2", laneId: "laneB", effortEstimated: 20, effortConsumed: 8 }, 5), // terminal
-    state({ id: "F", columnId: "col3", laneId: "laneB" }, 70), // terminal AND stale
-    state({ id: "G", columnId: "ghost", laneId: "ghost" }, 5), // unknown refs
-  ];
-  const metrics = computeFlowMetrics(cards, [], CONFIG, NOW);
-  const col1 = metrics.perColumn["col1"];
+test("budget croisé sums each field and reads as a share of the RDLI envelope", () => {
+  const metrics = computePortfolioMetrics(CARDS, EVENTS, CONFIG, NOW);
+  assert.equal(metrics.budget.rdli, 200);
+  assert.equal(metrics.budget.estimated, 150);
+  assert.equal(metrics.budget.engaged, 120);
+  assert.equal(metrics.budget.consumed, 50);
+  assert.equal(metrics.engagedPct, 60);
+  assert.equal(metrics.consumedPct, 25);
+  assert.equal(metrics.remainingTotal, 100); // 150 j.h planned - 50 consumed
+});
+
+test("an unknown RDLI envelope reads 0 %, never Infinity", () => {
+  const noEnvelope = [state({ id: "X1", budgetEngaged: 40, budgetConsumed: 10 })];
+  const metrics = computePortfolioMetrics(noEnvelope, [], CONFIG, NOW);
+  assert.equal(metrics.budget.rdli, 0);
+  assert.equal(metrics.engagedPct, 0);
+  assert.equal(metrics.consumedPct, 0);
+  assert.equal(Number.isFinite(metrics.engagedPct), true);
+});
+
+test("roles merge charge and contention, tension first", () => {
+  const metrics = computePortfolioMetrics(CARDS, EVENTS, CONFIG, NOW);
   assert.deepEqual(
-    { count: col1?.count, blocked: col1?.blocked, fresh: col1?.fresh, recent: col1?.recent, aging: col1?.aging, stale: col1?.stale },
-    { count: 4, blocked: 1, fresh: 1, recent: 1, aging: 1, stale: 1 },
+    metrics.roles.map((role) => [role.id, role.remaining, role.contention]),
+    [
+      ["pA", 60, 1], // flagged AND heaviest
+      ["pGhost", 0, 1], // flagged with no charge planned — that IS the warning
+      ["pB", 40, 0],
+    ],
   );
-  assert.equal(col1?.wip, null);
-  assert.equal(metrics.perColumn["col2"]?.wip, 3);
-  assert.deepEqual(metrics.totals, { total: 7, delivered: 2, blocked: 1, stale: 2 });
-  assert.deepEqual(metrics.order, ["col1", "col2", "col3"]);
-  const laneA = metrics.laneLoads["laneA"];
-  assert.deepEqual({ est: laneA?.est, cons: laneA?.cons, count: laneA?.count }, { est: 15, cons: 4, count: 4 });
-  const laneB = metrics.laneLoads["laneB"];
-  assert.deepEqual({ est: laneB?.est, cons: laneB?.cons, count: laneB?.count }, { est: 20, cons: 8, count: 2 });
+  assert.deepEqual(metrics.contention.map((role) => role.id), ["pA", "pGhost"]);
 });
 
-// A 5-column board: c1..c3 are in-flow, c4/c5 (last two) are terminal.
-function wideConfig(): BoardConfig {
-  const config = testConfig();
-  config.columns = ["c1", "c2", "c3", "c4", "c5"].map((id) => ({
-    id,
-    name: id.toUpperCase(),
-    wip: null,
-    gate: null,
-    note: "",
-  }));
-  return config;
-}
+test("a profile is counted once per card even if flagged twice", () => {
+  const twice = [state({ id: "X1", contentionProfiles: ["pA", "pA"] })];
+  const metrics = computePortfolioMetrics(twice, [], CONFIG, NOW);
+  assert.equal(metrics.roles.find((role) => role.id === "pA")?.contention, 1);
+});
 
-function wideEvents(): CardEvent[] {
-  return [
-    entry("X1", "c1", "2026-01-01T00:00:00.000Z", "created"),
-    entry("X1", "c2", "2026-01-11T00:00:00.000Z"), // c1 avg 10
-    entry("X2", "c2", "2026-01-01T00:00:00.000Z", "created"),
-    entry("X2", "c3", "2026-01-31T00:00:00.000Z"), // c2 avg 30
-    entry("X3", "c3", "2026-01-01T00:00:00.000Z", "created"),
-    entry("X3", "c4", "2026-01-06T00:00:00.000Z"), // c3 avg 5
-    entry("X4", "c4", "2026-01-01T00:00:00.000Z", "created"),
-    entry("X4", "c5", "2027-05-16T00:00:00.000Z"), // c4 avg 500 — terminal
+test("flow summary reports débit over 30/90 days and average lead/cycle", () => {
+  const { flow } = computePortfolioMetrics(CARDS, EVENTS, CONFIG, NOW);
+  assert.equal(flow.throughput30, 1); // S001 delivered 10 days ago
+  assert.equal(flow.throughput90, 2); // + S002 delivered 50 days ago
+  assert.equal(flow.leadTimeAvg, 40); // (40-10) and (100-50) => (30 + 50) / 2
+  assert.equal(flow.cycleTimeAvg, 30); // (30-10) and (90-50) => (20 + 40) / 2
+});
+
+test("a portfolio with nothing delivered yields zeros and null averages", () => {
+  const { flow } = computePortfolioMetrics([CARDS[3] as CardState], EVENTS, CONFIG, NOW);
+  assert.deepEqual(flow, { throughput30: 0, throughput90: 0, leadTimeAvg: null, cycleTimeAvg: null });
+});
+
+test("wip rows cumulate the column limit across canaux and exclude delivered work", () => {
+  const rows = wipRows(CARDS.filter((card) => !card.archived), CONFIG);
+  assert.deepEqual(
+    rows.map((row) => [row.id, row.count, row.limit, row.over]),
+    [
+      ["col1", 1, 0, false], // no WIP set => limit 0, never « over »
+      ["col2", 0, 6, false], // wip 3 x 2 canaux
+      ["col3", 1, 4, false], // wip 2 x 2 canaux
+      ["col4", 0, 0, false], // terminal: delivered work is not encours
+    ],
+  );
+});
+
+test("wip flags a column past its cumulated limit", () => {
+  const crowded = Array.from({ length: 7 }, (_, i) => state({ id: `C${i}`, columnId: "col2" }));
+  const row = wipRows(crowded, CONFIG).find((candidate) => candidate.id === "col2");
+  assert.equal(row?.count, 7);
+  assert.equal(row?.limit, 6);
+  assert.equal(row?.over, true);
+});
+
+test("blockages list the blocked cards, oldest first, with their column name", () => {
+  const rows = blockages(CARDS.filter((card) => !card.archived), CONFIG, NOW);
+  assert.equal(rows.length, 1);
+  assert.deepEqual(rows[0], {
+    id: "S003",
+    title: "Sujet de test",
+    reason: "Attente arbitrage",
+    columnName: "Actifs",
+    days: 12,
+  });
+});
+
+test("blockages sort by decreasing days in column", () => {
+  const many = [
+    state({ id: "B1", blocked: true, blockedReason: null }, 3),
+    state({ id: "B2", blocked: true, blockedReason: null }, 40),
+    state({ id: "B3", blocked: true, blockedReason: null }, 15),
   ];
-}
-
-test("bottleneck: highest avgStage x max(1, count) among NON-terminal columns", () => {
-  const config = wideConfig();
-  const cards: CardState[] = [
-    ...Array.from({ length: 2 }, (_, i) => state({ id: `P${i}`, columnId: "c1" })),
-    ...Array.from({ length: 10 }, (_, i) => state({ id: `Q${i}`, columnId: "c3" })),
-    ...Array.from({ length: 5 }, (_, i) => state({ id: `R${i}`, columnId: "c4" })),
-  ];
-  const metrics = computeFlowMetrics(cards, wideEvents(), config, NOW);
-  // Scores: c1 = 10x2 = 20, c2 = 30x1 = 30, c3 = 5x10 = 50; c4 (500x5) is terminal.
-  assert.equal(metrics.bottleneck, "c3");
-  assert.equal(metrics.avgStageDays["c4"], 500);
+  assert.deepEqual(blockages(many, CONFIG, NOW).map((row) => row.id), ["B2", "B3", "B1"]);
 });
 
-test("bottleneck ties resolve to the earliest column in board order", () => {
-  const config = wideConfig();
-  // Scores: c1 = 10x3 = 30, c2 = 30x1 = 30, c3 = 5x1 = 5 — tie between c1 and c2.
-  const cards = Array.from({ length: 3 }, (_, i) => state({ id: `P${i}`, columnId: "c1" }));
-  const metrics = computeFlowMetrics(cards, wideEvents(), config, NOW);
-  assert.equal(metrics.bottleneck, "c1");
+test("risk counts follow the config typology and drop empty types", () => {
+  const rows = riskCounts(CARDS.filter((card) => !card.archived), CONFIG);
+  assert.deepEqual(rows.map((row) => [row.id, row.count]), [["rSSG", 2], ["rInfra", 1]]);
 });
 
-test("empty portfolio yields zeroed metrics; the first in-flow column wins the zero-score tie", () => {
-  const metrics = computeFlowMetrics([], [], CONFIG, NOW);
-  assert.deepEqual(metrics.totals, { total: 0, delivered: 0, blocked: 0, stale: 0 });
-  assert.equal(metrics.perColumn["col1"]?.count, 0);
-  assert.equal(metrics.bottleneck, "col1"); // design behavior: max over zeros
+test("constraint counts keep every configured chip plus the « Aucune » row", () => {
+  const rows = constraintCounts(CARDS.filter((card) => !card.archived), CONFIG);
+  assert.deepEqual(
+    rows.map((row) => [row.id, row.name, row.count]),
+    [["legale", "Légale", 2], ["groupe", "Groupe", 1], ["aucune", "Aucune", 2]],
+  );
 });
 
-test("a board of only two columns is all-terminal: no bottleneck", () => {
-  const config = testConfig();
-  config.columns = config.columns.slice(0, 2);
-  const metrics = computeFlowMetrics([], [], config, NOW);
-  assert.equal(metrics.bottleneck, null);
+test("an empty portfolio computes without throwing", () => {
+  const metrics = computePortfolioMetrics([], [], CONFIG, NOW);
+  assert.equal(metrics.activeCount, 0);
+  assert.equal(metrics.remainingTotal, 0);
+  assert.deepEqual(metrics.roles, []);
+  assert.deepEqual(metrics.blockages, []);
+  assert.equal(metrics.flow.leadTimeAvg, null);
 });

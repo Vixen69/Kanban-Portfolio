@@ -2,7 +2,8 @@
 # unflagged from 22.18, so the middle runs its TypeScript directly, exactly as
 # `npm run serve` does in dev — no build/emit step, see ADR 015). Single stage:
 # a reproducible `npm ci` of the workspace, then the source needed at runtime.
-FROM node:22.18-alpine
+# Base image digest-pinned (tags move under you) so the build is reproducible.
+FROM node:22.18-alpine@sha256:1b2479dd35a99687d6638f5976fd235e26c5b37e8122f786fcd5fe231d63de5b
 WORKDIR /app
 ENV NODE_ENV=production
 
@@ -26,14 +27,23 @@ COPY config ./config
 COPY scripts/sbom.ts ./scripts/sbom.ts
 RUN node scripts/sbom.ts
 
-# Non-secret runtime config (CLAUDE.md §6 — secrets never in the image).
-# JSONL store on a mounted volume; Postgres arrives once `pg` is authorised.
+# Non-secret runtime config (CLAUDE.md §6 — secrets never in the image). The
+# image default is the base-less JSONL store on a mounted volume; the app stack
+# (docker/compose.yaml) sets KANBAN_STORAGE_DRIVER=postgres, the delivery back
+# end (ADR 016).
 ENV KANBAN_HOST=0.0.0.0 \
     KANBAN_PORT=8787 \
     KANBAN_STORAGE_DRIVER=jsonl \
     KANBAN_DATA_PATH=/data/board.jsonl \
     KANBAN_CONFIG_PATH=config/board.json
 
+# Run as the base image's non-root `node` user. The writable data dirs — /data
+# (image-default JSONL volume) and /app/data (the compose config-override mount,
+# ADR 013) — are created and chowned before VOLUME so the initialized volume
+# inherits node ownership; otherwise the runtime writes would fail as non-root.
+RUN mkdir -p /data /app/data && chown -R node:node /data /app/data
+
 EXPOSE 8787
 VOLUME ["/data"]
+USER node
 CMD ["node", "middle/main.ts"]

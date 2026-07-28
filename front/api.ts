@@ -9,7 +9,6 @@ import type {
   CardEvent,
   CardPatch,
   Criticality,
-  NatureKey,
 } from "../core/types.ts";
 
 /** What GET /api/board returns: import snapshots + the full event log. */
@@ -24,21 +23,23 @@ export interface CreatedCard {
   event: CardEvent;
 }
 
-/** The QuickAdd creation intent — the server builds everything else. */
+/** The QuickAdd creation intent — the server builds everything else,
+ * including the nature (derived from the canal, ADR 018). */
 export interface NewCardInput {
   title: string;
   domain: string;
   laneId: string;
   typeId: string;
-  nature: NatureKey;
   criticality: Criticality;
   owner: string;
 }
 
-/** A target cell for a move intent. */
+/** A target cell for a move intent; beforeId = insert just before that
+ * card in the cell (a drop landed on it — manual ordering, ADR 019). */
 export interface MoveTarget {
   laneId: string;
   columnId: string;
+  beforeId?: string;
 }
 
 /** A failed API call, carrying a French, user-facing message. */
@@ -134,11 +135,15 @@ export function postCard(input: NewCardInput): Promise<CreatedCard> {
 }
 
 /**
- * POST a move intent. Inputs: card id, target lane/column.
+ * POST a move intent. Inputs: card id, target lane/column and the optional
+ * insertion target (beforeId, ADR 019).
  * Output: the stored CardEvent. Failure: throws ApiError.
  */
 export function postMove(cardId: string, to: MoveTarget): Promise<CardEvent> {
-  return postIntent({ type: "moved", cardId, toLaneId: to.laneId, toColumnId: to.columnId });
+  return postIntent({
+    type: "moved", cardId, toLaneId: to.laneId, toColumnId: to.columnId,
+    ...(to.beforeId === undefined ? {} : { beforeId: to.beforeId }),
+  });
 }
 
 /** POST a block intent with a reason. Output: the stored event. Failure: throws ApiError. */
@@ -159,6 +164,20 @@ export function postEdit(cardId: string, patch: CardPatch): Promise<CardEvent> {
 /** POST a comment intent. Inputs: card id, comment text. Output: the stored event. Failure: throws ApiError. */
 export function postComment(cardId: string, text: string): Promise<CardEvent> {
   return postIntent({ type: "commented", cardId, text });
+}
+
+/**
+ * POST an archive intent — archiving is itself an event (ADR 017): the card
+ * leaves the board but stays in the fold for the archive view.
+ * Input: the card id. Output: the stored event. Failure: throws ApiError.
+ */
+export function postArchive(cardId: string): Promise<CardEvent> {
+  return postIntent({ type: "archived", cardId });
+}
+
+/** POST an unarchive intent — the card returns to the board. Output: the stored event. Failure: throws ApiError. */
+export function postUnarchive(cardId: string): Promise<CardEvent> {
+  return postIntent({ type: "unarchived", cardId });
 }
 
 /**

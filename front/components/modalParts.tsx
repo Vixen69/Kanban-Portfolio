@@ -3,10 +3,7 @@
 // and the read/edit renderers for admin-defined custom card fields.
 
 import type { ReactNode } from "react";
-import type { Criticality, CustomValue, FieldDef, NatureKey } from "../../core/types.ts";
-
-/** Design order of the nature keys in the edit/create selects. */
-export const NATURE_KEYS: readonly NatureKey[] = ["simple", "complicated", "complex"];
+import type { Criticality, CustomValue, FieldDef } from "../../core/types.ts";
 
 /** Design order of the criticality keys in the edit/create selects. */
 export const CRITICALITY_KEYS: readonly Criticality[] = ["normal", "major", "top"];

@@ -16,3 +16,9 @@ data/
 *.jsonl
 # Local Docker dev env (credentials) — only the .example is committed.
 docker/.env
+# Design exports land as a zip + extracted folder; the REFERENCE that is
+# versioned is design/*.jsx at the root (scripts/import-design.ts writes
+# there so `git diff design/` shows the delta). The raw export is a local
+# working copy, not a second source of truth.
+design/*.zip
+design/Portfolio kanban/

@@ -4,9 +4,9 @@
 // stays hard-coded.
 
 import type {
-  AgeThresholds, BoardConfig, Card, Column, CriticalityStyle, Domain,
-  FieldDef, FieldOption, FieldType, GateCode, GateDef, Lane, NatureStyle,
-  RiskSeverityStyle, RoleFamily,
+  AgeThresholds, BoardConfig, Column, CriticalityStyle, Domain,
+  FieldDef, FieldOption, FieldType, GateCode, GateDef, Lane, NatureKey,
+  NatureStyle, RiskSeverityStyle, RoleFamily,
 } from "./types.ts";
 import {
   fail, isRecord, optionalText, parseKeyed, parseNonEmptyArray,
@@ -14,6 +14,7 @@ import {
 } from "./config-parse.ts";
 
 export { ConfigError } from "./config-parse.ts";
+export { laneNature, reconcileCardRefs } from "./config-derive.ts";
 
 const NATURE_KEYS = ["simple", "complicated", "complex"] as const;
 const CRITICALITY_KEYS = ["top", "major", "normal"] as const;
@@ -22,12 +23,21 @@ const FIELD_TYPES: readonly FieldType[] = ["text", "number", "date", "select", "
 const AGE_KEYS = ["freshMaxDays", "recentMaxDays", "agingMaxDays"] as const;
 const RISK_SEVERITY_KEYS = ["faible", "moyen", "eleve"] as const;
 
+// natureKey: one of the three fixed keys; absent defaults to "complicated"
+// (back-compat with runtime overrides stored before design v11).
+function parseNatureKey(value: unknown, path: string): NatureKey {
+  if (value === undefined) return "complicated";
+  if (value === "simple" || value === "complicated" || value === "complex") return value;
+  fail(`${path} doit valoir "simple", "complicated" ou "complex"`);
+}
+
 function parseLane(value: unknown, index: number): Lane {
   const record = requireRecord(value, `lanes[${index}]`);
   return {
     id: requireText(record.id, `lanes[${index}].id`),
     name: requireText(record.name, `lanes[${index}].name`),
     nature: optionalText(record.nature, `lanes[${index}].nature`),
+    natureKey: parseNatureKey(record.natureKey, `lanes[${index}].natureKey`),
     detail: optionalText(record.detail, `lanes[${index}].detail`),
   };
 }
@@ -270,29 +280,3 @@ export function validateBoardConfig(raw: unknown): BoardConfig {
   };
 }
 
-// Keeps an id when it still exists in the collection, else first entry.
-function keepOrFirst(id: string, items: readonly { id: string }[]): string {
-  return items.some((item) => item.id === id) ? id : (items[0] as { id: string }).id;
-}
-
-/**
- * Remaps a card's config references for display after an admin edit removed
- * the lane, column, domain or type the card pointed at.
- * Input: any object carrying the card's laneId/columnId/domain/typeId, plus
- * a validated BoardConfig (all four collections non-empty).
- * Output: { laneId, columnId, domain, typeId } — each kept as-is when still
- * present in the config, otherwise remapped to the config's first entry
- * (a null typeId stays null: it references nothing).
- * Failure: none. Display-level fallback only — NEVER writes events.
- */
-export function reconcileCardRefs(
-  card: Pick<Card, "laneId" | "columnId" | "domain" | "typeId">,
-  config: BoardConfig,
-): Pick<Card, "laneId" | "columnId" | "domain" | "typeId"> {
-  return {
-    laneId: keepOrFirst(card.laneId, config.lanes),
-    columnId: keepOrFirst(card.columnId, config.columns),
-    domain: keepOrFirst(card.domain, config.domains),
-    typeId: card.typeId === null ? null : keepOrFirst(card.typeId, config.types),
-  };
-}

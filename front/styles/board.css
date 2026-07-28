@@ -11,7 +11,9 @@
 /* ---------- Board grid ---------- */
 .board-area { grid-area: board; position: relative; overflow: hidden; }
 .board { height: 100%; width: 100%; display: grid; gap: 1px; background: var(--bd); transition: grid-template-columns .22s ease, grid-template-rows .2s ease; }
-.corner { background: var(--bg-page); }
+.corner { background: var(--bg-page); display: flex; flex-direction: column; align-items: stretch; justify-content: center; gap: 3px; padding: 3px; }
+.totals-toggle { background: none; border: 1px solid var(--bd-sub); border-radius: 4px; color: var(--tx-3); cursor: pointer; font-size: 9px; font-family: inherit; padding: 2px 6px; }
+.totals-toggle:hover { color: var(--accent); border-color: var(--accent); }
 
 .col-head { background: var(--bg-page); padding: 5px 9px; cursor: pointer; display: flex; flex-direction: column; gap: 2px; justify-content: center; overflow: hidden; }
 .col-head:hover { background: #e7ebf2; }
@@ -19,7 +21,24 @@
 .col-head-top { display: flex; align-items: center; gap: 6px; }
 .col-label { font-size: 11px; font-weight: 600; color: var(--tx-1); letter-spacing: .02em; white-space: nowrap; }
 .gate-badge { font-size: 7px; font-weight: 700; color: var(--gate); border: 1px solid var(--gate); border-radius: 3px; padding: 0 3px; letter-spacing: .04em; }
-.col-note { font-size: 8px; color: var(--tx-4); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Totaux d'en-tête (design v12). La note fonctionnelle de la colonne est
+   passée en infobulle : les totaux ont pris sa ligne (ADR 020). */
+.col-totals { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--bd-sub); display: flex; flex-direction: column; gap: 1px; }
+.ct-row { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; font-size: 8px; color: var(--tx-3); }
+.ct-row > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ct-row b { color: var(--tx-1); font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+.ct-row b i { font-style: normal; font-weight: 500; color: var(--tx-4); margin-left: 1px; font-size: 7px; }
+.ct-row.over b { color: var(--danger-strong); }
+.ct-row.cap { margin-top: 2px; padding-top: 2px; border-top: 1px dotted var(--bd-sub); }
+.ct-row.cap b { color: var(--accent); }
+/* La liste des profils est plafonnée et défilante : le critère « une seule
+   page » se mesure en mode compact, et 19 profils ne doivent jamais
+   pousser le tableau hors de l'écran (ADR 020). */
+.ct-roles { margin-top: 3px; padding-top: 3px; border-top: 1px dotted var(--bd-sub); display: flex; flex-direction: column; gap: 1px; max-height: 132px; overflow-y: auto; }
+.ct-role { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; font-size: 7px; color: var(--tx-4); }
+.ct-role-name { display: flex; align-items: center; gap: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ct-role-name i { width: 5px; height: 5px; border-radius: 1px; flex: 0 0 auto; }
+.ct-role b { color: var(--tx-2); font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
 .col-collapse { margin-left: auto; background: none; border: none; color: var(--tx-4); cursor: pointer; font-size: 14px; line-height: 1; padding: 0 3px; border-radius: 3px; }
 .col-collapse:hover { color: var(--tx-1); background: #dde3ee; }
 .col-collapsed { flex-direction: column; align-items: center; gap: 7px; padding: 7px 0; cursor: pointer; }
@@ -30,15 +49,36 @@
 
 .lane-label { position: relative; background: var(--bg-page); border-right: 1px solid var(--bd); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; writing-mode: vertical-rl; transform: rotate(180deg); padding: 8px 0; }
 .lane-label:hover { background: #e7ebf2; }
+.lane-label:hover .collapse-caret { color: var(--accent); }
+.lane-label.no-collapse { cursor: default; }
+.lane-label.no-collapse:hover { background: var(--bg-page); }
+.lane-label.no-collapse:hover .collapse-caret { color: var(--tx-4); }
 .lane-name { font-size: 11px; font-weight: 600; color: var(--tx-2); letter-spacing: .03em; }
 .lane-nature { font-size: 8px; color: var(--tx-4); text-transform: uppercase; letter-spacing: .1em; }
 .collapse-caret { font-size: 9px; color: var(--tx-4); }
+/* Totaux du canal repliés : pastille inline dans l'étiquette verticale. */
+.lane-totals { font-size: 8px; color: var(--tx-4); line-height: 1.4; text-align: center; }
+.lane-totals b { color: var(--tx-2); font-variant-numeric: tabular-nums; }
+/* Totaux du canal dépliés : l'étiquette repasse à l'horizontale et la
+   gouttière s'élargit (LANE_GUTTER.expanded, core/layout.ts). */
+.lane-label.expanded { writing-mode: horizontal-tb; transform: none; flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 4px; padding: 8px 10px; overflow-y: auto; }
+.lane-label.expanded .collapse-caret { align-self: flex-start; }
+.lane-label.expanded .lane-name { font-size: 11px; font-weight: 700; color: var(--tx-1); }
+.lane-col-totals { margin-top: 2px; padding-top: 4px; border-top: 1px solid var(--bd-sub); }
 .lane-label.collapsed .lane-nature { display: none; }
+/* Canal replié : étiquette horizontale en pastille débordante (design v11) */
+.lane-label.collapsed { writing-mode: horizontal-tb; transform: none; flex-direction: row; gap: 6px; padding: 0 10px; justify-content: flex-start; overflow: visible; z-index: 6; cursor: pointer; }
+.lane-label.collapsed:hover { background: #e7ebf2; }
+.lane-label.collapsed:hover .lane-name { background: #eef2fb; box-shadow: 1px 0 4px rgba(29,78,216,.18); color: var(--accent); }
+.lane-label.collapsed .lane-name { font-size: 11px; font-weight: 700; color: var(--tx-1); white-space: nowrap; background: var(--bg-page); padding: 2px 7px; border-radius: 4px; box-shadow: 1px 0 4px rgba(15,23,42,.10); }
+.lane-label.collapsed .collapse-caret { font-size: 10px; }
 
 .cell { position: relative; background: var(--bg-cell); overflow: hidden; display: flex; flex-direction: column; padding: 2px; }
 .cell.focused { background: var(--bg-cell-2); }
 .cell.dragover { background: #d7e2f8; outline: 1px dashed var(--accent); outline-offset: -2px; }
-.cell[data-wip="over"] { box-shadow: inset 0 0 0 1px rgba(220,38,38,.4), inset 0 0 22px rgba(220,38,38,.10); }
+/* Cellule au-delà de sa limite d'encours : lavis rouge (design v11) */
+.cell[data-wip="over"] { background: linear-gradient(160deg, #fbe3e3 0%, #f7cfcf 55%, #f2b8b8 100%); box-shadow: inset 0 0 0 1px rgba(220,38,38,.45); }
+.cell.focused[data-wip="over"] { background: linear-gradient(160deg, #fbe3e3 0%, #f5c9c9 100%); }
 .gate-line { position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: linear-gradient(to bottom, transparent, var(--gate), transparent); opacity: .75; z-index: 4; }
 .cell-head { display: flex; align-items: center; justify-content: flex-end; gap: 5px; height: 12px; padding: 0 3px; flex: 0 0 auto; }
 .wip { font-size: 8px; font-variant-numeric: tabular-nums; color: var(--tx-4); }
@@ -47,8 +87,25 @@
 .cell-cards { flex: 1; display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
 .cell.focused .cell-cards { overflow-y: auto; }
 .cell-empty { flex: 1; }
+/* Indice de défilement : flèche fondue tant que la cellule peut défiler (design v11) */
+.scroll-hint { position: absolute; left: 0; right: 0; bottom: 0; height: 32px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 2px; color: var(--accent); pointer-events: none; opacity: 0; transition: opacity .18s; background: linear-gradient(to top, color-mix(in oklab, var(--bg-cell) 96%, transparent) 30%, transparent); z-index: 3; }
+.scroll-hint.on { opacity: .9; animation: hint-bob 1.5s ease-in-out infinite; }
+.scroll-hint svg { width: 26px; height: 26px; filter: drop-shadow(0 1px 1px rgba(15,23,42,.18)); }
+.cell.focused .scroll-hint { background: linear-gradient(to top, color-mix(in oklab, var(--bg-cell-2) 96%, transparent) 30%, transparent); }
+@keyframes hint-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(3px); } }
+@media (prefers-reduced-motion: reduce) { .scroll-hint.on { animation: none; } }
 
 .ccell { background: var(--bg-cell); display: flex; align-items: center; justify-content: center; gap: 6px; }
 .ccount { font-size: 11px; font-weight: 600; color: var(--tx-2); font-variant-numeric: tabular-nums; }
 .cblk { font-size: 8px; font-weight: 700; color: #fff; background: var(--danger); border-radius: 7px; padding: 0 4px; }
 .cstale { width: 6px; height: 6px; border-radius: 50%; background: var(--warn); }
+/* Cellules repliées interactives + popover tickets (design v11) */
+.ccell.has, .ccol-cell.has { cursor: pointer; }
+.ccell.has:hover, .ccol-cell.has:hover { background: #e7ebf2; box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 30%, transparent); }
+.cpop { background: #fff; border: 1px solid var(--bd); border-radius: 8px; box-shadow: 0 10px 30px rgba(15,23,42,.18); overflow: hidden; }
+.cpop-head { font-size: 8px; text-transform: uppercase; letter-spacing: .07em; color: var(--tx-4); padding: 7px 10px 5px; background: var(--bg-page); border-bottom: 1px solid var(--bd-sub); }
+.cpop-list { max-height: 300px; overflow-y: auto; padding: 3px; }
+.cpop-row { display: flex; align-items: center; gap: 7px; width: 100%; text-align: left; background: none; border: none; cursor: pointer; padding: 5px 7px; border-radius: 5px; font-family: inherit; }
+.cpop-row:hover { background: var(--bg-cell-2); }
+.cpop-name { flex: 1; min-width: 0; font-size: 11px; color: var(--tx-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cpop-blk { font-size: 9px; font-weight: 700; color: #fff; background: var(--danger); border-radius: 50%; width: 14px; height: 14px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }

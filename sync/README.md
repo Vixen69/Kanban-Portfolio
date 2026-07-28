@@ -1,4 +1,4 @@
-# sync/ — Sprint 5
+# sync/ — RP4
 
 Processus CLI séparé : tire depuis l'adaptateur actif (csv-import, puis
 sciforma en lecture seule), écrit dans **PostgreSQL** (via le port

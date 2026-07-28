@@ -1,34 +1,82 @@
-/* Metrics view — full-screen flow-metrics overlay: KPIs, per-stage bars,
-   age composition, charge par canal.
-   Ported verbatim from design/Portefeuille DSI - Kanban NMO.html (design v9). */
+/* Metrics view (design v12) — full-screen governance read-out: KPI header,
+   budget croisé, contention, charge par rôle, flux, encours, risques,
+   blocages. Ported from the « Metrics v2 » section of
+   design/Portfolio kanban/Portefeuille DSI - Kanban NMO.html.
 
+   Cross-file dependencies (metrics.css is imported LAST in front/main.tsx):
+   - .bgraph / .bg-row / .bg-label / .bg-track / .bg-fill / .bg-ref / .bg-val
+     are defined in modal.css (the card detail's budget graph) and reused
+     verbatim here; only the positioning guard below is restated.
+   - .blk-pulse and @keyframes pulse come from cards.css.
+*/
+
+/* ---------- Shell ---------- */
 .metrics-view { position: fixed; inset: 0; z-index: 70; background: var(--bg-page); display: flex; flex-direction: column; padding: 18px 22px; overflow-y: auto; }
 .metrics-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; }
 .metrics-title { font-family: 'DM Serif Display', serif; font-size: 22px; color: var(--tx-1); }
 .metrics-sub { font-size: 11px; color: var(--tx-3); }
-.metrics-kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 14px; }
-.kpi { background: #fff; border: 1px solid var(--bd); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 3px; }
-.kpi-num { font-size: 22px; font-weight: 700; color: var(--tx-1); line-height: 1; }
-.kpi-lab { font-size: 9px; text-transform: uppercase; letter-spacing: .06em; color: var(--tx-4); }
-.kpi.alert .kpi-num { color: var(--danger-strong); } .kpi.warn .kpi-num { color: var(--warn); } .kpi.accent .kpi-num { color: var(--accent); font-size: 15px; }
-.metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.metric-panel { background: #fff; border: 1px solid var(--bd); border-radius: 8px; padding: 14px 16px; }
-.metric-panel.wide { grid-column: 1 / -1; }
-.mp-title { font-size: 12px; font-weight: 700; color: var(--tx-1); margin-bottom: 11px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.mp-hint { font-size: 9px; font-weight: 400; color: var(--tx-4); display: flex; align-items: center; gap: 2px; }
+
+/* ---------- Bar primitives (shared by every panel) ---------- */
 .lg-sw { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-left: 6px; }
 .mp-empty { font-size: 11px; color: var(--ok); }
 .mb-row { display: flex; align-items: center; gap: 9px; margin: 5px 0; }
-.mb-label { width: 96px; font-size: 10px; color: var(--tx-2); flex: 0 0 auto; text-align: right; }
-.mb-track { flex: 1; height: 13px; background: #eef1f6; border-radius: 3px; overflow: hidden; }
-.mb-track.stack { display: flex; }
+.mb-label { width: 128px; font-size: 10px; color: var(--tx-2); flex: 0 0 auto; text-align: right; display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
+/* position: relative is LOAD-BEARING: .m2-wip-lim and the .mb-fill layers are
+   absolutely positioned inside this track. Without it they escape their row
+   and the WIP tick draws as a full-height black line across the page. */
+.mb-track { position: relative; flex: 1; height: 13px; background: #eef1f6; border-radius: 3px; overflow: hidden; }
 .mb-fill { display: block; height: 100%; border-radius: 3px; }
-.seg { height: 100%; }
-.mb-val { width: 44px; font-size: 10px; font-weight: 600; color: var(--tx-2); flex: 0 0 auto; font-variant-numeric: tabular-nums; }
-.charge-canal { display: flex; align-items: center; gap: 9px; margin: 7px 0; }
-.cc-label { width: 120px; font-size: 11px; color: var(--tx-2); flex: 0 0 auto; }
-.cc-label i { color: var(--tx-4); font-style: normal; }
-.cc-track { flex: 1; height: 15px; background: #eef1f6; border-radius: 3px; overflow: hidden; }
-.cc-est { display: block; height: 100%; background: #d3dceb; border-radius: 3px; }
-.cc-cons { display: block; height: 100%; border-radius: 3px; }
-.cc-val { width: 96px; font-size: 10px; font-weight: 600; color: var(--tx-2); text-align: right; flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+.mb-fill.soft { position: absolute; left: 0; top: 0; }
+.mb-fill.over { position: absolute; left: 0; top: 0; }
+.mb-val { width: 74px; font-size: 10px; font-weight: 600; color: var(--tx-2); flex: 0 0 auto; font-variant-numeric: tabular-nums; text-align: right; }
+.mb-val b { color: var(--tx-1); }
+.cont-flag { width: 6px; height: 6px; border-radius: 50%; background: var(--danger); flex: 0 0 auto; }
+.m2-wip-lim { position: absolute; top: -1px; bottom: -1px; width: 2px; background: #0f172a; opacity: .5; }
+/* Same guard for the budget graph reused from modal.css: .bg-ref is absolute
+   and must stay inside its track even if modal.css ever changes. */
+.bg-track { position: relative; overflow: hidden; }
+
+/* ---------- KPI header ---------- */
+.m2-kpis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 9px; margin-bottom: 14px; }
+.mkpi { background: #fff; border: 1px solid var(--bd); border-radius: 8px; padding: 11px 13px; display: flex; flex-direction: column; gap: 4px; }
+.mkpi-num { font-size: 22px; font-weight: 700; color: var(--tx-1); line-height: 1; font-variant-numeric: tabular-nums; }
+.mkpi-num i { font-size: 12px; font-weight: 600; font-style: normal; color: var(--tx-3); margin-left: 1px; }
+.mkpi-lab { font-size: 8.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--tx-4); line-height: 1.3; }
+.mkpi.alert { border-color: #e0a3a3; }
+.mkpi.alert .mkpi-num { color: var(--danger-strong); }
+.mkpi.warn .mkpi-num { color: var(--warn); }
+.mkpi.accent .mkpi-num { color: var(--accent); }
+.mkpi.ok .mkpi-num { color: var(--ok); }
+
+/* ---------- Panel grid ---------- */
+.m2-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+.m2-panel { background: #fff; border: 1px solid var(--bd); border-radius: 8px; padding: 14px 16px; }
+.m2-panel.wide { grid-column: 1 / -1; }
+.m2-title { font-size: 12px; font-weight: 700; color: var(--tx-1); margin-bottom: 11px; display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.m2-hint { font-size: 9px; font-weight: 400; color: var(--tx-4); }
+.m2-flag { font-size: 10px; margin-top: 9px; padding-top: 8px; border-top: 1px solid var(--bd-sub); }
+.m2-flag.danger { color: var(--danger-strong); }
+.m2-flag.warn { color: var(--warn); }
+.m2-flag.ok { color: var(--ok); }
+.m2-legend { display: flex; flex-wrap: wrap; gap: 13px; margin-top: 9px; font-size: 9px; color: var(--tx-4); }
+.m2-legend span { display: inline-flex; align-items: center; gap: 3px; }
+.m2-note { font-size: 9px; color: var(--tx-4); margin-top: 8px; line-height: 1.45; }
+
+/* ---------- Flux ---------- */
+.m2-flowrow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; }
+.m2-stat { background: #f7f9fc; border: 1px solid var(--bd-sub); border-radius: 6px; padding: 10px; text-align: center; }
+.m2-stat-num { display: block; font-size: 20px; font-weight: 700; color: var(--tx-1); line-height: 1; font-variant-numeric: tabular-nums; }
+.m2-stat-num i { font-size: 11px; font-weight: 600; font-style: normal; color: var(--tx-3); }
+.m2-stat-lab { display: block; font-size: 8.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--tx-4); margin-top: 4px; }
+
+/* ---------- Contraintes projet ---------- */
+.m2-constraints { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--bd-sub); }
+.cn-chip { font-size: 9px; font-weight: 700; border-radius: 4px; padding: 2px 7px; border: 1px solid; }
+
+/* ---------- Blocages ---------- */
+.blk-list { display: flex; flex-direction: column; }
+.blk-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--bd-sub); }
+.blk-item:last-child { border-bottom: none; }
+.blk-name { font-size: 11px; font-weight: 600; color: var(--tx-1); flex: 0 0 auto; max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.blk-reason { font-size: 10px; color: var(--tx-3); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.blk-meta { font-size: 9px; color: var(--tx-4); flex: 0 0 auto; font-variant-numeric: tabular-nums; }

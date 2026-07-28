@@ -19,6 +19,10 @@ export interface HeaderProps {
   onClearFocus: () => void;
   onToggleSidebar: () => void;
   onMetrics: () => void;
+  /** Opens the archives overlay (design v11). */
+  onArchive: () => void;
+  /** Number of archived subjects — the badge hides at zero. */
+  archivedCount: number;
   onAdmin: () => void;
   onAdd: () => void;
 }
@@ -70,6 +74,12 @@ export function Header(props: HeaderProps) {
         </div>
         <Legend config={props.config} />
         <button className="icon-btn" onClick={props.onMetrics} title="Métriques de flux">☷</button>
+        <button className="icon-btn arch-btn" onClick={props.onArchive} title="Archives">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="4" width="18" height="4" rx="1" /><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8" /><path d="M10 12h4" />
+          </svg>
+          {props.archivedCount > 0 && <span className="arch-count">{props.archivedCount}</span>}
+        </button>
         <button className="icon-btn" onClick={props.onAdmin} title="Configuration du tableau">⚙</button>
         <button className="add-btn" onClick={props.onAdd} title="Nouveau sujet (N)">+ Sujet</button>
       </div>

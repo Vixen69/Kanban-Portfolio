@@ -53,33 +53,32 @@ export function TypeTag({ type, big }: { type: ProjectType | null; big?: boolean
 }
 
 /**
- * Compact estimate read-out (meilleur estimé vs consommé). The budget pair
- * (k€) wins when the card has one, else the effort pair (j.h).
+ * Compact budget/charge read-out of the expanded card (design v12): the
+ * meilleur estimé in k€ next to the reste à faire in j.h. The progress bar
+ * it replaces mixed two units on one track; these are the two figures a
+ * stage is actually read on, so they are stated rather than drawn.
  * Input: the card state.
- * Output: label + progress track (accent fill, warn at >= 85 %, danger
- * when over), or null when the card has neither estimate.
- * Failure modes: none (a zero estimate renders an empty 0 % track).
+ * Output: the two-stat row, or null when the card carries neither an
+ * estimate nor a plan de charge.
+ * Failure modes: none — a card with no per-profile plan falls back to its
+ * card-level effort (same rule as core/totals).
  */
 export function EstimeBar({ card }: { card: CardState }) {
-  const est = card.budgetEstimated ?? card.effortEstimated;
-  if (est === null) return null;
-  const useBudget = card.budgetEstimated !== null;
-  const cons = (useBudget ? card.budgetConsumed : card.effortConsumed) ?? 0;
-  const unit = useBudget ? "k€" : "j.h";
-  const pct = est ? Math.round((cons / est) * 100) : 0;
-  const over = cons > est;
+  const est = card.budgetEstimated ?? card.effortEstimated ?? 0;
+  const plan = card.chargeByProfile;
+  const jh = plan.length > 0
+    ? plan.reduce((total, entry) => total + entry.jh, 0)
+    : card.effortEstimated ?? 0;
+  const done = plan.length > 0
+    ? plan.reduce((total, entry) => total + entry.done, 0)
+    : card.effortConsumed ?? 0;
+  const raf = Math.max(0, jh - done);
+  if (est === 0 && jh === 0) return null;
   return (
-    <div className="ec-row" title={`Meilleur estimé ${est} ${unit} · Consommé ${cons} ${unit}`}>
-      <span className="ec-label">{cons} / {est} {unit}</span>
-      <span className="ec-track">
-        <span
-          className="ec-fill"
-          style={{
-            width: Math.min(100, pct) + "%",
-            background: over ? "var(--danger)" : pct >= 85 ? "var(--warn)" : "var(--accent)",
-          }}
-        />
-      </span>
+    <div className="ec-row" title={`Meilleur estimé ${est} k€ · Reste à faire ${raf} j.h`}>
+      <span className="ec-stat">est. <b>{est.toLocaleString("fr-FR")}</b> k€</span>
+      <span className="ec-sep" />
+      <span className="ec-stat">RAF <b>{raf.toLocaleString("fr-FR")}</b> j.h</span>
     </div>
   );
 }

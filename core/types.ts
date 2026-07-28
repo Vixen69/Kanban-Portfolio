@@ -124,6 +124,8 @@ export type CardEventType =
   | "unblocked"
   | "edited"
   | "commented"
+  | "archived"
+  | "unarchived"
   | "deleted"
   | "imported";
 
@@ -154,20 +156,25 @@ export interface CardComment {
 
 /**
  * A card with its event-derived runtime state: current position, blocked
- * state, comments, and the timestamp it entered its current column (drives
- * aging). Cards with a "deleted" event are absent from folded output.
+ * state, archived flag, comments, and the timestamp it entered its current
+ * column (drives aging). Cards with a "deleted" event are absent from
+ * folded output; archived cards stay in it (the archive view lists them)
+ * but leave the board and every count.
  */
 export interface CardState extends Card {
   /** ISO timestamp the card entered its current column, from the event log. */
   enteredColumnAt: string;
   /** Comments in chronological order, from "commented" events. */
   comments: CardComment[];
+  /** True after an "archived" event (reversible via "unarchived"). */
+  archived: boolean;
 }
 
 /**
  * The fields an "edited" event may change. Position (moved), blocked state
  * (blocked/unblocked) and comments (commented) have their own event types;
- * id, createdAt, source and sciformaId are immutable source data.
+ * id, createdAt, source and sciformaId are immutable source data. Nature is
+ * NOT editable (design v11): it is positional — carried by the canal.
  */
 export type CardPatch = Partial<
   Pick<
@@ -178,7 +185,6 @@ export type CardPatch = Partial<
     | "criticality"
     | "typeId"
     | "codename"
-    | "nature"
     | "tags"
     | "effortEstimated"
     | "effortConsumed"

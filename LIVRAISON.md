@@ -8,7 +8,9 @@ lancer, le vérifier, et les deux points à trancher avec le référent techniqu
 > **En une phrase** : deux images de conteneur (un front nginx statique, un
 > middle Express) construites depuis ce dépôt, servies en **même origine**
 > (le front proxifie `/api` vers le middle), **zéro egress**, dépendances
-> **dans le plafond SBOM**, avec un **SBOM CycloneDX** livré à côté.
+> **dans le plafond SBOM**, conteneurs **durcis** (en-têtes de sécurité sur la
+> page et l'API, middle non-root, images épinglées par digest, ports loopback),
+> avec un **SBOM CycloneDX** livré à côté.
 
 ---
 
@@ -50,12 +52,12 @@ Ce que fait chaque image (voir `docker/Dockerfile.front` / `.middle`) :
   compilation** : le middle exécute son TypeScript directement (Node 22.18,
   *type stripping*), exactement comme `npm run serve` en dev (ADR 015).
 
-> ⚠️ La construction n'a **pas** pu être exécutée dans l'environnement de
-> l'auteur (pas de Docker). Chaque étape a été **prouvée par sa commande
-> équivalente sur l'hôte** (build front → `front/dist` ; `node middle/main.ts`
-> → l'API sert 150 cartes ; `node scripts/sbom.ts` → CycloneDX). Le premier
-> `docker build` doit être lancé et vérifié sur une machine avec Docker
-> (section 8).
+> ✓ La pile Docker durcie a été **construite et lancée de bout en bout**
+> (2026-07-15) : `docker compose --profile app up -d --build` → `db` *healthy*,
+> `middle` non-root (`whoami`=`node`) sur `postgres`, `front` nginx :8080
+> servant **150 cartes** via le proxy même-origine, en-têtes de sécurité
+> présents sur la page, rendu **sans violation CSP**. Le runbook de la
+> section 8 reproduit cette vérification.
 
 ## 4. Lancer
 
@@ -64,9 +66,11 @@ docker compose -f docker/compose.yaml --profile app up
 ```
 
 - **Front** : http://localhost:8080 (nginx). Tout appel `/api/*` est proxifié
-  vers le middle en même origine.
-- **Middle** : http://localhost:8787 (Express). Stockage **JSONL** sur le
-  volume `/data`.
+  vers le middle en même origine. Ports publiés liés à la **loopback**
+  (`127.0.0.1`) — rien n'est exposé au-delà de la machine.
+- **Middle** : http://localhost:8787 (Express), en utilisateur **non-root**.
+  Stockage **PostgreSQL** par défaut dans la pile compose (service `db`) ;
+  JSONL sur volume `/data` en repli si `KANBAN_STORAGE_DRIVER=jsonl`.
 
 ### Configuration (variables d'environnement du middle, `middle/config.ts`)
 
@@ -74,12 +78,38 @@ docker compose -f docker/compose.yaml --profile app up
 |---|---|---|
 | `KANBAN_HOST` | `0.0.0.0` (image) | Interface d'écoute |
 | `KANBAN_PORT` | `8787` | Port |
-| `KANBAN_STORAGE_DRIVER` | `jsonl` | Pilote de stockage (seul `jsonl` actif) |
-| `KANBAN_DATA_PATH` | `/data/board.jsonl` | Fichier de données (sur volume) |
+| `KANBAN_STORAGE_DRIVER` | `jsonl` (image) · `postgres` (compose) | Pilote : `postgres` ou `jsonl` |
+| `DATABASE_URL` | — | Connexion PostgreSQL (pilote `postgres`) ; **secret hors dépôt** |
+| `KANBAN_PG_APPEND_ONLY` | `1` | Trigger append-only du journal ; `0` = démo (retire le garde-fou) — **garder `1` en production** |
+| `KANBAN_DATA_PATH` | `/data/board.jsonl` (image) · `/app/data/board.jsonl` (compose) | Fichier JSONL + dossier de la surcharge de config (ADR 013) |
 | `KANBAN_CONFIG_PATH` | `config/board.json` | Topologie par défaut (dans l'image) |
 
 **Secrets** : aucun n'est dans l'image (CLAUDE.md §6). Les identifiants (DB,
 sync) arriveront par fichier/secret monté hors dépôt, référencés par chemin.
+
+### Exposer aux autres postes (mode réseau, opt-in explicite)
+
+Par défaut, **rien n'est joignable depuis le réseau** (tous les ports publiés
+sont liés à `127.0.0.1`). Pour servir d'autres postes, on ouvre **uniquement le
+front** (nginx) — le middle, la base et Adminer restent en loopback, tout accès
+passe par le front en même origine :
+
+- **Le plus simple** : double-cliquer **« Lancer en Docker (reseau).cmd »** —
+  il relance la pile avec le front sur toutes les interfaces, tente d'ajouter
+  la règle de pare-feu entrante (port 8080), et affiche les adresses à
+  communiquer (`http://<ip-du-poste>:8080`).
+- En ligne de commande : `FRONT_BIND=0.0.0.0 docker compose -f
+  docker/compose.yaml --profile app up -d` (+ règle de pare-feu entrante
+  TCP 8080 si besoin).
+- Retour en local seul : relancer sans `FRONT_BIND` (ou via
+  « Lancer en Docker.cmd »).
+
+> ⚠️ **Pas d'authentification avant RP3** : tout poste qui joint le port 8080
+> peut lire **et modifier** le tableau. À réserver à un segment réseau
+> restreint/maîtrisé (c'est la posture documentée : contrôle d'accès réseau,
+> l'auth applicative arrive en RP3). Sur la plateforme du client, l'équivalent
+> propre est l'ingress/reverse-proxy de la plateforme routant vers le port 80
+> du conteneur front, sans publier d'autre port.
 
 Proxy front (`docker/Dockerfile.front`) : `MIDDLE_HOST` / `MIDDLE_PORT` (défaut
 `middle` / `8787`) — à ajuster si le service middle porte un autre nom sur la

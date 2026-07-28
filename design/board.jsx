@@ -88,16 +88,18 @@ function CustomBadges({ card }) {
 
 // Compact budget read-out (meilleur estimé vs consommé) for the expanded card.
 function EstimeBar({ card }) {
-  if (card.estimeBudget == null && card.estime == null) return null;
-  const est = card.estimeBudget != null ? card.estimeBudget : card.estime;
-  const cons = card.estimeBudget != null ? (card.consommeBudget || 0) : (card.consomme || 0);
-  const unit = card.estimeBudget != null ? 'k€' : 'j.h';
-  const pct = est ? Math.round(cons / est * 100) : 0;
-  const over = cons > est;
+  const est = card.estimeBudget != null ? card.estimeBudget : (card.estime || 0);
+  const prof = card.chargeByProfile || [];
+  let jh = 0, done = 0;
+  if (prof.length) prof.forEach(p => { jh += p.jh || 0; done += p.done || 0; });
+  else { jh = card.estime || 0; done = card.consomme || 0; }
+  const raf = Math.max(0, jh - done);
+  if (!est && !jh) return null;
   return (
-    <div className="ec-row" title={`Meilleur estimé ${est} ${unit} · Consommé ${cons} ${unit}`}>
-      <span className="ec-label">{cons} / {est} {unit}</span>
-      <span className="ec-track"><span className="ec-fill" style={{ width: Math.min(100, pct) + '%', background: over ? 'var(--danger)' : pct >= 85 ? 'var(--warn)' : 'var(--accent)' }} /></span>
+    <div className="ec-row" title={`Meilleur estimé ${est} k€ · Reste à faire ${raf} j.h`}>
+      <span className="ec-stat">est. <b>{est.toLocaleString('fr-FR')}</b> k€</span>
+      <span className="ec-sep" />
+      <span className="ec-stat">RAF <b>{raf.toLocaleString('fr-FR')}</b> j.h</span>
     </div>
   );
 }

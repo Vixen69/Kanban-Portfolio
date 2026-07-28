@@ -3,16 +3,16 @@
 // on the left); the server assigns id, codename, column and timestamps.
 
 import { useState } from "react";
-import type { BoardConfig, Criticality, NatureKey } from "../../core/types.ts";
-import { CRITICALITY_KEYS, Field, NATURE_KEYS, SelectField } from "./modalParts.tsx";
+import type { BoardConfig, Criticality } from "../../core/types.ts";
+import { CRITICALITY_KEYS, Field, SelectField } from "./modalParts.tsx";
 
-/** Creation intent sent to POST /api/cards (through App/useBoardStore). */
+/** Creation intent sent to POST /api/cards (through App/useBoardStore). The
+ * nature is NOT part of it: the server derives it from the canal (ADR 018). */
 export interface QuickAddInput {
   title: string;
   domain: string;
   laneId: string;
   typeId: string;
-  nature: NatureKey;
   criticality: Criticality;
   owner: string;
 }
@@ -25,20 +25,19 @@ export interface QuickAddProps {
 }
 
 // Design defaults: first domain/lane, « Mise en œuvre » type when present,
-// nature simple, criticality normal.
+// criticality normal. No nature choice — the canal carries it (design v11).
 function initialInput(config: BoardConfig): QuickAddInput {
   return {
     title: "",
     domain: config.domains[0]!.id,
     laneId: config.lanes[0]!.id,
     typeId: config.types.find((type) => type.id === "mise_en_oeuvre")?.id ?? config.types[0]!.id,
-    nature: "simple",
     criticality: "normal",
     owner: "",
   };
 }
 
-// The five vocabulary selects of the creation form (design order).
+// The four vocabulary selects of the creation form (design order).
 function SelectGrid({ draft, config, set }: {
   draft: QuickAddInput;
   config: BoardConfig;
@@ -49,7 +48,6 @@ function SelectGrid({ draft, config, set }: {
       <SelectField label="Type de projet" value={draft.typeId} options={config.types.map((t) => ({ value: t.id, label: t.name }))} onChange={(v) => set({ typeId: v })} />
       <SelectField label="Domaine RDOM" value={draft.domain} options={config.domains.map((d) => ({ value: d.id, label: d.name }))} onChange={(v) => set({ domain: v })} />
       <SelectField label="Canal" value={draft.laneId} options={config.lanes.map((l) => ({ value: l.id, label: l.name }))} onChange={(v) => set({ laneId: v })} />
-      <SelectField label="Nature" value={draft.nature} options={NATURE_KEYS.map((k) => ({ value: k, label: config.natures[k].label }))} onChange={(v) => set({ nature: v as NatureKey })} />
       <SelectField label="Criticité" value={draft.criticality} options={CRITICALITY_KEYS.map((k) => ({ value: k, label: config.criticalities[k].label }))} onChange={(v) => set({ criticality: v as Criticality })} />
     </div>
   );

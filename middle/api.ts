@@ -9,15 +9,11 @@ import type { CardEventInput } from "../core/events.ts";
 import { lifecycleEvent, movedEvent } from "../core/events.ts";
 import { EDITABLE_FIELDS, foldEvents } from "../core/state.ts";
 import { validateBoardConfig } from "../core/config.ts";
-import type {
-  BoardConfig,
-  CardEventType,
-  CardState,
-  Criticality,
-  CustomValue,
-  NatureKey,
-} from "../core/types.ts";
+import type { BoardConfig, CardEventType, CardState } from "../core/types.ts";
 import type { ConfigStore } from "./config-store.ts";
+import { patchValidators } from "./validation.ts";
+
+export { isCriticality } from "./validation.ts";
 
 /** Actor stamped on events until authentication exists (RP3). */
 export const SERVER_ACTOR = "anonymous";
@@ -28,11 +24,32 @@ export interface ApiResult {
   body: unknown;
 }
 
+// Writes are validated against a fold of the CURRENT log, then appended —
+// with real I/O between read and write. Serializing the whole
+// read-fold-validate-append section in-process closes the validate-then-
+// append race (two concurrent intents both validated against the same stale
+// fold would poison the append-only log with non-chaining events). Sound
+// for the delivery model — the middle is mono-instance (single JSONL
+// writer; one container on Postgres); a multi-instance middle would need a
+// DB-level advisory lock instead.
+let writeChain: Promise<unknown> = Promise.resolve();
+
+/**
+ * Runs a write task after every previously queued write has settled.
+ * Input: the async task. Output: the task's promise (rejections propagate
+ * to the caller only — the chain itself never breaks). Failure: none.
+ */
+export function serializedWrite<T>(task: () => Promise<T>): Promise<T> {
+  const run = writeChain.then(task, task);
+  writeChain = run.then(() => undefined, () => undefined);
+  return run;
+}
+
 /** Thrown when a request body fails validation; the transport maps it to 400. */
 export class BadRequest extends Error {}
 
 const POSTABLE: ReadonlySet<string> = new Set([
-  "moved", "blocked", "unblocked", "edited", "commented", "deleted",
+  "moved", "blocked", "unblocked", "edited", "commented", "archived", "unarchived", "deleted",
 ]);
 
 /**
@@ -76,16 +93,21 @@ export async function getBoard(storage: BoardStorage): Promise<ApiResult> {
 /**
  * POST /api/events — validates an event intent against the live (folded)
  * board and the runtime config, stamps server id/ts/actor, and appends it.
+ * The read-fold-validate-append section runs serialized (see
+ * serializedWrite) so concurrent intents validate against each other's
+ * results, never against a shared stale fold.
  * Inputs: the storage, the runtime board config, the parsed JSON body.
  * Output: 201 with the stored CardEvent.
  * Failure: throws BadRequest (→ 400) on an invalid intent; propagates storage
  * errors (→ 500).
  */
-export async function postEvent(storage: BoardStorage, config: BoardConfig, raw: unknown): Promise<ApiResult> {
-  const [cards, events] = await Promise.all([storage.listBaseCards(), storage.listEvents()]);
-  const states = foldEvents(cards, events);
-  const input = buildValidatedEvent(config, states, raw);
-  return { status: 201, body: await storage.appendEvent(input) };
+export function postEvent(storage: BoardStorage, config: BoardConfig, raw: unknown): Promise<ApiResult> {
+  return serializedWrite(async () => {
+    const [cards, events] = await Promise.all([storage.listBaseCards(), storage.listEvents()]);
+    const states = foldEvents(cards, events);
+    const input = buildValidatedEvent(config, states, raw);
+    return { status: 201, body: await storage.appendEvent(input) };
+  });
 }
 
 /**
@@ -98,22 +120,6 @@ export function asObject(raw: unknown): Record<string, unknown> {
     throw new BadRequest("Corps JSON (objet) attendu.");
   }
   return raw as Record<string, unknown>;
-}
-
-/**
- * True when the value is one of the fixed nature keys.
- * Input: any value. Output: a NatureKey type guard result. Failure: none.
- */
-export function isNature(value: unknown): value is NatureKey {
-  return value === "simple" || value === "complicated" || value === "complex";
-}
-
-/**
- * True when the value is one of the fixed criticality keys.
- * Input: any value. Output: a Criticality type guard result. Failure: none.
- */
-export function isCriticality(value: unknown): value is Criticality {
-  return value === "top" || value === "major" || value === "normal";
 }
 
 // Validates the common envelope (type allowed, card exists in the folded
@@ -131,7 +137,7 @@ function buildValidatedEvent(
   const cardId = body["cardId"];
   const state = typeof cardId === "string" ? states.find((card) => card.id === cardId) : undefined;
   if (!state) throw new BadRequest("Carte inconnue.");
-  return buildByType(config, type as CardEventType, state, body, new Date().toISOString());
+  return buildByType(config, type as CardEventType, state, body, new Date().toISOString(), states);
 }
 
 function buildByType(
@@ -140,10 +146,11 @@ function buildByType(
   state: CardState,
   body: Record<string, unknown>,
   ts: string,
+  states: CardState[],
 ): CardEventInput {
   switch (type) {
     case "moved":
-      return buildMoved(config, state, body, ts);
+      return buildMoved(config, state, body, ts, states);
     case "blocked":
       return buildBlocked(state, body, ts);
     case "unblocked":
@@ -153,6 +160,12 @@ function buildByType(
       return buildEdited(config, state, body, ts);
     case "commented":
       return buildCommented(state, body, ts);
+    case "archived":
+      if (state.archived) throw new BadRequest("Carte déjà archivée.");
+      return lifecycleEvent("archived", state.id, SERVER_ACTOR, ts);
+    case "unarchived":
+      if (!state.archived) throw new BadRequest("Carte non archivée.");
+      return lifecycleEvent("unarchived", state.id, SERVER_ACTOR, ts);
     case "deleted":
       return lifecycleEvent("deleted", state.id, SERVER_ACTOR, ts);
     default:
@@ -160,15 +173,42 @@ function buildByType(
   }
 }
 
+// The optional insertion target of a move (ADR 019): another card the drop
+// landed on, which MUST sit in the target cell of the folded board.
+function validBeforeId(
+  states: CardState[],
+  state: CardState,
+  body: Record<string, unknown>,
+  to: { laneId: string; columnId: string },
+): string | undefined {
+  const beforeId = body["beforeId"];
+  if (beforeId === undefined) return undefined;
+  if (typeof beforeId !== "string" || beforeId === state.id) {
+    throw new BadRequest("Carte cible de l’insertion invalide.");
+  }
+  // An archived target is off the board: no legitimate drop can land on it.
+  const target = states.find((card) => card.id === beforeId);
+  if (!target || target.archived || target.laneId !== to.laneId || target.columnId !== to.columnId) {
+    throw new BadRequest("Carte cible de l’insertion hors de la cellule visée.");
+  }
+  return beforeId;
+}
+
 // "from" is the card's authoritative current cell (server-derived, not
-// client-supplied); "to" must reference known topology and differ from the
-// current cell — recording a same-cell move would reset the aging clock.
+// client-supplied); "to" must reference known topology. A same-cell move is
+// only accepted as a reorder (beforeId present, ADR 019) — a plain same-cell
+// move would reset the aging clock for nothing.
 function buildMoved(
   config: BoardConfig,
   state: CardState,
   body: Record<string, unknown>,
   ts: string,
+  states: CardState[],
 ): CardEventInput {
+  // An archived card is off the board (ADR 017): its position may not
+  // change until it is unarchived — the log must never record board moves
+  // of invisible cards.
+  if (state.archived) throw new BadRequest("Carte archivée : désarchiver avant de déplacer.");
   const toColumnId = body["toColumnId"];
   const toLaneId = body["toLaneId"];
   if (typeof toColumnId !== "string" || !config.columns.some((c) => c.id === toColumnId)) {
@@ -177,11 +217,13 @@ function buildMoved(
   if (typeof toLaneId !== "string" || !config.lanes.some((lane) => lane.id === toLaneId)) {
     throw new BadRequest("Canal cible inconnu.");
   }
-  if (state.laneId === toLaneId && state.columnId === toColumnId) {
+  const to = { laneId: toLaneId, columnId: toColumnId };
+  const beforeId = validBeforeId(states, state, body, to);
+  if (state.laneId === toLaneId && state.columnId === toColumnId && beforeId === undefined) {
     throw new BadRequest("Carte déjà dans cette cellule.");
   }
   const from = { laneId: state.laneId, columnId: state.columnId };
-  return movedEvent(state.id, from, { laneId: toLaneId, columnId: toColumnId }, SERVER_ACTOR, ts);
+  return movedEvent(state.id, from, to, SERVER_ACTOR, ts, beforeId);
 }
 
 function buildBlocked(
@@ -192,6 +234,9 @@ function buildBlocked(
   const reason = typeof body["reason"] === "string" ? body["reason"].trim() : "";
   if (reason.length === 0) throw new BadRequest("Motif de blocage requis.");
   if (reason.length > 500) throw new BadRequest("Motif de blocage trop long (500 caractères max).");
+  // Re-blocking would silently restart the andon clock and shadow the
+  // original motif; lifting first keeps the escalation story honest.
+  if (state.blocked) throw new BadRequest("Carte déjà bloquée.");
   return lifecycleEvent("blocked", state.id, SERVER_ACTOR, ts, { reason });
 }
 
@@ -204,67 +249,6 @@ function buildCommented(
   if (text.length === 0) throw new BadRequest("Commentaire requis.");
   if (text.length > 2000) throw new BadRequest("Commentaire trop long (2000 caractères max).");
   return lifecycleEvent("commented", state.id, SERVER_ACTOR, ts, { text });
-}
-
-// Small structural predicates reused across the patch validators.
-const amountOrNull = (v: unknown) =>
-  v === null || (typeof v === "number" && Number.isFinite(v) && v >= 0);
-const stringArray = (v: unknown) =>
-  Array.isArray(v) && v.every((item) => typeof item === "string");
-const stringOrNull = (v: unknown) => v === null || typeof v === "string";
-const nonNegNumber = (v: unknown) => typeof v === "number" && Number.isFinite(v) && v >= 0;
-const isPlainObj = (v: unknown): v is Record<string, unknown> =>
-  typeof v === "object" && v !== null && !Array.isArray(v);
-
-// Config-aware validators for the design-v10 detail fields: referential ids
-// (profiles, risk types, project constraints) must point at existing topology.
-function designV10Validators(config: BoardConfig): Record<string, (v: unknown) => boolean> {
-  const profileIds = new Set(config.profiles.map((p) => p.id));
-  const riskIds = new Set(config.riskTypes.map((r) => r.id));
-  const constraintIds = new Set(config.projectConstraints.map((c) => c.id));
-  return {
-    budgetEngaged: amountOrNull,
-    budgetRdli: amountOrNull,
-    contentionNote: (v) => typeof v === "string",
-    contentionProfiles: (v) => stringArray(v) && (v as string[]).every((id) => profileIds.has(id)),
-    projectConstraints: (v) => stringArray(v) && (v as string[]).every((id) => constraintIds.has(id)),
-    alerts: stringArray,
-    dateRdr: stringOrNull,
-    chargeByProfile: (v) => Array.isArray(v) && v.every((e) =>
-      isPlainObj(e) && profileIds.has(e.profileId as string) && nonNegNumber(e.jh) && nonNegNumber(e.done)),
-    risks: (v) => Array.isArray(v) && v.every((r) =>
-      isPlainObj(r) && riskIds.has(r.type as string) && typeof r.desc === "string"),
-  };
-}
-
-// Per-field acceptance for an "edited" patch, closed over the runtime config
-// so referential fields (domain, typeId, profiles…) must point at existing
-// topology.
-function patchValidators(config: BoardConfig): Record<string, (value: unknown) => boolean> {
-  const customValue = (v: unknown): v is CustomValue =>
-    v === null || typeof v === "string" || typeof v === "boolean" ||
-    (typeof v === "number" && Number.isFinite(v));
-  return {
-    title: (v) => typeof v === "string" && v.trim().length > 0,
-    owner: (v) => typeof v === "string",
-    domain: (v) => typeof v === "string" && config.domains.some((d) => d.id === v),
-    criticality: isCriticality,
-    typeId: (v) => v === null || (typeof v === "string" && config.types.some((t) => t.id === v)),
-    codename: stringOrNull,
-    nature: isNature,
-    tags: stringArray,
-    effortEstimated: amountOrNull,
-    effortConsumed: amountOrNull,
-    budgetEstimated: amountOrNull,
-    budgetConsumed: amountOrNull,
-    loadPlan: stringOrNull,
-    resources: stringArray,
-    notes: (v) => typeof v === "string",
-    ...designV10Validators(config),
-    custom: (v) =>
-      typeof v === "object" && v !== null && !Array.isArray(v) &&
-      Object.values(v).every(customValue),
-  };
 }
 
 // The patch must be an object holding only whitelisted fields with valid
@@ -281,6 +265,7 @@ function buildEdited(
     throw new BadRequest("Patch d’édition invalide.");
   }
   const fields = patch as Record<string, unknown>;
+  if (Object.keys(fields).length === 0) throw new BadRequest("Patch d’édition vide.");
   const allowed = new Set(EDITABLE_FIELDS);
   const validators = patchValidators(config);
   for (const key of Object.keys(fields)) {

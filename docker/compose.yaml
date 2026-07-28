@@ -12,13 +12,15 @@ name: portfolio-kanban
 services:
   db:
     profiles: ["app"]
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-kanban}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-thuglife}
       POSTGRES_DB: ${POSTGRES_DB:-kanban}
+    # Loopback-bound: the dev-password database is never reachable beyond this
+    # machine. Drop the 127.0.0.1 prefix only for a deliberately shared host.
     ports:
-      - "${DB_PORT:-5432}:5432"
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
@@ -44,8 +46,11 @@ services:
       KANBAN_DATA_PATH: /app/data/board.jsonl
     volumes:
       - config-data:/app/data
+    # Loopback-bound: the write API is unauthenticated (auth is RP3), so it is
+    # not reachable beyond this machine. Reach it through the front proxy on
+    # :8080 (same-origin). Drop the 127.0.0.1 prefix only for a shared host.
     ports:
-      - "8787:8787"
+      - "127.0.0.1:8787:8787"
     depends_on:
       db:
         condition: service_healthy
@@ -58,21 +63,30 @@ services:
     environment:
       MIDDLE_HOST: middle
       MIDDLE_PORT: "8787"
+    # Bind address of the ONLY published entry point. Default: loopback —
+    # nothing reachable from the network. « Lancer en Docker (reseau).cmd »
+    # sets FRONT_BIND=0.0.0.0 to serve other machines through nginx (explicit
+    # opt-in; no auth before RP3 → restricted network segments only). middle,
+    # db and adminer ALWAYS stay loopback: every access goes through the front.
     ports:
-      - "8080:80"
+      - "${FRONT_BIND:-127.0.0.1}:8080:80"
     depends_on:
       - middle
 
   # Web DB editor for DEMO/DEV only (profil `tools`, jamais en production).
   #   docker compose --profile app --profile tools up
   #   -> http://localhost:8081  (Système PostgreSQL · Serveur db · kanban / thuglife · base kanban)
+  # Le plugin card-boxes éclate la colonne jsonb `data` (cards, card_events)
+  # en boîtes typées par champ — repli JSON brut inclus (docker/adminer/).
   adminer:
     profiles: ["tools"]
-    image: adminer:4
+    image: adminer:4.17.1@sha256:bb7f148f65aae5916b79a5b7b4ac594f04b17340840cda4c556c84fe4c89b110
     environment:
       ADMINER_DEFAULT_SERVER: db
     ports:
-      - "8081:8080"
+      - "127.0.0.1:8081:8080"
+    volumes:
+      - ./adminer/card-boxes.php:/var/www/html/plugins-enabled/card-boxes.php:ro
     depends_on:
       - db
 

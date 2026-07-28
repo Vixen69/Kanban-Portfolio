@@ -19,10 +19,16 @@ export interface CardItemProps {
   config: BoardConfig;
   /** Show the code projet on the card (sidebar toggle). */
   showCodes: boolean;
-  /** Two-stage click: the App focuses the column first, then opens the detail. */
+  /** One click opens the card detail (design v11). */
   onOpen: (card: CardState) => void;
   onDragStart: (e: DragEvent, card: CardState) => void;
   onDragEnd: () => void;
+  /** A dragged card hovers this one (drop-before indicator, ADR 019). */
+  onCardOver: (e: DragEvent, card: CardState) => void;
+  /** A dragged card was dropped on this one (insert before it, ADR 019). */
+  onCardDrop: (e: DragEvent, card: CardState) => void;
+  /** True while this card is the insertion target of the current drag. */
+  dropTarget: boolean;
 }
 
 // Blocked cards override the domain accent with the validated red wash +
@@ -68,20 +74,26 @@ export function MiniCard(props: CardItemProps) {
   const domain = domainById(config)[card.domain];
   return (
     <div
-      className={"mini" + (props.dimmed ? " dimmed" : "")}
+      className={"mini" + (props.dimmed ? " dimmed" : "") + (props.dropTarget ? " drop-before" : "")}
       draggable
       onClick={() => props.onOpen(card)}
       onDragStart={(e) => props.onDragStart(e, card)}
       onDragEnd={props.onDragEnd}
+      onDragOver={(e) => props.onCardOver(e, card)}
+      onDrop={(e) => props.onCardDrop(e, card)}
       style={{ height: "var(--card-h)", ...acc.root }}
       title={`${card.title}  ·  ${type !== null ? type.name : ""}  ·  ${domain !== undefined ? domain.name : ""}  ·  ${card.owner}  ·  ${days}j`}
     >
+      {/* Blocked = the red wash alone; no pulse dot on tickets (one signal
+          per information — the dot stays in the fiche's BLOCAGE banner).
+          Type first, then the name (aligned across tickets), the criticality
+          picto AFTER the name. */}
       <span className="mini-accent" style={acc.accent} />
-      {card.blocked && <span className="blk-pulse" />}
-      <CritMark c={card.criticality} />
       <TypeTag type={type} />
       {props.showCodes && card.codename !== null && <span className="mini-code">{card.codename}</span>}
       <span className="mini-name">{card.title}</span>
+      <CritMark c={card.criticality} />
+      <span className="card-fill" />
       <AgeText days={days} age={config.age} />
     </div>
   );
@@ -101,19 +113,21 @@ export function FocusCard(props: CardItemProps) {
   const acc = cardAccent(card, config);
   return (
     <div
-      className={"focus-card" + (props.dimmed ? " dimmed" : "")}
+      className={"focus-card" + (props.dimmed ? " dimmed" : "") + (props.dropTarget ? " drop-before" : "")}
       draggable
       onClick={() => props.onOpen(card)}
       onDragStart={(e) => props.onDragStart(e, card)}
       onDragEnd={props.onDragEnd}
+      onDragOver={(e) => props.onCardOver(e, card)}
+      onDrop={(e) => props.onCardDrop(e, card)}
       style={acc.root}
     >
       <span className="focus-accent" style={acc.accent} />
       <div className="focus-body">
         <div className="focus-line1">
-          {card.blocked && <span className="blk-pulse" />}
-          <CritMark c={card.criticality} big />
           <span className="focus-name">{card.title}</span>
+          <CritMark c={card.criticality} big />
+          <span className="card-fill" />
           <AgeText days={days} age={config.age} />
         </div>
         <FocusMeta card={card} config={config} showCodes={props.showCodes} />

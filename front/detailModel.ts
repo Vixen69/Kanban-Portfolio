@@ -1,9 +1,8 @@
 // Pure derivations for the card detail modal (design/modals.jsx computed
-// block): the budget cross-graph rows, the derived auto-alerts, the projected
-// RDR date state, and the plan-de-charge profile rows. No React, no network.
+// block): the budget cross-graph rows, the projected RDR date state, and
+// the plan-de-charge profile rows. No React, no network.
 
 import type { BoardConfig, CardState } from "../core/types.ts";
-import { daysInColumn } from "../core/aging.ts";
 
 const DAY_MS = 86_400_000;
 
@@ -39,28 +38,6 @@ export function budgetModel(card: CardState): { rows: BudgetRow[]; bMax: number;
   return { rows, bMax, bRdli, bReal };
 }
 
-/** A derived alert (severity key from config.riskSeverity + text). */
-export interface AutoAlert {
-  sev: "faible" | "moyen" | "eleve";
-  text: string;
-}
-
-/** Derived signals shown above the retained risks (design autoAlerts). */
-export function autoAlerts(card: CardState, config: BoardConfig, now: number): AutoAlert[] {
-  const est = card.effortEstimated ?? 0;
-  const cons = card.effortConsumed ?? 0;
-  const days = daysInColumn(card, new Date(now));
-  const { bRdli, bReal } = budgetModel(card);
-  const bEng = card.budgetEngaged ?? 0;
-  const alerts: AutoAlert[] = [];
-  if (card.blocked) alerts.push({ sev: "eleve", text: "Bloqué — " + (card.blockedReason || "raison non précisée") });
-  if (cons > est) alerts.push({ sev: "eleve", text: `Dépassement de charge · ${cons}/${est} j.h` });
-  if (days > 60) alerts.push({ sev: "moyen", text: `Stagnation · ${days} j dans ${colLabel(config, card.columnId)}` });
-  if (bReal > bRdli) alerts.push({ sev: "eleve", text: "Réalisé au-delà de l’enveloppe RDLI" });
-  else if (bEng > bRdli) alerts.push({ sev: "moyen", text: "Engagé au-delà de l’enveloppe RDLI" });
-  return alerts;
-}
-
 /** Projected RDR (delivery) date state and labels. */
 export interface RdrModel {
   state: "" | "soon" | "past";
@@ -88,8 +65,11 @@ export interface ProfileRow {
   raf: number;
 }
 
-/** Plan-de-charge rows sorted by descending j.h, plus max/total for the bars. */
-export function profileRows(card: CardState, config: BoardConfig): { rows: ProfileRow[]; max: number; total: number } {
+/**
+ * Plan-de-charge rows sorted by descending j.h, plus max/total for the bars
+ * and the summed per-profile consumed (design v11 « consommés » subtitle).
+ */
+export function profileRows(card: CardState, config: BoardConfig): { rows: ProfileRow[]; max: number; total: number; done: number } {
   const rows = card.chargeByProfile.map((entry) => {
     const profile = config.profiles.find((p) => p.id === entry.profileId);
     return {
@@ -103,5 +83,6 @@ export function profileRows(card: CardState, config: BoardConfig): { rows: Profi
   }).sort((a, b) => b.jh - a.jh);
   const max = Math.max(1, ...rows.map((row) => row.jh));
   const total = rows.reduce((sum, row) => sum + row.jh, 0);
-  return { rows, max, total };
+  const done = rows.reduce((sum, row) => sum + row.done, 0);
+  return { rows, max, total, done };
 }

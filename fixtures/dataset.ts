@@ -118,15 +118,6 @@ export const CONTENTION_NOTES = [
   "Dépendance forte au même architecte que deux projets du portefeuille.",
 ];
 
-/** Free-text alert notes (design/data.jsx) — editable on the card. */
-export const ALERT_NOTES = [
-  "Décision COPROJ attendue avant la prochaine étape.",
-  "Jalon réglementaire à confirmer avec le métier.",
-  "Risque de glissement si l’arbitrage budgétaire tarde.",
-  "Point de vigilance remonté au COPIL du mois.",
-  "Validation sponsor en attente — relance prévue.",
-];
-
 /** Risk descriptions per bearing entity (riskType id → candidate texts). */
 export const RISK_DESC: Record<string, string[]> = {
   ssg: ["Revue sécurité non planifiée", "Exposition de données à qualifier", "Conformité SSI à confirmer"],

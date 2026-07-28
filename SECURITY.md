@@ -27,7 +27,9 @@ minimaliste initiale ; `core/` et la logique d'API sont repris tels quels.
 - La surface est le **SBOM autorisé du client** (plafond fixé par le référent
   technique ; voir `DEPENDENCIES.md`). On reste dans les versions autorisées
   et on n'emploie que le nécessaire.
-- Un seul ajout runtime à faire autoriser : le client PostgreSQL **`pg`**.
+- Le seul ajout runtime hors liste initiale, le client PostgreSQL **`pg`**, a
+  été **autorisé par le référent (2026-07-07)** et installé (ADR 016) ; il est
+  confiné à son adaptateur (`middle/storage/postgres.ts`, test de frontière).
 - Hachage des mots de passe par **`scrypt` de `node:crypto`** (module natif,
   aucune dépendance ajoutée, préféré à bcrypt/argon2).
 
@@ -50,31 +52,58 @@ minimaliste initiale ; `core/` et la logique d'API sont repris tels quels.
   d'environnement/secrets **hors dépôt**, référencés par chemin (dotenv).
 - Le journal d'évènements (`card_events`) est **append-only** : à la fois
   piste d'audit et source unique des métriques de flux. L'append-only est
-  défendu au niveau du schéma (révocation des droits UPDATE/DELETE et/ou
-  triggers). Portée : ces garde-fous arrêtent la réécriture par la voie SQL
-  applicative ; ils ne sont pas inviolables face à un accès direct au fichier
-  ou à la base.
+  défendu au niveau du schéma par un **trigger** interdisant UPDATE/DELETE.
+  Portée : ce garde-fou arrête la réécriture par la voie SQL applicative ; il
+  n'est pas inviolable face à un accès direct au fichier ou à la base.
+- **Interrupteur de démo** `KANBAN_PG_APPEND_ONLY=0` : retire le trigger pour
+  autoriser des retouches directes en base (démo/dev via Adminer). **Doit
+  rester à `1` en production** (défaut du code et du compose). Le lanceur
+  « Lancer en Docker.cmd » le met à `0` — c'est un raccourci de démo local, pas
+  la configuration de livraison.
 - **L'intégrité repose in fine sur le contrôle d'accès à la plateforme/VM**
   (réseau, moindre privilège) et les solutions propres du client. Le chaînage
   de hachés (preuve d'inviolabilité applicative) a été **écarté** sur cette
   base — l'authentification applicative reste additive par-dessus.
 
-## Durcissement du middle (Express)
+## Durcissement du web (implémenté)
 
-Repris du serveur `node:http` et à réimplémenter en middlewares Express :
+En-têtes de sécurité posés à **deux points** — la page HTML est servie par
+nginx (front), l'API JSON par Express (middle) — avec la **même politique** de
+part et d'autre (à garder en phase : `docker/nginx.default.conf.template` et
+`SECURITY_HEADERS` dans `middle/app.ts`) :
 
-- **CSP** : `default-src 'self'` (avec `style-src 'unsafe-inline'` tant que des
-  styles en ligne subsistent — l'UI pose des variables CSS de vieillissement).
-- En-têtes de sécurité posés **explicitement** (pas de `helmet` tant qu'il
-  n'est pas autorisé) : `X-Content-Type-Options: nosniff`, `Referrer-Policy`,
-  `Cross-Origin-Opener-Policy`, `Permissions-Policy`.
-- **Même origine** : aucun en-tête CORS n'est émis par le middle — le front
-  et le middle partagent l'origine (reverse-proxy), donc rien à autoriser en
-  cross-origin. `cors` est disponible dans le SBOM mais non utilisé.
-- Limite de taille du corps de requête, délais de requête (anti slow-loris),
-  validation de chaque intention POST contre la topologie (rejet en 400).
+- **CSP** : `default-src 'self'` ; `script-src 'self'` ; `style-src 'self'
+  'unsafe-inline'` (l'UI pose des variables CSS de vieillissement) ;
+  `object-src 'none'` ; `frame-ancestors 'none'` ; `base-uri`/`form-action`
+  `'self'`. La page ajoute `img-src`/`font-src … data:` pour les actifs inline
+  du build Vite.
+- En-têtes posés **explicitement** (pas de `helmet`) : `X-Content-Type-Options:
+  nosniff`, `Referrer-Policy: no-referrer`, `Cross-Origin-Opener-Policy:
+  same-origin`, `Permissions-Policy` restrictif ; `server_tokens off` sur nginx.
+- **Même origine** : aucun en-tête CORS émis par le middle — front et middle
+  partagent l'origine (reverse-proxy), donc rien à autoriser en cross-origin.
+  `cors` est disponible dans le SBOM mais non utilisé.
+- Plafond de corps de requête **64 Kio** (Express + nginx), délais de requête
+  (anti slow-loris), validation de chaque intention POST contre la topologie
+  (rejet en 400) ; une erreur interne renvoie un message générique — jamais
+  chemins/SQL/titres (testé).
 - Journalisation : `card_id` / id d'évènement et message uniquement ; jamais
   un objet carte/évènement ni un corps de requête.
+
+## Durcissement des conteneurs (implémenté)
+
+- **Middle non-root** : le process Express tourne en utilisateur `node` ; les
+  volumes de données lui appartiennent (`docker/Dockerfile.middle`).
+- **Images de base épinglées par digest** (`node`, `nginx`, `postgres`,
+  `adminer`) — build reproductible, le tag ne bouge pas sous nos pieds.
+- **Ports publiés liés à la loopback** (`127.0.0.1`) dans le compose : l'API
+  non authentifiée (auth = RP3) et la base (mot de passe de dev) ne sont pas
+  joignables au-delà de la machine ; l'accès passe par le front en même origine.
+  L'exposition réseau est un **opt-in explicite** (`FRONT_BIND=0.0.0.0`, lanceur
+  « Lancer en Docker (reseau).cmd ») qui n'ouvre que le front — à réserver à un
+  segment réseau restreint tant que l'auth (RP3) n'est pas livrée.
+- **`pg` Pool** : un écouteur `error` empêche qu'un incident de base au repos
+  (redémarrage, bascule) ne fasse tomber le process middle.
 
 ## Build vérifiable et livraison
 

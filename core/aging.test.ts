@@ -13,7 +13,7 @@ function daysAgo(days: number): string {
 }
 
 function state(overrides: Parameters<typeof testCard>[0] = {}, daysHere = 0): CardState {
-  return { ...testCard(overrides), enteredColumnAt: daysAgo(daysHere), comments: [] };
+  return { ...testCard(overrides), enteredColumnAt: daysAgo(daysHere), comments: [], archived: false };
 }
 
 function assertClose(actual: number, expected: number, label: string): void {

@@ -9,6 +9,7 @@ import { Pool, type PoolClient } from "pg";
 import type { BoardStorage } from "../../core/ports.ts";
 import type { CardEventInput } from "../../core/events.ts";
 import type { Card, CardEvent } from "../../core/types.ts";
+import { logError } from "../log.ts";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS cards (
@@ -158,6 +159,11 @@ function buildStorage(pool: Pool, runTx: Tx): BoardStorage {
  */
 export async function createPostgresStorage(connectionString?: string, appendOnly = true): Promise<BoardStorage> {
   const pool = connectionString ? new Pool({ connectionString }) : new Pool();
+  // An idle pooled connection can emit 'error' with no query in flight (a DB
+  // restart, failover or network blip). An 'error' event with no listener is a
+  // fatal uncaught exception in Node — attach one so the middle logs it and
+  // keeps running (the pool reconnects on the next query) instead of crashing.
+  pool.on("error", (err) => logError("pg pool", err));
   await pool.query(SCHEMA);
   await pool.query(appendOnly ? APPEND_ONLY_ON : APPEND_ONLY_OFF);
   return buildStorage(pool, makeTx(pool));

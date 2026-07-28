@@ -1,11 +1,13 @@
 // POST /api/cards handler (ADR 012). Split from api.ts to respect the
 // 300-line file cap; same style: a pure handler over injected storage. The
-// server builds the whole Card — id, codename, first column, timestamps —
-// from a minimal creation intent (the QuickAdd form fields).
+// server builds the whole Card — id, codename, first column, timestamps,
+// nature (from the canal, ADR 018) — from a minimal creation intent (the
+// QuickAdd form fields).
 
 import type { BoardStorage } from "../core/ports.ts";
-import type { BoardConfig, Card, Criticality, NatureKey } from "../core/types.ts";
-import { asObject, BadRequest, isCriticality, isNature, SERVER_ACTOR } from "./api.ts";
+import type { BoardConfig, Card, Criticality } from "../core/types.ts";
+import { laneNature } from "../core/config.ts";
+import { asObject, BadRequest, isCriticality, serializedWrite, SERVER_ACTOR } from "./api.ts";
 import type { ApiResult } from "./api.ts";
 
 interface NewCardInput {
@@ -13,7 +15,6 @@ interface NewCardInput {
   domain: string;
   laneId: string;
   typeId: string;
-  nature: NatureKey;
   criticality: Criticality;
   owner: string;
 }
@@ -24,25 +25,30 @@ interface NewCardInput {
  * event (toColumn = first column, payload { laneId }) in one atomic
  * storage batch: the card can never exist without its audit trace.
  * Inputs: the storage, the runtime board config, the parsed JSON body
- * ({ title, domain, laneId, typeId, nature, criticality, owner }).
+ * ({ title, domain, laneId, typeId, criticality, owner }) — the nature is
+ * derived server-side from the canal (positional, ADR 018).
  * Output: 201 with { card, event }.
  * Failure: throws BadRequest (→ 400) on invalid input; propagates storage
  * errors, including a duplicate id (→ 500) — nothing is persisted then.
  */
-export async function postCard(storage: BoardStorage, config: BoardConfig, raw: unknown): Promise<ApiResult> {
-  const input = validateCardInput(config, asObject(raw));
-  const ts = new Date().toISOString();
-  const card = buildCard(config, await storage.listBaseCards(), input, ts);
-  const event = await storage.insertCard(card, {
-    ts,
-    actor: SERVER_ACTOR,
-    cardId: card.id,
-    type: "created",
-    fromColumn: null,
-    toColumn: card.columnId,
-    payload: { laneId: card.laneId },
+export function postCard(storage: BoardStorage, config: BoardConfig, raw: unknown): Promise<ApiResult> {
+  // Serialized with every other write: two concurrent creations would both
+  // read the same base cards and compute the same next id (duplicate-key 500).
+  return serializedWrite(async () => {
+    const input = validateCardInput(config, asObject(raw));
+    const ts = new Date().toISOString();
+    const card = buildCard(config, await storage.listBaseCards(), input, ts);
+    const event = await storage.insertCard(card, {
+      ts,
+      actor: SERVER_ACTOR,
+      cardId: card.id,
+      type: "created",
+      fromColumn: null,
+      toColumn: card.columnId,
+      payload: { laneId: card.laneId },
+    });
+    return { status: 201, body: { card, event } };
   });
-  return { status: 201, body: { card, event } };
 }
 
 // Checks every creation field against the runtime topology. The title and
@@ -63,8 +69,6 @@ function validateCardInput(config: BoardConfig, body: Record<string, unknown>): 
   if (typeof typeId !== "string" || !config.types.some((t) => t.id === typeId)) {
     throw new BadRequest("Type de projet inconnu.");
   }
-  const nature = body["nature"];
-  if (!isNature(nature)) throw new BadRequest("Nature invalide.");
   const criticality = body["criticality"];
   if (!isCriticality(criticality)) throw new BadRequest("Criticité invalide.");
   const owner = body["owner"] === undefined ? "" : body["owner"];
@@ -72,7 +76,7 @@ function validateCardInput(config: BoardConfig, body: Record<string, unknown>): 
   if (owner.trim().length > 120) {
     throw new BadRequest("Chef de projet trop long (120 caractères max).");
   }
-  return { title, domain, laneId, typeId, nature, criticality, owner: owner.trim() };
+  return { title, domain, laneId, typeId, criticality, owner: owner.trim() };
 }
 
 // Next free "S"-prefixed id: max numeric suffix over existing base cards + 1,
@@ -120,7 +124,7 @@ function buildCard(config: BoardConfig, existing: Card[], input: NewCardInput, t
     criticality: input.criticality,
     typeId: input.typeId,
     codename: `PX${Math.floor(1000000 + Math.random() * 9000000)}`,
-    nature: input.nature,
+    nature: laneNature(config, input.laneId),
     tags: [],
     dependencies: [],
     blocked: false,
