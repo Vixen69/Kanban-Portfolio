@@ -596,6 +596,32 @@ de son ADR.
   aucun artefact de rendu (sondage DOM : seuls les 6 `.gate-line` DoR/DoD
   attendus, tous confinés).
 
+### 2026-07-29 — Import CSV, étape 1 : RDOM en mode audit
+- **RP4 démarre par le parseur d'import**, construit fichier par fichier
+  (`RDOM` → `SP_total` → `projet` → `ressources_PDC`) selon le contrat
+  consigné dans `docs/IMPORT-MAPPING.md`. Décisions d'auteur du jour :
+  entrée en **CSV** (Q13 — aucune bibliothèque, plafond SBOM intact) ; la
+  table **`RDOM`** (domaine ↔ nom) remplace `CORRESP` et sert deux usages —
+  domaine via le responsable de portefeuille ET exclusion des RDOM pour
+  dégager le chef de projet (Q4+Q5 tranchées).
+- **Mode audit pur** : rien n'est chargé, le produit est le rapport
+  (inventaire, pris, écarté, douteux, signalements — rien d'ignoré en
+  silence). Nouveau `adapters/csv-import/` : modules purs sans accès disque
+  (décodage UTF-8/1252 signalé, lecteur CSV artisanal `;`, **reconnaissance
+  par contrat d'en-têtes jamais par nom de fichier**, rapport déterministe),
+  CLI mince `sync/import.ts` (`npm run import -- <dossier>`) qui lit la
+  config via `getRuntime()` — un override admin est respecté.
+- La résolution des domaines accepte id, nom ou code court (`ING`, `A&D`…) ;
+  doublons fusionnés + signalés, nom sous deux domaines → douteux, domaine
+  sans RDOM → avertissement de couverture.
+- Échantillon synthétique `fixtures/import/RDOM.csv` (12 noms inventés, 9
+  domaines). Aucune donnée réelle : la vraie table sera un CSV créé côté
+  client, hors dépôt.
+- ADR 021. Vérifié : 390 tests verts (~50 nouveaux), conventions vertes,
+  typecheck vert ; essai CLI sur l'échantillon → 12 pris / 0 écarté /
+  0 douteux, rapport identique sur double exécution (hors ligne de date),
+  usage/dossier invalide → exit 1.
+
 ### À venir
 - **RP3** : auth JWT-en-cookie (login, rôles viewer/editor/admin, acteur =
   utilisateur authentifié à la place de « anonymous ») ; CLI de comptes ;
@@ -608,8 +634,12 @@ de son ADR.
   "anonymous"` dans `middle/api.ts`, passée à chaque constructeur d'évènement ;
   `postEvent` ne prend pas d'identité — RP3 doit faire transiter l'identité
   authentifiée requête → route `app.ts` → `postEvent` → builders.
-- RP4 csv-import / sciforma + sync ; RP5 métriques (**vue implémentée**,
-  ADR 007) ; RP6 **CI plateforme** — la conteneurisation (ADR 015) et
-  l'adaptateur `pg` (ADR 016) sont **faits**, et il n'y a **pas** de build
-  TS→JS (exécution TypeScript directe sous Node 22) ; reste l'intégration CI
-  dans la plateforme du client. Chaque phase : une entrée datée ici.
+- RP4 : l'étape 1 du parseur (RDOM, audit) est **faite** (ADR 021) ;
+  restent les étapes 2-4 (`SP_total` cartes, `projet` domaine+chef de
+  projet, `ressources_PDC` charge — questions Q1/Q3/Q15 notamment), le mode
+  chargement réel via `BoardStorage.importCards`, puis sciforma + sync ;
+  RP5 métriques (**vue implémentée**, ADR 007) ; RP6 **CI plateforme** — la
+  conteneurisation (ADR 015) et l'adaptateur `pg` (ADR 016) sont **faits**,
+  et il n'y a **pas** de build TS→JS (exécution TypeScript directe sous
+  Node 22) ; reste l'intégration CI dans la plateforme du client. Chaque
+  phase : une entrée datée ici.
