@@ -176,6 +176,12 @@ Produit à chaque exécution (mode audit comme mode réel) :
 **Vérification manuelle** : ~20 projets sur les ~150, choisis exprès (plus
 gros budgets, nominatif, tout-générique, cas signalés par le rapport).
 
+**Granularité (précisé à l'étape 2)** : le « pris » est **par carte** (une
+ligne par sujet, avec sa position) ; les anomalies de **cellules**
+(illisibles, futurs, unités, codes anormaux…) sont **agrégées par motif et
+par colonne** — compte + jusqu'à 8 numéros de ligne — pour qu'un export de
+1 400 lignes reste lisible sans rien perdre de localisable.
+
 ## Pièges anticipés — contrôles obligatoires du parseur
 
 Le parseur est volontairement tatillon : chaque contrôle ci-dessous produit
@@ -196,10 +202,14 @@ compte ; lignes vides ou de commentaire.
 
 **Nombres et dates à la française.** Virgule décimale, espaces de milliers,
 nombres stockés en texte, « N/A », « - », « ? », erreurs de formule
-(#REF!, #N/A), valeurs négatives → tout est signalé. Dates : formats FR,
-numéros de série Excel, dates saisies en texte, jalons remplis avec
-« oui »/« x » au lieu d'une date. Un jalon daté dans le futur (RDLI
-*prévue*, pas *passée*) ne vaut pas position Actifs (Q15).
+(#REF!, #N/A), valeurs négatives, unités écrites dans la cellule → tout
+est signalé. Dates : formats FR (heure tolérée), années à 2 chiffres
+(pivot 70 : 70-99 → 19xx, 00-69 → 20xx), numéros de série Excel (lus et
+**signalés** — c'est une interprétation), « oui »/« x » (compté passé +
+signalé) et les booléens Excel VRAI/FAUX (« FAUX » = non explicite, sans
+bruit). Un jalon daté dans le futur (RDLI *prévue*, pas *passée*) ne vaut
+pas position Actifs (Q15) — comparaison sur la date **locale** du poste
+qui exécute l'audit.
 
 **Jointures et orphelins.** Orphelins listés dans les deux sens (projet du
 PDC absent de `SP_total`, projet de `SP_total` absent de `projet`…), jamais

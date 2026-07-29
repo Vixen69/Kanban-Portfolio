@@ -8,12 +8,15 @@ const BOM = String.fromCharCode(0xfeff);
  * Canonical form for tolerant label comparison.
  * Inputs: any raw header or cell text.
  * Outputs: trimmed, BOM-free, whitespace-collapsed, lowercased, accent-free
- * string; œ/æ are expanded to oe/ae because NFD does not decompose them.
+ * string; œ/æ are expanded to oe/ae because NFD does not decompose them;
+ * typographic apostrophes are unified to the ASCII one (the board config
+ * uses « ’ », the exports use « ' » — both must compare equal).
  * Failure modes: none — total function, empty input yields "".
  */
 export function normalizeLabel(raw: string): string {
   return raw
     .replaceAll(BOM, "")
+    .replace(/[’‘ʼ´]/g, "'")
     .replace(/\s+/g, " ")
     .trim()
     .toLowerCase()

@@ -637,6 +637,53 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-07-29 — Import CSV, étape 2 : SP_total en mode audit
+- **Le contrat `SP_total`** (libellés réels du relevé du jour) rejoint le
+  registre : 10 colonnes requises (Nom, Type, Début, 3 jalons, 4 montants),
+  « État suivant autorisé » en optionnelle (relevé des valeurs distinctes =
+  matière pour Q1), 12 colonnes **ignorées connues** — nouveau concept de
+  contrat : réclamées sans bruit, listées une fois au rapport, jamais en
+  « colonne en trop ».
+- **Recherche d'en-têtes sous préambule** (`identify.ts`, extrait de
+  l'orchestrateur) : la ligne d'en-têtes est cherchée parmi les ~20
+  premières lignes non vides — l'export réel `SP_total` porte une ligne de
+  filtres au-dessus (« Afficher les montants calculés pour : », « FAUX »).
+  Préambule signalé, jamais silencieux.
+- **Lecteur `sp-total.ts`** : découpage du Nom (code `PE` 4-6 chiffres
+  toléré et signalé → `codename`, reste → titre), Type par liste blanche
+  (inconnus → douteux par libellé distinct), position par jalons **ancrée
+  sur la config** (RDR validé passé → dernière colonne ; RDLI validé passé
+  → ancre d'activation ; sinon colonne d'entrée — amont par défaut, Q1
+  ouverte), **jalon daté dans le futur signalé et non compté** (règle Q15,
+  « oui »/« x » compté passé + signalé), montants français (virgule,
+  espaces, erreurs de formule signalées), `Début` → `createdAt` (ex-Q6
+  tranchée). Signalements **agrégés** par motif+colonne (compte + première
+  ligne) pour rester lisibles à 1 400 lignes ; le pris reste par carte.
+- **Horloge injectée** : `runImportAudit(files, config, now)` — la règle du
+  futur est déterministe et testable.
+- **Attrapé par l'audit lui-même** : l'apostrophe typographique de la
+  config (« Gestion d'obsolescence ») ne s'appariait pas à l'ASCII des
+  exports — unifiée dans `normalizeLabel`.
+- **Revue adversariale (15 correctifs)** — les trouvailles confirmées :
+  un **match complet domine désormais tout near-miss** (le vrai
+  `Projets.csv`, porteur de Nom+Type+Début, aurait été diagnostiqué
+  « SP_total incomplet ») ; les **lignes de total/sous-total sont exclues**
+  (contrôle obligatoire — double compte) ; jalons incohérents (RDR sans
+  RDLI) signalés ; codes PE anormaux signalés (casse, espaces, longueur,
+  7+ chiffres non extraits, nom réduit au code) ; **même code sous deux
+  noms → douteux** (détecteur de renommage) ; années à 2 chiffres : pivot
+  70 (95 → 1995, plus jamais 2095) ; VRAI/FAUX d'Excel = oui/non
+  explicites ; lectures en série Excel et unités dans les cellules
+  signalées ; datetimes FR tolérés ; « aujourd'hui » comparé en date
+  **locale** (plus de « futur » fantôme entre minuit et 2 h) ; lignes
+  tronquées comptées ; near-miss enrichi (ligne + en-têtes vus) ; borne de
+  recherche d'en-têtes dite quand atteinte ; « Début » vides comptés ;
+  agrégats avec jusqu'à 8 numéros de ligne. Nouveaux modules
+  `subject-name.ts` et `tallies.ts` (plafond 300 lignes).
+- 418 tests verts (+26), conventions et typecheck verts ; essai CLI sur les
+  squelettes : 20 pris, 1 douteux voulu (type inconnu), 6 signalements
+  attendus, rapport identique sur double exécution.
+
 ### 2026-07-29 — Fix : la molette défile dans les cellules pleines, tous modes
 - La flèche d'indication (v11) promettait un défilement que seul le mode
   focus offrait : `.cell-cards` était `overflow: hidden` hors focus. Réglé

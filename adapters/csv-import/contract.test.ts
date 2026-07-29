@@ -61,6 +61,13 @@ test("a missing column is a near-miss with the precise missing list", () => {
   assert.deepEqual(result.missing, ["Nom"]);
 });
 
+test("a full match dominates a bigger contract's near-miss (Projets.csv case)", () => {
+  const result = identifyHeader(["Domaine", "Nom", "Type", "Début", "Responsable 1"]);
+  assert.equal(result.status, "match");
+  if (result.status !== "match") return;
+  assert.equal(result.contract.id, RDOM_CONTRACT.id);
+});
+
 test("alien or empty headers are unknown", () => {
   assert.equal(identifyHeader(["Projet", "Budget"]).status, "unknown");
   assert.equal(identifyHeader([]).status, "unknown");

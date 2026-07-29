@@ -1,0 +1,10 @@
+;;;Afficher les montants calculés pour :;;Toute période;;;;;Afficher les lignes sans montants :;;;FAUX;;;;;;;;;
+Notes;Menu;Nom;Type;Score criblage;Priorité;Top projet;Responsable 1;État suivant autorisé;Catégorie;Début;Jalon RVSR ou Fin;Jalon RDLI validé;Jalon RDR validé (Réf.8);Jalon RDR prévisionnel;Budget présenté PDSI;* Budget validé RDLI;* CAT global projet;Coût prév (ME);Coût réel;ME Achats;Engagé Achats;Réel Achats
+;;PE10001 Modernisation atelier;Achat;;;;;RDR;;12/01/2025;;03/03/2025;10/06/2026;;;150;;120,5;80;;30;
+;;PE10002 Refonte portail interne;Evolution - TMA;;;;;RDLI;;05/02/2025;;20/04/2026;;15/12/2026;;90;;75;22,5;;5;
+;;PE10003 Montée de version calcul;Gestion d'obsolescence;;;;;;;10/03/2026;;;;;;60;;45;0;;0;
+;;Étude connectivité site B;Étude;;;;;;;01/07/2026;;01/10/2026;;;;40;;30;;;;
+;;PE1004 Pilote supervision;TMA Corrective;;;;;;;15/05/2026;;x;;;;25;;20;10;;2;
+;;PE10006 Déploiement outillage;Forfait;;;;;;;02/06/2026;;;;;;35;;28;;;;
+;;PE10007 Sécurisation accès;Mise en œuvre;;;;;;;20/03/2025;;18/08/2025;02/02/2026;;;110;;95;95;;40;
+;;PE10008 Cartographie applicative;Étude;;;;;;;01/04/2026;;;;;;20;;15;3;;1;

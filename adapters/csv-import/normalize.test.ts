@@ -15,6 +15,7 @@ const CASES: Array<[string, string, string]> = [
   ["inner whitespace collapsed", "Archi \t &  Dev", "archi & dev"],
   ["non-breaking space collapsed", `Archi${NBSP}&${NBSP}Dev`, "archi & dev"],
   ["BOM stripped", `${BOM}Domaine`, "domaine"],
+  ["typographic apostrophe unified", "Gestion d’obsolescence", "gestion d'obsolescence"],
   ["oe ligature expanded", "Œuvre", "oeuvre"],
   ["ae ligature expanded", "Ægide", "aegide"],
   ["cedilla and grave", "Reçu à", "recu a"],

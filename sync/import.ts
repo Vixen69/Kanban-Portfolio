@@ -70,7 +70,7 @@ if (args === null) {
 try {
   const boardConfig = loadRuntimeBoardConfig();
   const files = readInputFiles(args.folder);
-  const { report } = runImportAudit(files, boardConfig);
+  const { report } = runImportAudit(files, boardConfig, new Date());
   const outPath = resolve(args.out ?? join(args.folder, "rapport-import.md"));
   mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, renderReport(report, new Date()), "utf8");
