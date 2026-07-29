@@ -257,6 +257,57 @@ Direction validée par l'auteur (2026-07-29), construction après le parseur :
 - Restent à décider au lancement : visibilité du bloc (restreint PMO/admin
   pressenti), valeur exacte de la constante, ADR dédié.
 
+## Relevé réel des exports (2026-07-29, VM cliente — via le rapport d'audit)
+
+Premier passage du parseur sur les exports réels : les en-têtes ci-dessous
+sont recopiés du rapport (aucun fichier n'a quitté la VM). Tous les exports
+riches sont en **Windows-1252** (détecté et signalé).
+
+**`Projets.csv`** (l'export `projet` ; 1,2 Mo, ~1 357 lignes) — colonnes :
+Fichier · Id · **Nom** · **Domaine** (présence inattendue, vocabulaire à
+identifier — voir questions) · Portefeuille · Type · Nature · État du
+processus · État du budget · **Responsable 1/2/3** ·
+**Responsable portefeuilles** (pluriel) · Nature du projet · « Priorité. »
+(point final) · Criticité · Score total · Début · Date T0 · Date
+prévisionnelle de démarrage (RDO) · Date prévisionnelle de déploiement ·
+Fin · Descriptions texte riche · Objectifs · **Impact si report du projet
+(colonne dupliquée, présente deux fois)** · Entité demandeur · Entité
+payeur · Entité payeur mutualisée · Directions Participantes · Programme
+métier · Outils · Exigences légales et/ou de sécurité · Charge JH · Taux
+TUO · les familles budget : Budget PDSI Présenté Charge (Res) (J) /
+Coût (Res) / Coût (Trans) / « Budget  Présenté PDSI Total Coût (Res+Trans) »
+(**double espace**) ; « Budget  Validé PDSI … » (Charge (Res) (J), Coût
+(Res), Coût (Trans), « Total coût » — **casse minuscule**) ; Budget RDLI
+Charge (Res) (J) / Coût (Trans) / Total Coût (Res+Trans) (**pas de
+« Coût (Res) » RDLI**) ; Coût final/réel ME (Res.+Trans) / (Trans) / (Res),
+Charge finale/réelle ME (Res) (J) · Créateur · Référence active (Réf.) ·
+**Jalon en cours** · Top projet · Catégorie · Date création · CAT ·
+Projet.Actif · Date d'export.
+
+**`Ressources_PdC.csv`** (le plan de charge ; 920 Ko) — colonnes :
+**Matricule · Ressource · Organisation · Métier · Id Projet · Nom Projet** ·
+Type projet · Portefeuille · **2023 → 2030, chaque année suivie d'une
+colonne vide** (le motif attendu des en-têtes fusionnés
+prévisionnel/réel — l'aplatissement CSV laisse la 2ᵉ sous-colonne sans
+libellé) · Total Prév. · Total Réel · « Etat du processus » (**sans
+accent**, vs « État … » dans Projets) · Date de publication · Projet.Actif ·
+Date export. Conforme au relevé anticipé ; Q7 confirmée et étendue
+(2023→2030).
+
+**`SP_total.csv`** (290 Ko) — la première ligne non vide est un **préambule
+de filtres** (« Afficher les montants calculés pour : », « Toute période »,
+« Afficher les lignes sans montants : », « FAUX », note « (*) : Montant ne
+tenant pas compte de l'année sélèctionnée. » — sic) : la vraie ligne
+d'en-têtes est plus bas, **encore à relever**. L'étape 2 devra chercher la
+ligne d'en-têtes sous le préambule (recherche de la meilleure ligne
+candidate parmi les premières lignes).
+
+**Leçons pour les contrats** : normalisation indispensable (accents
+inconsistants entre fichiers, doubles espaces, casse variable, point final,
+libellés dupliqués) — déjà couverte par `normalizeLabel` + écarts
+« dupliqué » ; l'arbitrage « l'en-tête le plus juste gagne » est né de ce
+passage (Projets.csv porte Domaine+Nom et volait le contrat RDOM).
+
 ## Relevé de structure à faire sur pièce (sans rien transférer)
 
 Pour chacun de `SP_total`, `projet`, `ressources_PDC`, l'auteur relève sur
@@ -302,7 +353,9 @@ office de vérification sur site.
 
 | # | Question | Avec qui |
 |---|---|---|
-| Q1 | Position amont (ni RDLI ni RDR validé) : tout en Demandes ou une colonne source distingue Demandes/Qualification/Études/Prêts ? | PMO |
+| Q1 | Position amont (ni RDLI ni RDR validé) : tout en Demandes ou une colonne source distingue Demandes/Qualification/Études/Prêts ? (candidats vus au relevé réel : « État du processus », « Jalon en cours ») | PMO |
+| Q16 | `Projets.csv` porte une colonne « Domaine » inattendue : quel vocabulaire ? (les libellés sont lisibles dans la section Écarté du rapport du 2026-07-29 — « domaine inconnu « X » ») ; si c'est notre découpage RDOM, elle peut devenir la source primaire du domaine, la table RDOM restant l'exclusion du chef de projet | Auteur + rapport |
+| Q17 | La vraie ligne d'en-têtes de `SP_total.csv` (sous le préambule de filtres) : à recopier du fichier | Auteur |
 | Q3 | Canal : défaut unique, seuil (coût prévu ?), ou affectation manuelle post-import ? | Auteur + PMO |
 | Q6 | Date de début → `createdAt` ? | Auteur |
 | Q8 | Unité des valeurs du plan de charge : jours ? (cohérence avec 200 j/an) | PMO |
