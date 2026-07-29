@@ -345,6 +345,11 @@ office de vérification sur site.
   responsable de portefeuille de `projet` rapproché par nom (`CORRESP`
   abandonné), et la même liste **exclut les RDOM** des responsables 1/2/3
   pour dégager le chef de projet.
+- **Q16 (ex-question, tranchée 2026-07-29)** — La colonne « Domaine » de
+  `Projets.csv` reste **ignorée** : son vocabulaire est celui de
+  l'organisation (celui que `CORRESP` aurait dû traduire). Source du
+  domaine confirmée : la colonne réelle **« Responsable portefeuilles »**
+  (pluriel, relevé réel) → table `RDOM`.
 - **Ordre de construction** — parseur livré par étapes : `RDOM` →
   `SP_total` → `projet` → `ressources_PDC` ; un rapport à chaque passage,
   inventaire des fichiers en tête de rapport (voir Construction par étapes).
@@ -354,7 +359,6 @@ office de vérification sur site.
 | # | Question | Avec qui |
 |---|---|---|
 | Q1 | Position amont (ni RDLI ni RDR validé) : tout en Demandes ou une colonne source distingue Demandes/Qualification/Études/Prêts ? (candidats vus au relevé réel : « État du processus », « Jalon en cours ») | PMO |
-| Q16 | `Projets.csv` porte une colonne « Domaine » inattendue : quel vocabulaire ? (les libellés sont lisibles dans la section Écarté du rapport du 2026-07-29 — « domaine inconnu « X » ») ; si c'est notre découpage RDOM, elle peut devenir la source primaire du domaine, la table RDOM restant l'exclusion du chef de projet | Auteur + rapport |
 | Q17 | La vraie ligne d'en-têtes de `SP_total.csv` (sous le préambule de filtres) : à recopier du fichier | Auteur |
 | Q3 | Canal : défaut unique, seuil (coût prévu ?), ou affectation manuelle post-import ? | Auteur + PMO |
 | Q6 | Date de début → `createdAt` ? | Auteur |
