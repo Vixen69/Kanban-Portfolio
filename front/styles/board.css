@@ -84,8 +84,12 @@
 .wip { font-size: 8px; font-variant-numeric: tabular-nums; color: var(--tx-4); }
 .wip.warn { color: var(--warn); font-weight: 600; } .wip.over { color: var(--danger-strong); font-weight: 700; }
 .cell-blocked { font-size: 8px; font-weight: 700; color: #fff; background: var(--danger); border-radius: 7px; padding: 0 4px; line-height: 1.45; }
-.cell-cards { flex: 1; display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
-.cell.focused .cell-cards { overflow-y: auto; }
+/* Scrollable in every mode (the hint arrow promises it); the scrollbar is
+   hidden on compact cells to keep the radiator dense, visible when focused. */
+.cell-cards { flex: 1; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
+.cell-cards::-webkit-scrollbar { width: 0; }
+.cell.focused .cell-cards { scrollbar-width: auto; }
+.cell.focused .cell-cards::-webkit-scrollbar { width: 8px; }
 .cell-empty { flex: 1; }
 /* Indice de défilement : flèche fondue tant que la cellule peut défiler (design v11) */
 .scroll-hint { position: absolute; left: 0; right: 0; bottom: 0; height: 32px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 2px; color: var(--accent); pointer-events: none; opacity: 0; transition: opacity .18s; background: linear-gradient(to top, color-mix(in oklab, var(--bg-cell) 96%, transparent) 30%, transparent); z-index: 3; }

@@ -622,6 +622,18 @@ de son ADR.
   0 douteux, rapport identique sur double exécution (hors ligne de date),
   usage/dossier invalide → exit 1.
 
+### 2026-07-29 — Fix : la molette défile dans les cellules pleines, tous modes
+- La flèche d'indication (v11) promettait un défilement que seul le mode
+  focus offrait : `.cell-cards` était `overflow: hidden` hors focus. Réglé
+  dans `front/styles/board.css` : `overflow-y: auto` partout,
+  barre de défilement masquée sur les cellules compactes (le radiateur
+  reste dense), visible en focus comme avant. La page, elle, ne défile
+  toujours pas (critère « une seule page » revérifié à 1920×1080,
+  150 cartes : débordement 0×0 ; hint et molette vérifiés en application).
+- Signalé par l'auteur : le défilement ne répondait jamais sur la VM Linux
+  cliente — à revérifier sur site avec ce correctif (CSS standard, aucune
+  fonctionnalité récente dans le chemin du scroll).
+
 ### À venir
 - **RP3** : auth JWT-en-cookie (login, rôles viewer/editor/admin, acteur =
   utilisateur authentifié à la place de « anonymous ») ; CLI de comptes ;
