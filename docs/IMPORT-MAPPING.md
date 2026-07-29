@@ -302,6 +302,11 @@ d'en-têtes est plus bas, **encore à relever**. L'étape 2 devra chercher la
 ligne d'en-têtes sous le préambule (recherche de la meilleure ligne
 candidate parmi les premières lignes).
 
+**`CORRESP.csv`** (3 038 o, utf-8 — abandonné, pour mémoire) — colonnes :
+« Organisation » ; « Domaine (Orga) » ; « Sous-domaine (Orga) ». C'est le
+vocabulaire organisation que porte aussi la colonne « Domaine » de
+`Projets.csv` (Q16 : ignorée).
+
 **Leçons pour les contrats** : normalisation indispensable (accents
 inconsistants entre fichiers, doubles espaces, casse variable, point final,
 libellés dupliqués) — déjà couverte par `normalizeLabel` + écarts
