@@ -62,21 +62,24 @@ re-jouable, rien à mémoriser entre deux exécutions.
 `SP_total` n'a **pas de colonne ID projet dédiée** : le code n'y existe que
 lorsqu'il est documenté dans le Nom.
 
-| Colonne | Champ carte | Règle |
+Libellés réels (relevé du 2026-07-29) :
+
+| Colonne réelle | Champ carte | Règle |
 |---|---|---|
-| Nom (code + libellé) | `codename` + `title` | Découpage : code `PE` + 5 chiffres (souvent, pas toujours présent), le reste = titre. **Le nom fait foi comme clé de jointure** (voir Règles) |
-| Type de projet | `typeId` | Correspondance directe (Obsolescence, TMA Corrective, Achat…) |
-| Priorité 0–4 | — | Ignorée (à reconsidérer plus tard) |
-| Responsable 1 | — | Non fiable (parfois le RDOM) ; le chef de projet vient de `projet` |
-| Date de début | `createdAt` ? | À confirmer (Q6) |
-| Jalon RVSR | — | Fin prévue « historique » ; non retenu a priori (Q10) |
-| Jalon RDLI (date de passage) | → position | Présent = projet lancé = colonne **Actifs** (voir Règles) |
-| Jalon RDR validé | → position | Présent = au-delà d'Actifs (Done ? Exploitation ? — Q2) |
-| RDR prévisionnel | `dateRdr` | Choix pressenti comme date de livraison projetée |
-| Budget validé | `budgetRdli` | Enveloppe RDLI, k€ |
-| Coût prévu | `budgetEstimated` | Meilleur estimé, k€ |
-| Réel | `budgetConsumed` | k€ |
-| Engagé achat | `budgetEngaged` | k€ |
+| « Nom » (code + libellé) | `codename` + `title` | Découpage : code `PE` + 5 chiffres (souvent, pas toujours présent), le reste = titre. **Le nom fait foi comme clé de jointure** (voir Règles) |
+| « Type » | `typeId` | Correspondance directe (Obsolescence, TMA Corrective, Achat…) ; libellés inconnus signalés |
+| « Priorité », « Score criblage », « Top projet », « Catégorie », « Notes », « Menu », « * CAT global projet », « Budget présenté PDSI », « ME Achats », « Réel Achats » | — | Ignorées (connues et voulues — listées une fois au rapport, jamais en silence) |
+| « Responsable 1 » | — | Non fiable (parfois le RDOM) ; le chef de projet vient de `projet` |
+| « État suivant autorisé » | — | Candidat pour la position amont (Q1) ; relevé des valeurs distinctes au rapport |
+| « Début » | `createdAt` | Tranché avec le plan d'étape 2 (ex-Q6) |
+| « Jalon RVSR ou Fin » | — | Fin prévue « historique » ; non retenu a priori (Q10) |
+| « Jalon RDLI validé » | → position | Daté et passé = projet lancé = colonne **Actifs** (Q15 : date future = signalé, pas de position) |
+| « Jalon RDR validé (Réf.8) » | → position | Daté et passé = **Exploitation** (Q2 tranchée) |
+| « Jalon RDR prévisionnel » | `dateRdr` | Date de livraison projetée |
+| « * Budget validé RDLI » | `budgetRdli` | Enveloppe RDLI, k€ (astérisque = note du préambule) |
+| « Coût prév (ME) » | `budgetEstimated` | Meilleur estimé, k€ |
+| « Coût réel » | `budgetConsumed` | k€ |
+| « Engagé Achats » | `budgetEngaged` | k€ |
 
 ## `projet` — mapping des colonnes
 
@@ -297,10 +300,18 @@ Date export. Conforme au relevé anticipé ; Q7 confirmée et étendue
 **`SP_total.csv`** (290 Ko) — la première ligne non vide est un **préambule
 de filtres** (« Afficher les montants calculés pour : », « Toute période »,
 « Afficher les lignes sans montants : », « FAUX », note « (*) : Montant ne
-tenant pas compte de l'année sélèctionnée. » — sic) : la vraie ligne
-d'en-têtes est plus bas, **encore à relever**. L'étape 2 devra chercher la
-ligne d'en-têtes sous le préambule (recherche de la meilleure ligne
-candidate parmi les premières lignes).
+tenant pas compte de l'année sélèctionnée. » — sic) : l'étape 2 cherche la
+ligne d'en-têtes sous le préambule. Colonnes réelles (relevées sur pièce,
+Q17 tranchée 2026-07-29) : Notes · Menu · **Nom** · **Type** ·
+Score criblage · Priorité · Top projet · Responsable 1 ·
+**État suivant autorisé** (candidat Q1) · Catégorie · **Début** ·
+**Jalon RVSR ou Fin** · **Jalon RDLI validé** ·
+**Jalon RDR validé (Réf.8)** · **Jalon RDR prévisionnel** ·
+Budget présenté PDSI · **« * Budget validé RDLI »** (astérisque en tête,
+renvoi à la note du préambule ; export fait en « Toute période » donc
+montants complets) · « * CAT global projet » · **Coût prév (ME)** ·
+**Coût réel** · ME Achats · **Engagé Achats** · Réel Achats.
+Pas de colonne ID : le code est bien embarqué dans le Nom (conforme).
 
 **`CORRESP.csv`** (3 038 o, utf-8 — abandonné, pour mémoire) — colonnes :
 « Organisation » ; « Domaine (Orga) » ; « Sous-domaine (Orga) ». C'est le
@@ -355,6 +366,9 @@ office de vérification sur site.
   l'organisation (celui que `CORRESP` aurait dû traduire). Source du
   domaine confirmée : la colonne réelle **« Responsable portefeuilles »**
   (pluriel, relevé réel) → table `RDOM`.
+- **Q17** — Ligne d'en-têtes réelle de `SP_total.csv` relevée sur pièce
+  (voir Relevé réel) ; le préambule de filtres est au-dessus, l'étape 2
+  cherche la ligne d'en-têtes parmi les premières lignes du fichier.
 - **Ordre de construction** — parseur livré par étapes : `RDOM` →
   `SP_total` → `projet` → `ressources_PDC` ; un rapport à chaque passage,
   inventaire des fichiers en tête de rapport (voir Construction par étapes).
@@ -364,7 +378,6 @@ office de vérification sur site.
 | # | Question | Avec qui |
 |---|---|---|
 | Q1 | Position amont (ni RDLI ni RDR validé) : tout en Demandes ou une colonne source distingue Demandes/Qualification/Études/Prêts ? (candidats vus au relevé réel : « État du processus », « Jalon en cours ») | PMO |
-| Q17 | La vraie ligne d'en-têtes de `SP_total.csv` (sous le préambule de filtres) : à recopier du fichier | Auteur |
 | Q3 | Canal : défaut unique, seuil (coût prévu ?), ou affectation manuelle post-import ? | Auteur + PMO |
 | Q6 | Date de début → `createdAt` ? | Auteur |
 | Q8 | Unité des valeurs du plan de charge : jours ? (cohérence avec 200 j/an) | PMO |
