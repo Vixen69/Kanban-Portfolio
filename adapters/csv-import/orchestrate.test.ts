@@ -43,6 +43,7 @@ test("an alien-header csv is inventoried unknown, RDOM still parsed", () => {
   );
   const alien = report.inventory.find((f) => f.name === "autre.csv");
   assert.equal(alien?.status, "unknown");
+  assert.match(alien?.detail ?? "", /en-têtes vus : « Projet » ; « Budget »/);
   assert.notEqual(rdom, null);
 });
 

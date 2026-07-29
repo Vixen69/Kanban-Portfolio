@@ -99,7 +99,10 @@ function identifyAndInventory(
 ): HeaderMatch | null {
   const identified = identifyHeader(headerCells);
   if (identified.status === "unknown") {
-    addInventory(report, file, "unknown", { encoding, detail: "aucune colonne connue" });
+    addInventory(report, file, "unknown", {
+      encoding,
+      detail: `aucune colonne connue — en-têtes vus : ${headersSample(headerCells)}`,
+    });
     return null;
   }
   if (identified.status === "near-miss") {
@@ -117,6 +120,16 @@ function identifyAndInventory(
     detail: deviationsLabel(identified.deviations),
   });
   return identified;
+}
+
+// The exact header labels of an unrecognized file, verbatim — the report
+// doubles as the on-site structure survey (docs/IMPORT-MAPPING.md « Relevé
+// de structure ») without any file ever leaving the client machine.
+function headersSample(cells: string[]): string {
+  const MAX = 30;
+  const quoted = cells.slice(0, MAX).map((c) => (c.trim() === "" ? "« (vide) »" : `« ${c.trim()} »`));
+  const rest = cells.length - MAX;
+  return quoted.join(" ; ") + (rest > 0 ? ` ; … (+${rest})` : "");
 }
 
 function deviationsLabel(deviations: HeaderDeviation[]): string | undefined {
