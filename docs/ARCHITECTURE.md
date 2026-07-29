@@ -622,6 +622,21 @@ de son ADR.
   0 douteux, rapport identique sur double exécution (hors ligne de date),
   usage/dossier invalide → exit 1.
 
+### 2026-07-29 — Premier passage réel du parseur : leçons et correctif
+- Premier audit sur les exports réels (VM cliente) : l'export `Projets.csv`
+  porte lui aussi des colonnes « Domaine » et « Nom » et **volait le contrat
+  RDOM** par ordre alphabétique (1 357 lignes écartées, 0 pris — l'audit a
+  tout expliqué, rien avalé). Correctif : **l'en-tête le plus juste gagne**
+  (moins d'écarts, puis ordre des noms) ; les autres candidats passent en
+  douteux avec le décompte des écarts.
+- Confirmations de terrain : exports en **Windows-1252** (détecté, signalé,
+  lu) ; noms de fichiers réels ≠ noms attendus (la reconnaissance par
+  en-têtes fait le travail) ; `Ressources_PdC` porte bien les années en
+  en-têtes à deux niveaux (« 2026 » puis colonne vide, jusqu'à 2029) ;
+  `SP_total` a un **préambule au-dessus de ses en-têtes** (« FAUX »,
+  « montants calculés pour : ») → l'étape 2 devra chercher la ligne
+  d'en-têtes sous le préambule.
+
 ### 2026-07-29 — Fix : la molette défile dans les cellules pleines, tous modes
 - La flèche d'indication (v11) promettait un défilement que seul le mode
   focus offrait : `.cell-cards` était `overflow: hidden` hors focus. Réglé

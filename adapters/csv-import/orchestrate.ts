@@ -40,28 +40,50 @@ export interface AuditResult {
 export function runImportAudit(files: InputFile[], config: BoardConfig): AuditResult {
   const report = createReport();
   const sorted = [...files].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
-  let rdom: RdomTable | null = null;
-  let rdomFile = "";
+  const candidates: RdomCandidate[] = [];
   for (const file of sorted) {
     if (!file.name.toLowerCase().endsWith(".csv")) {
       addInventory(report, file, "not-csv", {});
       continue;
     }
     const parsed = processCsvFile(file, report);
-    if (parsed === null || parsed.match.contract.id !== RDOM_CONTRACT.id) continue;
-    if (rdom === null) {
-      rdom = parseRdom(parsed.dataRows, parsed.match, config.domains, report, file.name);
-      rdomFile = file.name;
-    } else {
-      doubt(
-        report, file.name,
-        `deux fichiers correspondent au contrat RDOM (« ${rdomFile} » et « ${file.name} ») — premier retenu`,
-      );
+    if (parsed !== null && parsed.match.contract.id === RDOM_CONTRACT.id) {
+      candidates.push({ file, match: parsed.match, dataRows: parsed.dataRows });
     }
   }
+  const rdom = electRdom(candidates, config, report);
   emitMissing(report, rdom !== null);
   emitAssembly(report, rdom);
   return { report, rdom };
+}
+
+interface RdomCandidate {
+  file: InputFile;
+  match: HeaderMatch;
+  dataRows: CsvRow[];
+}
+
+// Several files can carry the two RDOM columns — a rich `projet` export does
+// (seen on the real 2026-07-29 run, where it stole the match by name order).
+// The cleanest header wins: fewest deviations, then first name; the others
+// are flagged douteux, never silently parsed as the wrong table.
+function electRdom(
+  candidates: RdomCandidate[], config: BoardConfig, report: ImportReport,
+): RdomTable | null {
+  const best = candidates.reduce<RdomCandidate | null>(
+    (acc, c) => (acc === null || c.match.deviations.length < acc.match.deviations.length ? c : acc),
+    null,
+  );
+  if (best === null) return null;
+  for (const c of candidates) {
+    if (c === best) continue;
+    doubt(
+      report, c.file.name,
+      `correspond aussi au contrat RDOM (${c.match.deviations.length} écart(s) d'en-têtes, contre ` +
+        `${best.match.deviations.length} pour « ${best.file.name} ») — non retenu`,
+    );
+  }
+  return parseRdom(best.dataRows, best.match, config.domains, report, best.file.name);
 }
 
 // Decode + parse + identify one .csv; feeds the inventory and returns the

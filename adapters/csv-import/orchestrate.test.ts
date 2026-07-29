@@ -47,14 +47,31 @@ test("an alien-header csv is inventoried unknown, RDOM still parsed", () => {
   assert.notEqual(rdom, null);
 });
 
-test("two RDOM matches: first name in order wins, second is doubtful", () => {
+test("two clean RDOM matches: first name wins the tie, second is doubtful", () => {
   const { report, rdom } = runImportAudit(
     [file("b.csv", FULL_RDOM), file("a.csv", "Domaine;Nom\nInfra;SOLO\n")],
     CONFIG,
   );
   assert.equal(rdom?.entries.length, 1);
   assert.equal(report.doubtful.length, 1);
-  assert.match(report.doubtful[0]?.question ?? "", /« a\.csv » et « b\.csv »/);
+  assert.equal(report.doubtful[0]?.file, "b.csv");
+  assert.match(report.doubtful[0]?.question ?? "", /non retenu/);
+});
+
+test("a rich export carrying Domaine+Nom does not steal the RDOM contract", () => {
+  const decoy =
+    "Domaine;Nom;Type;Responsable 1;Budget\n" +
+    "Portefeuille X;Projet Alpha;Achat;M. Untel;12\n" +
+    "Portefeuille Y;Projet Beta;Étude;Mme Unetelle;7\n";
+  const { report, rdom } = runImportAudit(
+    [file("a_projets.csv", decoy), file("z_rdom.csv", FULL_RDOM)],
+    CONFIG,
+  );
+  assert.equal(rdom?.entries.length, 9);
+  assert.equal(report.taken.length, 9);
+  const doubt = report.doubtful.find((d) => d.file === "a_projets.csv");
+  assert.match(doubt?.question ?? "", /3 écart\(s\) d'en-têtes, contre 0 pour « z_rdom\.csv »/);
+  assert.equal(report.discarded.length, 0);
 });
 
 test("a Windows-1252 file is read, flagged, and its accents decoded", () => {
