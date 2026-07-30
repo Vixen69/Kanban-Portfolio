@@ -320,7 +320,9 @@ Score criblage · Priorité · Top projet · Responsable 1 ·
 Budget présenté PDSI · **« * Budget validé RDLI »** (astérisque en tête,
 renvoi à la note du préambule ; export fait en « Toute période » donc
 montants complets) · « * CAT global projet » · **Coût prév (ME)** ·
-**Coût réel** · ME Achats · **Engagé Achats** · Réel Achats.
+**Coût réel** · ME Achats · **Engagé Achats** · Réel Achats ·
+« Budget validé PDSI » (24ᵉ colonne, constatée au passage réel du
+2026-07-30 — ignorée connue).
 Pas de colonne ID : le code est bien embarqué dans le Nom (conforme).
 
 **`CORRESP.csv`** (3 038 o, utf-8 — abandonné, pour mémoire) — colonnes :
@@ -396,4 +398,5 @@ office de vérification sur site.
 | Q11 | Date du jalon RDLI comme date d'entrée en Actifs dans le journal (âge vrai des cartes importées) ? | Auteur |
 | Q12 | Réel > prévisionnel : assouplir la contrainte `done ≤ jh` du modèle (`ChargeEntry`) avant l'import ? | Auteur |
 | Q14 | Projet de `SP_total` sans ligne dans `projet` (domaine/chef inconnus) : carte créée avec placeholders ou écartée ? | Auteur |
+| Q18 | **Périmètre d'import** : le premier passage réel (2026-07-30) donne **1 095 sujets** (Demandes 914 · Actifs 84 · Exploitation 97) pour un tableau conçu pour ~150 cartes. Règle de filtrage à trancher — candidats relevés : « Projet.Actif » (`Projets.csv`, `Ressources_PdC`), « État du processus » (`Projets.csv`), « État suivant autorisé » (`SP_total`) | Auteur + PMO |
 | Q15 | Sémantique du jalon RDLI : la date peut-elle être future (prévue, pas passée) ? Règle : ≤ aujourd'hui pour valoir Actifs ? | PMO |

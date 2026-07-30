@@ -41,7 +41,7 @@ export const SP_TOTAL_CONTRACT: FileContract = {
   ignored: [
     "Notes", "Menu", "Score criblage", "Priorité", "Top projet", "Responsable 1",
     "Catégorie", "Jalon RVSR ou Fin", "* CAT global projet", "Budget présenté PDSI",
-    "ME Achats", "Réel Achats",
+    "Budget validé PDSI", "ME Achats", "Réel Achats",
   ],
 };
 
