@@ -3,7 +3,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { normalizeLabel } from "./normalize.ts";
+import { createTolerantLookup, damageTolerantPattern, normalizeLabel } from "./normalize.ts";
 
 const BOM = String.fromCharCode(0xfeff);
 const NBSP = String.fromCharCode(0xa0);
@@ -34,4 +34,29 @@ test("normalizeLabel is idempotent", () => {
     const once = normalizeLabel(input);
     assert.equal(normalizeLabel(once), once, label);
   }
+});
+
+const REPL = String.fromCharCode(0xfffd);
+
+test("damageTolerantPattern matches every destroyed form of an accent", () => {
+  const pattern = damageTolerantPattern("Début");
+  for (const damaged of ["debut", "d?but", `d${REPL}but`, "dbut"]) {
+    assert.ok(pattern.test(normalizeLabel(damaged)), damaged);
+  }
+  assert.equal(pattern.test("debute"), false);
+  assert.equal(pattern.test("dabut"), false);
+  const oe = damageTolerantPattern("Mise en œuvre");
+  assert.ok(oe.test(normalizeLabel("Mise en ?uvre")));
+  assert.ok(oe.test(normalizeLabel("Mise en oeuvre")));
+});
+
+test("createTolerantLookup repairs single matches, refuses ambiguity", () => {
+  const lookup = createTolerantLookup([
+    ["Étude", "etude"], ["Élan", "elan-a"], ["Êlan", "elan-b"],
+  ]);
+  assert.deepEqual(lookup("Étude"), { id: "etude", repaired: false });
+  assert.deepEqual(lookup("?tude"), { id: "etude", repaired: true });
+  assert.deepEqual(lookup("tude"), { id: "etude", repaired: true });
+  assert.equal(lookup("inconnu"), null);
+  assert.equal(lookup("?lan"), null);
 });

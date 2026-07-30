@@ -4,7 +4,7 @@
 // so every deviation is named precisely). Étapes 2-4 register sp_total /
 // projet / ressources_pdc here without touching the engine.
 
-import { normalizeLabel } from "./normalize.ts";
+import { damageTolerantPattern, normalizeLabel } from "./normalize.ts";
 
 /** One recognizable source file: canonical column labels. */
 export interface FileContract {
@@ -66,6 +66,8 @@ export interface HeaderMatch {
   deviations: HeaderDeviation[];
   /** Ignored-by-contract columns present in this file (report them once). */
   ignoredPresent: string[];
+  /** Canonical labels only matched through accent-damage repair (report). */
+  repaired: string[];
 }
 
 /** Some canonical columns found, others missing: the file is NOT parsed. */
@@ -84,6 +86,7 @@ interface Evaluation {
   deviations: HeaderDeviation[];
   missing: string[];
   ignoredPresent: string[];
+  repaired: string[];
 }
 
 /**
@@ -135,6 +138,7 @@ export function identifyHeader(
     status: "match", contract: best.contract,
     columnIndex: best.columnIndex, headerWidth: headerCells.length,
     deviations: best.deviations, ignoredPresent: best.ignoredPresent,
+    repaired: best.repaired,
   };
 }
 
@@ -145,7 +149,8 @@ function evaluate(
   contract: FileContract, headerCells: string[], normalized: string[],
 ): Evaluation {
   const e: Evaluation = {
-    contract, columnIndex: new Map(), deviations: [], missing: [], ignoredPresent: [],
+    contract, columnIndex: new Map(), deviations: [], missing: [],
+    ignoredPresent: [], repaired: [],
   };
   const claimed = new Set<number>();
   claimColumns(contract.columns, normalized, e, claimed, e.missing);
@@ -166,8 +171,10 @@ function evaluate(
   return e;
 }
 
-// Claims every cell matching each label; a null `missing` marks the
-// optional set (absence tolerated). Duplicates keep the first index.
+// Claims every cell matching each label — exactly first, then through the
+// accent-damage patterns (destroyed é -> "?"/"�"/dropped, a real client
+// case) with the repair recorded. A null `missing` marks the optional set
+// (absence tolerated). Duplicates keep the first index.
 function claimColumns(
   labels: readonly string[], normalized: string[],
   e: Evaluation, claimed: Set<number>, missing: string[] | null,
@@ -178,6 +185,13 @@ function claimColumns(
     normalized.forEach((label, index) => {
       if (label === wanted) hits.push(index);
     });
+    if (hits.length === 0) {
+      const pattern = damageTolerantPattern(column);
+      normalized.forEach((label, index) => {
+        if (!claimed.has(index) && pattern.test(label)) hits.push(index);
+      });
+      if (hits.length > 0) e.repaired.push(column);
+    }
     const first = hits[0];
     if (first === undefined) {
       if (missing !== null) missing.push(column);

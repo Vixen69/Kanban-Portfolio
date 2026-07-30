@@ -61,6 +61,22 @@ test("a missing column is a near-miss with the precise missing list", () => {
   assert.deepEqual(result.missing, ["Nom"]);
 });
 
+test("destroyed accents in headers are repaired, and the repair is listed", () => {
+  const REPL = String.fromCharCode(0xfffd);
+  const result = identifyHeader([
+    "Nom", "Type", "D?but", `Jalon RDLI valid${REPL}`, "Jalon RDR valid (R?f.8)",
+    "Jalon RDR pr?visionnel", "* Budget valid? RDLI", "Co?t pr?v (ME)",
+    "Co?t r?el", "Engag? Achats", "?tat suivant autoris?",
+  ]);
+  assert.equal(result.status, "match");
+  if (result.status !== "match") return;
+  assert.equal(result.contract.id, "sp_total");
+  assert.ok(result.repaired.includes("Début"));
+  assert.ok(result.repaired.includes("Jalon RDR validé (Réf.8)"));
+  assert.ok(result.repaired.includes("État suivant autorisé"));
+  assert.deepEqual(result.deviations, []);
+});
+
 test("accent-stripped headers still match (Excel CSV exports lose accents)", () => {
   const result = identifyHeader([
     "Nom", "Type", "Debut", "Jalon RDLI valide", "Jalon RDR valide (Ref.8)",

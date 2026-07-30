@@ -84,6 +84,15 @@ test("accent-stripped type labels still resolve (Etude -> etude)", () => {
   assert.equal(table.drafts[1]?.typeId, "mise_en_oeuvre");
 });
 
+test("destroyed-accent type labels are repaired and signaled", () => {
+  const { table, report } = run(["Détruit;?tude;;;;;;;;;", "Cass?;Mise en ?uvre;;;;;;;;;"]);
+  assert.equal(table.drafts[0]?.typeId, "etude");
+  assert.equal(table.drafts[1]?.typeId, "mise_en_oeuvre");
+  const repaired = report.warnings.find((w) => /« Type » aux accents détruits/.test(w.message));
+  assert.match(repaired?.message ?? "", /2 cellule\(s\), ligne\(s\) 2, 3/);
+  assert.equal(report.doubtful.length, 0);
+});
+
 test("a name without code keeps its full title, no codename", () => {
   const { table } = run(["Refonte réseau usine;;;;;;;;;;"]);
   assert.equal(table.drafts[0]?.codename, null);

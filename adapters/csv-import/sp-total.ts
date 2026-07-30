@@ -6,7 +6,8 @@
 
 import type { BoardConfig } from "../../core/types.ts";
 import { resolveFlowAnchors } from "../../core/flow.ts";
-import { normalizeLabel } from "./normalize.ts";
+import { createTolerantLookup, normalizeLabel } from "./normalize.ts";
+import type { TolerantHit } from "./normalize.ts";
 import { parseFrenchAmount, parseFrenchDate } from "./values.ts";
 import { splitSubjectName } from "./subject-name.ts";
 import { tallyInto, tallyLabel } from "./tallies.ts";
@@ -51,7 +52,7 @@ interface SpContext {
   match: HeaderMatch;
   report: ImportReport;
   fileName: string;
-  typeByLabel: Map<string, string>;
+  typeLookup: (cell: string) => TolerantHit | null;
   entryId: string;
   activationId: string;
   exploitationId: string;
@@ -106,15 +107,12 @@ function createContext(
       "ancre d'activation introuvable dans la topologie — les jalons RDLI positionnent en colonne d'entrée",
       fileName);
   }
-  const typeByLabel = new Map<string, string>();
-  for (const type of config.types) {
-    for (const label of [type.id, type.name, type.short]) {
-      typeByLabel.set(normalizeLabel(label), type.id);
-    }
-  }
+  const typeLookup = createTolerantLookup(
+    config.types.flatMap((t): Array<[string, string]> => [[t.id, t.id], [t.name, t.id], [t.short, t.id]]),
+  );
   const pad = (n: number): string => String(n).padStart(2, "0");
   return {
-    match, report, fileName, typeByLabel,
+    match, report, fileName, typeLookup,
     entryId, activationId: anchors?.activation?.id ?? entryId,
     exploitationId: last?.id ?? entryId,
     columnNames: new Map(config.columns.map((c) => [c.id, c.name])),
@@ -189,8 +187,10 @@ function buildDraft(
   const typeCell = cell(ctx, row, "Type").trim();
   let typeId: string | null = null;
   if (typeCell !== "") {
-    typeId = ctx.typeByLabel.get(normalizeLabel(typeCell)) ?? null;
-    if (typeId === null) tallyInto(ctx.unknownTypes, typeCell, row.line);
+    const hit = ctx.typeLookup(typeCell);
+    typeId = hit?.id ?? null;
+    if (hit === null) tallyInto(ctx.unknownTypes, typeCell, row.line);
+    else if (hit.repaired) tally(ctx, "« Type » aux accents détruits — rapproché d'un type du board", row.line);
   }
   const stateCell = cell(ctx, row, "État suivant autorisé").trim();
   if (stateCell !== "") ctx.nextStates.set(stateCell, (ctx.nextStates.get(stateCell) ?? 0) + 1);

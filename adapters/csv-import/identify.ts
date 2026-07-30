@@ -128,6 +128,11 @@ function classify(
       `colonnes ignorées (prévues au contrat) : ${identification.ignoredPresent.join(" ; ")}`,
       file.name);
   }
+  if (identification.repaired.length > 0) {
+    warn(report,
+      `en-têtes aux accents détruits, rapprochés du contrat : ${identification.repaired.join(" ; ")}`,
+      file.name);
+  }
   const status = identification.deviations.length > 0 ? "recognized-with-deviations" : "recognized";
   addInventory(report, file, status, {
     encoding,
