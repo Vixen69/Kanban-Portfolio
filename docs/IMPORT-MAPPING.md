@@ -324,6 +324,13 @@ montants complets) · « * CAT global projet » · **Coût prév (ME)** ·
 « Budget validé PDSI » (24ᵉ colonne, constatée au passage réel du
 2026-07-30 — ignorée connue).
 Pas de colonne ID : le code est bien embarqué dans le Nom (conforme).
+Constats du passage réel complet (2026-07-30, 1 095 sujets) : les
+**unités sont écrites dans presque toutes les cellules de coût**
+(« Coût prév (ME) » : 1 091/1 095) — c'est la norme de cet export ;
+« Type » porte une douzaine de valeurs numériques isolées (1 sujet
+chacune — cellules décalées ou codes résiduels, signalées) et le libellé
+« RUN (Projet) » (correspondance à trancher) ; 3 jalons incohérents,
+4 RDR validés futurs, 1 coût négatif — tous signalés.
 
 **`CORRESP.csv`** (3 038 o, utf-8 — abandonné, pour mémoire) — colonnes :
 « Organisation » ; « Domaine (Orga) » ; « Sous-domaine (Orga) ». C'est le
@@ -381,6 +388,13 @@ office de vérification sur site.
 - **Q17** — Ligne d'en-têtes réelle de `SP_total.csv` relevée sur pièce
   (voir Relevé réel) ; le préambule de filtres est au-dessus, l'étape 2
   cherche la ligne d'en-têtes parmi les premières lignes du fichier.
+- **Q1 (tranchée 2026-07-30, auteur)** — Position amont : **tout en
+  Demandes** faute d'information fiable (« mets tout en Demandes si tu
+  n'as pas d'infos »). Valeurs réelles d'« État suivant autorisé »
+  relevées au rapport : Nouveau (138) · Budget présenté (382) · Basculé
+  en Reporté (11) · Annulé (42) · Budget validé (42) · Fusionné (5), ~475
+  vides — un affinage ultérieur reste possible, non requis. Les « Annulé »
+  et « Fusionné » rejoignent la question de périmètre (Q18).
 - **Ordre de construction** — parseur livré par étapes : `RDOM` →
   `SP_total` → `projet` → `ressources_PDC` ; un rapport à chaque passage,
   inventaire des fichiers en tête de rapport (voir Construction par étapes).
@@ -389,7 +403,6 @@ office de vérification sur site.
 
 | # | Question | Avec qui |
 |---|---|---|
-| Q1 | Position amont — **cadré par l'auteur (2026-07-30)** : RDLI passée → Actifs ; le reste réparti entre **Demandes et Études** (pas tout en Demandes). Reste à fixer le critère de partage Demandes/Études — candidat pressenti : « État suivant autorisé » (`SP_total`), valeurs réelles à relever au rapport | Auteur + PMO |
 | Q3 | Canal : défaut unique, seuil (coût prévu ?), ou affectation manuelle post-import ? | Auteur + PMO |
 | Q6 | Date de début → `createdAt` ? | Auteur |
 | Q8 | Unité des valeurs du plan de charge : jours ? (cohérence avec 200 j/an) | PMO |
