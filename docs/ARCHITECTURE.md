@@ -637,6 +637,32 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-07-30 — Import CSV, étape 3 : le consolidé assemble les cartes
+- **L'assemblage s'inverse (Q18)** : l'onglet « Projets » du classeur de
+  consolidation de l'auteur devient le **fichier maître du périmètre** —
+  ses lignes retenues (`isProjetSIS` vrai) SONT les cartes ; `SP_total`
+  enrichit (jalons → position, budgets), `Projets.csv` enrichit (chef de
+  projet = Responsables 1→2→3 moins les RDOM, domaine de repli par nom de
+  RDOM sur « Responsable portefeuilles », mots entiers — MARTINEZ ne
+  déclenche pas MARTIN), la table RDOM arbitre. Nouveau contrat
+  `consolide` (requis réduit au trio sûr Nom / Domaine (Ptf) / isProjetSIS,
+  le reste optionnel/ignoré — les extras du rapport verrouilleront les
+  libellés photographiés), contrat `projets` (libellés réels du relevé).
+- **Jointures par confiance décroissante** : nom complet, puis code PE,
+  puis titre sans code — chaque chemin compté, désaccord code/titre →
+  douteux (le code gagne), sujets SP_total hors consolidé comptés « hors
+  périmètre ». Nouveaux modules `consolide.ts`, `projets.ts`, `enrich.ts`
+  (cartes enrichies + stats), `assembly.ts` (lignes d'état) ;
+  `parseFrenchBoolean` (VRAI/FAUX/OUI/NON/1/0).
+- **Le rapport d'assemblage dit tout** : périmètre (retenus/exclus),
+  répartition des cartes, position par jalons (n/N et par chemin de
+  jointure), couverture domaine (consolidé/RDOM/manquant), chef de projet,
+  hors-périmètre ; relevés « Complexité du projet » (candidat canal) et
+  « Domaine (Ptf) » inconnus.
+- 437 tests verts (+13) ; essai CLI sur les six squelettes : 5 cartes
+  (Demandes 2 · Actifs 1 · Exploitation 2), jointures nom 1 · code 4,
+  domaine et chef 5/5, 1 exclu de périmètre, 3 hors périmètre.
+
 ### 2026-07-29 — Import CSV, étape 2 : SP_total en mode audit
 - **Le contrat `SP_total`** (libellés réels du relevé du jour) rejoint le
   registre : 10 colonnes requises (Nom, Type, Début, 3 jalons, 4 montants),

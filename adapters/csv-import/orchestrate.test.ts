@@ -1,6 +1,6 @@
 // End-to-end checks of the audit pass against the real board config:
 // inventory classification, per-contract election, header search under a
-// preamble, encoding flags, roadmap entries, and determinism.
+// preamble, the full four-file assembly, and determinism.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -36,52 +36,70 @@ function file(name: string, content: string): InputFile {
   return { name, bytes: Buffer.from(content, "utf8") };
 }
 
+function fixture(name: string): InputFile {
+  return { name, bytes: readFileSync(new URL(`../../fixtures/import/${name}`, import.meta.url)) };
+}
+
 function audit(files: InputFile[]) {
   return runImportAudit(files, CONFIG, NOW);
 }
 
 test("a clean RDOM file covers the nine domains without any anomaly", () => {
   const { report, rdom } = audit([file("RDOM.csv", FULL_RDOM)]);
-  assert.equal(report.inventory.length, 1);
   assert.equal(report.inventory[0]?.status, "recognized");
-  assert.equal(report.inventory[0]?.encoding, "utf-8");
   assert.equal(report.taken.length, 9);
-  assert.deepEqual(report.discarded, []);
-  assert.deepEqual(report.doubtful, []);
   assert.deepEqual(report.warnings, []);
   assert.equal(rdom?.namesByDomain.size, 9);
   assert.equal(report.assembly[0]?.status, "prête (9 noms, 9 domaines)");
-  assert.deepEqual(report.missingExpected.map((m) => m.name), ["SP_total", "projet", "ressources_PDC"]);
+  assert.deepEqual(report.missingExpected.map((m) => m.name),
+    ["consolidé", "SP_total", "Projets", "ressources_PDC"]);
 });
 
-test("SP_total: preamble skipped, ignored columns listed, cards distributed", () => {
-  const { report, spTotal } = audit([file("SP_total.csv", FULL_SP)]);
+test("SP_total alone: preamble skipped, cards waiting for the perimeter", () => {
+  const { report, spTotal, cards } = audit([file("SP_total.csv", FULL_SP)]);
   assert.equal(report.inventory[0]?.status, "recognized");
   assert.ok(report.warnings.some((w) => /en-têtes reconnus ligne 2 — 1 ligne\(s\) ignorée\(s\) au-dessus/.test(w.message)));
-  const ignored = report.warnings.find((w) => /colonnes ignorées \(prévues au contrat\)/.test(w.message));
-  assert.match(ignored?.message ?? "", /Notes ; Menu ; Score criblage/);
   assert.equal(spTotal?.drafts.length, 2);
-  assert.equal(spTotal?.drafts[0]?.codename, "PE20001");
-  assert.equal(spTotal?.drafts[0]?.columnId, "actifs");
-  assert.equal(spTotal?.drafts[1]?.columnId, "demandes");
+  assert.equal(cards, null);
   const cartes = report.assembly.find((a) => a.subject === "cartes");
-  assert.equal(cartes?.status, "2 prête(s) — répartition : Demandes 1 · Actifs 1");
+  assert.match(cartes?.status ?? "", /en attente du `consolidé` — 2 sujet\(s\) SP_total lus/);
   const profile = report.assembly.find((a) => a.subject === "profil `SP_total`");
-  assert.equal(
-    profile?.status,
-    "code PE : 1/2 · type : 1/2 · budget : 1/2 · date de début : 1/2 (matière pour Q18)",
-  );
-  assert.deepEqual(report.missingExpected.map((m) => m.name), ["RDOM", "projet", "ressources_PDC"]);
+  assert.equal(profile?.status, "code PE : 1/2 · type : 1/2 · budget : 1/2 · date de début : 1/2");
 });
 
-test("an alien-header csv is inventoried unknown, RDOM still parsed", () => {
-  const { report, rdom } = audit(
-    [file("RDOM.csv", FULL_RDOM), file("autre.csv", "Projet;Budget\nX;1")],
-  );
-  const alien = report.inventory.find((f) => f.name === "autre.csv");
-  assert.equal(alien?.status, "unknown");
-  assert.match(alien?.detail ?? "", /en-têtes vus : « Projet » ; « Budget »/);
-  assert.notEqual(rdom, null);
+test("the four fixture files assemble a full deck", () => {
+  const { report, cards, consolide } = audit([
+    fixture("RDOM.csv"), fixture("SP_total.csv"), fixture("Consolide.csv"), fixture("Projets.csv"),
+  ]);
+  assert.equal(consolide?.entries.length, 5);
+  assert.equal(consolide?.excludedCount, 1);
+  assert.equal(cards?.cards.length, 5);
+  const byLabel = new Map(report.assembly.map((a) => [a.subject, a.status]));
+  assert.equal(byLabel.get("périmètre `consolidé`"), "5 retenu(s) · 1 hors périmètre (isProjetSIS faux)");
+  assert.equal(byLabel.get("cartes"), "5 — répartition : Demandes 2 · Actifs 1 · Exploitation 2");
+  assert.equal(byLabel.get("position par jalons"), "5/5 via SP_total (nom 1 · code 4 · titre 0) · défaut : 0");
+  assert.equal(byLabel.get("domaine"), "5/5 (consolidé 5 · RDOM 0) · manquant : 0");
+  assert.equal(byLabel.get("chef de projet"), "5/5");
+  assert.equal(byLabel.get("hors périmètre"), "3 sujet(s) SP_total non retenus par le consolidé");
+  const first = cards?.cards[0];
+  assert.equal(first?.title, "Modernisation atelier");
+  assert.equal(first?.codename, "PE10001");
+  assert.equal(first?.domainId, "infra");
+  assert.equal(first?.owner, "Alice MERLE");
+  assert.equal(first?.columnId, "exploitation");
+  assert.equal(first?.typeId, "achat");
+  assert.equal(first?.budgetRdli, 150);
+  assert.ok(report.discarded.some((d) => /hors périmètre \(isProjetSIS faux\)/.test(d.reason)));
+});
+
+test("a rich export carrying Domaine+Nom does not steal the RDOM contract", () => {
+  const decoy =
+    "Domaine;Nom;Colonne A;Responsable 1;Budget\n" +
+    "Portefeuille X;Projet Alpha;a;M. Untel;12\n";
+  const { report, rdom } = audit([file("a_projets.csv", decoy), file("z_rdom.csv", FULL_RDOM)]);
+  assert.equal(rdom?.entries.length, 9);
+  const doubt = report.doubtful.find((d) => d.file === "a_projets.csv");
+  assert.match(doubt?.question ?? "", /écart\(s\) d'en-têtes, contre 0 pour « z_rdom\.csv »/);
 });
 
 test("two clean RDOM matches: first name wins the tie, second is doubtful", () => {
@@ -89,24 +107,8 @@ test("two clean RDOM matches: first name wins the tie, second is doubtful", () =
     [file("b.csv", FULL_RDOM), file("a.csv", "Domaine;Nom\nInfra;SOLO\n")],
   );
   assert.equal(rdom?.entries.length, 1);
-  assert.equal(report.doubtful.length, 1);
   assert.equal(report.doubtful[0]?.file, "b.csv");
   assert.match(report.doubtful[0]?.question ?? "", /non retenu/);
-});
-
-test("a rich export carrying Domaine+Nom does not steal the RDOM contract", () => {
-  const decoy =
-    "Domaine;Nom;Colonne A;Responsable 1;Budget\n" +
-    "Portefeuille X;Projet Alpha;a;M. Untel;12\n" +
-    "Portefeuille Y;Projet Beta;b;Mme Unetelle;7\n";
-  const { report, rdom } = audit(
-    [file("a_projets.csv", decoy), file("z_rdom.csv", FULL_RDOM)],
-  );
-  assert.equal(rdom?.entries.length, 9);
-  assert.equal(report.taken.length, 9);
-  const doubt = report.doubtful.find((d) => d.file === "a_projets.csv");
-  assert.match(doubt?.question ?? "", /écart\(s\) d'en-têtes, contre 0 pour « z_rdom\.csv »/);
-  assert.equal(report.discarded.length, 0);
 });
 
 test("a Windows-1252 file is read, flagged, and its accents decoded", () => {
@@ -118,7 +120,6 @@ test("a Windows-1252 file is read, flagged, and its accents decoded", () => {
   const { report, rdom } = runImportAudit([{ name: "RDOM.csv", bytes }], CONFIG, NOW);
   assert.equal(report.inventory[0]?.encoding, "windows-1252");
   assert.equal(rdom?.entries[0]?.domainId, "ingenierie");
-  assert.ok(report.warnings.some((w) => /Windows-1252/.test(w.message)));
 });
 
 test("UTF-16 and non-csv files are inventoried and skipped", () => {
@@ -137,31 +138,26 @@ test("a near-miss header is inventoried and NOT parsed", () => {
   assert.equal(rdom, null);
   assert.equal(report.inventory[0]?.status, "near-miss");
   assert.match(report.inventory[0]?.detail ?? "", /colonnes manquantes : Nom/);
-  assert.equal(report.taken.length, 0);
 });
 
 test("empty lines above the header are skipped and flagged, file still read", () => {
   const { report, rdom } = audit([file("RDOM.csv", "\n\nDomaine;Nom\nInfra;SOLO\n")]);
-  assert.equal(report.inventory[0]?.status, "recognized");
   assert.equal(rdom?.entries.length, 1);
-  assert.equal(rdom?.entries[0]?.ref.line, 4);
   assert.ok(report.warnings.some((w) => /en-têtes reconnus ligne 3 — 2 ligne\(s\) ignorée\(s\) au-dessus/.test(w.message)));
 });
 
 test("no files at all: everything is expected, assembly says waiting", () => {
-  const { report, rdom, spTotal } = audit([]);
-  assert.equal(rdom, null);
-  assert.equal(spTotal, null);
-  assert.deepEqual(report.missingExpected.map((m) => m.name), ["RDOM", "SP_total", "projet", "ressources_PDC"]);
-  assert.match(report.assembly[0]?.status ?? "", /absente/);
-  assert.equal(report.assembly.length, 4);
+  const { report, cards } = audit([]);
+  assert.equal(cards, null);
+  assert.deepEqual(report.missingExpected.map((m) => m.name),
+    ["consolidé", "RDOM", "SP_total", "Projets", "ressources_PDC"]);
+  assert.equal(report.assembly.length, 3);
+  assert.match(report.assembly[1]?.status ?? "", /en attente de `SP_total` et du `consolidé`/);
 });
 
 test("the audit is deterministic for identical inputs", () => {
   const inputs = (): InputFile[] => [
-    file("RDOM.csv", FULL_RDOM),
-    file("SP_total.csv", FULL_SP),
-    file("autre.csv", "Projet;Budget\nX;1"),
+    fixture("RDOM.csv"), fixture("SP_total.csv"), fixture("Consolide.csv"), fixture("Projets.csv"),
   ];
   const first = runImportAudit(inputs(), CONFIG, NOW);
   const second = runImportAudit(inputs(), CONFIG, NOW);

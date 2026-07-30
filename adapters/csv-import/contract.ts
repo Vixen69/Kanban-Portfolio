@@ -45,8 +45,59 @@ export const SP_TOTAL_CONTRACT: FileContract = {
   ],
 };
 
+/** The consolidated « Projets » sheet — the perimeter master (Q18). Only
+ * the photo-certain trio is required; every uncertain label sits in
+ * optional/ignored so the report's verbatim extras lock the real ones. */
+export const CONSOLIDE_CONTRACT: FileContract = {
+  id: "consolide",
+  displayName: "Consolidé",
+  columns: ["Nom", "Domaine (Ptf)", "isProjetSIS"],
+  optional: [
+    "Id", "Type", "Complexité du projet", "État du processus", "Début", "Fin",
+    "Date T0", "Charge JH", "PDSI2026 O/N", "Catégorie", "Catégorisation",
+    "Type Gpe", "Priorité.", "Score total", "Jalon en cours",
+    "Référence active (Réf.)", "Date d'export", "Ss-Domaine (Ptf)",
+  ],
+  ignored: [
+    "Budget Validé PDSI", "Budget RDLI Charge", "Budget RDLI Total",
+    "Coût final ME (Res.+Trans)", "Coût réel ME (Res.+Trans)",
+    "Coût final ME (Trans)", "Coût réel ME (Trans)",
+    "Charge finale ME (Res) (J)", "Charge réelle ME (Res) (J)",
+    "Coût réel ME (Res)", "Coût final ME (Res)",
+  ],
+};
+
+/** The raw `projet` export — chef de projet + RDOM-based domain fallback
+ * (real labels, survey of 2026-07-29). */
+export const PROJETS_CONTRACT: FileContract = {
+  id: "projets",
+  displayName: "Projets",
+  columns: ["Nom", "Responsable 1", "Responsable 2", "Responsable 3", "Responsable portefeuilles"],
+  optional: ["Projet.Actif", "État du processus", "Id", "Domaine"],
+  ignored: [
+    "Fichier", "Portefeuille", "Type", "Nature", "État du budget",
+    "Nature du projet", "Priorité.", "Criticité", "Score total", "Début", "Date T0",
+    "Date prévisionnelle de démarrage (RDO)", "Date prévisionnelle de déploiement", "Fin",
+    "Descriptions texte riche", "Objectifs", "Impact si report du projet",
+    "Entité demandeur", "Entité payeur", "Entité payeur mutualisée",
+    "Directions Participantes", "Programme métier", "Outils",
+    "Exigences légales et/ou de sécurité", "Charge JH", "Taux TUO",
+    "Budget PDSI Présenté Charge (Res) (J)", "Budget Présenté PDSI Coût (Res)",
+    "Budget Présenté PDSI Coût (Trans)", "Budget Présenté PDSI Total Coût (Res+Trans)",
+    "Budget Validé PDSI Charge (Res) (J)", "Budget Validé PDSI Coût (Res)",
+    "Budget Validé PDSI Coût (Trans)", "Budget Validé PDSI Total coût (Res+Trans)",
+    "Budget RDLI Charge (Res) (J)", "Budget RDLI Coût (Trans)",
+    "Budget RDLI Total Coût (Res+Trans)", "Coût final ME (Res.+Trans)",
+    "Coût réel ME (Res.+Trans)", "Coût final ME (Trans)", "Coût réel ME (Trans)",
+    "Charge finale ME (Res) (J)", "Charge réelle ME (Res) (J)", "Coût réel ME (Res)",
+    "Coût final ME (Res)", "Créateur", "Référence active (Réf.)", "Jalon en cours",
+    "Top projet", "Catégorie", "Date création", "CAT", "Date d'export",
+  ],
+};
+
 /** Every registered contract, in priority order for tie-breaking. */
-export const CONTRACTS: readonly FileContract[] = [RDOM_CONTRACT, SP_TOTAL_CONTRACT];
+export const CONTRACTS: readonly FileContract[] =
+  [CONSOLIDE_CONTRACT, PROJETS_CONTRACT, RDOM_CONTRACT, SP_TOTAL_CONTRACT];
 
 /** A tolerated header anomaly (the file is still readable). */
 export interface HeaderDeviation {

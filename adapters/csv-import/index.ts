@@ -7,3 +7,6 @@ export { renderReport } from "./render-report.ts";
 export type { ImportReport } from "./report.ts";
 export type { RdomTable } from "./rdom.ts";
 export type { SpTotalTable, SubjectDraft } from "./sp-total.ts";
+export type { ConsolideTable } from "./consolide.ts";
+export type { ProjetsTable } from "./projets.ts";
+export type { CardAssembly, EnrichedCard } from "./enrich.ts";

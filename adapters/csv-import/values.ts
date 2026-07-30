@@ -61,6 +61,21 @@ const YES_FLAGS = ["oui", "x", "vrai", "true", "ok"];
 const NO_FLAGS = ["non", "faux", "false"];
 
 /**
+ * Parses a boolean-ish cell (Excel FR renders VRAI/FAUX; OUI/NON, 1/0 and
+ * their English twins occur in the wild).
+ * Inputs: the raw cell text. Outputs: true, false, null for an empty cell,
+ * or "invalid" for anything else (the caller signals it).
+ * Failure modes: none.
+ */
+export function parseFrenchBoolean(raw: string): boolean | null | "invalid" {
+  const label = normalizeLabel(raw);
+  if (label === "") return null;
+  if (YES_FLAGS.includes(label) || label === "1") return true;
+  if (NO_FLAGS.includes(label) || label === "0") return false;
+  return "invalid";
+}
+
+/**
  * Parses a date cell: FR formats (jj/mm/aaaa, jj-mm-aaaa, jj.mm.aaaa, with
  * an optional trailing hh:mm[:ss]; 2-digit years pivot at 70 — 70-99 map
  * to 19xx, 00-69 to 20xx), ISO (aaaa-mm-jj, optional time), or an Excel

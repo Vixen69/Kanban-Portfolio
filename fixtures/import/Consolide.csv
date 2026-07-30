@@ -1,0 +1,7 @@
+Nom;Domaine (Ptf);isProjetSIS;Id;Type;Complexité du projet;État du processus;Début
+Modernisation atelier;Infra;VRAI;PE10001;Achat;Complexe;En cours;12/01/2025
+Refonte portail interne;ING;VRAI;PE10002;Evolution - TMA;Simple;En cours;05/02/2025
+Montée de version calcul;Ingénierie;VRAI;PE10003;Gestion d'obsolescence;Compliqué;Nouveau;10/03/2026
+Étude connectivité site B;Cyber;VRAI;;Étude;Simple;Nouveau;01/07/2026
+Sécurisation accès;INF;VRAI;PE10007;Mise en œuvre;Complexe;En cours;20/03/2025
+Vieux projet clos;ERP;FAUX;PE10999;Achat;;Clos;01/01/2020

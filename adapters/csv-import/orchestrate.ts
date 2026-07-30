@@ -1,11 +1,13 @@
 // The audit pass the CLI calls: classify every received file (identify.ts),
-// elect the cleanest candidate per contract, run the contract readers, list
-// what is still expected, describe the assembly state. Pure and
-// filesystem-free; stateless by design — each run redoes the whole
-// assembly (docs/IMPORT-MAPPING.md « Construction par étapes »).
+// elect the cleanest candidate per contract, run the contract readers,
+// assemble the cards (enrich.ts — the consolidated sheet is the perimeter
+// master), then describe what is missing and the assembly state
+// (assembly.ts). Pure and filesystem-free; stateless by design.
 
 import type { BoardConfig } from "../../core/types.ts";
-import { RDOM_CONTRACT, SP_TOTAL_CONTRACT } from "./contract.ts";
+import {
+  CONSOLIDE_CONTRACT, PROJETS_CONTRACT, RDOM_CONTRACT, SP_TOTAL_CONTRACT,
+} from "./contract.ts";
 import type { HeaderMatch } from "./contract.ts";
 import type { CsvRow } from "./csv.ts";
 import { processFile } from "./identify.ts";
@@ -16,14 +18,24 @@ import { parseRdom } from "./rdom.ts";
 import type { RdomTable } from "./rdom.ts";
 import { parseSpTotal } from "./sp-total.ts";
 import type { SpTotalTable } from "./sp-total.ts";
+import { parseProjets } from "./projets.ts";
+import type { ProjetsTable } from "./projets.ts";
+import { parseConsolide } from "./consolide.ts";
+import type { ConsolideTable } from "./consolide.ts";
+import { assembleCards } from "./enrich.ts";
+import type { CardAssembly } from "./enrich.ts";
+import { emitAssembly, emitMissing } from "./assembly.ts";
 
 export type { InputFile } from "./identify.ts";
 
-/** The audit outcome: the report, plus the parsed tables for later steps. */
+/** The audit outcome: the report, the parsed tables, the assembled deck. */
 export interface AuditResult {
   report: ImportReport;
   rdom: RdomTable | null;
   spTotal: SpTotalTable | null;
+  projets: ProjetsTable | null;
+  consolide: ConsolideTable | null;
+  cards: CardAssembly | null;
 }
 
 interface Candidate {
@@ -39,8 +51,9 @@ interface Candidate {
  * `now` (injected for determinism; bounds the milestone-in-the-future
  * rule). When several files match one contract, the cleanest header wins
  * (fewest deviations, then first name); the others are flagged douteux.
- * Outputs: the report and the parsed tables. Deterministic for identical
- * inputs and `now`.
+ * Outputs: the report, the four tables and the assembled cards (non-null
+ * when the consolidated perimeter master is present). Deterministic for
+ * identical inputs and `now`.
  * Failure modes: none — unreadable or alien files land in the inventory
  * with a reason, nothing throws.
  */
@@ -55,15 +68,26 @@ export function runImportAudit(files: InputFile[], config: BoardConfig, now: Dat
     list.push({ file, ...parsed });
     byContract.set(parsed.match.contract.id, list);
   }
-  const rdomBest = elect(byContract.get(RDOM_CONTRACT.id) ?? [], report);
-  const spBest = elect(byContract.get(SP_TOTAL_CONTRACT.id) ?? [], report);
+  const pick = (id: string): Candidate | null => elect(byContract.get(id) ?? [], report);
+  const rdomBest = pick(RDOM_CONTRACT.id);
+  const spBest = pick(SP_TOTAL_CONTRACT.id);
+  const projetsBest = pick(PROJETS_CONTRACT.id);
+  const consolideBest = pick(CONSOLIDE_CONTRACT.id);
   const rdom = rdomBest === null ? null
     : parseRdom(rdomBest.dataRows, rdomBest.match, config.domains, report, rdomBest.file.name);
   const spTotal = spBest === null ? null
     : parseSpTotal(spBest.dataRows, spBest.match, config, report, spBest.file.name, now);
-  emitMissing(report, rdom !== null, spTotal !== null);
-  emitAssembly(report, rdom, spTotal, config);
-  return { report, rdom, spTotal };
+  const projets = projetsBest === null ? null
+    : parseProjets(projetsBest.dataRows, projetsBest.match, rdom, report, projetsBest.file.name);
+  const consolide = consolideBest === null ? null
+    : parseConsolide(consolideBest.dataRows, consolideBest.match, config, report, consolideBest.file.name);
+  const cards = assembleCards(consolide, spTotal, projets, config, report);
+  emitMissing(report, {
+    rdom: rdom !== null, spTotal: spTotal !== null,
+    projets: projets !== null, consolide: consolide !== null,
+  });
+  emitAssembly(report, { rdom, spTotal, projets, consolide, cards }, config);
+  return { report, rdom, spTotal, projets, consolide, cards };
 }
 
 // Several files can carry a contract's required columns — a rich `projet`
@@ -86,62 +110,4 @@ function elect(candidates: Candidate[], report: ImportReport): Candidate | null 
     );
   }
   return best;
-}
-
-// The inventory shows the roadmap: sources whose contract arrives at a
-// later step are listed as expected, with the step that defines them.
-function emitMissing(report: ImportReport, hasRdom: boolean, hasSpTotal: boolean): void {
-  if (!hasRdom) {
-    report.missingExpected.push({ name: "RDOM", note: "table domaine ↔ nom (fournie par l'auteur)" });
-  }
-  if (!hasSpTotal) {
-    report.missingExpected.push({ name: "SP_total", note: "sujets, jalons, budgets" });
-  }
-  report.missingExpected.push(
-    { name: "projet", note: "chef de projet et domaine — contrat défini à l'étape 3" },
-    { name: "ressources_PDC", note: "plan de charge — contrat défini à l'étape 4" },
-  );
-}
-
-function emitAssembly(
-  report: ImportReport, rdom: RdomTable | null, spTotal: SpTotalTable | null, config: BoardConfig,
-): void {
-  const rdomStatus = rdom === null
-    ? "absente — fournir le CSV « Domaine;Nom »"
-    : `prête (${rdom.entries.length} noms, ${rdom.namesByDomain.size} domaines)`;
-  report.assembly.push({ subject: "table RDOM", status: rdomStatus });
-  if (spTotal === null) {
-    report.assembly.push({ subject: "cartes", status: "en attente de `SP_total`" });
-  } else {
-    const parts = config.columns
-      .filter((c) => (spTotal.distribution.get(c.id) ?? 0) > 0)
-      .map((c) => `${c.name} ${spTotal.distribution.get(c.id)}`);
-    const detail = parts.length === 0 ? "" : ` — répartition : ${parts.join(" · ")}`;
-    report.assembly.push({
-      subject: "cartes",
-      status: `${spTotal.drafts.length} prête(s)${detail}`,
-    });
-    report.assembly.push({ subject: "profil `SP_total`", status: spTotalProfile(spTotal) });
-  }
-  report.assembly.push(
-    {
-      subject: "domaine et chef de projet des cartes",
-      status: "en attente de `projet` (étape 3)",
-    },
-    { subject: "plan de charge", status: "en attente de `ressources_PDC` (étape 4)" },
-  );
-}
-
-// Ventilation of the drafts along the candidate perimeter discriminants
-// (Q18): the counts point at where the real-project boundary lies.
-function spTotalProfile(spTotal: SpTotalTable): string {
-  const total = spTotal.drafts.length;
-  const coded = spTotal.drafts.filter((d) => d.codename !== null).length;
-  const typed = spTotal.drafts.filter((d) => d.typeId !== null).length;
-  const budgeted = spTotal.drafts.filter((d) =>
-    d.budgetRdli !== null || d.budgetEstimated !== null
-    || d.budgetConsumed !== null || d.budgetEngaged !== null).length;
-  const dated = spTotal.drafts.filter((d) => d.createdAt !== null).length;
-  return `code PE : ${coded}/${total} · type : ${typed}/${total}` +
-    ` · budget : ${budgeted}/${total} · date de début : ${dated}/${total} (matière pour Q18)`;
 }

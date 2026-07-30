@@ -344,6 +344,21 @@ chacune — cellules décalées ou codes résiduels, signalées) et le libellé
 vocabulaire organisation que porte aussi la colonne « Domaine » de
 `Projets.csv` (Q16 : ignorée).
 
+**`consolidé` — onglet « Projets » de `ExportsConsolidation_xxxx.xlsx`**
+(relevé sur photos, 2026-07-30 — libellés partiellement tronqués, à
+verrouiller au premier passage CSV) : Id · Nom · **Domaine (Ptf)** ·
+Ss-Domaine (Ptf) · Domaine/Ss-Domaine (fonctionnel ?) · Catégorie · Type ·
+Type Gpe · **Complexité du projet** (candidat canal/nature) · État du
+processus · Priorité. · Score total · Début · Date T0 · Fin · Charge JH ·
+familles budgets (Validé PDSI, RDLI, ME finals/réels) · Référence active
+(Réf.) · Jalon en cours · Catégorisation · Date d'export ·
+**isProjetSIS** (le drapeau de périmètre présumé) · PDSI2026 O/N ·
+familles 2026 (ME/Réel/Engagé/RAF/Budg. Res/Trans/CAPEX/OPEX). Le
+classeur porte aussi des onglets ProjetsJalons, Ress.Profils, PdC2026 —
+matière possible pour l'étape 4. Contrat étape 3 : requis réduit au trio
+sûr (Nom, Domaine (Ptf), isProjetSIS), tout le reste optionnel/ignoré —
+les extras du rapport verrouilleront les libellés réels.
+
 **Leçons pour les contrats** : normalisation indispensable (accents
 inconsistants entre fichiers, doubles espaces, casse variable, point final,
 libellés dupliqués) — déjà couverte par `normalizeLabel` + écarts
