@@ -78,6 +78,12 @@ test("a oui/x milestone counts as passed but is signaled", () => {
   assert.ok(report.warnings.some((w) => /sans date .*compté passé/.test(w.message)));
 });
 
+test("accent-stripped type labels still resolve (Etude -> etude)", () => {
+  const { table } = run(["Sans accents;Etude;;;;;;;;;", "Oeuvre;Mise en oeuvre;;;;;;;;;"]);
+  assert.equal(table.drafts[0]?.typeId, "etude");
+  assert.equal(table.drafts[1]?.typeId, "mise_en_oeuvre");
+});
+
 test("a name without code keeps its full title, no codename", () => {
   const { table } = run(["Refonte réseau usine;;;;;;;;;;"]);
   assert.equal(table.drafts[0]?.codename, null);

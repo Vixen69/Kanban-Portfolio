@@ -61,6 +61,18 @@ test("a missing column is a near-miss with the precise missing list", () => {
   assert.deepEqual(result.missing, ["Nom"]);
 });
 
+test("accent-stripped headers still match (Excel CSV exports lose accents)", () => {
+  const result = identifyHeader([
+    "Nom", "Type", "Debut", "Jalon RDLI valide", "Jalon RDR valide (Ref.8)",
+    "Jalon RDR previsionnel", "* Budget valide RDLI", "Cout prev (ME)",
+    "Cout reel", "Engage Achats", "Etat suivant autorise",
+  ]);
+  assert.equal(result.status, "match");
+  if (result.status !== "match") return;
+  assert.equal(result.contract.id, "sp_total");
+  assert.deepEqual(result.deviations, []);
+});
+
 test("a full match dominates a bigger contract's near-miss (Projets.csv case)", () => {
   const result = identifyHeader(["Domaine", "Nom", "Type", "Début", "Responsable 1"]);
   assert.equal(result.status, "match");
