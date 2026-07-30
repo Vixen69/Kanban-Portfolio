@@ -41,6 +41,12 @@ Le parseur se construit et se livre **fichier par fichier**, dans l'ordre :
    attente de `projet` ».
 4. **`ressources_PDC`** — le plan de charge, en dernier.
 
+**Révision 2026-07-30 (Q18)** : un export **« projet consolidé »**, fichier
+maître du périmètre, s'intercale — ses lignes sont les cartes retenues ;
+`SP_total` et `projet` deviennent des enrichissements joints par nom ;
+hors-consolidé = hors board (écarté, compté). L'étape 3 révisée porte le
+contrat du consolidé + les jointures d'enrichissement.
+
 **Modèle d'invocation : sans état caché.** À chaque exécution, le parseur
 lit le dossier d'entrée, prend les fichiers reconnus qui s'y trouvent,
 refait l'assemblage complet et produit le rapport. On ajoute les fichiers
@@ -55,6 +61,7 @@ re-jouable, rien à mémoriser entre deux exécutions.
 | `SP_total` | Les sujets/projets : identité, type, jalons, budgets | Source principale des cartes |
 | `projet` | Organisation : portefeuilles, responsables 1/2/3, responsable de portefeuille | Domaine + chef de projet |
 | `RDOM` | Table domaine ↔ nom de famille du/des RDOM (2 colonnes : domaine, nom ; une ligne par nom, un domaine peut en avoir plusieurs). Double usage : domaine via le responsable de portefeuille, ET liste d'exclusion pour le chef de projet | Composé par l'auteur, CSV côté client, **hors dépôt** (noms réels) |
+| `consolidé` | **Fichier maître du périmètre** (Q18) : une ligne = un projet retenu = une carte. Les autres fichiers l'enrichissent par jointure de nom. Nom réel du fichier et structure à relever au premier passage | Export PMO consolidé |
 | `ressources_PDC` | Plan de charge : une ligne par affectation ressource × projet, phasé par année (prévisionnel/réel) | `chargeByProfile` + analyse nominative |
 
 ## `SP_total` — mapping des colonnes
@@ -395,6 +402,16 @@ office de vérification sur site.
   en Reporté (11) · Annulé (42) · Budget validé (42) · Fusionné (5), ~475
   vides — un affinage ultérieur reste possible, non requis. Les « Annulé »
   et « Fusionné » rejoignent la question de périmètre (Q18).
+- **Q18 (tranchée 2026-07-30, auteur)** — **Le périmètre est porté par un
+  export « projet consolidé »**, fichier maître : ses lignes SONT les
+  projets retenus. L'assemblage s'inverse : le consolidé devient la source
+  des cartes ; `SP_total` (jalons → position, budgets) et `projet`
+  (domaine via RDOM, chef de projet) deviennent des **enrichissements
+  joints par nom**, puis `ressources_PDC` (charge). Sujet des autres
+  fichiers absent du consolidé = **hors périmètre** (écarté, compté) ;
+  projet du consolidé sans correspondance = **donnée manquante signalée**.
+  Structure du consolidé à relever au premier passage (le rapport
+  recopiera ses en-têtes).
 - **Ordre de construction** — parseur livré par étapes : `RDOM` →
   `SP_total` → `projet` → `ressources_PDC` ; un rapport à chaque passage,
   inventaire des fichiers en tête de rapport (voir Construction par étapes).
@@ -411,5 +428,4 @@ office de vérification sur site.
 | Q11 | Date du jalon RDLI comme date d'entrée en Actifs dans le journal (âge vrai des cartes importées) ? | Auteur |
 | Q12 | Réel > prévisionnel : assouplir la contrainte `done ≤ jh` du modèle (`ChargeEntry`) avant l'import ? | Auteur |
 | Q14 | Projet de `SP_total` sans ligne dans `projet` (domaine/chef inconnus) : carte créée avec placeholders ou écartée ? | Auteur |
-| Q18 | **Périmètre d'import** : le premier passage réel (2026-07-30) donne **1 095 sujets** (Demandes 914 · Actifs 84 · Exploitation 97) pour un tableau conçu pour ~150 cartes. **Précision de l'auteur (2026-07-30)** : l'identité projet = titre unique — or les 1 095 sont déjà dédupliqués par titre normalisé (46 douteux seulement) : l'inflation vient donc de l'historique (clos/abandonnés) ou de noms variants. Critère d'exclusion à trancher — candidats : « Projet.Actif » (`Projets.csv`, `Ressources_PdC`), « État du processus » (`Projets.csv`) ; le profil `SP_total` du rapport (code PE / type / budget / date en n/total) doit montrer la frontière | Auteur + PMO |
 | Q15 | Sémantique du jalon RDLI : la date peut-elle être future (prévue, pas passée) ? Règle : ≤ aujourd'hui pour valoir Actifs ? | PMO |
