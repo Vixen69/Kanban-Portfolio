@@ -123,16 +123,7 @@ function classify(
       `en-têtes reconnus ligne ${headerRow.line} — ${pick.rowIndex} ligne(s) ignorée(s) au-dessus (préambule)`,
       file.name);
   }
-  if (identification.ignoredPresent.length > 0) {
-    warn(report,
-      `colonnes ignorées (prévues au contrat) : ${identification.ignoredPresent.join(" ; ")}`,
-      file.name);
-  }
-  if (identification.repaired.length > 0) {
-    warn(report,
-      `en-têtes aux accents détruits, rapprochés du contrat : ${identification.repaired.join(" ; ")}`,
-      file.name);
-  }
+  warnContractNotes(file, report, identification);
   const status = identification.deviations.length > 0 ? "recognized-with-deviations" : "recognized";
   addInventory(report, file, status, {
     encoding,
@@ -140,6 +131,20 @@ function classify(
     detail: deviationsLabel(identification.deviations),
   });
   return { match: identification, dataRows: rows.slice(pick.rowIndex + 1) };
+}
+
+// The tolerated header particularities of a matched file, said once each.
+function warnContractNotes(file: InputFile, report: ImportReport, match: HeaderMatch): void {
+  if (match.ignoredPresent.length > 0) {
+    warn(report,
+      `colonnes ignorées (prévues au contrat) : ${match.ignoredPresent.join(" ; ")}`,
+      file.name);
+  }
+  if (match.repaired.length > 0) {
+    warn(report,
+      `en-têtes aux accents détruits, rapprochés du contrat : ${match.repaired.join(" ; ")}`,
+      file.name);
+  }
 }
 
 // The exact header labels of an unrecognized file, verbatim — the report
