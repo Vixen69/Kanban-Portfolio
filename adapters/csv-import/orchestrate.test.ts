@@ -66,6 +66,11 @@ test("SP_total: preamble skipped, ignored columns listed, cards distributed", ()
   assert.equal(spTotal?.drafts[1]?.columnId, "demandes");
   const cartes = report.assembly.find((a) => a.subject === "cartes");
   assert.equal(cartes?.status, "2 prête(s) — répartition : Demandes 1 · Actifs 1");
+  const profile = report.assembly.find((a) => a.subject === "profil `SP_total`");
+  assert.equal(
+    profile?.status,
+    "code PE : 1/2 · type : 1/2 · budget : 1/2 · date de début : 1/2 (matière pour Q18)",
+  );
   assert.deepEqual(report.missingExpected.map((m) => m.name), ["RDOM", "projet", "ressources_PDC"]);
 });
 

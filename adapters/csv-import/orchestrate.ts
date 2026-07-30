@@ -121,6 +121,7 @@ function emitAssembly(
       subject: "cartes",
       status: `${spTotal.drafts.length} prête(s)${detail}`,
     });
+    report.assembly.push({ subject: "profil `SP_total`", status: spTotalProfile(spTotal) });
   }
   report.assembly.push(
     {
@@ -129,4 +130,18 @@ function emitAssembly(
     },
     { subject: "plan de charge", status: "en attente de `ressources_PDC` (étape 4)" },
   );
+}
+
+// Ventilation of the drafts along the candidate perimeter discriminants
+// (Q18): the counts point at where the real-project boundary lies.
+function spTotalProfile(spTotal: SpTotalTable): string {
+  const total = spTotal.drafts.length;
+  const coded = spTotal.drafts.filter((d) => d.codename !== null).length;
+  const typed = spTotal.drafts.filter((d) => d.typeId !== null).length;
+  const budgeted = spTotal.drafts.filter((d) =>
+    d.budgetRdli !== null || d.budgetEstimated !== null
+    || d.budgetConsumed !== null || d.budgetEngaged !== null).length;
+  const dated = spTotal.drafts.filter((d) => d.createdAt !== null).length;
+  return `code PE : ${coded}/${total} · type : ${typed}/${total}` +
+    ` · budget : ${budgeted}/${total} · date de début : ${dated}/${total} (matière pour Q18)`;
 }
