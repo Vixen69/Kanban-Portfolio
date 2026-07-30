@@ -389,7 +389,7 @@ office de vérification sur site.
 
 | # | Question | Avec qui |
 |---|---|---|
-| Q1 | Position amont (ni RDLI ni RDR validé) : tout en Demandes ou une colonne source distingue Demandes/Qualification/Études/Prêts ? (candidats vus au relevé réel : « État du processus », « Jalon en cours ») | PMO |
+| Q1 | Position amont — **cadré par l'auteur (2026-07-30)** : RDLI passée → Actifs ; le reste réparti entre **Demandes et Études** (pas tout en Demandes). Reste à fixer le critère de partage Demandes/Études — candidat pressenti : « État suivant autorisé » (`SP_total`), valeurs réelles à relever au rapport | Auteur + PMO |
 | Q3 | Canal : défaut unique, seuil (coût prévu ?), ou affectation manuelle post-import ? | Auteur + PMO |
 | Q6 | Date de début → `createdAt` ? | Auteur |
 | Q8 | Unité des valeurs du plan de charge : jours ? (cohérence avec 200 j/an) | PMO |
@@ -398,5 +398,5 @@ office de vérification sur site.
 | Q11 | Date du jalon RDLI comme date d'entrée en Actifs dans le journal (âge vrai des cartes importées) ? | Auteur |
 | Q12 | Réel > prévisionnel : assouplir la contrainte `done ≤ jh` du modèle (`ChargeEntry`) avant l'import ? | Auteur |
 | Q14 | Projet de `SP_total` sans ligne dans `projet` (domaine/chef inconnus) : carte créée avec placeholders ou écartée ? | Auteur |
-| Q18 | **Périmètre d'import** : le premier passage réel (2026-07-30) donne **1 095 sujets** (Demandes 914 · Actifs 84 · Exploitation 97) pour un tableau conçu pour ~150 cartes. Règle de filtrage à trancher — candidats relevés : « Projet.Actif » (`Projets.csv`, `Ressources_PdC`), « État du processus » (`Projets.csv`), « État suivant autorisé » (`SP_total`) | Auteur + PMO |
+| Q18 | **Périmètre d'import** : le premier passage réel (2026-07-30) donne **1 095 sujets** (Demandes 914 · Actifs 84 · Exploitation 97) pour un tableau conçu pour ~150 cartes. **Précision de l'auteur (2026-07-30)** : l'identité projet = titre unique — or les 1 095 sont déjà dédupliqués par titre normalisé (46 douteux seulement) : l'inflation vient donc de l'historique (clos/abandonnés) ou de noms variants. Critère d'exclusion à trancher — candidats : « Projet.Actif » (`Projets.csv`, `Ressources_PdC`), « État du processus » (`Projets.csv`) ; le profil `SP_total` du rapport (code PE / type / budget / date en n/total) doit montrer la frontière | Auteur + PMO |
 | Q15 | Sémantique du jalon RDLI : la date peut-elle être future (prévue, pas passée) ? Règle : ≤ aujourd'hui pour valoir Actifs ? | PMO |
