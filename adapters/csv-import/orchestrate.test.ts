@@ -75,7 +75,9 @@ test("the three fixture files assemble a full deck, SP_total as gap-filler", () 
   assert.equal(cards?.cards.length, 6);
   const byLabel = new Map(report.assembly.map((a) => [a.subject, a.status]));
   assert.equal(byLabel.get("périmètre `consolidé`"),
-    "6 carte(s) — le fichier fait foi · isProjetSIS (informatif) : VRAI 1 · FAUX 5 · vide 0");
+    "6 carte(s) — le fichier fait foi · exclus : 2 (Domaine (Ptf) TMA CORRECTIVES / IT4IT)" +
+      " · isProjetSIS (informatif) : VRAI 1 · FAUX 5 · vide 0");
+  assert.equal(report.discarded.filter((d) => /« Domaine \(Ptf\) » exclu/.test(d.reason)).length, 2);
   assert.equal(byLabel.get("cartes"), "6 — répartition : Demandes 3 · Actifs 1 · Exploitation 2");
   assert.equal(byLabel.get("position"),
     "jalons datés SP_total 5 (nom 1 · code 4 · titre 0) · « Jalon en cours » 0 " +
@@ -113,6 +115,7 @@ test("consolidé alone (the 2026-07-31 shape): jalon en cours positions (Q19)", 
   assert.equal(first?.effortConsumed, 70);
   assert.equal(first?.dateRdr, "2026-09-15");
   assert.equal(first?.columnId, "actifs");
+  assert.equal(first?.laneId, "projets");
   assert.equal(first?.owner, "Alice MERLE");
   assert.equal(cards?.cards[1]?.columnId, "etudes");
   assert.equal(cards?.cards[2]?.columnId, "qualification");

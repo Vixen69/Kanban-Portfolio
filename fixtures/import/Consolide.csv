@@ -5,3 +5,5 @@ Montée de version calcul;Ingénierie;VRAI;PE10003;Gestion d'obsolescence;Compli
 Étude connectivité site B;;FAUX;;Étude;Simple;Nouveau;01/07/2026;;RDO;40;40;30;;;35;;;David GRAND;;BLANCHARD
 Sécurisation accès;INF;FAUX;PE10007;Mise en œuvre;Complexe;En cours;20/03/2025;02/05/2026;RDR;115;110;95;95;40;100;80;Emma FAVRE;;;MASSON
 Vieux projet clos;ERP;FAUX;PE10999;Achat;;Clos;01/01/2020;;;;;;;;;;Franck LEGRIS;;;ROUSSEL
+Vieille TMA;TMA CORRECTIVES;FAUX;;Achat;;Clos;;;;;;;;;;;Gil BOSC;;;ROUSSEL
+Outillage IT;IT4IT;FAUX;;Achat;;En cours;;;;;;;;;;;Hana RIU;;;ROUSSEL

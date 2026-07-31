@@ -1,10 +1,9 @@
 // Reader for the author's consolidated sheet — THE single card source
-// (Q18): every row IS a retained card, the file itself is the perimeter.
-// `isProjetSIS` is INFORMATIONAL only (SIS = Système d'Information du
-// Soutien, outside the DSI — corrected 2026-07-31, it must never exclude).
-// Domain comes from « Domaine (Ptf) » (board vocabulary) with an RDOM
-// surname fallback via « Responsable portefeuilles »; the chef de projet
-// is the first of Responsables 1→2→3 that is not an RDOM.
+// (Q18): every row IS a retained card, the file itself is the perimeter
+// (minus the excluded « Domaine (Ptf) » portfolios). `isProjetSIS` is
+// INFORMATIONAL only (SIS = SI du Soutien, hors DSI — it never excludes).
+// Domain: « Domaine (Ptf) » (board vocabulary) with RDOM surname fallback
+// via « Responsable portefeuilles »; owner: first non-RDOM Responsable.
 
 import type { BoardConfig } from "../../core/types.ts";
 import { createTolerantLookup, normalizeLabel } from "./normalize.ts";
@@ -61,6 +60,8 @@ export interface ConsolideTable {
   byName: ReadonlyMap<string, ConsolideEntry>;
   /** Informational VRAI/FAUX/vide counts of « isProjetSIS ». */
   sisCounts: { yes: number; no: number; blank: number };
+  /** Rows excluded by the « Domaine (Ptf) » exclusion list (author). */
+  excluded: number;
   /** Distinct « Complexité du projet » values (canal/nature material). */
   complexites: ReadonlyMap<string, number>;
   /** Distinct « Jalon en cours » values (position rule material). */
@@ -81,6 +82,7 @@ interface ConsolideContext {
   entries: ConsolideEntry[];
   byName: Map<string, ConsolideEntry>;
   sisCounts: { yes: number; no: number; blank: number };
+  excluded: number;
   complexites: Map<string, number>;
   jalons: Map<string, number>;
   processStates: Map<string, number>;
@@ -110,7 +112,7 @@ export function parseConsolide(
     typeLookup: createTolerantLookup(
       config.types.flatMap((t): Array<[string, string]> => [[t.id, t.id], [t.name, t.id], [t.short, t.id]]),
     ),
-    entries: [], byName: new Map(), sisCounts: { yes: 0, no: 0, blank: 0 },
+    entries: [], byName: new Map(), sisCounts: { yes: 0, no: 0, blank: 0 }, excluded: 0,
     complexites: new Map(), jalons: new Map(), processStates: new Map(),
     unknownDomains: new Map(), tallies: new Map(),
   };
@@ -118,10 +120,14 @@ export function parseConsolide(
   finalize(ctx);
   return {
     entries: ctx.entries, byName: ctx.byName, sisCounts: ctx.sisCounts,
+    excluded: ctx.excluded,
     complexites: ctx.complexites, jalons: ctx.jalons,
     processStates: ctx.processStates, unknownDomains: ctx.unknownDomains,
   };
 }
+
+/** « Domaine (Ptf) » labels excluded from the board (author, 2026-07-31). */
+const EXCLUDED_PTF = new Set(["tma correctives", "it4it"]);
 
 // Structural gates, the perimeter flag, then the entry build.
 function readConsolideRow(ctx: ConsolideContext, row: CsvRow): void {
@@ -139,6 +145,14 @@ function readConsolideRow(ctx: ConsolideContext, row: CsvRow): void {
   if (/^(sous[\s-])?total\b/.test(normalizedName)) {
     discard(ctx.report, ctx.fileName,
       "ligne de total/sous-total — exclue (risque de double compte)", { ref, value: nom });
+    return;
+  }
+  const ptf = normalizeLabel(cell(ctx, row, "Domaine (Ptf)"));
+  if (EXCLUDED_PTF.has(ptf)) {
+    ctx.excluded++;
+    discard(ctx.report, ctx.fileName,
+      `hors board — « Domaine (Ptf) » exclu (« ${cell(ctx, row, "Domaine (Ptf)").trim()} », décision auteur)`,
+      { ref, value: nom });
     return;
   }
   const already = ctx.byName.get(normalizedName);
@@ -273,7 +287,7 @@ function finalize(ctx: ConsolideContext): void {
       `« Domaine (Ptf) » inconnu du board : « ${label} » (${t.count} ligne(s), ligne(s) ` +
         `${t.lines.join(", ")}${t.count > t.lines.length ? ", …" : ""}) — repli RDOM tenté à la jointure`);
   }
-  survey(ctx, ctx.complexites, "« Complexité du projet » — valeurs vues", "candidat canal/nature");
+  survey(ctx, ctx.complexites, "« Complexité du projet » — valeurs vues", "information — sans lien avec le canal, décision auteur");
   survey(ctx, ctx.jalons, "« Jalon en cours » — valeurs vues", "règle de position à dicter");
   survey(ctx, ctx.processStates, "« État du processus » — valeurs vues", "information");
 }

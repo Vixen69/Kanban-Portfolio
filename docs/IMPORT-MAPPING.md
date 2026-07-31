@@ -95,6 +95,19 @@ restantes : ignorées connues (matière étape 4).
   cours » > Demandes. Cibles ancrées sur la config (qualification =
   ancre, études par id avec repli, actifs = ancre d'activation,
   exploitation = dernière colonne).
+  **Complément (auteur, même jour)** : les libellés réels relevés
+  (« Début T0 », « Go Live », « RDR Revue de réception », « Fin de
+  projet ») ne sont **pas** mappés — « sans infos, mets en Demandes » ;
+  la table RDO/RDLI/RDR/RVSR reste en place, inactive sur ces valeurs.
+- **Q3 tranchée (auteur, 2026-07-31)** — Canal : **toutes les cartes
+  importées entrent dans le canal « Projets » (compliqué)** — la colonne
+  « Complexité du projet » n'a **rien à voir** avec le canal (gardée en
+  simple relevé informatif). Le canal cible = la lane de `natureKey`
+  « complicated » de la config, jamais un id codé en dur.
+- **Exclusions de périmètre (auteur, 2026-07-31)** — les lignes dont
+  « Domaine (Ptf) » vaut **« TMA CORRECTIVES »** ou **« IT4IT »** sont
+  écartées du board (écartées avec raison, comptées). **« PROJETS
+  VENDUS » reste à trancher** — conservées sans domaine en attendant.
 
 **Modèle d'invocation : sans état caché.** À chaque exécution, le parseur
 lit le dossier d'entrée, prend les fichiers reconnus qui s'y trouvent,

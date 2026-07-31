@@ -121,6 +121,17 @@ test("duplicates, empty names and total rows are gated like everywhere", () => {
   ]);
 });
 
+test("TMA CORRECTIVES and IT4IT portfolios are excluded (author decision)", () => {
+  const { table, report } = run([
+    "Vieille TMA;TMA CORRECTIVES;VRAI;;;;;;;;;",
+    "Outillage;IT4IT;FAUX;;;;;;;;;",
+    "Gardé;Infra;VRAI;;;;;;;;;",
+  ]);
+  assert.equal(table.entries.length, 1);
+  assert.equal(table.excluded, 2);
+  assert.equal(report.discarded.filter((d) => /« Domaine \(Ptf\) » exclu/.test(d.reason)).length, 2);
+});
+
 test("a non-PE Id is not taken as a codename", () => {
   const { table } = run(["Alpha;Infra;VRAI;12345;;;;;;;;", "Beta;Infra;VRAI;PE 54321;;;;;;;;"]);
   assert.equal(table.entries[0]?.codename, null);

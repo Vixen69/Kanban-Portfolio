@@ -21,6 +21,9 @@ export interface EnrichedCard {
   title: string;
   normalizedName: string;
   codename: string | null;
+  /** Canal: every imported card lands in the « complicated » lane (Q3,
+   * author 2026-07-31 — « Complexité » has nothing to do with it). */
+  laneId: string;
   domainId: string | null;
   owner: string | null;
   typeId: string | null;
@@ -94,6 +97,7 @@ interface JoinContext {
   spByCode: Map<string, SubjectDraft>;
   spByTitle: Map<string, SubjectDraft | "ambiguous">;
   entryColumnId: string;
+  laneId: string;
   /** « Jalon en cours » value (normalized) -> target column id (Q19). */
   jalonColumns: Map<string, string>;
   columnNames: Map<string, string>;
@@ -135,6 +139,7 @@ function createJoin(
     spByName: spTotal?.byName ?? new Map(),
     spByCode, spByTitle,
     entryColumnId,
+    laneId: config.lanes.find((l) => l.natureKey === "complicated")?.id ?? config.lanes[0]?.id ?? "",
     jalonColumns: jalonColumnMap(config, entryColumnId),
     columnNames: new Map(config.columns.map((c) => [c.id, c.name])),
     consumedSp: new Set(),
@@ -168,6 +173,7 @@ function buildCard(ctx: JoinContext, entry: ConsolideEntry): EnrichedCard {
     title: entry.name,
     normalizedName: entry.normalizedName,
     codename: entry.codename ?? sp?.codename ?? null,
+    laneId: ctx.laneId,
     domainId: entry.domainId,
     owner: entry.owner,
     typeId: entry.typeId ?? sp?.typeId ?? null,
@@ -178,11 +184,8 @@ function buildCard(ctx: JoinContext, entry: ConsolideEntry): EnrichedCard {
     budgetEstimated: entry.budgetEstimated ?? sp?.budgetEstimated ?? null,
     budgetConsumed: entry.budgetConsumed ?? sp?.budgetConsumed ?? null,
     budgetEngaged: entry.budgetEngaged ?? sp?.budgetEngaged ?? null,
-    effortEstimated: entry.effortEstimated,
-    effortConsumed: entry.effortConsumed,
-    charges: [],
-    positioned: sp !== null,
-    ref: entry.ref,
+    effortEstimated: entry.effortEstimated, effortConsumed: entry.effortConsumed,
+    charges: [], positioned: sp !== null, ref: entry.ref,
   };
   const columnName = ctx.columnNames.get(card.columnId) ?? card.columnId;
   take(ctx.report, card.ref, card.title, `carte → colonne « ${columnName} »`, card.codename ?? undefined);

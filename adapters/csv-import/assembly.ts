@@ -60,9 +60,11 @@ export function emitAssembly(report: ImportReport, data: AssemblyData, config: B
   report.assembly.push({ subject: "table RDOM", status: rdomStatus });
   if (data.consolide !== null) {
     const sis = data.consolide.sisCounts;
+    const excluded = data.consolide.excluded === 0
+      ? "" : ` · exclus : ${data.consolide.excluded} (Domaine (Ptf) TMA CORRECTIVES / IT4IT)`;
     report.assembly.push({
       subject: "périmètre `consolidé`",
-      status: `${data.consolide.entries.length} carte(s) — le fichier fait foi` +
+      status: `${data.consolide.entries.length} carte(s) — le fichier fait foi${excluded}` +
         ` · isProjetSIS (informatif) : VRAI ${sis.yes} · FAUX ${sis.no} · vide ${sis.blank}`,
     });
   }
