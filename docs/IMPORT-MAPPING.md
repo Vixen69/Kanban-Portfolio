@@ -47,6 +47,14 @@ maître du périmètre, s'intercale — ses lignes sont les cartes retenues ;
 hors-consolidé = hors board (écarté, compté). L'étape 3 révisée porte le
 contrat du consolidé + les jointures d'enrichissement.
 
+**Révision 2026-07-31 (auteur)** : simplification finale — le consolidé
+(déposé sous le nom `Projets.csv`, 185 lignes) **contient tout sauf le
+plan de charge** et devient la **source unique des cartes** ; les exports
+bruts `SP_total` et `projet` sortent du circuit. Le parseur prend tout ce
+qu'il peut du consolidé, puis utilise `RDOM` (domaine de repli, exclusion
+du chef) et `ressources_PDC` (étape 4) au besoin. En-têtes réels du
+consolidé à verrouiller (recopie de la ligne 1 attendue).
+
 **Modèle d'invocation : sans état caché.** À chaque exécution, le parseur
 lit le dossier d'entrée, prend les fichiers reconnus qui s'y trouvent,
 refait l'assemblage complet et produit le rapport. On ajoute les fichiers
