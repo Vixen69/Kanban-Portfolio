@@ -75,9 +75,9 @@ test("the three fixture files assemble a full deck, SP_total as gap-filler", () 
   assert.equal(cards?.cards.length, 6);
   const byLabel = new Map(report.assembly.map((a) => [a.subject, a.status]));
   assert.equal(byLabel.get("périmètre `consolidé`"),
-    "6 carte(s) — le fichier fait foi · exclus : 2 (Domaine (Ptf) TMA CORRECTIVES / IT4IT)" +
+    "6 carte(s) — le fichier fait foi · exclus : 3 (Domaine (Ptf) TMA CORRECTIVES / IT4IT / PROJETS VENDUS)" +
       " · isProjetSIS (informatif) : VRAI 1 · FAUX 5 · vide 0");
-  assert.equal(report.discarded.filter((d) => /« Domaine \(Ptf\) » exclu/.test(d.reason)).length, 2);
+  assert.equal(report.discarded.filter((d) => /« Domaine \(Ptf\) » exclu/.test(d.reason)).length, 3);
   assert.equal(byLabel.get("cartes"), "6 — répartition : Demandes 3 · Actifs 1 · Exploitation 2");
   assert.equal(byLabel.get("position"),
     "jalons datés SP_total 5 (nom 1 · code 4 · titre 0) · « Jalon en cours » 0 " +

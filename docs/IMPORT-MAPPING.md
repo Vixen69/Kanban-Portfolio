@@ -105,9 +105,9 @@ restantes : ignorées connues (matière étape 4).
   simple relevé informatif). Le canal cible = la lane de `natureKey`
   « complicated » de la config, jamais un id codé en dur.
 - **Exclusions de périmètre (auteur, 2026-07-31)** — les lignes dont
-  « Domaine (Ptf) » vaut **« TMA CORRECTIVES »** ou **« IT4IT »** sont
-  écartées du board (écartées avec raison, comptées). **« PROJETS
-  VENDUS » reste à trancher** — conservées sans domaine en attendant.
+  « Domaine (Ptf) » vaut **« TMA CORRECTIVES »**, **« IT4IT »** ou
+  **« PROJETS VENDUS »** (pas arbitrables) sont écartées du board
+  (écartées avec raison, comptées dans la ligne périmètre).
 
 **Modèle d'invocation : sans état caché.** À chaque exécution, le parseur
 lit le dossier d'entrée, prend les fichiers reconnus qui s'y trouvent,

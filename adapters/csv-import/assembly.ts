@@ -61,7 +61,7 @@ export function emitAssembly(report: ImportReport, data: AssemblyData, config: B
   if (data.consolide !== null) {
     const sis = data.consolide.sisCounts;
     const excluded = data.consolide.excluded === 0
-      ? "" : ` · exclus : ${data.consolide.excluded} (Domaine (Ptf) TMA CORRECTIVES / IT4IT)`;
+      ? "" : ` · exclus : ${data.consolide.excluded} (Domaine (Ptf) TMA CORRECTIVES / IT4IT / PROJETS VENDUS)`;
     report.assembly.push({
       subject: "périmètre `consolidé`",
       status: `${data.consolide.entries.length} carte(s) — le fichier fait foi${excluded}` +
