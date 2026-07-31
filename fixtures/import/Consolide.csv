@@ -1,7 +1,7 @@
-Nom;Domaine (Ptf);isProjetSIS;Id;Type;Complexité du projet;État du processus;Début;Fin;Jalon en cours;Charge JH;Budget RDLI Total Coût (Res+Trans);Coût final ME (Res.+Trans);Coût réel ME (Res.+Trans);Engagé 2026 (Trans);Charge finale ME (Res) (J);Charge réelle ME (Res) (J)
-Modernisation atelier;Infra;VRAI;PE10001;Achat;Complexe;En cours;12/01/2025;15/09/2026;RDR;120;150;120,5;80;30;110;70
-Refonte portail interne;ING;VRAI;PE10002;Evolution - TMA;Simple;En cours;05/02/2025;15/12/2026;RDLI;90;90;75;22,5;5;85;20
-Montée de version calcul;Ingénierie;VRAI;PE10003;Gestion d'obsolescence;Compliqué;Nouveau;10/03/2026;;RDO;60;60;45;0;0;55;0
-Étude connectivité site B;Cyber;VRAI;;Étude;Simple;Nouveau;01/07/2026;;RDO;40;40;30;;;35;
-Sécurisation accès;INF;VRAI;PE10007;Mise en œuvre;Complexe;En cours;20/03/2025;02/05/2026;RDR;115;110;95;95;40;100;80
-Vieux projet clos;ERP;FAUX;PE10999;Achat;;Clos;01/01/2020;;;;;;;;;
+Nom;Domaine (Ptf);isProjetSIS;Id;Type;Complexité du projet;État du processus;Début;Fin;Jalon en cours;Charge JH;Budget RDLI Total Coût (Res+Trans);Coût final ME (Res.+Trans);Coût réel ME (Res.+Trans);Engagé 2026 (Trans);Charge finale ME (Res) (J);Charge réelle ME (Res) (J);Responsable 1;Responsable 2;Responsable 3;Responsable portefeuilles
+Modernisation atelier;Infra;FAUX;PE10001;Achat;Complexe;En cours;12/01/2025;15/09/2026;RDR;120;150;120,5;80;30;110;70;CARPENTIER;Alice MERLE;;CARPENTIER
+Refonte portail interne;ING;FAUX;PE10002;Evolution - TMA;Simple;En cours;05/02/2025;15/12/2026;RDLI;90;90;75;22,5;5;85;20;Bob NOEL;;;DURAND
+Montée de version calcul;Ingénierie;VRAI;PE10003;Gestion d'obsolescence;Compliqué;Nouveau;10/03/2026;;RDO;60;60;45;0;0;55;0;Chloé PETIT;;;DURAND
+Étude connectivité site B;;FAUX;;Étude;Simple;Nouveau;01/07/2026;;RDO;40;40;30;;;35;;;David GRAND;;BLANCHARD
+Sécurisation accès;INF;FAUX;PE10007;Mise en œuvre;Complexe;En cours;20/03/2025;02/05/2026;RDR;115;110;95;95;40;100;80;Emma FAVRE;;;MASSON
+Vieux projet clos;ERP;FAUX;PE10999;Achat;;Clos;01/01/2020;;;;;;;;;;Franck LEGRIS;;;ROUSSEL

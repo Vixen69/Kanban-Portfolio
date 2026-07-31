@@ -1,18 +1,22 @@
-// Reader for the author's consolidated « Projets » sheet — THE perimeter
-// master (Q18): its rows are the candidate cards; `isProjetSIS` keeps or
-// excludes each one. Domain comes from « Domaine (Ptf) » when it speaks the
-// board vocabulary (else étape-3 falls back to the RDOM join). Everything
-// uncertain is optional in the contract: the report's verbatim extras are
-// the feedback loop that locks the real labels.
+// Reader for the author's consolidated sheet — THE single card source
+// (Q18): every row IS a retained card, the file itself is the perimeter.
+// `isProjetSIS` is INFORMATIONAL only (SIS = Système d'Information du
+// Soutien, outside the DSI — corrected 2026-07-31, it must never exclude).
+// Domain comes from « Domaine (Ptf) » (board vocabulary) with an RDOM
+// surname fallback via « Responsable portefeuilles »; the chef de projet
+// is the first of Responsables 1→2→3 that is not an RDOM.
 
 import type { BoardConfig } from "../../core/types.ts";
 import { createTolerantLookup, normalizeLabel } from "./normalize.ts";
 import type { TolerantHit } from "./normalize.ts";
-import { parseFrenchAmount, parseFrenchBoolean, parseFrenchDate } from "./values.ts";
+import { parseFrenchBoolean } from "./values.ts";
+import { amountCell, dateCell } from "./cells.ts";
 import { tallyInto, tallyLabel } from "./tallies.ts";
 import type { Tally } from "./tallies.ts";
 import type { CsvRow } from "./csv.ts";
 import type { HeaderMatch } from "./contract.ts";
+import { surnameDomains } from "./rdom.ts";
+import type { RdomTable } from "./rdom.ts";
 import { discard, doubt, warn } from "./report.ts";
 import type { ImportReport, RowRef } from "./report.ts";
 
@@ -28,6 +32,10 @@ export interface ConsolideEntry {
   domainCell: string;
   typeId: string | null;
   createdAt: string | null;
+  /** Chef de projet: first non-RDOM of Responsables 1→3, or null. */
+  owner: string | null;
+  /** Informational only — never excludes (SIS = hors DSI). */
+  isProjetSis: boolean | null;
   /** « Fin » — the projected delivery date (mapping decision 2026-07-31). */
   dateRdr: string | null;
   /** Raw « Jalon en cours » label (position rule pending — surveyed). */
@@ -51,7 +59,8 @@ export interface ConsolideEntry {
 export interface ConsolideTable {
   entries: ConsolideEntry[];
   byName: ReadonlyMap<string, ConsolideEntry>;
-  excludedCount: number;
+  /** Informational VRAI/FAUX/vide counts of « isProjetSIS ». */
+  sisCounts: { yes: number; no: number; blank: number };
   /** Distinct « Complexité du projet » values (canal/nature material). */
   complexites: ReadonlyMap<string, number>;
   /** Distinct « Jalon en cours » values (position rule material). */
@@ -66,11 +75,12 @@ interface ConsolideContext {
   match: HeaderMatch;
   report: ImportReport;
   fileName: string;
+  rdom: RdomTable | null;
   domainLookup: (cell: string) => TolerantHit | null;
   typeLookup: (cell: string) => TolerantHit | null;
   entries: ConsolideEntry[];
   byName: Map<string, ConsolideEntry>;
-  excludedCount: number;
+  sisCounts: { yes: number; no: number; blank: number };
   complexites: Map<string, number>;
   jalons: Map<string, number>;
   processStates: Map<string, number>;
@@ -79,34 +89,35 @@ interface ConsolideContext {
 }
 
 /**
- * Parses the consolidated data rows (header excluded) into the perimeter.
- * Inputs: the data rows, the header match, the board config, the report
- * and the file name.
- * Outputs: the ConsolideTable; side effects: écarté (empty/total rows,
- * `isProjetSIS` faux), douteux (duplicates), aggregated signalements
- * (unreadable flags, unknown domains, complexity survey).
+ * Parses the consolidated data rows (header excluded): every kept row is a
+ * card — the file IS the perimeter.
+ * Inputs: the data rows, the header match, the board config, the RDOM
+ * table (surname fallback; null tolerated), the report and the file name.
+ * Outputs: the ConsolideTable; side effects: écarté (empty/total rows
+ * only), douteux (duplicates), aggregated signalements (unreadable cells,
+ * unknown domains, RDOM exclusions, surveys).
  * Failure modes: none — every anomaly is reported, nothing throws.
  */
 export function parseConsolide(
-  rows: CsvRow[], match: HeaderMatch, config: BoardConfig,
+  rows: CsvRow[], match: HeaderMatch, config: BoardConfig, rdom: RdomTable | null,
   report: ImportReport, fileName: string,
 ): ConsolideTable {
   const ctx: ConsolideContext = {
-    match, report, fileName,
+    match, report, fileName, rdom,
     domainLookup: createTolerantLookup(
       config.domains.flatMap((d): Array<[string, string]> => [[d.id, d.id], [d.name, d.id], [d.short, d.id]]),
     ),
     typeLookup: createTolerantLookup(
       config.types.flatMap((t): Array<[string, string]> => [[t.id, t.id], [t.name, t.id], [t.short, t.id]]),
     ),
-    entries: [], byName: new Map(), excludedCount: 0,
+    entries: [], byName: new Map(), sisCounts: { yes: 0, no: 0, blank: 0 },
     complexites: new Map(), jalons: new Map(), processStates: new Map(),
     unknownDomains: new Map(), tallies: new Map(),
   };
   for (const row of rows) readConsolideRow(ctx, row);
   finalize(ctx);
   return {
-    entries: ctx.entries, byName: ctx.byName, excludedCount: ctx.excludedCount,
+    entries: ctx.entries, byName: ctx.byName, sisCounts: ctx.sisCounts,
     complexites: ctx.complexites, jalons: ctx.jalons,
     processStates: ctx.processStates, unknownDomains: ctx.unknownDomains,
   };
@@ -130,12 +141,6 @@ function readConsolideRow(ctx: ConsolideContext, row: CsvRow): void {
       "ligne de total/sous-total — exclue (risque de double compte)", { ref, value: nom });
     return;
   }
-  const flag = perimeterFlag(ctx, row);
-  if (flag === false) {
-    ctx.excludedCount++;
-    discard(ctx.report, ctx.fileName, "hors périmètre (isProjetSIS faux)", { ref, value: nom });
-    return;
-  }
   const already = ctx.byName.get(normalizedName);
   if (already !== undefined) {
     doubt(ctx.report, ctx.fileName,
@@ -147,21 +152,11 @@ function readConsolideRow(ctx: ConsolideContext, row: CsvRow): void {
   registerEntry(ctx, row, ref, nom, normalizedName);
 }
 
-// The perimeter flag: absent column -> everything retained; unreadable
-// cell -> retained but signaled (never a silent exclusion).
-function perimeterFlag(ctx: ConsolideContext, row: CsvRow): boolean | null {
-  if (!ctx.match.columnIndex.has("isProjetSIS")) return null;
-  const parsed = parseFrenchBoolean(cell(ctx, row, "isProjetSIS"));
-  if (parsed === "invalid") {
-    tallyInto(ctx.tallies, "« isProjetSIS » illisible — ligne conservée", row.line);
-    return null;
-  }
-  return parsed;
-}
-
-function registerEntry(
-  ctx: ConsolideContext, row: CsvRow, ref: RowRef, nom: string, normalizedName: string,
-): void {
+// « Domaine (Ptf) » in the board vocabulary (tolerant), else the RDOM
+// surname of « Responsable portefeuilles »; unknown labels are surveyed.
+function deriveDomain(
+  ctx: ConsolideContext, row: CsvRow,
+): { domainId: string | null; domainCell: string } {
   const domainCell = cell(ctx, row, "Domaine (Ptf)").trim();
   let domainId: string | null = null;
   if (domainCell !== "") {
@@ -172,6 +167,53 @@ function registerEntry(
       tallyInto(ctx.tallies, "« Domaine (Ptf) » aux accents détruits — rapproché", row.line);
     }
   }
+  if (domainId === null) {
+    const fallback = surnameDomains(ctx.rdom, cell(ctx, row, "Responsable portefeuilles"));
+    if (fallback.size === 1) {
+      domainId = [...fallback][0] ?? null;
+      tallyInto(ctx.tallies, "domaine résolu par RDOM (« Responsable portefeuilles »)", row.line);
+    }
+  }
+  return { domainId, domainCell };
+}
+
+// « isProjetSIS » is informational only (SIS = hors DSI) — counted, never
+// used to exclude; an unreadable cell is signaled.
+function sisFlag(ctx: ConsolideContext, row: CsvRow): boolean | null {
+  const parsed = parseFrenchBoolean(cell(ctx, row, "isProjetSIS"));
+  if (parsed === true) ctx.sisCounts.yes++;
+  else if (parsed === false) ctx.sisCounts.no++;
+  else {
+    ctx.sisCounts.blank++;
+    if (parsed === "invalid") {
+      tallyInto(ctx.tallies, "« isProjetSIS » illisible", row.line);
+    }
+  }
+  return parsed === "invalid" ? null : parsed;
+}
+
+// Chef de projet: first of Responsables 1→3 that is not an RDOM surname;
+// every exclusion is counted (homonyms must stay visible).
+function deriveOwner(ctx: ConsolideContext, row: CsvRow): string | null {
+  let sawAny = false;
+  for (const column of ["Responsable 1", "Responsable 2", "Responsable 3"]) {
+    const value = cell(ctx, row, column).trim();
+    if (value === "") continue;
+    sawAny = true;
+    if (surnameDomains(ctx.rdom, value).size > 0) {
+      tallyInto(ctx.tallies, `« ${column} » est un RDOM — exclu du chef de projet`, row.line);
+      continue;
+    }
+    return value;
+  }
+  if (sawAny) tallyInto(ctx.tallies, "aucun chef de projet (responsables tous RDOM)", row.line);
+  return null;
+}
+
+function registerEntry(
+  ctx: ConsolideContext, row: CsvRow, ref: RowRef, nom: string, normalizedName: string,
+): void {
+  const { domainId, domainCell } = deriveDomain(ctx, row);
   const typeCell = cell(ctx, row, "Type").trim();
   const typeHit = typeCell === "" ? null : ctx.typeLookup(typeCell);
   bump(ctx.complexites, cell(ctx, row, "Complexité du projet").trim());
@@ -185,7 +227,9 @@ function registerEntry(
     codename: code === null ? null : `PE${code[1]}`,
     domainId, domainCell,
     typeId: typeHit?.id ?? null,
-    createdAt: dateOrNull(ctx, row, "Début"),
+    createdAt: dateCell(cell(ctx, row, "Début"), "Début", row.line, ctx.tallies),
+    owner: deriveOwner(ctx, row),
+    isProjetSis: sisFlag(ctx, row),
     jalonEnCours: jalon === "" ? null : jalon,
     ...financials(ctx, row),
     ref,
@@ -196,42 +240,21 @@ function registerEntry(
 
 // The money (k€) and effort (j.h) columns — mapping decided 2026-07-31.
 function financials(ctx: ConsolideContext, row: CsvRow) {
+  const amount = (column: string): number | null =>
+    amountCell(cell(ctx, row, column), column, row.line, ctx.tallies);
   return {
-    dateRdr: dateOrNull(ctx, row, "Fin"),
-    budgetRdli: amountOrNull(ctx, row, "Budget RDLI Total Coût (Res+Trans)"),
-    budgetEstimated: amountOrNull(ctx, row, "Coût final ME (Res.+Trans)"),
-    budgetConsumed: amountOrNull(ctx, row, "Coût réel ME (Res.+Trans)"),
-    budgetEngaged: amountOrNull(ctx, row, "Engagé 2026 (Trans)"),
-    effortEstimated: amountOrNull(ctx, row, "Charge finale ME (Res) (J)")
-      ?? amountOrNull(ctx, row, "Charge JH"),
-    effortConsumed: amountOrNull(ctx, row, "Charge réelle ME (Res) (J)"),
+    dateRdr: dateCell(cell(ctx, row, "Fin"), "Fin", row.line, ctx.tallies),
+    budgetRdli: amount("Budget RDLI Total Coût (Res+Trans)"),
+    budgetEstimated: amount("Coût final ME (Res.+Trans)"),
+    budgetConsumed: amount("Coût réel ME (Res.+Trans)"),
+    budgetEngaged: amount("Engagé 2026 (Trans)"),
+    effortEstimated: amount("Charge finale ME (Res) (J)") ?? amount("Charge JH"),
+    effortConsumed: amount("Charge réelle ME (Res) (J)"),
   };
 }
 
 function bump(map: Map<string, number>, value: string): void {
   if (value !== "") map.set(value, (map.get(value) ?? 0) + 1);
-}
-
-// Negative amounts are kept but signaled; units in cells likewise.
-function amountOrNull(ctx: ConsolideContext, row: CsvRow, column: string): number | null {
-  const parsed = parseFrenchAmount(cell(ctx, row, column));
-  if (parsed.kind === "empty") return null;
-  if (parsed.kind === "invalid") {
-    tallyInto(ctx.tallies, `« ${column} » illisible`, row.line);
-    return null;
-  }
-  if (parsed.unit !== undefined) tallyInto(ctx.tallies, `« ${column} » : unité écrite dans la cellule`, row.line);
-  if (parsed.value < 0) tallyInto(ctx.tallies, `« ${column} » négatif`, row.line);
-  return parsed.value;
-}
-
-function dateOrNull(ctx: ConsolideContext, row: CsvRow, column: string): string | null {
-  const parsed = parseFrenchDate(cell(ctx, row, column));
-  if (parsed.kind === "date") return parsed.iso;
-  if (parsed.kind !== "empty") {
-    tallyInto(ctx.tallies, `« ${column} » illisible`, row.line);
-  }
-  return null;
 }
 
 function cell(ctx: ConsolideContext, row: CsvRow, column: string): string {

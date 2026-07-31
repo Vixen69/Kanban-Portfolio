@@ -4,7 +4,6 @@
 
 import type { BoardConfig } from "../../core/types.ts";
 import type { ConsolideTable } from "./consolide.ts";
-import type { ProjetsTable } from "./projets.ts";
 import type { RdomTable } from "./rdom.ts";
 import type { SpTotalTable } from "./sp-total.ts";
 import type { CardAssembly } from "./enrich.ts";
@@ -18,7 +17,7 @@ import type { ImportReport } from "./report.ts";
  */
 export function emitMissing(
   report: ImportReport,
-  present: { rdom: boolean; spTotal: boolean; projets: boolean; consolide: boolean },
+  present: { rdom: boolean; consolide: boolean },
 ): void {
   if (!present.consolide) {
     report.missingExpected.push({
@@ -37,7 +36,6 @@ export function emitMissing(
 interface AssemblyData {
   rdom: RdomTable | null;
   spTotal: SpTotalTable | null;
-  projets: ProjetsTable | null;
   consolide: ConsolideTable | null;
   cards: CardAssembly | null;
 }
@@ -55,9 +53,11 @@ export function emitAssembly(report: ImportReport, data: AssemblyData, config: B
     : `prête (${data.rdom.entries.length} noms, ${data.rdom.namesByDomain.size} domaines)`;
   report.assembly.push({ subject: "table RDOM", status: rdomStatus });
   if (data.consolide !== null) {
+    const sis = data.consolide.sisCounts;
     report.assembly.push({
       subject: "périmètre `consolidé`",
-      status: `${data.consolide.entries.length} retenu(s) · ${data.consolide.excludedCount} hors périmètre (isProjetSIS faux)`,
+      status: `${data.consolide.entries.length} carte(s) — le fichier fait foi` +
+        ` · isProjetSIS (informatif) : VRAI ${sis.yes} · FAUX ${sis.no} · vide ${sis.blank}`,
     });
   }
   if (data.cards !== null) emitDeck(report, data.cards, config, data.spTotal !== null);
@@ -89,8 +89,7 @@ function emitDeck(report: ImportReport, deck: CardAssembly, config: BoardConfig,
   report.assembly.push(
     {
       subject: "domaine",
-      status: `${s.domainFromConsolide + s.domainFromRdom}/${s.total}` +
-        ` (consolidé ${s.domainFromConsolide} · RDOM ${s.domainFromRdom}) · manquant : ${s.domainMissing}`,
+      status: `${s.withDomain}/${s.total} · manquant : ${s.total - s.withDomain}`,
     },
     { subject: "chef de projet", status: `${s.withOwner}/${s.total}` },
   );
@@ -112,12 +111,6 @@ function emitWaiting(report: ImportReport, data: AssemblyData): void {
     );
   } else {
     report.assembly.push({ subject: "cartes", status: "en attente du `consolidé` (source unique des cartes)" });
-  }
-  if (data.projets !== null) {
-    report.assembly.push({
-      subject: "enrichissement `Projets`",
-      status: `chargé (${data.projets.entries.length} lignes) — en attente du \`consolidé\``,
-    });
   }
 }
 

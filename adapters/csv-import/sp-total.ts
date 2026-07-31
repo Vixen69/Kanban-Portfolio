@@ -1,8 +1,6 @@
-// Reader for SP_total (docs/IMPORT-MAPPING.md, Q2/Q15): « Jalon RDR
-// validé » dated and past -> last column; else « Jalon RDLI validé » dated
-// and past -> activation column; else entry column (Q1 open). Future,
-// "oui"/"x", serial-read or incoherent milestones are signaled. Cell-level
-// signalements are aggregated (tallies.ts); the pris list stays per card.
+// Reader for SP_total (Q2/Q15): RDR validé passé -> last column; RDLI
+// validé passé -> activation; else entry column (Q1). Anomalies signaled,
+// aggregated (tallies.ts); pris per card unless quiet (consolidé rules).
 
 import type { BoardConfig } from "../../core/types.ts";
 import { resolveFlowAnchors } from "../../core/flow.ts";
@@ -52,6 +50,8 @@ interface SpContext {
   match: HeaderMatch;
   report: ImportReport;
   fileName: string;
+  /** True when the consolidated file rules: no per-card pris lines. */
+  quiet: boolean;
   typeLookup: (cell: string) => TolerantHit | null;
   entryId: string;
   activationId: string;
@@ -68,20 +68,18 @@ interface SpContext {
 
 /**
  * Parses SP_total data rows (header excluded) into subject drafts.
- * Inputs: the data rows, the header match, the board config (types and
- * column anchors), the report, the file name, and `now` (injected — a
- * milestone dated after the LOCAL calendar day of `now` does not count as
- * passed, Q15 rule).
- * Outputs: the SpTotalTable; side effects: pris (one per card), écarté
- * (empty/total rows), douteux (duplicate names, shared codes, unknown
- * types) and aggregated signalements.
+ * Inputs: rows, header match, board config, report, file name, `now`
+ * (its LOCAL calendar day bounds the Q15 future rule) and quiet (no
+ * per-card pris lines when the consolidated file rules). Outputs: the
+ * SpTotalTable; side effects: report entries (écarté, douteux, tallies).
  * Failure modes: none — every anomaly is reported, nothing throws.
  */
 export function parseSpTotal(
   rows: CsvRow[], match: HeaderMatch, config: BoardConfig,
-  report: ImportReport, fileName: string, now: Date,
+  report: ImportReport, fileName: string, now: Date, quiet = false,
 ): SpTotalTable {
   const ctx = createContext(match, config, report, fileName, now);
+  ctx.quiet = quiet;
   for (const row of rows) readSpRow(ctx, row);
   finalize(ctx);
   return {
@@ -112,7 +110,7 @@ function createContext(
   );
   const pad = (n: number): string => String(n).padStart(2, "0");
   return {
-    match, report, fileName, typeLookup,
+    match, report, fileName, quiet: false, typeLookup,
     entryId, activationId: anchors?.activation?.id ?? entryId,
     exploitationId: last?.id ?? entryId,
     columnNames: new Map(config.columns.map((c) => [c.id, c.name])),
@@ -174,8 +172,10 @@ function registerDraft(
       ctx.byCode.set(draft.codename, draft);
     }
   }
-  const columnName = ctx.columnNames.get(draft.columnId) ?? draft.columnId;
-  take(ctx.report, ref, nom, `carte → colonne « ${columnName} »`, draft.codename ?? undefined);
+  if (!ctx.quiet) {
+    const columnName = ctx.columnNames.get(draft.columnId) ?? draft.columnId;
+    take(ctx.report, ref, nom, `carte → colonne « ${columnName} »`, draft.codename ?? undefined);
+  }
 }
 
 // Type, dates, milestones -> position, and the four budgets.

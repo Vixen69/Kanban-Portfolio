@@ -66,19 +66,20 @@ test("SP_total alone: preamble skipped, cards waiting for the perimeter", () => 
   assert.equal(profile?.status, "code PE : 1/2 · type : 1/2 · budget : 1/2 · date de début : 1/2");
 });
 
-test("the four fixture files assemble a full deck", () => {
+test("the three fixture files assemble a full deck, SP_total as gap-filler", () => {
   const { report, cards, consolide } = audit([
-    fixture("RDOM.csv"), fixture("SP_total.csv"), fixture("Consolide.csv"), fixture("Projets.csv"),
+    fixture("RDOM.csv"), fixture("SP_total.csv"), fixture("Consolide.csv"),
   ]);
-  assert.equal(consolide?.entries.length, 5);
-  assert.equal(consolide?.excludedCount, 1);
-  assert.equal(cards?.cards.length, 5);
+  assert.equal(consolide?.entries.length, 6);
+  assert.deepEqual(consolide?.sisCounts, { yes: 1, no: 5, blank: 0 });
+  assert.equal(cards?.cards.length, 6);
   const byLabel = new Map(report.assembly.map((a) => [a.subject, a.status]));
-  assert.equal(byLabel.get("périmètre `consolidé`"), "5 retenu(s) · 1 hors périmètre (isProjetSIS faux)");
-  assert.equal(byLabel.get("cartes"), "5 — répartition : Demandes 2 · Actifs 1 · Exploitation 2");
-  assert.equal(byLabel.get("position par jalons"), "5/5 via SP_total (nom 1 · code 4 · titre 0) · défaut : 0");
-  assert.equal(byLabel.get("domaine"), "5/5 (consolidé 5 · RDOM 0) · manquant : 0");
-  assert.equal(byLabel.get("chef de projet"), "5/5");
+  assert.equal(byLabel.get("périmètre `consolidé`"),
+    "6 carte(s) — le fichier fait foi · isProjetSIS (informatif) : VRAI 1 · FAUX 5 · vide 0");
+  assert.equal(byLabel.get("cartes"), "6 — répartition : Demandes 3 · Actifs 1 · Exploitation 2");
+  assert.equal(byLabel.get("position par jalons"), "5/6 via SP_total (nom 1 · code 4 · titre 0) · défaut : 1");
+  assert.equal(byLabel.get("domaine"), "6/6 · manquant : 0");
+  assert.equal(byLabel.get("chef de projet"), "6/6");
   assert.equal(byLabel.get("hors périmètre"), "3 sujet(s) SP_total non retenus par le consolidé");
   const first = cards?.cards[0];
   assert.equal(first?.title, "Modernisation atelier");
@@ -86,18 +87,20 @@ test("the four fixture files assemble a full deck", () => {
   assert.equal(first?.domainId, "infra");
   assert.equal(first?.owner, "Alice MERLE");
   assert.equal(first?.columnId, "exploitation");
-  assert.equal(first?.typeId, "achat");
   assert.equal(first?.budgetRdli, 150);
-  assert.ok(report.discarded.some((d) => /hors périmètre \(isProjetSIS faux\)/.test(d.reason)));
+  // SP_total is quiet: the pris lines are the 12 RDOM names + the 6 cards.
+  assert.equal(report.taken.length, 18);
+  assert.equal(report.discarded.filter((d) => /hors périmètre/.test(d.reason)).length, 0);
 });
 
 test("consolidé alone (the 2026-07-31 shape): cards assemble without SP_total", () => {
   const { report, cards } = audit([fixture("RDOM.csv"), fixture("Consolide.csv")]);
-  assert.equal(cards?.cards.length, 5);
+  assert.equal(cards?.cards.length, 6);
   const byLabel = new Map(report.assembly.map((a) => [a.subject, a.status]));
-  assert.equal(byLabel.get("cartes"), "5 — répartition : Demandes 5");
+  assert.equal(byLabel.get("cartes"), "6 — répartition : Demandes 6");
   assert.match(byLabel.get("position") ?? "", /Demandes par défaut — règle « Jalon en cours » à dicter/);
-  assert.equal(byLabel.get("domaine"), "5/5 (consolidé 5 · RDOM 0) · manquant : 0");
+  assert.equal(byLabel.get("domaine"), "6/6 · manquant : 0");
+  assert.equal(byLabel.get("chef de projet"), "6/6");
   const first = cards?.cards[0];
   assert.equal(first?.budgetRdli, 150);
   assert.equal(first?.budgetEstimated, 120.5);
@@ -105,6 +108,9 @@ test("consolidé alone (the 2026-07-31 shape): cards assemble without SP_total",
   assert.equal(first?.effortConsumed, 70);
   assert.equal(first?.dateRdr, "2026-09-15");
   assert.equal(first?.columnId, "demandes");
+  assert.equal(first?.owner, "Alice MERLE");
+  const noDomain = cards?.cards[3];
+  assert.equal(noDomain?.domainId, "cyber");
   const jalons = report.warnings.find((w) => /« Jalon en cours » — valeurs vues/.test(w.message));
   assert.match(jalons?.message ?? "", /« RDR » \(2\) ; « RDLI » \(1\) ; « RDO » \(2\)/);
 });
@@ -174,7 +180,7 @@ test("no files at all: everything is expected, assembly says waiting", () => {
 
 test("the audit is deterministic for identical inputs", () => {
   const inputs = (): InputFile[] => [
-    fixture("RDOM.csv"), fixture("SP_total.csv"), fixture("Consolide.csv"), fixture("Projets.csv"),
+    fixture("RDOM.csv"), fixture("SP_total.csv"), fixture("Consolide.csv"),
   ];
   const first = runImportAudit(inputs(), CONFIG, NOW);
   const second = runImportAudit(inputs(), CONFIG, NOW);

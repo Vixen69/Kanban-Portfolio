@@ -5,9 +5,7 @@
 // (assembly.ts). Pure and filesystem-free; stateless by design.
 
 import type { BoardConfig } from "../../core/types.ts";
-import {
-  CONSOLIDE_CONTRACT, PROJETS_CONTRACT, RDOM_CONTRACT, SP_TOTAL_CONTRACT,
-} from "./contract.ts";
+import { CONSOLIDE_CONTRACT, RDOM_CONTRACT, SP_TOTAL_CONTRACT } from "./contract.ts";
 import type { HeaderMatch } from "./contract.ts";
 import type { CsvRow } from "./csv.ts";
 import { processFile } from "./identify.ts";
@@ -18,8 +16,6 @@ import { parseRdom } from "./rdom.ts";
 import type { RdomTable } from "./rdom.ts";
 import { parseSpTotal } from "./sp-total.ts";
 import type { SpTotalTable } from "./sp-total.ts";
-import { parseProjets } from "./projets.ts";
-import type { ProjetsTable } from "./projets.ts";
 import { parseConsolide } from "./consolide.ts";
 import type { ConsolideTable } from "./consolide.ts";
 import { assembleCards } from "./enrich.ts";
@@ -33,7 +29,6 @@ export interface AuditResult {
   report: ImportReport;
   rdom: RdomTable | null;
   spTotal: SpTotalTable | null;
-  projets: ProjetsTable | null;
   consolide: ConsolideTable | null;
   cards: CardAssembly | null;
 }
@@ -71,23 +66,17 @@ export function runImportAudit(files: InputFile[], config: BoardConfig, now: Dat
   const pick = (id: string): Candidate | null => elect(byContract.get(id) ?? [], report);
   const rdomBest = pick(RDOM_CONTRACT.id);
   const spBest = pick(SP_TOTAL_CONTRACT.id);
-  const projetsBest = pick(PROJETS_CONTRACT.id);
   const consolideBest = pick(CONSOLIDE_CONTRACT.id);
   const rdom = rdomBest === null ? null
     : parseRdom(rdomBest.dataRows, rdomBest.match, config.domains, report, rdomBest.file.name);
-  const spTotal = spBest === null ? null
-    : parseSpTotal(spBest.dataRows, spBest.match, config, report, spBest.file.name, now);
-  const projets = projetsBest === null ? null
-    : parseProjets(projetsBest.dataRows, projetsBest.match, rdom, report, projetsBest.file.name);
   const consolide = consolideBest === null ? null
-    : parseConsolide(consolideBest.dataRows, consolideBest.match, config, report, consolideBest.file.name);
-  const cards = assembleCards(consolide, spTotal, projets, config, report);
-  emitMissing(report, {
-    rdom: rdom !== null, spTotal: spTotal !== null,
-    projets: projets !== null, consolide: consolide !== null,
-  });
-  emitAssembly(report, { rdom, spTotal, projets, consolide, cards }, config);
-  return { report, rdom, spTotal, projets, consolide, cards };
+    : parseConsolide(consolideBest.dataRows, consolideBest.match, config, rdom, report, consolideBest.file.name);
+  const spTotal = spBest === null ? null
+    : parseSpTotal(spBest.dataRows, spBest.match, config, report, spBest.file.name, now, consolide !== null);
+  const cards = assembleCards(consolide, spTotal, config, report);
+  emitMissing(report, { rdom: rdom !== null, consolide: consolide !== null });
+  emitAssembly(report, { rdom, spTotal, consolide, cards }, config);
+  return { report, rdom, spTotal, consolide, cards };
 }
 
 // Several files can carry a contract's required columns — a rich `projet`

@@ -652,6 +652,15 @@ de son ADR.
   seuls) : 5 cartes, budgets/charges/dates du consolidé, relevés Jalon en
   cours / Complexité / États émis ; l'appoint SP_total continue de
   positionner quand il est là.
+- **Correctif du même jour (premier passage réel)** : « isProjetSIS » ne
+  discrimine pas (SIS = SI du **Soutien**, hors DSI — l'inversion écartait
+  les ~159 vrais projets) → informatif seulement, **le périmètre = les
+  lignes du fichier** ; le consolidé apporte désormais aussi le **chef de
+  projet** (Responsables 1→3 moins RDOM, repli domaine par « Responsable
+  portefeuilles ») → Q20 fermée ; le contrat `projets` (brut) sort du
+  registre (il aurait volé la reconnaissance) ; le « Pris » du rapport =
+  les cartes, `SP_total` comble en silence. Modules : `cells.ts` (lecteurs
+  de cellules partagés), `projets.ts` retiré. 434 tests verts.
 
 ### 2026-07-30 — Import CSV, étape 3 : le consolidé assemble les cartes
 - **L'assemblage s'inverse (Q18)** : l'onglet « Projets » du classeur de

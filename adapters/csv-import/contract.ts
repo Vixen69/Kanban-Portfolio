@@ -60,6 +60,7 @@ export const CONSOLIDE_CONTRACT: FileContract = {
     "Coût final ME (Res.+Trans)", "Coût réel ME (Res.+Trans)",
     "Engagé 2026 (Trans)",
     "Charge finale ME (Res) (J)", "Charge réelle ME (Res) (J)",
+    "Responsable 1", "Responsable 2", "Responsable 3", "Responsable portefeuilles",
   ],
   ignored: [
     "Ss-Daine (Ptf)", "Domaine (Orga)", "Ss-Daine (Orga)", "Catégorie",
@@ -106,9 +107,12 @@ export const PROJETS_CONTRACT: FileContract = {
   ],
 };
 
-/** Every registered contract, in priority order for tie-breaking. */
+/** Every registered contract, in priority order for tie-breaking. The raw
+ * `projet` export left the circuit on 2026-07-31 (the consolidated sheet
+ * carries the responsables now); its contract stays defined but
+ * unregistered so it can never steal the consolidated file. */
 export const CONTRACTS: readonly FileContract[] =
-  [CONSOLIDE_CONTRACT, PROJETS_CONTRACT, RDOM_CONTRACT, SP_TOTAL_CONTRACT];
+  [CONSOLIDE_CONTRACT, RDOM_CONTRACT, SP_TOTAL_CONTRACT];
 
 /** A tolerated header anomaly (the file is still readable). */
 export interface HeaderDeviation {

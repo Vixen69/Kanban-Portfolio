@@ -189,6 +189,22 @@ function checkCoverage(domains: Domain[], entries: RdomEntry[], report: ImportRe
   }
 }
 
+/**
+ * The domains of every RDOM surname present in a cell, matched on whole
+ * words (never substrings — MARTIN must not fire inside MARTINEZ).
+ * Inputs: the RDOM table (null -> empty set) and the raw cell.
+ * Outputs: the distinct domain ids found. Failure modes: none.
+ */
+export function surnameDomains(rdom: RdomTable | null, cell: string): Set<string> {
+  const domains = new Set<string>();
+  if (rdom === null) return domains;
+  const words = new Set(normalizeLabel(cell).split(/[^a-z0-9']+/));
+  for (const entry of rdom.entries) {
+    if (words.has(entry.normalizedName)) domains.add(entry.domainId);
+  }
+  return domains;
+}
+
 function buildTable(entries: RdomEntry[]): RdomTable {
   const namesByDomain = new Map<string, string[]>();
   const domainsByName = new Map<string, string[]>();

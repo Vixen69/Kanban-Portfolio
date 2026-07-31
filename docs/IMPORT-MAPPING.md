@@ -66,12 +66,27 @@ l'auteur)** — mapping consolidé → carte décidé le même jour :
 « Engagé 2026 (Trans) » → `budgetEngaged` ;
 « Charge finale ME (Res) (J) » (repli « Charge JH ») → `effortEstimated` ;
 « Charge réelle ME (Res) (J) » → `effortConsumed` ;
-« isProjetSIS » → périmètre ; « Jalon en cours » → relevé des valeurs
+« Jalon en cours » → relevé des valeurs
 (**Q19** : règle de position à dicter — d'ici là, tout en Demandes) ;
-« Complexité du projet » → relevé (candidat canal). Pas de colonnes
-responsables : **chef de projet indisponible** dans cette source (0/N au
-rapport, source à définir plus tard). Familles PDSI/ME/2026 restantes :
-ignorées connues (matière étape 4).
+« Complexité du projet » → relevé (candidat canal). Familles PDSI/ME/2026
+restantes : ignorées connues (matière étape 4).
+
+**Corrections du 2026-07-31 (constatées sur le passage réel)** :
+- **« isProjetSIS » ne discrimine PAS** — SIS = Système d'Information du
+  **Soutien**, hors DSI ; le drapeau est purement **informatif** (compté
+  VRAI/FAUX au rapport). **Le périmètre = être une ligne du fichier
+  consolidé, point.** (L'inversion initiale écartait les ~159 vrais
+  projets.)
+- **Chef de projet : fourni par le consolidé** (colonnes Responsable 1/2/3
+  et Responsable portefeuilles ajoutées par l'auteur) — premier non-RDOM
+  des Responsables 1→3, exclusions comptées ; « Responsable
+  portefeuilles » sert de repli RDOM pour le domaine. **Q20 fermée.**
+- **Le contrat `projets` (export brut) sort du registre** — il aurait volé
+  la reconnaissance du consolidé (mêmes colonnes Responsables) ; le brut
+  ne circule plus.
+- **Le « Pris » du rapport = les cartes** (une ligne par carte assemblée) ;
+  `SP_total`, s'il est présent, comble les trous en silence (ses sujets ne
+  sont plus listés, les hors-périmètre restent comptés).
 
 **Modèle d'invocation : sans état caché.** À chaque exécution, le parseur
 lit le dossier d'entrée, prend les fichiers reconnus qui s'y trouvent,
