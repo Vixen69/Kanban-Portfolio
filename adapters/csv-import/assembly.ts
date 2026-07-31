@@ -8,6 +8,8 @@ import type { RdomTable } from "./rdom.ts";
 import type { SpTotalTable } from "./sp-total.ts";
 import type { CardAssembly } from "./enrich.ts";
 import { cardDistribution } from "./enrich.ts";
+import type { PdcTable } from "./pdc.ts";
+import type { ChargeStats } from "./charges.ts";
 import type { ImportReport } from "./report.ts";
 
 /**
@@ -17,7 +19,7 @@ import type { ImportReport } from "./report.ts";
  */
 export function emitMissing(
   report: ImportReport,
-  present: { rdom: boolean; consolide: boolean },
+  present: { rdom: boolean; consolide: boolean; pdc: boolean },
 ): void {
   if (!present.consolide) {
     report.missingExpected.push({
@@ -28,16 +30,20 @@ export function emitMissing(
   if (!present.rdom) {
     report.missingExpected.push({ name: "RDOM", note: "table domaine ↔ nom (fournie par l'auteur)" });
   }
-  report.missingExpected.push(
-    { name: "ressources_PDC", note: "plan de charge — contrat défini à l'étape 4" },
-  );
+  if (!present.pdc) {
+    report.missingExpected.push(
+      { name: "Ressources_PdC", note: "plan de charge 2026 par profil (+ consolidation nominative)" },
+    );
+  }
 }
 
 interface AssemblyData {
   rdom: RdomTable | null;
   spTotal: SpTotalTable | null;
   consolide: ConsolideTable | null;
+  pdc: PdcTable | null;
   cards: CardAssembly | null;
+  chargeStats: ChargeStats | null;
 }
 
 /**
@@ -62,7 +68,18 @@ export function emitAssembly(report: ImportReport, data: AssemblyData, config: B
   }
   if (data.cards !== null) emitDeck(report, data.cards, config, data.spTotal !== null);
   else emitWaiting(report, data);
-  report.assembly.push({ subject: "plan de charge", status: "en attente de `ressources_PDC` (étape 4)" });
+  report.assembly.push({ subject: "plan de charge", status: chargeStatus(data) });
+}
+
+function chargeStatus(data: AssemblyData): string {
+  if (data.pdc === null) return "en attente de `Ressources_PdC`";
+  if (data.chargeStats === null || data.cards === null) {
+    return `chargé (${data.pdc.projects.size} projets) — en attente du \`consolidé\``;
+  }
+  const s = data.chargeStats;
+  return `${s.covered}/${data.cards.cards.length} cartes couvertes · 2026 : ${s.totalJh} j.h prév.` +
+    ` · ${s.totalDone} réel · projets PdC hors périmètre : ${s.pdcOutside}` +
+    ` · cartes sans charge : ${s.uncovered}`;
 }
 
 // The assembled deck: distribution + join and coverage counters.

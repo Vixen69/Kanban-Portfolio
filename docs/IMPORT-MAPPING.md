@@ -169,6 +169,17 @@ lignes (plusieurs ressources).
 sommées — jamais supposées uniques. Les fusions (variantes de préfixe, etc.)
 sont tracées au rapport.
 
+**Implémenté (étape 4, 2026-07-31)** : contrat `ressources_pdc` (requis :
+Matricule, Ressource, Métier, Nom Projet, « 2026 ») ; la sous-ligne
+Prév./Réel est détectée et consommée (appariement par position signalé si
+absente) ; Métier → profil par liste blanche tolérante, préfixe pointé
+décollé (« Externe. », sociétés) et **relevé** (Q9 à confirmer) ; métier
+inconnu ou vide → seau « non attribué », questionné ; réel > prévisionnel
+**conservé et signalé** (Q12 appliquée) ; lignes de total exclues ;
+jointure sur les cartes nom > code (« Id Projet ») > titre ; consolidation
+nominative au rapport (top 15, j.h/200 → taux ETP) — les noms restent sur
+la machine d'exécution.
+
 ## Règles de dérivation
 
 - **Jointure inter-fichiers : le nom de projet fait foi** (tranché

@@ -12,6 +12,7 @@ import { tallyInto, tallyLabel } from "./tallies.ts";
 import type { Tally } from "./tallies.ts";
 import type { ConsolideEntry, ConsolideTable } from "./consolide.ts";
 import type { SpTotalTable, SubjectDraft } from "./sp-total.ts";
+import type { CardCharge } from "./charges.ts";
 import { doubt, take, warn } from "./report.ts";
 import type { ImportReport, RowRef } from "./report.ts";
 
@@ -32,6 +33,8 @@ export interface EnrichedCard {
   budgetEngaged: number | null;
   effortEstimated: number | null;
   effortConsumed: number | null;
+  /** 2026 charges by profile, attached by charges.ts (empty until then). */
+  charges: CardCharge[];
   /** True when SP_total milestones positioned the card. */
   positioned: boolean;
   ref: RowRef;
@@ -177,6 +180,7 @@ function buildCard(ctx: JoinContext, entry: ConsolideEntry): EnrichedCard {
     budgetEngaged: entry.budgetEngaged ?? sp?.budgetEngaged ?? null,
     effortEstimated: entry.effortEstimated,
     effortConsumed: entry.effortConsumed,
+    charges: [],
     positioned: sp !== null,
     ref: entry.ref,
   };

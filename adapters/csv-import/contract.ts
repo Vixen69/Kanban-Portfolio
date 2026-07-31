@@ -107,12 +107,27 @@ export const PROJETS_CONTRACT: FileContract = {
   ],
 };
 
+/** The plan de charge (Ressources_PdC): two-level headers — the year row
+ * carries « 2026 » over a Prév./Réel pair, reconstructed by the reader
+ * from the sub-header row (real labels, survey of 2026-07-31). */
+export const PDC_CONTRACT: FileContract = {
+  id: "ressources_pdc",
+  displayName: "Ressources_PdC",
+  columns: ["Matricule", "Ressource", "Métier", "Nom Projet", "2026"],
+  optional: ["Organisation", "Id Projet", "Total Prév.", "Total Réel"],
+  ignored: [
+    "Type projet", "Portefeuille", "2023", "2024", "2025", "2027", "2028",
+    "2029", "2030", "Etat du processus", "Date de publication",
+    "Projet.Actif", "Date export",
+  ],
+};
+
 /** Every registered contract, in priority order for tie-breaking. The raw
  * `projet` export left the circuit on 2026-07-31 (the consolidated sheet
  * carries the responsables now); its contract stays defined but
  * unregistered so it can never steal the consolidated file. */
 export const CONTRACTS: readonly FileContract[] =
-  [CONSOLIDE_CONTRACT, RDOM_CONTRACT, SP_TOTAL_CONTRACT];
+  [CONSOLIDE_CONTRACT, RDOM_CONTRACT, SP_TOTAL_CONTRACT, PDC_CONTRACT];
 
 /** A tolerated header anomaly (the file is still readable). */
 export interface HeaderDeviation {

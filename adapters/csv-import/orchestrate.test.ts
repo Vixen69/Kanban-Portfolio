@@ -51,7 +51,7 @@ test("a clean RDOM file covers the nine domains without any anomaly", () => {
   assert.deepEqual(report.warnings, []);
   assert.equal(rdom?.namesByDomain.size, 9);
   assert.equal(report.assembly[0]?.status, "prête (9 noms, 9 domaines)");
-  assert.deepEqual(report.missingExpected.map((m) => m.name), ["consolidé", "ressources_PDC"]);
+  assert.deepEqual(report.missingExpected.map((m) => m.name), ["consolidé", "Ressources_PdC"]);
 });
 
 test("SP_total alone: preamble skipped, cards waiting for the perimeter", () => {
@@ -122,6 +122,24 @@ test("consolidé alone (the 2026-07-31 shape): jalon en cours positions (Q19)", 
   assert.match(jalons?.message ?? "", /« RDR » \(2\) ; « RDLI » \(1\) ; « RDO » \(2\)/);
 });
 
+test("the full four-file set attaches the 2026 charges to the cards", () => {
+  const { report, cards, chargeStats } = audit([
+    fixture("RDOM.csv"), fixture("SP_total.csv"), fixture("Consolide.csv"), fixture("Ressources_PdC.csv"),
+  ]);
+  assert.deepEqual(chargeStats, {
+    covered: 3, uncovered: 3, pdcOutside: 1, totalJh: 170, totalDone: 78,
+  });
+  const byLabel = new Map(report.assembly.map((a) => [a.subject, a.status]));
+  assert.equal(byLabel.get("plan de charge"),
+    "3/6 cartes couvertes · 2026 : 170 j.h prév. · 78 réel · projets PdC hors périmètre : 1 · cartes sans charge : 3");
+  const first = cards?.cards[0];
+  assert.deepEqual(first?.charges.find((c) => c.profileId === "pmo"), { profileId: "pmo", jh: 40, done: 25 });
+  assert.deepEqual(first?.charges.find((c) => c.profileId === "concept_dev"),
+    { profileId: "concept_dev", jh: 60, done: 20 });
+  assert.ok(report.warnings.some((w) => /mobilisation 2026 : « Jean ROCA » 0,35 ETP \(70 j.h/.test(w.message)));
+  assert.ok(report.warnings.some((w) => /réel 2026 > prévisionnel 2026/.test(w.message)));
+});
+
 test("a rich export carrying Domaine+Nom does not steal the RDOM contract", () => {
   const decoy =
     "Domaine;Nom;Colonne A;Responsable 1;Budget\n" +
@@ -180,7 +198,7 @@ test("no files at all: everything is expected, assembly says waiting", () => {
   const { report, cards } = audit([]);
   assert.equal(cards, null);
   assert.deepEqual(report.missingExpected.map((m) => m.name),
-    ["consolidé", "RDOM", "ressources_PDC"]);
+    ["consolidé", "RDOM", "Ressources_PdC"]);
   assert.equal(report.assembly.length, 3);
   assert.match(report.assembly[1]?.status ?? "", /en attente du `consolidé` \(source unique des cartes\)/);
 });

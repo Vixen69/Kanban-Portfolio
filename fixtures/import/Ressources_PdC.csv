@@ -1,0 +1,7 @@
+Matricule;Ressource;Organisation;Métier;Id Projet;Nom Projet;Type projet;Portefeuille;2023;;2024;;2025;;2026;;2027;;2028;;2029;;2030;;Total Prév.;Total Réel;Etat du processus;Date de publication;Projet.Actif;Date export
+;;;;;;;;Prév.;Réel;Prév.;Réel;Prév.;Réel;Prév.;Réel;Prév.;Réel;Prév.;Réel;Prév.;Réel;Prév.;Réel;;;;;;
+M001;Jean ROCA;DSI;PMO;PE10001;Modernisation atelier;Achat;PTF A;;;;;10;8;40;25;;;;;;;;;50;33;En cours;01/07/2026;VRAI;30/07/2026
+M001;Jean ROCA;DSI;PMO;PE10002;Refonte portail interne;Evolution;PTF A;;;;;;;30;10;;;;;;;;;30;10;En cours;;VRAI;
+;Concepteur générique;DSI;Externe.Concept.Dév.;PE10001;Modernisation atelier;Achat;PTF A;;;;;;;60;20;;;;;;;;;60;20;;;VRAI;
+M002;Zoé LANE;DSI;Métier inconnu XYZ;PE10003;Montée de version calcul;Etude;PTF B;;;;;;;15;18;;;;;;;;;15;18;;;VRAI;
+M003;Luc BER;DSI;PMO;;Projet fantôme hors périmètre;Etude;PTF B;;;;;;;25;5;;;;;;;;;25;5;;;VRAI;

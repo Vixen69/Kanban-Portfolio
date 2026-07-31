@@ -9,3 +9,5 @@ export type { RdomTable } from "./rdom.ts";
 export type { SpTotalTable, SubjectDraft } from "./sp-total.ts";
 export type { ConsolideTable } from "./consolide.ts";
 export type { CardAssembly, EnrichedCard } from "./enrich.ts";
+export type { PdcTable } from "./pdc.ts";
+export type { CardCharge, ChargeStats } from "./charges.ts";

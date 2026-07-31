@@ -637,6 +637,23 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-07-31 — Import CSV, étape 4 : le plan de charge rejoint les cartes
+- **Contrat `ressources_pdc`** (libellés réels) : en-têtes à deux niveaux
+  reconstruits — « 2026 » au premier niveau, la sous-ligne Prév./Réel
+  détectée et consommée (repli positionnel signalé). Seul 2026 est lu
+  (fenêtre annuelle, 200 j.h = 1 ETP).
+- **Lecteur `pdc.ts`** : Métier → profil DSI (liste blanche tolérante,
+  préfixes pointés décollés et relevés — Q9), inconnu/vide → seau « non
+  attribué » questionné ; lignes sommées par projet × profil, jamais
+  supposées uniques ; réel > prévisionnel conservé + signalé (Q12) ;
+  `charges.ts` joint sur les cartes (nom > code > titre) et émet la
+  **consolidation nominative** (top 15, taux ETP) — les noms ne quittent
+  pas la machine. La ligne d'assemblage « plan de charge » chiffre la
+  couverture, les totaux 2026 et les orphelins des deux côtés.
+- 441 tests verts ; essai CLI 4 squelettes : 3/6 cartes couvertes,
+  170 j.h prév · 78 réel, 1 projet PdC hors périmètre, préfixe « Externe »
+  relevé, mobilisation nominative émise.
+
 ### 2026-07-31 — Le consolidé devient la source unique des cartes
 - **Simplification finale de l'auteur** : l'onglet consolidé (déposé en
   `Projets.csv`, 185 lignes, 53 colonnes dictées et verrouillées) porte
