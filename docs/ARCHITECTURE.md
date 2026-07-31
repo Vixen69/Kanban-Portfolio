@@ -637,6 +637,22 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-07-31 — Le consolidé devient la source unique des cartes
+- **Simplification finale de l'auteur** : l'onglet consolidé (déposé en
+  `Projets.csv`, 185 lignes, 53 colonnes dictées et verrouillées) porte
+  tout sauf le plan de charge — les exports bruts `SP_total` et `projet`
+  sortent des attendus (leurs contrats restent : s'ils sont présents, ils
+  comblent les trous). Mapping direct consolidé → carte (budgets RDLI/ME,
+  charges (J), Début/Fin, type, domaine « (Ptf) » au vocabulaire board).
+- **Position** : plus de jalons datés dans la source — « Jalon en cours »
+  est relevé (valeurs comptées au rapport) et la règle valeur → colonne
+  reste à dicter (**Q19**) ; d'ici là tout en Demandes (Q1). **Chef de
+  projet** : indisponible dans cette source (**Q20**).
+- Vérifié : 438 tests verts ; assemblage à 3 fichiers (RDOM + consolidé
+  seuls) : 5 cartes, budgets/charges/dates du consolidé, relevés Jalon en
+  cours / Complexité / États émis ; l'appoint SP_total continue de
+  positionner quand il est là.
+
 ### 2026-07-30 — Import CSV, étape 3 : le consolidé assemble les cartes
 - **L'assemblage s'inverse (Q18)** : l'onglet « Projets » du classeur de
   consolidation de l'auteur devient le **fichier maître du périmètre** —

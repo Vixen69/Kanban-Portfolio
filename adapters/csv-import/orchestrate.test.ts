@@ -51,8 +51,7 @@ test("a clean RDOM file covers the nine domains without any anomaly", () => {
   assert.deepEqual(report.warnings, []);
   assert.equal(rdom?.namesByDomain.size, 9);
   assert.equal(report.assembly[0]?.status, "prête (9 noms, 9 domaines)");
-  assert.deepEqual(report.missingExpected.map((m) => m.name),
-    ["consolidé", "SP_total", "Projets", "ressources_PDC"]);
+  assert.deepEqual(report.missingExpected.map((m) => m.name), ["consolidé", "ressources_PDC"]);
 });
 
 test("SP_total alone: preamble skipped, cards waiting for the perimeter", () => {
@@ -90,6 +89,24 @@ test("the four fixture files assemble a full deck", () => {
   assert.equal(first?.typeId, "achat");
   assert.equal(first?.budgetRdli, 150);
   assert.ok(report.discarded.some((d) => /hors périmètre \(isProjetSIS faux\)/.test(d.reason)));
+});
+
+test("consolidé alone (the 2026-07-31 shape): cards assemble without SP_total", () => {
+  const { report, cards } = audit([fixture("RDOM.csv"), fixture("Consolide.csv")]);
+  assert.equal(cards?.cards.length, 5);
+  const byLabel = new Map(report.assembly.map((a) => [a.subject, a.status]));
+  assert.equal(byLabel.get("cartes"), "5 — répartition : Demandes 5");
+  assert.match(byLabel.get("position") ?? "", /Demandes par défaut — règle « Jalon en cours » à dicter/);
+  assert.equal(byLabel.get("domaine"), "5/5 (consolidé 5 · RDOM 0) · manquant : 0");
+  const first = cards?.cards[0];
+  assert.equal(first?.budgetRdli, 150);
+  assert.equal(first?.budgetEstimated, 120.5);
+  assert.equal(first?.effortEstimated, 110);
+  assert.equal(first?.effortConsumed, 70);
+  assert.equal(first?.dateRdr, "2026-09-15");
+  assert.equal(first?.columnId, "demandes");
+  const jalons = report.warnings.find((w) => /« Jalon en cours » — valeurs vues/.test(w.message));
+  assert.match(jalons?.message ?? "", /« RDR » \(2\) ; « RDLI » \(1\) ; « RDO » \(2\)/);
 });
 
 test("a rich export carrying Domaine+Nom does not steal the RDOM contract", () => {
@@ -150,9 +167,9 @@ test("no files at all: everything is expected, assembly says waiting", () => {
   const { report, cards } = audit([]);
   assert.equal(cards, null);
   assert.deepEqual(report.missingExpected.map((m) => m.name),
-    ["consolidé", "RDOM", "SP_total", "Projets", "ressources_PDC"]);
+    ["consolidé", "RDOM", "ressources_PDC"]);
   assert.equal(report.assembly.length, 3);
-  assert.match(report.assembly[1]?.status ?? "", /en attente de `SP_total` et du `consolidé`/);
+  assert.match(report.assembly[1]?.status ?? "", /en attente du `consolidé` \(source unique des cartes\)/);
 });
 
 test("the audit is deterministic for identical inputs", () => {

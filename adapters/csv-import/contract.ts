@@ -45,25 +45,36 @@ export const SP_TOTAL_CONTRACT: FileContract = {
   ],
 };
 
-/** The consolidated « Projets » sheet — the perimeter master (Q18). Only
- * the photo-certain trio is required; every uncertain label sits in
- * optional/ignored so the report's verbatim extras lock the real ones. */
+/** The consolidated sheet (delivered as Projets.csv) — the SINGLE card
+ * source since 2026-07-31: everything but the plan de charge. The 53 real
+ * labels were dictated by the author (« Ss-Daine », double spaces and
+ * « (Res|Trans) » pipes are verbatim; normalization absorbs the spacing). */
 export const CONSOLIDE_CONTRACT: FileContract = {
   id: "consolide",
   displayName: "Consolidé",
   columns: ["Nom", "Domaine (Ptf)", "isProjetSIS"],
   optional: [
     "Id", "Type", "Complexité du projet", "État du processus", "Début", "Fin",
-    "Date T0", "Charge JH", "PDSI2026 O/N", "Catégorie", "Catégorisation",
-    "Type Gpe", "Priorité.", "Score total", "Jalon en cours",
-    "Référence active (Réf.)", "Date d'export", "Ss-Domaine (Ptf)",
+    "Jalon en cours", "Charge JH",
+    "Budget RDLI Total Coût (Res+Trans)",
+    "Coût final ME (Res.+Trans)", "Coût réel ME (Res.+Trans)",
+    "Engagé 2026 (Trans)",
+    "Charge finale ME (Res) (J)", "Charge réelle ME (Res) (J)",
   ],
   ignored: [
-    "Budget Validé PDSI", "Budget RDLI Charge", "Budget RDLI Total",
-    "Coût final ME (Res.+Trans)", "Coût réel ME (Res.+Trans)",
+    "Ss-Daine (Ptf)", "Domaine (Orga)", "Ss-Daine (Orga)", "Catégorie",
+    "Type Gpe", "Priorité.", "Score total", "Date T0",
+    "Budget Validé PDSI Charge (Res) (J)", "Budget Validé PDSI Coût (Res)",
+    "Budget Validé PDSI Coût (Trans)", "Budget Validé PDSI Total coût (Res+Trans)",
+    "Budget RDLI Charge (Res) (J)", "Budget RDLI Coût (Trans)",
     "Coût final ME (Trans)", "Coût réel ME (Trans)",
-    "Charge finale ME (Res) (J)", "Charge réelle ME (Res) (J)",
     "Coût réel ME (Res)", "Coût final ME (Res)",
+    "Référence active (Réf.)", "Catégorisation", "Date d'export",
+    "PDSI2026 O/N", "ME 2026 (Res|Trans)", "ME 2026 (Res)", "ME2026 (Trans)",
+    "ME2026 (Trans CAPEX)", "ME2026 (Trans OPEX)", "Réel 2026 (Res|Trans)",
+    "Réel 2026 (Trans)", "Réel 2026 (Res)(€)", "Réel 2026 (Res)(J)",
+    "RAF 2026 (Res|Trans)", "Budget validé PDSI2026", "Budg.2026 (Res)",
+    "Budg.2026 (Trans)", "Budg.2026 (Trans.CAPEX)", "Budg.2026 (Trans.OPEX)",
   ],
 };
 

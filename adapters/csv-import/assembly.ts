@@ -21,16 +21,13 @@ export function emitMissing(
   present: { rdom: boolean; spTotal: boolean; projets: boolean; consolide: boolean },
 ): void {
   if (!present.consolide) {
-    report.missingExpected.push({ name: "consolidé", note: "fichier maître du périmètre (Q18) — sans lui, pas d'assemblage de cartes" });
+    report.missingExpected.push({
+      name: "consolidé",
+      note: "source unique des cartes (révision 2026-07-31) — sans lui, pas d'assemblage",
+    });
   }
   if (!present.rdom) {
     report.missingExpected.push({ name: "RDOM", note: "table domaine ↔ nom (fournie par l'auteur)" });
-  }
-  if (!present.spTotal) {
-    report.missingExpected.push({ name: "SP_total", note: "sujets, jalons → position, budgets" });
-  }
-  if (!present.projets) {
-    report.missingExpected.push({ name: "Projets", note: "chef de projet + domaine de repli (RDOM)" });
   }
   report.missingExpected.push(
     { name: "ressources_PDC", note: "plan de charge — contrat défini à l'étape 4" },
@@ -63,39 +60,46 @@ export function emitAssembly(report: ImportReport, data: AssemblyData, config: B
       status: `${data.consolide.entries.length} retenu(s) · ${data.consolide.excludedCount} hors périmètre (isProjetSIS faux)`,
     });
   }
-  if (data.cards !== null) emitDeck(report, data.cards, config);
+  if (data.cards !== null) emitDeck(report, data.cards, config, data.spTotal !== null);
   else emitWaiting(report, data);
   report.assembly.push({ subject: "plan de charge", status: "en attente de `ressources_PDC` (étape 4)" });
 }
 
 // The assembled deck: distribution + join and coverage counters.
-function emitDeck(report: ImportReport, deck: CardAssembly, config: BoardConfig): void {
+function emitDeck(report: ImportReport, deck: CardAssembly, config: BoardConfig, hasSp: boolean): void {
   const distribution = cardDistribution(deck.cards);
   const parts = config.columns
     .filter((c) => (distribution.get(c.id) ?? 0) > 0)
     .map((c) => `${c.name} ${distribution.get(c.id)}`);
   const s = deck.stats;
-  report.assembly.push(
-    {
-      subject: "cartes",
-      status: `${s.total}${parts.length === 0 ? "" : ` — répartition : ${parts.join(" · ")}`}`,
-    },
-    {
+  report.assembly.push({
+    subject: "cartes",
+    status: `${s.total}${parts.length === 0 ? "" : ` — répartition : ${parts.join(" · ")}`}`,
+  });
+  report.assembly.push(hasSp
+    ? {
       subject: "position par jalons",
       status: `${s.positioned}/${s.total} via SP_total (nom ${s.joinByName} · code ${s.joinByCode}` +
         ` · titre ${s.joinByTitle}) · défaut : ${s.withoutSp}`,
-    },
+    }
+    : {
+      subject: "position",
+      status: "Demandes par défaut — règle « Jalon en cours » à dicter (valeurs relevées aux signalements)",
+    });
+  report.assembly.push(
     {
       subject: "domaine",
       status: `${s.domainFromConsolide + s.domainFromRdom}/${s.total}` +
         ` (consolidé ${s.domainFromConsolide} · RDOM ${s.domainFromRdom}) · manquant : ${s.domainMissing}`,
     },
     { subject: "chef de projet", status: `${s.withOwner}/${s.total}` },
-    {
+  );
+  if (hasSp) {
+    report.assembly.push({
       subject: "hors périmètre",
       status: `${s.spOutsidePerimeter} sujet(s) SP_total non retenus par le consolidé`,
-    },
-  );
+    });
+  }
 }
 
 // No deck yet: say what each present table waits for.
@@ -107,7 +111,7 @@ function emitWaiting(report: ImportReport, data: AssemblyData): void {
       { subject: "profil `SP_total`", status: profile },
     );
   } else {
-    report.assembly.push({ subject: "cartes", status: "en attente de `SP_total` et du `consolidé`" });
+    report.assembly.push({ subject: "cartes", status: "en attente du `consolidé` (source unique des cartes)" });
   }
   if (data.projets !== null) {
     report.assembly.push({

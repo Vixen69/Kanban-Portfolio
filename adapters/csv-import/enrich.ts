@@ -31,6 +31,8 @@ export interface EnrichedCard {
   budgetEstimated: number | null;
   budgetConsumed: number | null;
   budgetEngaged: number | null;
+  effortEstimated: number | null;
+  effortConsumed: number | null;
   /** True when SP_total milestones positioned the card. */
   positioned: boolean;
   ref: RowRef;
@@ -84,6 +86,7 @@ export function assembleCards(
 
 interface JoinContext {
   report: ImportReport;
+  hasSp: boolean;
   spByName: ReadonlyMap<string, SubjectDraft>;
   spByCode: Map<string, SubjectDraft>;
   spByTitle: Map<string, SubjectDraft | "ambiguous">;
@@ -111,6 +114,7 @@ function createJoin(
   }
   return {
     report,
+    hasSp: spTotal !== null,
     spByName: spTotal?.byName ?? new Map(),
     spByCode, spByTitle,
     pjByName: projets?.byName ?? new Map(),
@@ -126,13 +130,17 @@ function createJoin(
   };
 }
 
-// One consolidated row -> one card, enriched from both joins.
+// One consolidated row -> one card. The consolidated sheet is the primary
+// value source (2026-07-31); SP_total, when present, only fills the gaps
+// (position by dated milestones, missing budgets).
 function buildCard(ctx: JoinContext, entry: ConsolideEntry): EnrichedCard {
-  const sp = joinSp(ctx, entry);
+  const sp = ctx.hasSp ? joinSp(ctx, entry) : null;
   const pj = joinPj(ctx, entry);
   if (sp === null) {
     ctx.stats.withoutSp++;
-    tallyInto(ctx.tallies, "carte sans correspondance SP_total — position par défaut (Demandes)", entry.ref.line);
+    if (ctx.hasSp) {
+      tallyInto(ctx.tallies, "carte sans correspondance SP_total — position par défaut (Demandes)", entry.ref.line);
+    }
   } else {
     ctx.stats.positioned++;
     ctx.consumedSp.add(sp.normalizedName);
@@ -140,6 +148,13 @@ function buildCard(ctx: JoinContext, entry: ConsolideEntry): EnrichedCard {
       tallyInto(ctx.tallies, "code du consolidé ≠ code SP_total — drapeau", entry.ref.line);
     }
   }
+  return cardFrom(ctx, entry, sp, pj);
+}
+
+// Field precedence: the consolidated sheet first, SP_total fills the gaps.
+function cardFrom(
+  ctx: JoinContext, entry: ConsolideEntry, sp: SubjectDraft | null, pj: ProjetEntry | null,
+): EnrichedCard {
   const domainId = entry.domainId ?? pj?.domainId ?? null;
   if (entry.domainId !== null) ctx.stats.domainFromConsolide++;
   else if (pj?.domainId != null) ctx.stats.domainFromRdom++;
@@ -156,11 +171,13 @@ function buildCard(ctx: JoinContext, entry: ConsolideEntry): EnrichedCard {
     typeId: entry.typeId ?? sp?.typeId ?? null,
     columnId: sp?.columnId ?? ctx.entryColumnId,
     createdAt: entry.createdAt ?? sp?.createdAt ?? null,
-    dateRdr: sp?.dateRdr ?? null,
-    budgetRdli: sp?.budgetRdli ?? null,
-    budgetEstimated: sp?.budgetEstimated ?? null,
-    budgetConsumed: sp?.budgetConsumed ?? null,
-    budgetEngaged: sp?.budgetEngaged ?? null,
+    dateRdr: entry.dateRdr ?? sp?.dateRdr ?? null,
+    budgetRdli: entry.budgetRdli ?? sp?.budgetRdli ?? null,
+    budgetEstimated: entry.budgetEstimated ?? sp?.budgetEstimated ?? null,
+    budgetConsumed: entry.budgetConsumed ?? sp?.budgetConsumed ?? null,
+    budgetEngaged: entry.budgetEngaged ?? sp?.budgetEngaged ?? null,
+    effortEstimated: entry.effortEstimated,
+    effortConsumed: entry.effortConsumed,
     positioned: sp !== null,
     ref: entry.ref,
   };

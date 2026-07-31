@@ -55,6 +55,24 @@ qu'il peut du consolidé, puis utilise `RDOM` (domaine de repli, exclusion
 du chef) et `ressources_PDC` (étape 4) au besoin. En-têtes réels du
 consolidé à verrouiller (recopie de la ligne 1 attendue).
 
+**En-têtes réels verrouillés (2026-07-31, 53 colonnes dictées par
+l'auteur)** — mapping consolidé → carte décidé le même jour :
+« Nom » → titre + clé ; « Id » (PE) → `codename` ; « Domaine (Ptf) » →
+`domain` (vocabulaire board, tolérant, inconnus signalés) ; « Type » →
+`typeId` ; « Début » → `createdAt` ; « Fin » → `dateRdr` ;
+« Budget RDLI Total Coût (Res+Trans) » → `budgetRdli` ;
+« Coût final ME (Res.+Trans) » → `budgetEstimated` ;
+« Coût réel ME (Res.+Trans) » → `budgetConsumed` ;
+« Engagé 2026 (Trans) » → `budgetEngaged` ;
+« Charge finale ME (Res) (J) » (repli « Charge JH ») → `effortEstimated` ;
+« Charge réelle ME (Res) (J) » → `effortConsumed` ;
+« isProjetSIS » → périmètre ; « Jalon en cours » → relevé des valeurs
+(**Q19** : règle de position à dicter — d'ici là, tout en Demandes) ;
+« Complexité du projet » → relevé (candidat canal). Pas de colonnes
+responsables : **chef de projet indisponible** dans cette source (0/N au
+rapport, source à définir plus tard). Familles PDSI/ME/2026 restantes :
+ignorées connues (matière étape 4).
+
 **Modèle d'invocation : sans état caché.** À chaque exécution, le parseur
 lit le dossier d'entrée, prend les fichiers reconnus qui s'y trouvent,
 refait l'assemblage complet et produit le rapport. On ajoute les fichiers
@@ -450,5 +468,7 @@ office de vérification sur site.
 | Q10 | Jalon RVSR : ignoré définitivement ou conservé quelque part ? | Auteur |
 | Q11 | Date du jalon RDLI comme date d'entrée en Actifs dans le journal (âge vrai des cartes importées) ? | Auteur |
 | Q12 | Réel > prévisionnel : assouplir la contrainte `done ≤ jh` du modèle (`ChargeEntry`) avant l'import ? | Auteur |
-| Q14 | Projet de `SP_total` sans ligne dans `projet` (domaine/chef inconnus) : carte créée avec placeholders ou écartée ? | Auteur |
+| Q14 | Projet de `SP_total` sans ligne dans `projet` (domaine/chef inconnus) : carte créée avec placeholders ou écartée ? (portée réduite depuis que le consolidé est la source unique) | Auteur |
+| Q19 | Règle « **Jalon en cours** » → colonne du board : correspondance à dicter à partir des valeurs relevées au rapport (d'ici là : tout en Demandes) | Auteur |
+| Q20 | **Chef de projet** : absent du consolidé — source à définir (réintroduire l'export `projet`, ajouter une colonne au consolidé, ou saisie dans l'outil ?) | Auteur |
 | Q15 | Sémantique du jalon RDLI : la date peut-elle être future (prévue, pas passée) ? Règle : ≤ aujourd'hui pour valoir Actifs ? | PMO |
