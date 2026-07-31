@@ -77,7 +77,9 @@ test("the three fixture files assemble a full deck, SP_total as gap-filler", () 
   assert.equal(byLabel.get("périmètre `consolidé`"),
     "6 carte(s) — le fichier fait foi · isProjetSIS (informatif) : VRAI 1 · FAUX 5 · vide 0");
   assert.equal(byLabel.get("cartes"), "6 — répartition : Demandes 3 · Actifs 1 · Exploitation 2");
-  assert.equal(byLabel.get("position par jalons"), "5/6 via SP_total (nom 1 · code 4 · titre 0) · défaut : 1");
+  assert.equal(byLabel.get("position"),
+    "jalons datés SP_total 5 (nom 1 · code 4 · titre 0) · « Jalon en cours » 0 " +
+      "(RDO→Qualification, RDLI→Études, RDR→Actifs, RVSR→Exploitation — Q19) · défaut Demandes : 1");
   assert.equal(byLabel.get("domaine"), "6/6 · manquant : 0");
   assert.equal(byLabel.get("chef de projet"), "6/6");
   assert.equal(byLabel.get("hors périmètre"), "3 sujet(s) SP_total non retenus par le consolidé");
@@ -93,12 +95,15 @@ test("the three fixture files assemble a full deck, SP_total as gap-filler", () 
   assert.equal(report.discarded.filter((d) => /hors périmètre/.test(d.reason)).length, 0);
 });
 
-test("consolidé alone (the 2026-07-31 shape): cards assemble without SP_total", () => {
+test("consolidé alone (the 2026-07-31 shape): jalon en cours positions (Q19)", () => {
   const { report, cards } = audit([fixture("RDOM.csv"), fixture("Consolide.csv")]);
   assert.equal(cards?.cards.length, 6);
   const byLabel = new Map(report.assembly.map((a) => [a.subject, a.status]));
-  assert.equal(byLabel.get("cartes"), "6 — répartition : Demandes 6");
-  assert.match(byLabel.get("position") ?? "", /Demandes par défaut — règle « Jalon en cours » à dicter/);
+  assert.equal(byLabel.get("cartes"),
+    "6 — répartition : Demandes 1 · Qualification 2 · Études 1 · Actifs 2");
+  assert.equal(byLabel.get("position"),
+    "« Jalon en cours » 5 (RDO→Qualification, RDLI→Études, RDR→Actifs," +
+      " RVSR→Exploitation — Q19) · défaut Demandes : 1");
   assert.equal(byLabel.get("domaine"), "6/6 · manquant : 0");
   assert.equal(byLabel.get("chef de projet"), "6/6");
   const first = cards?.cards[0];
@@ -107,10 +112,12 @@ test("consolidé alone (the 2026-07-31 shape): cards assemble without SP_total",
   assert.equal(first?.effortEstimated, 110);
   assert.equal(first?.effortConsumed, 70);
   assert.equal(first?.dateRdr, "2026-09-15");
-  assert.equal(first?.columnId, "demandes");
+  assert.equal(first?.columnId, "actifs");
   assert.equal(first?.owner, "Alice MERLE");
-  const noDomain = cards?.cards[3];
-  assert.equal(noDomain?.domainId, "cyber");
+  assert.equal(cards?.cards[1]?.columnId, "etudes");
+  assert.equal(cards?.cards[2]?.columnId, "qualification");
+  assert.equal(cards?.cards[3]?.domainId, "cyber");
+  assert.equal(cards?.cards[5]?.columnId, "demandes");
   const jalons = report.warnings.find((w) => /« Jalon en cours » — valeurs vues/.test(w.message));
   assert.match(jalons?.message ?? "", /« RDR » \(2\) ; « RDLI » \(1\) ; « RDO » \(2\)/);
 });

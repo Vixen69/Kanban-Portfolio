@@ -76,16 +76,14 @@ function emitDeck(report: ImportReport, deck: CardAssembly, config: BoardConfig,
     subject: "cartes",
     status: `${s.total}${parts.length === 0 ? "" : ` — répartition : ${parts.join(" · ")}`}`,
   });
-  report.assembly.push(hasSp
-    ? {
-      subject: "position par jalons",
-      status: `${s.positioned}/${s.total} via SP_total (nom ${s.joinByName} · code ${s.joinByCode}` +
-        ` · titre ${s.joinByTitle}) · défaut : ${s.withoutSp}`,
-    }
-    : {
-      subject: "position",
-      status: "Demandes par défaut — règle « Jalon en cours » à dicter (valeurs relevées aux signalements)",
-    });
+  const defaults = s.total - s.positioned - s.byJalon;
+  report.assembly.push({
+    subject: "position",
+    status: (hasSp ? `jalons datés SP_total ${s.positioned} (nom ${s.joinByName} · code ${s.joinByCode}` +
+        ` · titre ${s.joinByTitle}) · ` : "") +
+      `« Jalon en cours » ${s.byJalon} (RDO→Qualification, RDLI→Études, RDR→Actifs,` +
+      ` RVSR→Exploitation — Q19) · défaut Demandes : ${defaults}`,
+  });
   report.assembly.push(
     {
       subject: "domaine",

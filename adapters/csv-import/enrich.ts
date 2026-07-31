@@ -7,6 +7,7 @@
 
 import type { BoardConfig } from "../../core/types.ts";
 import { resolveFlowAnchors } from "../../core/flow.ts";
+import { normalizeLabel } from "./normalize.ts";
 import { tallyInto, tallyLabel } from "./tallies.ts";
 import type { Tally } from "./tallies.ts";
 import type { ConsolideEntry, ConsolideTable } from "./consolide.ts";
@@ -40,6 +41,8 @@ export interface EnrichedCard {
 export interface CardStats {
   total: number;
   positioned: number;
+  /** Cards positioned by the « Jalon en cours » rule (Q19). */
+  byJalon: number;
   joinByName: number;
   joinByCode: number;
   joinByTitle: number;
@@ -88,10 +91,29 @@ interface JoinContext {
   spByCode: Map<string, SubjectDraft>;
   spByTitle: Map<string, SubjectDraft | "ambiguous">;
   entryColumnId: string;
+  /** « Jalon en cours » value (normalized) -> target column id (Q19). */
+  jalonColumns: Map<string, string>;
   columnNames: Map<string, string>;
   consumedSp: Set<string>;
   stats: CardStats;
   tallies: Map<string, Tally>;
+}
+
+// Q19 (author, 2026-07-31): « Jalon en cours » is the NEXT milestone, so
+// it tells where the project stands — RDO -> Qualification, RDLI ->
+// Études, RDR -> Actifs (RDLI passed), RVSR -> Exploitation. Column ids
+// come from the config anchors, never hardcoded blindly: missing targets
+// degrade to the entry column.
+function jalonColumnMap(config: BoardConfig, entryId: string): Map<string, string> {
+  const anchors = resolveFlowAnchors(config);
+  const byId = (id: string): string | undefined => config.columns.find((c) => c.id === id)?.id;
+  const qualification = anchors?.qualification?.id ?? entryId;
+  const etudes = byId("etudes") ?? qualification;
+  const actifs = anchors?.activation?.id ?? entryId;
+  const exploitation = config.columns[config.columns.length - 1]?.id ?? entryId;
+  return new Map([
+    ["rdo", qualification], ["rdli", etudes], ["rdr", actifs], ["rvsr", exploitation],
+  ]);
 }
 
 function createJoin(
@@ -103,16 +125,18 @@ function createJoin(
     if (draft.codename !== null && !spByCode.has(draft.codename)) spByCode.set(draft.codename, draft);
     spByTitle.set(draft.normalizedTitle, spByTitle.has(draft.normalizedTitle) ? "ambiguous" : draft);
   }
+  const entryColumnId = resolveFlowAnchors(config)?.entry.id ?? config.columns[0]?.id ?? "";
   return {
     report,
     hasSp: spTotal !== null,
     spByName: spTotal?.byName ?? new Map(),
     spByCode, spByTitle,
-    entryColumnId: resolveFlowAnchors(config)?.entry.id ?? config.columns[0]?.id ?? "",
+    entryColumnId,
+    jalonColumns: jalonColumnMap(config, entryColumnId),
     columnNames: new Map(config.columns.map((c) => [c.id, c.name])),
     consumedSp: new Set(),
     stats: {
-      total: 0, positioned: 0, joinByName: 0, joinByCode: 0, joinByTitle: 0,
+      total: 0, positioned: 0, byJalon: 0, joinByName: 0, joinByCode: 0, joinByTitle: 0,
       withoutSp: 0, withDomain: 0, withOwner: 0, spOutsidePerimeter: 0,
     },
     tallies: new Map(),
@@ -144,7 +168,7 @@ function buildCard(ctx: JoinContext, entry: ConsolideEntry): EnrichedCard {
     domainId: entry.domainId,
     owner: entry.owner,
     typeId: entry.typeId ?? sp?.typeId ?? null,
-    columnId: sp?.columnId ?? ctx.entryColumnId,
+    columnId: sp?.columnId ?? jalonColumn(ctx, entry),
     createdAt: entry.createdAt ?? sp?.createdAt ?? null,
     dateRdr: entry.dateRdr ?? sp?.dateRdr ?? null,
     budgetRdli: entry.budgetRdli ?? sp?.budgetRdli ?? null,
@@ -159,6 +183,19 @@ function buildCard(ctx: JoinContext, entry: ConsolideEntry): EnrichedCard {
   const columnName = ctx.columnNames.get(card.columnId) ?? card.columnId;
   take(ctx.report, card.ref, card.title, `carte → colonne « ${columnName} »`, card.codename ?? undefined);
   return card;
+}
+
+// The Q19 fallback: map « Jalon en cours » to its column; unknown labels
+// are tallied and land in the entry column.
+function jalonColumn(ctx: JoinContext, entry: ConsolideEntry): string {
+  if (entry.jalonEnCours === null) return ctx.entryColumnId;
+  const target = ctx.jalonColumns.get(normalizeLabel(entry.jalonEnCours));
+  if (target === undefined) {
+    tallyInto(ctx.tallies, `« Jalon en cours » non reconnu (« ${entry.jalonEnCours} ») — Demandes`, entry.ref.line);
+    return ctx.entryColumnId;
+  }
+  ctx.stats.byJalon++;
+  return target;
 }
 
 // Name first, then PE code, then title; a code/title disagreement is a

@@ -87,6 +87,14 @@ restantes : ignorées connues (matière étape 4).
 - **Le « Pris » du rapport = les cartes** (une ligne par carte assemblée) ;
   `SP_total`, s'il est présent, comble les trous en silence (ses sujets ne
   sont plus listés, les hors-périmètre restent comptés).
+- **Q19 tranchée (auteur, 2026-07-31)** — « Jalon en cours » = le
+  **prochain jalon attendu** : RDO → **Qualification** ; RDLI → **Études**
+  (RDO passée) ; RDR → **Actifs** (RDLI passée) ; RVSR → **Exploitation**
+  (RDR passée) ; vide ou inconnu → **Demandes** (inconnus signalés).
+  Priorité : jalons datés de `SP_total` s'il est présent > « Jalon en
+  cours » > Demandes. Cibles ancrées sur la config (qualification =
+  ancre, études par id avec repli, actifs = ancre d'activation,
+  exploitation = dernière colonne).
 
 **Modèle d'invocation : sans état caché.** À chaque exécution, le parseur
 lit le dossier d'entrée, prend les fichiers reconnus qui s'y trouvent,
@@ -484,6 +492,5 @@ office de vérification sur site.
 | Q11 | Date du jalon RDLI comme date d'entrée en Actifs dans le journal (âge vrai des cartes importées) ? | Auteur |
 | Q12 | Réel > prévisionnel : assouplir la contrainte `done ≤ jh` du modèle (`ChargeEntry`) avant l'import ? | Auteur |
 | Q14 | Projet de `SP_total` sans ligne dans `projet` (domaine/chef inconnus) : carte créée avec placeholders ou écartée ? (portée réduite depuis que le consolidé est la source unique) | Auteur |
-| Q19 | Règle « **Jalon en cours** » → colonne du board : correspondance à dicter à partir des valeurs relevées au rapport (d'ici là : tout en Demandes) | Auteur |
 | Q20 | **Chef de projet** : absent du consolidé — source à définir (réintroduire l'export `projet`, ajouter une colonne au consolidé, ou saisie dans l'outil ?) | Auteur |
 | Q15 | Sémantique du jalon RDLI : la date peut-elle être future (prévue, pas passée) ? Règle : ≤ aujourd'hui pour valoir Actifs ? | PMO |
