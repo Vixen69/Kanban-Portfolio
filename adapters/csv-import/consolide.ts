@@ -126,9 +126,7 @@ export function parseConsolide(
   };
 }
 
-/** « Domaine (Ptf) » labels excluded from the board (author, 2026-07-31):
- * TMA CORRECTIVES and IT4IT are out of scope, PROJETS VENDUS are not
- * arbitrable — none of them belongs on an arbitration board. */
+/** « Domaine (Ptf) » excluded from the board — not arbitrable (author). */
 const EXCLUDED_PTF = new Set(["tma correctives", "it4it", "projets vendus"]);
 
 // Structural gates, the perimeter flag, then the entry build.
