@@ -11,3 +11,5 @@ export type { ConsolideTable } from "./consolide.ts";
 export type { CardAssembly, EnrichedCard } from "./enrich.ts";
 export type { PdcTable } from "./pdc.ts";
 export type { CardCharge, ChargeStats } from "./charges.ts";
+export { IMPORT_ACTOR, planLoad } from "./to-cards.ts";
+export type { LoadPlan } from "./to-cards.ts";

@@ -637,6 +637,26 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-08-01 — Chargement réel : l'import écrit dans le board
+- **Le pipeline d'import est complet** : le mode audit reste le défaut, le
+  drapeau `--charger` écrit les cartes et leurs évènements via
+  `BoardStorage.importCards` (même chemin que le seed, driver au choix).
+  Nouveau module pur `adapters/csv-import/to-cards.ts` : il **planifie**
+  l'écriture (cartes + évènements) à partir du deck audité et de l'état
+  courant du board, sans jamais toucher au stockage — donc testable.
+- **Décisions auteur** : l'âge des cartes démarre à la **date de début du
+  projet** (l'évènement `imported` est daté ainsi) ; un ré-import **met à
+  jour l'existant et ajoute les nouvelles** (identité = code PE, sinon
+  `IMP-<nom>`). **Règle de conflit** : l'export gagne sur les faits
+  (budgets, charge, domaine, chef, dates, type), le tableau gagne sur la
+  **position** dès qu'un humain a déplacé la carte — la divergence est
+  signalée, jamais écrasée ; une carte jamais bougée suit l'export
+  (`moved` d'acteur `import-csv`).
+- Vérifié de bout en bout sur un magasin jetable : 6 cartes créées puis
+  ré-import **idempotent** (0 créée, 6 mises à jour, 0 évènement ajouté),
+  cartes complètes (domaine, chef, budgets, charge par profil), évènements
+  `imported` datés du début de projet. 455 tests verts.
+
 ### 2026-08-01 — Le chef de projet revient de l'export brut
 - **Constat sur les vrais fichiers** (premier assemblage complet : 148
   cartes, domaine 148/148, plan de charge 139/148) : **chef de projet

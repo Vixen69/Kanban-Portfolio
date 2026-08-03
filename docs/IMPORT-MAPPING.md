@@ -234,6 +234,30 @@ la machine d'exécution.
   contraintes, alertes, blocage, notes, tags) : vides à l'import, vécus
   dans l'outil.
 
+## Chargement réel (décisions auteur, 2026-08-01)
+
+Le mode audit reste le défaut ; l'écriture dans le board demande le
+drapeau explicite `--charger` (`node sync/import.ts <dossier> --charger`).
+
+- **Âge des cartes** : le compteur d'âge démarre à la **date de début du
+  projet** (« Début ») — l'évènement `imported` est daté ainsi ; à défaut,
+  l'instant de l'exécution.
+- **Ré-import** : **met à jour les cartes existantes, ajoute les
+  nouvelles**. Identité stable = le **code PE** quand il existe, sinon un
+  identifiant dérivé du nom normalisé (`IMP-…`) ; un renommage sans code
+  crée donc une nouvelle carte — le contrôle croisé des codes le signale
+  en amont.
+- **Règle de conflit** : l'**export gagne sur les faits** (budgets,
+  charge, domaine, chef de projet, dates, type — vérités Sciforma) ; le
+  **tableau gagne sur la position** dès qu'un humain a déplacé la carte à
+  la main (l'arbitrage est celui du PMO) — la divergence est alors
+  **signalée**, jamais écrasée. Une carte que personne n'a bougée suit
+  l'export (évènement `moved` d'acteur `import-csv`).
+- Les champs que les exports ne portent pas (tags, risques, contraintes,
+  blocage, notes, ressources) restent vides : ils se vivent dans l'outil.
+  Une édition faite dans l'outil (`edited`) prime sur le rafraîchissement
+  de la ligne d'import — c'est la logique du journal, assumée.
+
 ## Constantes de référence
 
 - **200 j.h/an = 1 ETP.** Base de la lecture « taux d'affectation » : une
