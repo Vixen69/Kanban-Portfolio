@@ -147,12 +147,16 @@ test("the full four-file set attaches the 2026 charges to the cards", () => {
   const { report, cards, chargeStats } = audit([
     fixture("RDOM.csv"), fixture("SP_total.csv"), fixture("Consolide.csv"), fixture("Ressources_PdC.csv"),
   ]);
+  // The file total covers the whole DSI; the cards' own load is a subset.
   assert.deepEqual(chargeStats, {
-    covered: 3, uncovered: 3, pdcOutside: 1, totalJh: 170, totalDone: 78,
+    covered: 3, uncovered: 3, pdcOutside: 1,
+    totalJh: 170, totalDone: 78, cardsJh: 145, cardsDone: 73,
   });
   const byLabel = new Map(report.assembly.map((a) => [a.subject, a.status]));
   assert.equal(byLabel.get("plan de charge"),
-    "3/6 cartes couvertes · 2026 : 170 j.h prév. · 78 réel · projets PdC hors périmètre : 1 · cartes sans charge : 3");
+    "3/6 cartes couvertes · charge 2026 des cartes : 145 j.h prév. · 73 réel" +
+      " · total du fichier PdC (toute la DSI) : 170 / 78" +
+      " · projets PdC hors périmètre : 1 · cartes sans charge : 3");
   const first = cards?.cards[0];
   assert.deepEqual(first?.charges.find((c) => c.profileId === "pmo"), { profileId: "pmo", jh: 40, done: 25 });
   assert.deepEqual(first?.charges.find((c) => c.profileId === "concept_dev"),

@@ -97,9 +97,10 @@ function chargeStatus(data: AssemblyData): string {
     return `chargé (${data.pdc.projects.size} projets) — en attente du \`consolidé\``;
   }
   const s = data.chargeStats;
-  return `${s.covered}/${data.cards.cards.length} cartes couvertes · 2026 : ${formatJh(s.totalJh)} j.h prév.` +
-    ` · ${formatJh(s.totalDone)} réel · projets PdC hors périmètre : ${s.pdcOutside}` +
-    ` · cartes sans charge : ${s.uncovered}`;
+  return `${s.covered}/${data.cards.cards.length} cartes couvertes · charge 2026 des cartes : ` +
+    `${formatJh(s.cardsJh)} j.h prév. · ${formatJh(s.cardsDone)} réel` +
+    ` · total du fichier PdC (toute la DSI) : ${formatJh(s.totalJh)} / ${formatJh(s.totalDone)}` +
+    ` · projets PdC hors périmètre : ${s.pdcOutside} · cartes sans charge : ${s.uncovered}`;
 }
 
 // The assembled deck: distribution + join and coverage counters.
