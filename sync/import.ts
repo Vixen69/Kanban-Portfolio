@@ -79,6 +79,9 @@ function readInputFiles(folder: string): InputFile[] {
 async function load(deck: EnrichedCard[], config: BoardConfig): Promise<LoadPlan> {
   const cfg = loadServerConfig(process.env);
   mkdirSync(dirname(cfg.dataPath), { recursive: true });
+  // Say the destination BEFORE writing: the driver defaults to jsonl, so a
+  // forgotten KANBAN_STORAGE_DRIVER=postgres must never pass unnoticed.
+  console.log(`destination : ${storageLabel(cfg.storageDriver, cfg.dataPath)}`);
   const { createStorage } = await import("../middle/storage/select.ts");
   const storage = await createStorage(cfg.storageDriver, cfg.dataPath);
   try {
@@ -89,6 +92,20 @@ async function load(deck: EnrichedCard[], config: BoardConfig): Promise<LoadPlan
   } finally {
     await storage.close();
   }
+}
+
+// Where the cards are about to land, in plain French.
+function storageLabel(driver: string, dataPath: string): string {
+  if (driver === "postgres") {
+    const url = process.env["DATABASE_URL"];
+    const target = url === undefined ? "variables PG*" : url.replace(/\/\/[^@]*@/, "//…@");
+    return `PostgreSQL (${target})`;
+  }
+  if (driver === "jsonl") {
+    return `fichier JSONL ${resolve(dataPath)}` +
+      " — poser KANBAN_STORAGE_DRIVER=postgres pour écrire dans la base du tableau";
+  }
+  return driver;
 }
 
 function loadSummary(plan: LoadPlan): string {
