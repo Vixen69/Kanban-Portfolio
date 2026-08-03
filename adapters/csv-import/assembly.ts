@@ -9,6 +9,7 @@ import type { SpTotalTable } from "./sp-total.ts";
 import type { CardAssembly } from "./enrich.ts";
 import { cardDistribution } from "./enrich.ts";
 import type { PdcTable } from "./pdc.ts";
+import { formatJh } from "./charges.ts";
 import type { ChargeStats } from "./charges.ts";
 import type { ImportReport } from "./report.ts";
 
@@ -79,8 +80,8 @@ function chargeStatus(data: AssemblyData): string {
     return `chargé (${data.pdc.projects.size} projets) — en attente du \`consolidé\``;
   }
   const s = data.chargeStats;
-  return `${s.covered}/${data.cards.cards.length} cartes couvertes · 2026 : ${s.totalJh} j.h prév.` +
-    ` · ${s.totalDone} réel · projets PdC hors périmètre : ${s.pdcOutside}` +
+  return `${s.covered}/${data.cards.cards.length} cartes couvertes · 2026 : ${formatJh(s.totalJh)} j.h prév.` +
+    ` · ${formatJh(s.totalDone)} réel · projets PdC hors périmètre : ${s.pdcOutside}` +
     ` · cartes sans charge : ${s.uncovered}`;
 }
 

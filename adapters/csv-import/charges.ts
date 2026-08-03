@@ -31,6 +31,15 @@ const ETP_BASE = 200;
 const TOP_PERSONS = 15;
 
 /**
+ * Formats a j.h total for the report: one decimal at most, French comma.
+ * Inputs: the raw sum (floating-point noise expected from the additions).
+ * Outputs: the display string. Failure modes: none.
+ */
+export function formatJh(value: number): string {
+  return (Math.round(value * 10) / 10).toString().replace(".", ",");
+}
+
+/**
  * Joins the plan de charge onto the cards and emits the nominative
  * consolidation.
  * Inputs: the cards (mutated: `charges` attached), the PdcTable (null ->
@@ -98,7 +107,8 @@ function emitPersons(report: ImportReport, pdc: PdcTable): void {
   for (const person of top) {
     const etp = (person.jh / ETP_BASE).toFixed(2).replace(".", ",");
     warn(report,
-      `mobilisation 2026 : « ${person.name} » ${etp} ETP (${person.jh} j.h prévisionnel · ${person.done} réel)`,
+      `mobilisation 2026 : « ${person.name} » ${etp} ETP (${formatJh(person.jh)} j.h prévisionnel` +
+        ` · ${formatJh(person.done)} réel)`,
       "consolidation nominative");
   }
   if (pdc.persons.length > TOP_PERSONS) {
