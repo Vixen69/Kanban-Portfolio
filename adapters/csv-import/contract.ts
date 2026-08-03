@@ -122,12 +122,15 @@ export const PDC_CONTRACT: FileContract = {
   ],
 };
 
-/** Every registered contract, in priority order for tie-breaking. The raw
- * `projet` export left the circuit on 2026-07-31 (the consolidated sheet
- * carries the responsables now); its contract stays defined but
- * unregistered so it can never steal the consolidated file. */
+/** Every registered contract, **from the most specific to the most
+ * generic**: when a file fully matches several contracts, the first one
+ * here wins (registry order IS the priority). The consolidated sheet must
+ * outrank the raw `projet` export even if it ever gains Responsable
+ * columns; RDOM comes last — its two generic columns (Domaine, Nom) exist
+ * in almost every rich export. The raw `projet` export is back in
+ * (2026-08-01): it is the ONLY source of the chef de projet. */
 export const CONTRACTS: readonly FileContract[] =
-  [CONSOLIDE_CONTRACT, RDOM_CONTRACT, SP_TOTAL_CONTRACT, PDC_CONTRACT];
+  [CONSOLIDE_CONTRACT, PROJETS_CONTRACT, SP_TOTAL_CONTRACT, PDC_CONTRACT, RDOM_CONTRACT];
 
 /** A tolerated header anomaly (the file is still readable). */
 export interface HeaderDeviation {
@@ -180,8 +183,10 @@ interface Evaluation {
  * with at least one column found (with the precise missing list);
  * "unknown" otherwise. A FULL match always dominates any near-miss (a rich
  * export carrying a small contract's two columns plus fragments of a
- * larger one must resolve to the full match, seen on the real Projets.csv);
- * within a status, more required columns found wins, then registry order.
+ * larger one must resolve to the full match, seen on the real Projets.csv).
+ * Among full matches, **registry order decides** (CONTRACTS is ordered
+ * most-specific first); among near-misses, more required columns found
+ * wins, then registry order.
  * Failure modes: none — an empty header yields "unknown".
  */
 export function identifyHeader(
@@ -190,7 +195,6 @@ export function identifyHeader(
 ): HeaderIdentification {
   const normalized = headerCells.map(normalizeLabel);
   let bestFull: Evaluation | null = null;
-  let bestFullFound = -1;
   let bestPartial: Evaluation | null = null;
   let bestPartialFound = -1;
   for (const contract of contracts) {
@@ -198,10 +202,7 @@ export function identifyHeader(
     const found = contract.columns.length - evaluation.missing.length;
     if (found === 0) continue;
     if (evaluation.missing.length === 0) {
-      if (found > bestFullFound) {
-        bestFull = evaluation;
-        bestFullFound = found;
-      }
+      bestFull ??= evaluation;
     } else if (found > bestPartialFound) {
       bestPartial = evaluation;
       bestPartialFound = found;

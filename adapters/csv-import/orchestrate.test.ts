@@ -51,7 +51,8 @@ test("a clean RDOM file covers the nine domains without any anomaly", () => {
   assert.deepEqual(report.warnings, []);
   assert.equal(rdom?.namesByDomain.size, 9);
   assert.equal(report.assembly[0]?.status, "prête (9 noms, 9 domaines)");
-  assert.deepEqual(report.missingExpected.map((m) => m.name), ["consolidé", "Ressources_PdC"]);
+  assert.deepEqual(report.missingExpected.map((m) => m.name),
+    ["consolidé", "Projets (export brut)", "Ressources_PdC"]);
 });
 
 test("SP_total alone: preamble skipped, cards waiting for the perimeter", () => {
@@ -82,14 +83,14 @@ test("the three fixture files assemble a full deck, SP_total as gap-filler", () 
   assert.equal(byLabel.get("position"),
     "jalons datés SP_total 5 (nom 1 · code 4 · titre 0) · « Jalon en cours » 0 " +
       "(RDO→Qualification, RDLI→Études, RDR→Actifs, RVSR→Exploitation — Q19) · défaut Demandes : 1");
-  assert.equal(byLabel.get("domaine"), "6/6 · manquant : 0");
-  assert.equal(byLabel.get("chef de projet"), "6/6");
+  assert.equal(byLabel.get("domaine"), "5/6 · manquant : 1");
+  assert.equal(byLabel.get("chef de projet"), "0/6");
   assert.equal(byLabel.get("hors périmètre"), "3 sujet(s) SP_total non retenus par le consolidé");
   const first = cards?.cards[0];
   assert.equal(first?.title, "Modernisation atelier");
   assert.equal(first?.codename, "PE10001");
   assert.equal(first?.domainId, "infra");
-  assert.equal(first?.owner, "Alice MERLE");
+  assert.equal(first?.owner, null);
   assert.equal(first?.columnId, "exploitation");
   assert.equal(first?.budgetRdli, 150);
   // SP_total is quiet: the pris lines are the 12 RDOM names + the 6 cards.
@@ -106,8 +107,8 @@ test("consolidé alone (the 2026-07-31 shape): jalon en cours positions (Q19)", 
   assert.equal(byLabel.get("position"),
     "« Jalon en cours » 5 (RDO→Qualification, RDLI→Études, RDR→Actifs," +
       " RVSR→Exploitation — Q19) · défaut Demandes : 1");
-  assert.equal(byLabel.get("domaine"), "6/6 · manquant : 0");
-  assert.equal(byLabel.get("chef de projet"), "6/6");
+  assert.equal(byLabel.get("domaine"), "5/6 · manquant : 1");
+  assert.equal(byLabel.get("chef de projet"), "0/6");
   const first = cards?.cards[0];
   assert.equal(first?.budgetRdli, 150);
   assert.equal(first?.budgetEstimated, 120.5);
@@ -116,13 +117,30 @@ test("consolidé alone (the 2026-07-31 shape): jalon en cours positions (Q19)", 
   assert.equal(first?.dateRdr, "2026-09-15");
   assert.equal(first?.columnId, "actifs");
   assert.equal(first?.laneId, "projets");
-  assert.equal(first?.owner, "Alice MERLE");
+  assert.equal(first?.owner, null);
   assert.equal(cards?.cards[1]?.columnId, "etudes");
   assert.equal(cards?.cards[2]?.columnId, "qualification");
-  assert.equal(cards?.cards[3]?.domainId, "cyber");
+  assert.equal(cards?.cards[3]?.domainId, null);
   assert.equal(cards?.cards[5]?.columnId, "demandes");
   const jalons = report.warnings.find((w) => /« Jalon en cours » — valeurs vues/.test(w.message));
   assert.match(jalons?.message ?? "", /« RDR » \(2\) ; « RDLI » \(1\) ; « RDO » \(2\)/);
+});
+
+test("the raw `projet` export supplies the chefs de projet (2026-08-01)", () => {
+  const { report, cards } = audit([
+    fixture("RDOM.csv"), fixture("Consolide.csv"), fixture("Projets.csv"),
+  ]);
+  const byLabel = new Map(report.assembly.map((a) => [a.subject, a.status]));
+  // Owners: CARPENTIER/MASSON/DURAND/BLANCHARD are RDOM -> excluded.
+  assert.equal(byLabel.get("chef de projet"), "6/6 (dont 6 via l'export `projet`)");
+  assert.deepEqual(cards?.cards.map((c) => c.owner),
+    ["Alice MERLE", "Bob NOEL", "Chloé PETIT", "David GRAND", "Emma FAVRE", "Franck LEGRIS"]);
+  // « Sécurisation accès » joins « PE10007 Sécurisation accès » by title.
+  assert.equal(cards?.cards[4]?.owner, "Emma FAVRE");
+  // The empty « Domaine (Ptf) » falls back to the RDOM of BLANCHARD.
+  assert.equal(byLabel.get("domaine"), "6/6 · manquant : 0");
+  assert.equal(cards?.cards[3]?.domainId, "cyber");
+  assert.ok(report.warnings.some((w) => /« Responsable 1 » est un RDOM — exclu/.test(w.message)));
 });
 
 test("the full four-file set attaches the 2026 charges to the cards", () => {
@@ -201,7 +219,7 @@ test("no files at all: everything is expected, assembly says waiting", () => {
   const { report, cards } = audit([]);
   assert.equal(cards, null);
   assert.deepEqual(report.missingExpected.map((m) => m.name),
-    ["consolidé", "RDOM", "Ressources_PdC"]);
+    ["consolidé", "RDOM", "Projets (export brut)", "Ressources_PdC"]);
   assert.equal(report.assembly.length, 3);
   assert.match(report.assembly[1]?.status ?? "", /en attente du `consolidé` \(source unique des cartes\)/);
 });

@@ -5,7 +5,9 @@
 // (assembly.ts). Pure and filesystem-free; stateless by design.
 
 import type { BoardConfig } from "../../core/types.ts";
-import { CONSOLIDE_CONTRACT, PDC_CONTRACT, RDOM_CONTRACT, SP_TOTAL_CONTRACT } from "./contract.ts";
+import {
+  CONSOLIDE_CONTRACT, PDC_CONTRACT, PROJETS_CONTRACT, RDOM_CONTRACT, SP_TOTAL_CONTRACT,
+} from "./contract.ts";
 import type { HeaderMatch } from "./contract.ts";
 import type { CsvRow } from "./csv.ts";
 import { processFile } from "./identify.ts";
@@ -18,6 +20,8 @@ import { parseSpTotal } from "./sp-total.ts";
 import type { SpTotalTable } from "./sp-total.ts";
 import { parseConsolide } from "./consolide.ts";
 import type { ConsolideTable } from "./consolide.ts";
+import { parseProjets } from "./projets.ts";
+import type { ProjetsTable } from "./projets.ts";
 import { assembleCards } from "./enrich.ts";
 import type { CardAssembly } from "./enrich.ts";
 import { parsePdc } from "./pdc.ts";
@@ -34,6 +38,7 @@ export interface AuditResult {
   rdom: RdomTable | null;
   spTotal: SpTotalTable | null;
   consolide: ConsolideTable | null;
+  projets: ProjetsTable | null;
   pdc: PdcTable | null;
   cards: CardAssembly | null;
   chargeStats: ChargeStats | null;
@@ -79,14 +84,20 @@ export function runImportAudit(files: InputFile[], config: BoardConfig, now: Dat
     : parseConsolide(consolideBest.dataRows, consolideBest.match, config, rdom, report, consolideBest.file.name);
   const spTotal = spBest === null ? null
     : parseSpTotal(spBest.dataRows, spBest.match, config, report, spBest.file.name, now, consolide !== null);
+  const projetsBest = pick(PROJETS_CONTRACT.id);
+  const projets = projetsBest === null ? null
+    : parseProjets(projetsBest.dataRows, projetsBest.match, rdom, report, projetsBest.file.name);
   const pdcBest = pick(PDC_CONTRACT.id);
   const pdc = pdcBest === null ? null
     : parsePdc(pdcBest.dataRows, pdcBest.match, config, report, pdcBest.file.name);
-  const cards = assembleCards(consolide, spTotal, config, report);
+  const cards = assembleCards(consolide, spTotal, projets, config, report);
   const chargeStats = attachCharges(cards?.cards ?? [], pdc, report);
-  emitMissing(report, { rdom: rdom !== null, consolide: consolide !== null, pdc: pdc !== null });
-  emitAssembly(report, { rdom, spTotal, consolide, pdc, cards, chargeStats }, config);
-  return { report, rdom, spTotal, consolide, pdc, cards, chargeStats };
+  emitMissing(report, {
+    rdom: rdom !== null, consolide: consolide !== null,
+    projets: projets !== null, pdc: pdc !== null,
+  });
+  emitAssembly(report, { rdom, spTotal, consolide, projets, pdc, cards, chargeStats }, config);
+  return { report, rdom, spTotal, consolide, projets, pdc, cards, chargeStats };
 }
 
 // Several files can carry a contract's required columns — a rich `projet`

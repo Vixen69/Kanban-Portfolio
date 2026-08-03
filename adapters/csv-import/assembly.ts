@@ -4,6 +4,7 @@
 
 import type { BoardConfig } from "../../core/types.ts";
 import type { ConsolideTable } from "./consolide.ts";
+import type { ProjetsTable } from "./projets.ts";
 import type { RdomTable } from "./rdom.ts";
 import type { SpTotalTable } from "./sp-total.ts";
 import type { CardAssembly } from "./enrich.ts";
@@ -20,7 +21,7 @@ import type { ImportReport } from "./report.ts";
  */
 export function emitMissing(
   report: ImportReport,
-  present: { rdom: boolean; consolide: boolean; pdc: boolean },
+  present: { rdom: boolean; consolide: boolean; projets: boolean; pdc: boolean },
 ): void {
   if (!present.consolide) {
     report.missingExpected.push({
@@ -30,6 +31,11 @@ export function emitMissing(
   }
   if (!present.rdom) {
     report.missingExpected.push({ name: "RDOM", note: "table domaine ↔ nom (fournie par l'auteur)" });
+  }
+  if (!present.projets) {
+    report.missingExpected.push(
+      { name: "Projets (export brut)", note: "chef de projet — absent du consolidé" },
+    );
   }
   if (!present.pdc) {
     report.missingExpected.push(
@@ -42,6 +48,7 @@ interface AssemblyData {
   rdom: RdomTable | null;
   spTotal: SpTotalTable | null;
   consolide: ConsolideTable | null;
+  projets: ProjetsTable | null;
   pdc: PdcTable | null;
   cards: CardAssembly | null;
   chargeStats: ChargeStats | null;
@@ -72,6 +79,16 @@ export function emitAssembly(report: ImportReport, data: AssemblyData, config: B
   if (data.cards !== null) emitDeck(report, data.cards, config, data.spTotal !== null);
   else emitWaiting(report, data);
   report.assembly.push({ subject: "plan de charge", status: chargeStatus(data) });
+}
+
+// Where the chefs de projet came from: the raw `projet` export is their
+// only source (the consolidated sheet has no Responsable columns).
+function ownerStatus(s: CardAssembly["stats"]): string {
+  const source = s.ownerFromProjets === 0
+    ? "" : ` (dont ${s.ownerFromProjets} via l'export \`projet\`)`;
+  const missing = s.withoutProjets === 0
+    ? "" : ` · ${s.withoutProjets} carte(s) sans ligne dans l'export \`projet\``;
+  return `${s.withOwner}/${s.total}${source}${missing}`;
 }
 
 function chargeStatus(data: AssemblyData): string {
@@ -109,7 +126,7 @@ function emitDeck(report: ImportReport, deck: CardAssembly, config: BoardConfig,
       subject: "domaine",
       status: `${s.withDomain}/${s.total} · manquant : ${s.total - s.withDomain}`,
     },
-    { subject: "chef de projet", status: `${s.withOwner}/${s.total}` },
+    { subject: "chef de projet", status: ownerStatus(s) },
   );
   if (hasSp) {
     report.assembly.push({

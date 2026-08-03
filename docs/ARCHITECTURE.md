@@ -637,6 +637,25 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-08-01 — Le chef de projet revient de l'export brut
+- **Constat sur les vrais fichiers** (premier assemblage complet : 148
+  cartes, domaine 148/148, plan de charge 139/148) : **chef de projet
+  0/148** — le consolidé n'a pas de colonnes Responsable. Le contrat
+  `projets` (export brut) **revient au registre** comme unique source de
+  l'`owner` ; ses lignes ne deviennent jamais des cartes, elles enrichissent
+  le périmètre du consolidé par jointure nom puis titre. Q20 fermée.
+- **Priorité des contrats = ordre du registre** (consolidé, projets,
+  SP_total, PdC, RDOM — du plus spécifique au plus générique) : un fichier
+  correspondant pleinement à plusieurs contrats prend le premier. Règle
+  plus robuste que « le plus de colonnes trouvées » : le consolidé ne peut
+  plus être pris pour l'export brut s'il gagne des Responsable, et RDOM
+  (deux colonnes génériques) ne peut plus rafler un export riche.
+- Le rapport dit la provenance : « chef de projet : n/N (dont m via
+  l'export `projet`) · k carte(s) sans ligne dans l'export ».
+- Correctif d'affichage : totaux j.h arrondis au dixième (les données
+  réelles sortaient « 25011.0399999997 »).
+- 449 tests verts, conventions et typecheck verts.
+
 ### 2026-07-31 — Import CSV, étape 4 : le plan de charge rejoint les cartes
 - **Contrat `ressources_pdc`** (libellés réels) : en-têtes à deux niveaux
   reconstruits — « 2026 » au premier niveau, la sous-ligne Prév./Réel

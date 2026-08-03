@@ -77,13 +77,21 @@ restantes : ignorées connues (matière étape 4).
   VRAI/FAUX au rapport). **Le périmètre = être une ligne du fichier
   consolidé, point.** (L'inversion initiale écartait les ~159 vrais
   projets.)
-- **Chef de projet : fourni par le consolidé** (colonnes Responsable 1/2/3
-  et Responsable portefeuilles ajoutées par l'auteur) — premier non-RDOM
-  des Responsables 1→3, exclusions comptées ; « Responsable
-  portefeuilles » sert de repli RDOM pour le domaine. **Q20 fermée.**
-- **Le contrat `projets` (export brut) sort du registre** — il aurait volé
-  la reconnaissance du consolidé (mêmes colonnes Responsables) ; le brut
-  ne circule plus.
+- **Chef de projet : Q20 fermée le 2026-08-01** — vérification faite sur
+  les vrais fichiers, le consolidé **n'a pas** de colonnes Responsable
+  (chef de projet 0/148 au rapport). Le **contrat `projets` (export brut)
+  revient au registre** : il est la **seule source du chef de projet**.
+  Le consolidé reste le périmètre et la source des valeurs ; l'export brut
+  n'apporte que l'`owner` (premier des Responsables 1→3 qui n'est **pas**
+  un RDOM, exclusions comptées) et le domaine de repli via « Responsable
+  portefeuilles ». Ses lignes ne deviennent **jamais** des cartes ;
+  jointure par nom puis titre.
+- **Priorité des contrats = ordre du registre** (du plus spécifique au plus
+  générique : consolidé, projets, SP_total, PdC, RDOM). Un fichier qui
+  correspond pleinement à plusieurs contrats prend le premier — le
+  consolidé ne peut plus être pris pour l'export brut même s'il gagnait un
+  jour des colonnes Responsable, et RDOM (2 colonnes très génériques) ne
+  peut plus rafler un export riche.
 - **Le « Pris » du rapport = les cartes** (une ligne par carte assemblée) ;
   `SP_total`, s'il est présent, comble les trous en silence (ses sujets ne
   sont plus listés, les hors-périmètre restent comptés).
