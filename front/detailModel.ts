@@ -66,6 +66,17 @@ export interface ProfileRow {
 }
 
 /**
+ * Day counts rounded to two decimals: summing floats otherwise shows
+ * « 36.099999999994 » in the fiche. Purely a reading concern — the stored
+ * value is untouched.
+ * Inputs: a j.h amount. Outputs: the same amount, at most two decimals.
+ * Failure modes: none.
+ */
+export function roundJh(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+/**
  * Plan-de-charge rows sorted by descending j.h, plus max/total for the bars
  * and the summed per-profile consumed (design v11 « consommés » subtitle).
  */
@@ -74,15 +85,15 @@ export function profileRows(card: CardState, config: BoardConfig): { rows: Profi
     const profile = config.profiles.find((p) => p.id === entry.profileId);
     return {
       profileId: entry.profileId,
-      jh: entry.jh,
-      done: entry.done ?? 0,
+      jh: roundJh(entry.jh),
+      done: roundJh(entry.done ?? 0),
       name: profile?.name ?? entry.profileId,
       color: profile?.color ?? "#64748b",
-      raf: Math.max(0, entry.jh - (entry.done ?? 0)),
+      raf: roundJh(Math.max(0, entry.jh - (entry.done ?? 0))),
     };
   }).sort((a, b) => b.jh - a.jh);
   const max = Math.max(1, ...rows.map((row) => row.jh));
-  const total = rows.reduce((sum, row) => sum + row.jh, 0);
-  const done = rows.reduce((sum, row) => sum + row.done, 0);
+  const total = roundJh(rows.reduce((sum, row) => sum + row.jh, 0));
+  const done = roundJh(rows.reduce((sum, row) => sum + row.done, 0));
   return { rows, max, total, done };
 }

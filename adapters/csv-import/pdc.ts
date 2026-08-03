@@ -122,8 +122,8 @@ function readPdcRow(ctx: PdcContext, match: HeaderMatch, row: CsvRow): void {
   const profileId = resolveMetier(ctx, match, row);
   addToProject(ctx, match, row, ref, nameCell, profileId, jh, done);
   addToPerson(ctx, match, row, jh, done);
-  ctx.totals.jh += jh;
-  ctx.totals.done += done;
+  ctx.totals.jh = roundJh(ctx.totals.jh + jh);
+  ctx.totals.done = roundJh(ctx.totals.done + done);
 }
 
 // Métier -> profile: direct tolerant match, else with the first
@@ -150,6 +150,12 @@ function resolveMetier(ctx: PdcContext, match: HeaderMatch, row: CsvRow): string
   return null;
 }
 
+// Day counts, two decimals: repeated float additions otherwise produce
+// « 36.099999999994 » — noise that would reach the board and its editors.
+function roundJh(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
 function addToProject(
   ctx: PdcContext, match: HeaderMatch, row: CsvRow, ref: RowRef,
   nameCell: string, profileId: string | null, jh: number, done: number,
@@ -169,8 +175,8 @@ function addToProject(
   }
   const key = profileId ?? "";
   const bucket = project.charges.get(key) ?? { jh: 0, done: 0 };
-  bucket.jh += jh;
-  bucket.done += done;
+  bucket.jh = roundJh(bucket.jh + jh);
+  bucket.done = roundJh(bucket.done + done);
   project.charges.set(key, bucket);
 }
 
@@ -181,8 +187,8 @@ function addToPerson(ctx: PdcContext, match: HeaderMatch, row: CsvRow, jh: numbe
   if (matricule === "") return;
   const name = (row.cells[match.columnIndex.get("Ressource") ?? -1] ?? "").trim() || matricule;
   const person = ctx.persons.get(matricule) ?? { name, jh: 0, done: 0 };
-  person.jh += jh;
-  person.done += done;
+  person.jh = roundJh(person.jh + jh);
+  person.done = roundJh(person.done + done);
   ctx.persons.set(matricule, person);
 }
 

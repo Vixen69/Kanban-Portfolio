@@ -73,6 +73,15 @@ test("unknown and empty métiers land in the unassigned bucket, reported", () =>
   assert.ok(report.warnings.some((w) => /« Métier » vide/.test(w.message)));
 });
 
+test("summed day counts stay clean (no floating-point noise)", () => {
+  const { table } = run([
+    row("M1", "Jean", "PMO", "", "Alpha", "24,52", "0,1"),
+    row("M2", "Aya", "PMO", "", "Alpha", "11,58", "0,2"),
+  ]);
+  assert.deepEqual(table.projects.get("alpha")?.charges.get("pmo"), { jh: 36.1, done: 0.3 });
+  assert.deepEqual(table.totals, { jh: 36.1, done: 0.3 });
+});
+
 test("réel > prévisionnel is kept and signaled; persons are consolidated", () => {
   const { table, report } = run([
     row("M1", "Jean ROCA", "PMO", "", "Alpha", "15", "18"),
