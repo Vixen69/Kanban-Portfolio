@@ -15,7 +15,6 @@ import { dirname, join, resolve } from "node:path";
 import { validateBoardConfig } from "../core/config.ts";
 import { loadServerConfig } from "../middle/config.ts";
 import { createConfigStore } from "../middle/config-store.ts";
-import { createStorage } from "../middle/storage/select.ts";
 import { planLoad, renderReport, runImportAudit } from "../adapters/csv-import/index.ts";
 import type { InputFile, LoadPlan } from "../adapters/csv-import/index.ts";
 import type { EnrichedCard } from "../adapters/csv-import/index.ts";
@@ -74,10 +73,13 @@ function readInputFiles(folder: string): InputFile[] {
 }
 
 // The real load: plan against what the board already holds, then write the
-// cards and their events in one atomic batch.
+// cards and their events in one atomic batch. The storage module is loaded
+// LAZILY: audit mode must keep running with no node_modules at all (the
+// parser is dependency-free by design; only the pg driver needs an install).
 async function load(deck: EnrichedCard[], config: BoardConfig): Promise<LoadPlan> {
   const cfg = loadServerConfig(process.env);
   mkdirSync(dirname(cfg.dataPath), { recursive: true });
+  const { createStorage } = await import("../middle/storage/select.ts");
   const storage = await createStorage(cfg.storageDriver, cfg.dataPath);
   try {
     const [events, baseCards] = await Promise.all([storage.listEvents(), storage.listBaseCards()]);
@@ -131,6 +133,14 @@ try {
   }
 } catch (error) {
   const detail = error instanceof Error ? error.message : String(error);
+  if (detail.includes("Cannot find package")) {
+    console.error(
+      "import : échec — le chargement exige les dépendances du dépôt.\n" +
+        "Lancer une fois « npm ci » à la racine, puis relancer avec --charger.\n" +
+        `(détail : ${detail})`,
+    );
+    process.exit(1);
+  }
   console.error(`import : échec — ${detail}`);
   process.exit(1);
 }
