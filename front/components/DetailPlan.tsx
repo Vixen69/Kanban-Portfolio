@@ -7,6 +7,7 @@ import type { BoardConfig, CardPatch, CardState, Profile } from "../../core/type
 import { daysInColumn } from "../../core/aging.ts";
 import { colLabel, profileRows, rdrModel } from "../detailModel.ts";
 import { ChargeEditor, ContentionEditor, InlineEdit } from "./modalEditors.tsx";
+import { fmtNum } from "../format.ts";
 
 /** Compact chef-de-projet strip: avatar initial, editable owner, age. */
 export function OwnerStrip({ card, config, now, onPatch }: {
@@ -58,17 +59,17 @@ function ProfRow({ p, max, onCommitDone }: { p: ReturnType<typeof profileRows>["
   return (
     <div className="prof-row">
       <span className="prof-name"><i className="prof-dot" style={{ background: p.color }} />{p.name}</span>
-      <div className="prof-track" title={`${p.done} consommés · ${p.raf} restants`}>
+      <div className="prof-track" title={`${fmtNum(p.done)} consommés · ${fmtNum(p.raf)} restants`}>
         <span className="prof-done" style={{ width: `${(p.jh / max) * 100}%`, background: `color-mix(in oklab, ${p.color} 22%, #fff)`, borderColor: `color-mix(in oklab, ${p.color} 35%, transparent)` }} />
         <span className="prof-fill" style={{ width: `${(p.done / max) * 100}%`, background: p.color }} />
       </div>
       <span className="prof-jh" title="Consommé / estimé — cliquer le consommé pour modifier">
         <InlineEdit<number>
-          value={p.done} type="number" className="prof-done-num" display={String(p.done)}
+          value={p.done} type="number" className="prof-done-num" display={fmtNum(p.done)}
           fromInput={(v) => { const n = v === "" ? 0 : Number(v); return Number.isFinite(n) ? Math.round(n) : 0; }}
           onCommit={onCommitDone}
         />
-        <span className="prof-slash">/</span><b>{p.jh}</b> j.h
+        <span className="prof-slash">/</span><b>{fmtNum(p.jh)}</b> j.h
       </span>
     </div>
   );
@@ -99,7 +100,7 @@ export function PlanDeCharge({ card, config, onPatch }: { card: CardState; confi
         <div className="cm-empty" onClick={() => setEdit(true)}>Aucune charge répartie. Cliquer pour renseigner les profils.</div>
       ) : (
         <>
-          <div className="prof-sub">{total} j.h estimés · {done} consommés</div>
+          <div className="prof-sub">{fmtNum(total)} j.h estimés · {fmtNum(done)} consommés</div>
           <div className="prof-table">
             {rows.map((p, i) => <ProfRow key={i} p={p} max={max} onCommitDone={commitDone(p.profileId, p.jh)} />)}
           </div>

@@ -5,12 +5,10 @@
 
 import type { BoardConfig } from "../../core/types.ts";
 import { profileLoadRows, remainingLoad, type GroupTotals } from "../../core/totals.ts";
+import { fmtUnit } from "../format.ts";
 
-// Whole units, French grouping. Money is k€ and load is j.h — decimals
-// would be noise at portfolio scale.
-function fmt(value: number): string {
-  return Math.round(value).toLocaleString("fr-FR");
-}
+// Aggregates are read at portfolio scale: whole units (front/format.ts).
+const fmt = fmtUnit;
 
 /**
  * One labelled figure of a totals block.

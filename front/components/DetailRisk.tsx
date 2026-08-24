@@ -6,6 +6,7 @@ import { useState } from "react";
 import type { BoardConfig, CardPatch, CardState } from "../../core/types.ts";
 import { budgetModel } from "../detailModel.ts";
 import { InlineEdit, RiskEditor } from "./modalEditors.tsx";
+import { fmtNum } from "../format.ts";
 
 /** Budget cross-graph: one bar per figure, the RDLI envelope as a ref line. */
 export function BudgetGraph({ card, onPatch }: { card: CardState; onPatch: (patch: CardPatch) => void }) {
@@ -23,7 +24,7 @@ export function BudgetGraph({ card, onPatch }: { card: CardState; onPatch: (patc
             </div>
             <span className="bg-val" style={{ color: r.key === "real" && bReal > bRdli ? "var(--danger-strong)" : "var(--tx-2)" }}>
               <InlineEdit<number>
-                value={r.val} type="number"
+                value={r.val} type="number" display={fmtNum(r.val)}
                 fromInput={(v) => (v === "" ? 0 : Math.max(0, Number(v)))}
                 onCommit={(v) => onPatch({ [r.field]: v } as CardPatch)}
               />

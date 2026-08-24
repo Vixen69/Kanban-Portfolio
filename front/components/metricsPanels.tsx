@@ -8,18 +8,14 @@ import type { ReactNode } from "react";
 import type { RoleLoad } from "../../core/metrics.ts";
 import type { Blockage, FlowSummary, LabelledCount, WipRow } from "../../core/metrics-flow.ts";
 import type { GroupTotals } from "../../core/totals.ts";
+import { fmtUnit } from "../format.ts";
 
 /** How many blockages the panel lists before summarising the rest. */
 const TOP_BLOCKAGES = 8;
 
-/**
- * Rounded, French-formatted integer (k€, j.h, counts).
- * Inputs: a number. Output: the fr-FR string ("1 250"). Failure: none —
- * NaN would format as "NaN", which the core never produces.
- */
-export function fmt(value: number): string {
-  return Math.round(value).toLocaleString("fr-FR");
-}
+/** Aggregate figure, whole units (front/format.ts). Re-exported so the
+ * panels and the metrics view share one formatter. */
+export const fmt = fmtUnit;
 
 // Bar width as a CSS percentage; a zero max yields "0%" rather than NaN.
 function width(value: number, max: number): string {

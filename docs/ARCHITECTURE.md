@@ -637,6 +637,26 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-08-24 — Affichage des nombres normalisé
+- **Deux règles, un seul module** (`front/format.ts`) : les **agrégats**
+  (en-têtes de colonne, étiquettes de canal, KPI Metrics) s'affichent en
+  **unités entières** — les décimales seraient du bruit à l'échelle du
+  portefeuille ; les valeurs de **carte et de fiche** gardent **au plus une
+  décimale** (24,5 j.h). Virgule et séparateur de milliers français
+  partout ; une valeur non finie rend « — », jamais « NaN ».
+- Les deux fonctions `fmt` dupliquées (BoardTotals, metricsPanels) sont
+  remplacées par le formateur partagé ; les affichages bruts qui restaient
+  (plan de charge par profil, sous-titre estimés/consommés, graphe budget
+  de la fiche, carte en focus, total de l'éditeur de charge) passent par
+  `fmtNum`. Les champs de saisie ne sont jamais formatés — un
+  `input[type=number]` exige la valeur brute, sans virgule.
+- Déclenché par le terrain : « 24,52 / 36.099999999994 j.h » dans la fiche.
+- Vérifié en application (carte volontairement salie via l'API) : fiche
+  « 24,5/36,1 j.h », « 177,6 j.h estimés · 24,8 consommés », budget
+  « 236,4 » ; en-têtes « 2 055k€ · 2 808j.h RAF » ; Metrics « 11 001j.h ».
+  Sondage DOM : **aucun nombre à deux décimales ou plus** dans tout le
+  tableau, la fiche et la vue Metrics. 459 tests verts.
+
 ### 2026-08-01 — Chargement réel : l'import écrit dans le board
 - **Le pipeline d'import est complet** : le mode audit reste le défaut, le
   drapeau `--charger` écrit les cartes et leurs évènements via

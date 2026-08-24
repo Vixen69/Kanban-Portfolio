@@ -12,6 +12,7 @@ import type {
   ProjectType,
 } from "../../core/types.ts";
 import { ageCategory, ageLabel } from "../../core/aging.ts";
+import { fmtNum } from "../format.ts";
 
 // Gold crown for a top-criticality card (design/board.jsx CrownSVG).
 function CrownSVG({ s }: { s: number }) {
@@ -75,10 +76,10 @@ export function EstimeBar({ card }: { card: CardState }) {
   const raf = Math.max(0, jh - done);
   if (est === 0 && jh === 0) return null;
   return (
-    <div className="ec-row" title={`Meilleur estimé ${est} k€ · Reste à faire ${raf} j.h`}>
-      <span className="ec-stat">est. <b>{est.toLocaleString("fr-FR")}</b> k€</span>
+    <div className="ec-row" title={`Meilleur estimé ${fmtNum(est)} k€ · Reste à faire ${fmtNum(raf)} j.h`}>
+      <span className="ec-stat">est. <b>{fmtNum(est)}</b> k€</span>
       <span className="ec-sep" />
-      <span className="ec-stat">RAF <b>{raf.toLocaleString("fr-FR")}</b> j.h</span>
+      <span className="ec-stat">RAF <b>{fmtNum(raf)}</b> j.h</span>
     </div>
   );
 }

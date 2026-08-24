@@ -5,6 +5,7 @@
 
 import { type ReactNode, useState } from "react";
 import type { BoardConfig, ChargeEntry, Risk } from "../../core/types.ts";
+import { fmtNum } from "../format.ts";
 
 /** A value the InlineEdit control can display and edit. */
 type InlineValue = string | number | null;
@@ -130,7 +131,7 @@ export function ChargeEditor({ config, charge, est, cons, onSave, onCancel }: {
           </CeRow>
         ))}
       </div>
-      <EditorFoot summary={<>Total <b>{total}</b> j.h</>} onSave={save} onCancel={onCancel} />
+      <EditorFoot summary={<>Total <b>{fmtNum(total)}</b> j.h</>} onSave={save} onCancel={onCancel} />
     </div>
   );
 }
