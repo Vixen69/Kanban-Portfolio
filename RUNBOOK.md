@@ -1,0 +1,172 @@
+# Runbook — Portefeuille DSI · Kanban NMO
+
+Remonter la pile sur la VM, puis importer les exports Sciforma — de l'audit
+jusqu'aux cartes affichées sur le tableau.
+
+| | |
+|---|---|
+| VM | `DVPZ-KANBAN-VD1` |
+| Dossier | `~/Kanban-Portfolio-main` |
+| Tableau | `http://localhost:8080` |
+
+---
+
+## A. Remonter la pile
+
+**1. Se placer dans le dépôt**
+
+```bash
+cd ~/Kanban-Portfolio-main
+```
+
+**2. Démarrer les conteneurs** (base, middle, front)
+
+```bash
+docker compose -f docker/compose.yaml --profile app up -d
+```
+
+**3. Vérifier**
+
+```bash
+docker compose -f docker/compose.yaml --profile app ps
+```
+
+> **Attendu** : `db` healthy · `middle` Up · `front` Up sur `127.0.0.1:8080`
+
+Puis ouvrir `http://localhost:8080` — **Ctrl+F5** au premier affichage.
+
+**En option — Adminer**, pour inspecter la base :
+
+```bash
+docker compose -f docker/compose.yaml --profile app --profile tools up -d
+```
+
+> **Accès** : `localhost:8081` · PostgreSQL · serveur `db` · `kanban` / `thuglife` · base `kanban`
+
+---
+
+## B. Importer les exports Sciforma
+
+Déposer les CSV dans `imports/`. La reconnaissance se fait **par les
+en-têtes**, jamais par le nom du fichier — seule contrainte : deux fichiers
+ne peuvent pas porter le même nom.
+
+| Fichier | Ce qu'il apporte |
+|---|---|
+| `Projets_consolide.csv` **(requis)** | Le périmètre et les cartes : titre, domaine, type, dates, budgets, charges. Chaque ligne devient une carte. |
+| `Projets.csv` | L'export brut — seule source du **chef de projet** (premier responsable qui n'est pas un RDOM). |
+| `RDOM.csv` | Table domaine ↔ nom : résout les domaines et exclut les RDOM du chef de projet. |
+| `Ressources_PdC.csv` | Plan de charge 2026 par profil, plus la consolidation nominative (taux ETP). |
+| `SP_total.csv` *(optionnel)* | Comble les trous : ses jalons datés positionnent les cartes plus finement. |
+
+**1. Auditer** — n'écrit rien dans le tableau
+
+```bash
+node sync/import.ts imports
+```
+
+> **Produit** : `imports/rapport-import.md` + le résumé Pris / Écartés / Douteux / Signalements
+
+**2. Lire le rapport** — section « État de l'assemblage »
+
+Périmètre, répartition des cartes, position, **domaine n/N**, **chef de
+projet n/N**, couverture du plan de charge. On ne charge que lorsque ces
+chiffres tiennent.
+
+**3. Préparer les dépendances** — une seule fois par machine
+
+```bash
+docker cp portfolio-kanban-middle-1:/app/node_modules ./node_modules
+```
+
+Sans réseau. Alternative classique : `npm ci`. Nécessaire uniquement pour le
+chargement (le pilote PostgreSQL) ; l'audit tourne sans aucune dépendance.
+
+**4. Charger dans le tableau**
+
+```bash
+export KANBAN_STORAGE_DRIVER=postgres
+export DATABASE_URL=postgres://kanban:thuglife@localhost:5432/kanban
+node sync/import.ts imports --charger
+```
+
+> **Attendu** : `destination : PostgreSQL (…)` puis
+> `chargement : N créée(s) · M mise(s) à jour`
+
+---
+
+## C. Contrôles et entretien
+
+**Compter les cartes en base**
+
+```bash
+docker exec portfolio-kanban-db-1 psql -U kanban -d kanban -c "SELECT count(*) FROM cards;"
+```
+
+**Vider les cartes** — garde le schéma et la topologie
+
+```bash
+docker exec portfolio-kanban-db-1 psql -U kanban -d kanban -c "TRUNCATE cards, card_events RESTART IDENTITY;"
+```
+
+**Mettre à jour le code** — après un transfert de ZIP
+
+```bash
+chmod +x *.sh verify.sh
+docker compose -f docker/compose.yaml --profile app up -d --build
+```
+
+**Arrêter** — les données restent dans le volume
+
+```bash
+docker compose -f docker/compose.yaml --profile app down
+```
+
+**Session bloquée après une absence**
+
+```bash
+pkill -u $USER -f xrdp
+```
+
+Puis se reconnecter. Si ça persiste : disque plein (`df -h`) ou mot de passe
+expiré.
+
+---
+
+## Les pièges
+
+*(tous rencontrés au moins une fois)*
+
+**1. Jamais `-v` ni `--volumes`** — sur `down` comme sur
+`docker system prune` : c'est le volume qui contient les cartes. Sans ce
+drapeau, les données survivent à tout.
+
+**2. `export` est obligatoire** — une affectation seule sur sa ligne n'est
+pas transmise à `node` : le pilote reste `jsonl` et les cartes partent dans
+un fichier au lieu de la base. Contrôler la ligne `destination :` affichée
+juste avant l'écriture.
+
+**3. Deux fichiers, deux noms** — le consolidé et l'export brut ne peuvent
+pas s'appeler tous les deux `Projets.csv` dans `imports/` ; l'un écraserait
+l'autre.
+
+**4. L'audit est le défaut** — rien n'est écrit dans le tableau tant que
+`--charger` n'est pas passé. Le rapport, lui, est produit à chaque exécution
+et écrasé.
+
+**5. Le ré-import respecte vos arbitrages** — il met à jour les cartes
+existantes et ajoute les nouvelles. L'export gagne sur les **faits**
+(budgets, charge, domaine, chef, dates) ; le tableau garde la **position**
+d'une carte déplacée à la main — la divergence est signalée, jamais écrasée.
+
+---
+
+## Règles de fond
+
+- **Identité des cartes** : le code PE, sinon le nom.
+- **Âge** : depuis la date de début du projet.
+- **Canal** : toutes les cartes importées entrent en « Projets ».
+- **Hors board** : TMA CORRECTIVES · IT4IT · PROJETS VENDUS.
+
+Le détail des décisions d'import est dans `docs/IMPORT-MAPPING.md` ; la
+livraison conteneurisée dans `LIVRAISON.md`.
