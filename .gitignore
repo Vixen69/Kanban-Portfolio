@@ -22,3 +22,7 @@ docker/.env
 # working copy, not a second source of truth.
 design/*.zip
 design/Portfolio kanban/
+# Exports PPM réels et leur rapport d'audit : ils vivent dans le dossier de
+# travail de la machine cliente, jamais dans le dépôt (CLAUDE.md §7 — aucune
+# donnée client ne traverse). Le dossier lui-même reste local.
+imports/
