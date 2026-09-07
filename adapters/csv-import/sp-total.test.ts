@@ -14,7 +14,7 @@ import type { SpTotalTable } from "./sp-total.ts";
 import type { ImportReport } from "./report.ts";
 
 const CONFIG = JSON.parse(
-  readFileSync(new URL("../../config/board.json", import.meta.url), "utf8"),
+  readFileSync(new URL("./test-board.legacy.json", import.meta.url), "utf8"),
 ) as BoardConfig;
 
 const NOW = new Date("2026-07-29T12:00:00.000Z");

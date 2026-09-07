@@ -65,6 +65,11 @@ export function patchValidators(config: BoardConfig): Record<string, (value: unk
     title: (v) => typeof v === "string" && v.trim().length > 0 && v.length <= 200,
     owner: boundedText(120),
     domain: (v) => typeof v === "string" && config.domains.some((d) => d.id === v),
+    // Any declared sub-domain id is accepted here; the fold keeps a
+    // sub-domain only while its (current) domain declares it — the two
+    // fields may travel in separate patches (config-derive, ADR 022).
+    subDomain: (v) => v === null || (typeof v === "string" &&
+      config.domains.some((d) => (d.subDomains ?? []).some((s) => s.id === v))),
     criticality: isCriticality,
     typeId: (v) => v === null || (typeof v === "string" && config.types.some((t) => t.id === v)),
     codename: boundedTextOrNull(40),

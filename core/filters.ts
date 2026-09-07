@@ -1,14 +1,31 @@
 // Sidebar filters (design v11): search, the « Bloqués uniquement » toggle
-// and three pill groups — project type, criticality, domain. (The nature
-// group left in v11: nature is positional, carried by the canal.) Filters
-// DIM cards, they never remove them: the spatial structure of the board is
-// always the truth. Pure logic, rendered by front/components/Sidebar.tsx.
+// and the pill groups — project type, criticality, domain (with its
+// sub-domains, ADR 022), constraint. (The nature group left in v11: nature
+// is positional, carried by the canal.) Filters DIM cards, they never
+// remove them: the spatial structure of the board is always the truth.
+// Pure logic, rendered by front/components/Sidebar.tsx.
 
 import type { BoardConfig, Card, CardState, Criticality } from "./types.ts";
 import { isStale } from "./aging.ts";
 
 /** The togglable pill groups of FilterState (search/blockedOnly excluded). */
-export type FilterGroup = "type" | "crit" | "domain" | "constraint";
+export type FilterGroup = "type" | "crit" | "domain" | "subDomain" | "constraint";
+
+/**
+ * The key of one sub-domain pill in FilterState.subDomain — scoped by its
+ * domain, since two domains may declare a sub-domain with the same id.
+ * Inputs: the domain id, the sub-domain id. Output: "domain/sub".
+ * Failure: none.
+ */
+export function subDomainKey(domainId: string, subDomainId: string): string {
+  return `${domainId}/${subDomainId}`;
+}
+
+// Every sub-domain pill key the config declares, in config order.
+function subDomainKeys(config: BoardConfig): string[] {
+  return config.domains.flatMap((domain) =>
+    (domain.subDomains ?? []).map((sub) => subDomainKey(domain.id, sub.id)));
+}
 
 /**
  * The filter state driven by the sidebar. Group maps record key ->
@@ -23,6 +40,13 @@ export interface FilterState {
   type: Record<string, boolean>;
   crit: Record<Criticality, boolean>;
   domain: Record<string, boolean>;
+  /**
+   * Sub-domain pills keyed by subDomainKey (ADR 022). A card wearing a
+   * sub-domain must pass its domain AND its sub-domain pill; a card without
+   * one follows its domain alone. Toggling a domain pill resets its
+   * sub-domains to the same value (withDomainToggled).
+   */
+  subDomain: Record<string, boolean>;
   /** Project-constraint ids (design v12). OR-shaped — see cardMatches. */
   constraint: Record<string, boolean>;
   /**
@@ -63,8 +87,38 @@ export function defaultFilters(config: BoardConfig): FilterState {
     type: on(config.types.map((type) => type.id)),
     crit: { top: true, major: true, normal: true },
     domain: on(config.domains.map((domain) => domain.id)),
+    subDomain: on(subDomainKeys(config)),
     constraint: on(config.projectConstraints.map((constraint) => constraint.id)),
     noConstraint: true,
+  };
+}
+
+/**
+ * Flips one domain pill and aligns every sub-domain pill of that domain on
+ * the new value (a domain checked = all its sub-domains; unchecked = none).
+ * Inputs: the filters, the board config (the domain's sub-domain list), the
+ * domain id. Output: a new FilterState (input untouched). Failure: none.
+ */
+export function withDomainToggled(filters: FilterState, config: BoardConfig, domainId: string): FilterState {
+  const value = filters.domain[domainId] === false;
+  const subDomain = { ...filters.subDomain };
+  for (const sub of config.domains.find((domain) => domain.id === domainId)?.subDomains ?? []) {
+    subDomain[subDomainKey(domainId, sub.id)] = value;
+  }
+  return { ...filters, domain: { ...filters.domain, [domainId]: value }, subDomain };
+}
+
+/**
+ * Sets every domain AND sub-domain pill at once (the domain group's
+ * tout / rien quick actions).
+ * Inputs: the filters, the value. Output: a new FilterState. Failure: none.
+ */
+export function withDomainsSet(filters: FilterState, value: boolean): FilterState {
+  const set = (keys: string[]) => Object.fromEntries(keys.map((key) => [key, value]));
+  return {
+    ...filters,
+    domain: set(Object.keys(filters.domain)),
+    subDomain: set(Object.keys(filters.subDomain)),
   };
 }
 
@@ -83,6 +137,7 @@ export function isFilterActive(filters: FilterState): boolean {
     groupOff(filters.type) ||
     groupOff(filters.crit) ||
     groupOff(filters.domain) ||
+    groupOff(filters.subDomain) ||
     groupOff(filters.constraint) ||
     !filters.noConstraint
   );
@@ -100,8 +155,9 @@ function constraintPasses(card: Card, filters: FilterState): boolean {
  * Whether one card stays lit: the search matches its title OR codename
  * (trimmed, case-insensitive) AND it is blocked when blockedOnly is on AND
  * every group passes. A group passes when the card's key is missing from
- * the map or mapped to true; a null typeId always passes the type group.
- * The constraint group is OR-shaped (see constraintPasses).
+ * the map or mapped to true; a null typeId always passes the type group,
+ * a null subDomain always passes the sub-domain group (the card follows its
+ * domain alone). The constraint group is OR-shaped (see constraintPasses).
  * Inputs: a Card (CardState included), the filters.
  * Output: true when the card passes everything. Failure: none.
  */
@@ -115,6 +171,9 @@ export function cardMatches(card: Card, filters: FilterState): boolean {
   if (filters.blockedOnly && !card.blocked) return false;
   if (filters.crit[card.criticality] === false) return false;
   if (filters.domain[card.domain] === false) return false;
+  if (card.subDomain !== null && filters.subDomain[subDomainKey(card.domain, card.subDomain)] === false) {
+    return false;
+  }
   if (card.typeId !== null && filters.type[card.typeId] === false) return false;
   if (!constraintPasses(card, filters)) return false;
   return true;

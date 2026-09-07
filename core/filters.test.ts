@@ -7,6 +7,8 @@ import {
   isFilterActive,
   portfolioCounts,
   viewCounts,
+  withDomainToggled,
+  withDomainsSet,
   type FilterState,
 } from "./filters.ts";
 import { testCard, testConfig } from "./test-helpers.ts";
@@ -26,14 +28,15 @@ function state(overrides: Parameters<typeof testCard>[0] = {}, daysHere = 1): Ca
 
 // Age thresholds from testConfig: stale beyond 60 days in column.
 // Project constraints are spread on purpose — one single, one double, one
-// bare — so the OR-shaped constraint predicate is actually exercised.
+// bare — so the OR-shaped constraint predicate is actually exercised. The
+// two beta cards split on the sub-domain: S002 wears b1, S004 wears none.
 const PORTFOLIO: CardState[] = [
   state(
     { id: "S001", title: "Refonte GMAO", domain: "alpha", typeId: "t1", criticality: "top", nature: "simple", codename: "PX1111111", projectConstraints: ["legale"] },
     2,
   ),
   state(
-    { id: "S002", title: "Sujet Beta", domain: "beta", typeId: "t2", criticality: "normal", nature: "complicated", codename: "PX2222222", projectConstraints: ["legale", "groupe"] },
+    { id: "S002", title: "Sujet Beta", domain: "beta", subDomain: "b1", typeId: "t2", criticality: "normal", nature: "complicated", codename: "PX2222222", projectConstraints: ["legale", "groupe"] },
     30,
   ),
   state(
@@ -60,6 +63,7 @@ test("default filters are neutral: every key true, blockedOnly off, nothing dimm
   const filters = defaultFilters(CONFIG);
   assert.deepEqual(filters.type, { t1: true, t2: true });
   assert.deepEqual(filters.domain, { alpha: true, beta: true });
+  assert.deepEqual(filters.subDomain, { "beta/b1": true, "beta/b2": true });
   assert.deepEqual(filters.crit, { top: true, major: true, normal: true });
   assert.deepEqual(filters.constraint, { legale: true, groupe: true });
   assert.equal(filters.noConstraint, true);
@@ -81,6 +85,9 @@ test("each filter dimension dims the right cards (table)", () => {
     { name: "search matches codename, trimmed", mutate: (f) => (f.search = "  px111  "), dimmed: ["S002", "S003", "S004"] },
     { name: "search without match dims all", mutate: (f) => (f.search = "zzz"), dimmed: ["S001", "S002", "S003", "S004"] },
     { name: "domain off", mutate: (f) => (f.domain["alpha"] = false), dimmed: ["S001", "S003"] },
+    // A sub-domain pill dims only the card wearing it; the undetailed beta card follows its domain alone.
+    { name: "sub-domain off", mutate: (f) => (f.subDomain["beta/b1"] = false), dimmed: ["S002"] },
+    { name: "other sub-domain off dims nothing it does not own", mutate: (f) => (f.subDomain["beta/b2"] = false), dimmed: [] },
     { name: "type off (null typeId passes)", mutate: (f) => (f.type["t1"] = false), dimmed: ["S001", "S004"] },
     { name: "crit top off", mutate: (f) => (f.crit.top = false), dimmed: ["S001"] },
     { name: "crit normal off", mutate: (f) => (f.crit.normal = false), dimmed: ["S002", "S004"] },
@@ -119,6 +126,25 @@ test("a key missing from a group map counts as enabled", () => {
   delete (filters.crit as Record<string, boolean>)["top"];
   delete filters.constraint["legale"];
   assert.equal(cardMatches(PORTFOLIO[0] as CardState, filters), true);
+});
+
+test("toggling a domain pill aligns its sub-domain pills; tout/rien sweeps both maps", () => {
+  const start = defaultFilters(CONFIG);
+  start.subDomain["beta/b2"] = false; // a partial selection
+  const off = withDomainToggled(start, CONFIG, "beta");
+  assert.equal(off.domain["beta"], false);
+  assert.deepEqual(off.subDomain, { "beta/b1": false, "beta/b2": false });
+  assert.equal(start.domain["beta"], true, "input untouched");
+  const on = withDomainToggled(off, CONFIG, "beta");
+  assert.equal(on.domain["beta"], true);
+  assert.deepEqual(on.subDomain, { "beta/b1": true, "beta/b2": true });
+  // A domain without sub-domains only flips itself.
+  assert.deepEqual(withDomainToggled(on, CONFIG, "alpha").subDomain, on.subDomain);
+  const none = withDomainsSet(on, false);
+  assert.deepEqual(none.domain, { alpha: false, beta: false });
+  assert.deepEqual(none.subDomain, { "beta/b1": false, "beta/b2": false });
+  assert.equal(isFilterActive(none), true);
+  assert.equal(isFilterActive(withDomainsSet(none, true)), false);
 });
 
 test("« Aucune » is independent of the constraint pills in both directions", () => {

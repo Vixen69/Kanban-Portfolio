@@ -118,6 +118,7 @@ function buildCard(config: BoardConfig, existing: Card[], input: NewCardInput, t
     id: nextCardId(existing),
     title: input.title,
     domain: input.domain,
+    subDomain: null,
     laneId: input.laneId,
     columnId: firstColumn.id,
     owner: input.owner,

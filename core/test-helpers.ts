@@ -37,7 +37,8 @@ function testVocabularies(): Vocabularies {
 
 /**
  * A small valid v2 board topology for tests: 2 lanes, 3 columns (one WIP,
- * one gate), 2 domains, 2 types, no custom fields, design age thresholds,
+ * one gate), 2 domains (beta detailed into two sub-domains, ADR 022),
+ * 2 types, no custom fields, design age thresholds,
  * plus the design-v10 typologies (see testVocabularies).
  * Output: a fresh BoardConfig (safe to mutate in a test). Failure: none.
  */
@@ -54,7 +55,7 @@ export function testConfig(): BoardConfig {
     ],
     domains: [
       { id: "alpha", name: "Alpha", short: "ALP", color: "#10b981" },
-      { id: "beta", name: "Beta", short: "BET", color: "#6366f1" },
+      { id: "beta", name: "Beta", short: "BET", color: "#6366f1", subDomains: [{ id: "b1", name: "Beta 1" }, { id: "b2", name: "Beta 2" }] },
     ],
     types: [
       { id: "t1", name: "Type 1", short: "T1", color: "#0369a1" },
@@ -89,7 +90,7 @@ export function testCard(overrides: Partial<Card> = {}): Card {
   return {
     id: "S001",
     title: "Sujet de test",
-    domain: "alpha",
+    domain: "alpha", subDomain: null,
     laneId: "laneA",
     columnId: "col1",
     owner: "M. Test",

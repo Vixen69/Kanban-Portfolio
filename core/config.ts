@@ -4,17 +4,18 @@
 // stays hard-coded.
 
 import type {
-  AgeThresholds, BoardConfig, Column, CriticalityStyle, Domain,
+  AgeThresholds, BoardConfig, Column, CriticalityStyle,
   FieldDef, FieldOption, FieldType, GateCode, GateDef, Lane, NatureKey,
-  NatureStyle, RiskSeverityStyle, RoleFamily,
+  NatureStyle, RiskSeverityStyle,
 } from "./types.ts";
 import {
   fail, isRecord, optionalText, parseKeyed, parseNonEmptyArray,
   requireExactKeys, requireRecord, requireText, uniqueIds,
 } from "./config-parse.ts";
+import { parseColored, parseDomain, parseIdNameColor } from "./config-vocab.ts";
 
 export { ConfigError } from "./config-parse.ts";
-export { laneNature, reconcileCardRefs } from "./config-derive.ts";
+export { laneNature, reconcileCardRefs, subDomainsOf } from "./config-derive.ts";
 
 const NATURE_KEYS = ["simple", "complicated", "complex"] as const;
 const CRITICALITY_KEYS = ["top", "major", "normal"] as const;
@@ -74,27 +75,6 @@ function parseColumn(value: unknown, index: number): Column {
     column.hasBlockedZone = record.hasBlockedZone;
   }
   return column;
-}
-
-// Domains and project types share the same shape (id/name/short/color).
-function parseColored(value: unknown, kind: string, index: number): Domain {
-  const record = requireRecord(value, `${kind}[${index}]`);
-  return {
-    id: requireText(record.id, `${kind}[${index}].id`),
-    name: requireText(record.name, `${kind}[${index}].name`),
-    short: requireText(record.short, `${kind}[${index}].short`),
-    color: requireText(record.color, `${kind}[${index}].color`),
-  };
-}
-
-// Role families and profiles share the same shape (id/name/color, no short).
-function parseIdNameColor(value: unknown, kind: string, index: number): RoleFamily {
-  const record = requireRecord(value, `${kind}[${index}]`);
-  return {
-    id: requireText(record.id, `${kind}[${index}].id`),
-    name: requireText(record.name, `${kind}[${index}].name`),
-    color: requireText(record.color, `${kind}[${index}].color`),
-  };
 }
 
 // The resource → role-family map. Every value must name a known role family.
@@ -224,7 +204,8 @@ function parseAge(value: unknown): AgeThresholds {
  * visual text (column note, lane nature/detail) defaults to "" when absent;
  * a missing column wip or gate defaults to null; a missing fields array
  * defaults to []; a missing showOnCard defaults to false; options are kept
- * only on "select" fields.
+ * only on "select" fields; a domain's subDomains is kept only when declared
+ * (ADR 022).
  * Failure: throws ConfigError with a French message naming the first
  * offending field; never returns a partially valid config.
  */
@@ -255,7 +236,7 @@ export function validateBoardConfig(raw: unknown): BoardConfig {
   if (!isRecord(raw)) fail("la configuration doit être un objet JSON");
   const lanes = parseNonEmptyArray(raw.lanes, "lanes", parseLane);
   const columns = parseNonEmptyArray(raw.columns, "columns", parseColumn);
-  const domains = parseNonEmptyArray(raw.domains, "domains", (v, i) => parseColored(v, "domains", i));
+  const domains = parseNonEmptyArray(raw.domains, "domains", parseDomain);
   const types = parseNonEmptyArray(raw.types, "types", (v, i) => parseColored(v, "types", i));
   uniqueIds(lanes, "lanes");
   uniqueIds(columns, "columns");

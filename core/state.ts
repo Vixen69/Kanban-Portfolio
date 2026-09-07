@@ -49,6 +49,7 @@ const EDITABLE: Record<string, (value: unknown) => boolean> = {
   title: (value) => typeof value === "string" && value.length > 0,
   owner: (value) => typeof value === "string",
   domain: (value) => typeof value === "string" && value.length > 0,
+  subDomain: isStringOrNull,
   criticality: (value) => value === "top" || value === "major" || value === "normal",
   typeId: isStringOrNull,
   codename: isStringOrNull,
@@ -224,7 +225,9 @@ function applyReorder(order: string[], event: CardEvent): void {
 export function foldEvents(cards: Card[], events: CardEvent[]): CardState[] {
   const byId = new Map<string, CardState>();
   for (const card of cards) {
-    byId.set(card.id, { ...card, enteredColumnAt: card.createdAt, comments: [], archived: false });
+    // Snapshots stored before ADR 022 carry no subDomain: read them as null.
+    const subDomain = card.subDomain ?? null;
+    byId.set(card.id, { ...card, subDomain, enteredColumnAt: card.createdAt, comments: [], archived: false });
   }
   const order = cards.map((card) => card.id);
   const ordered = events

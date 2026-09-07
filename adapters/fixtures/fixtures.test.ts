@@ -83,16 +83,33 @@ test("column fill matches the design and pause stays empty", () => {
 test("domain and type fills match the design", () => {
   const domains = countBy(PORTFOLIO.subjects.map((subject) => subject.domain));
   const domainFill: [string, number][] = [
-    ["ingenierie", 23], ["soutien", 15], ["industrie", 15], ["corporate", 21],
-    ["erp", 18], ["plm", 15], ["infra", 18], ["archi_dev", 15], ["cyber", 10],
+    ["ad", 20], ["corporate", 24], ["erp", 16], ["industrie", 15], ["infra", 20],
+    ["ing", 16], ["it4it", 10], ["plm", 13], ["soutien", 11], ["support_office", 5],
   ];
   for (const [id, count] of domainFill) assert.equal(domains.get(id) ?? 0, count, id);
   const types = countBy(PORTFOLIO.subjects.map((subject) => subject.typeId));
   const typeFill: [string, number][] = [
-    ["mise_en_oeuvre", 40], ["evolution_tma", 35], ["etude", 25],
-    ["obsolescence", 20], ["tma_corrective", 18], ["achat", 12],
+    ["mise_en_oeuvre", 62], ["etude", 40], ["obsolescence", 30], ["ia", 18],
   ];
   for (const [id, count] of typeFill) assert.equal(types.get(id) ?? 0, count, id);
+});
+
+test("sub-domains are seeded only inside detailed domains and resolve against the config", () => {
+  const declared = new Map(CONFIG.domains.map((d) => [d.id, new Set((d.subDomains ?? []).map((s) => s.id))]));
+  const withSub = new Set<string>();
+  const withoutSub = new Set<string>();
+  for (const subject of PORTFOLIO.subjects) {
+    if (subject.subDomain === null) {
+      withoutSub.add(subject.domain);
+      continue;
+    }
+    assert.ok(declared.get(subject.domain)?.has(subject.subDomain), `${subject.id}: ${subject.domain}/${subject.subDomain}`);
+    withSub.add(subject.domain);
+  }
+  // Both detailed domains are exercised, each with at least one undetailed card;
+  // undetailed domains never carry a sub-domain.
+  assert.deepEqual([...withSub].sort(), ["ad", "corporate"]);
+  assert.ok(withoutSub.has("ad") && withoutSub.has("corporate"));
 });
 
 test("every reference resolves against config/board.json", () => {

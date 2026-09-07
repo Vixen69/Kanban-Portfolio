@@ -36,12 +36,24 @@ export interface Column {
   hasBlockedZone?: boolean;
 }
 
-/** A responsible domain (RDOM) with its display color and 3-letter code. */
+/** A sub-domain of a domain (ADR 022) — vocabulary only, no color of its own. */
+export interface SubDomain {
+  id: string;
+  name: string;
+}
+
+/**
+ * A domain (the client's « Domaine (Orga) » vocabulary) with its display
+ * color and 3-letter code. `subDomains` is only declared on the domains the
+ * PMO wants detailed (ADR 022: A&D and CORPORATE); absent elsewhere, where
+ * the sub-domain is folded into the domain.
+ */
 export interface Domain {
   id: string;
   name: string;
   short: string;
   color: string;
+  subDomains?: SubDomain[];
 }
 
 /** A project type ("Achat", "Étude"…) — more visible than the domain on cards. */

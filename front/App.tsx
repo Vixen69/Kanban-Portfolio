@@ -66,7 +66,7 @@ function useDisplayCards(cards: CardState[], config: BoardConfig): CardState[] {
         const unchanged =
           refs.laneId === card.laneId && refs.columnId === card.columnId &&
           refs.domain === card.domain && refs.typeId === card.typeId &&
-          nature === card.nature;
+          refs.subDomain === card.subDomain && nature === card.nature;
         return unchanged ? card : { ...card, ...refs, nature };
       }),
     [cards, config],

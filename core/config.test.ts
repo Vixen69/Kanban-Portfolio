@@ -20,8 +20,11 @@ test("the repository's config/board.json is valid", () => {
   const config = validateBoardConfig(raw);
   assert.equal(config.lanes.length, 3);
   assert.equal(config.columns.length, 8);
-  assert.equal(config.domains.length, 9);
-  assert.equal(config.types.length, 6);
+  assert.equal(config.domains.length, 10);
+  assert.equal(config.types.length, 4);
+  // ADR 022: only A&D and CORPORATE are detailed into sub-domains.
+  const detailed = config.domains.filter((d) => d.subDomains !== undefined).map((d) => [d.id, d.subDomains?.length]);
+  assert.deepEqual(detailed, [["ad", 4], ["corporate", 9]]);
   assert.equal(config.fields.length, 0);
   assert.equal(config.columns.find((c) => c.id === "prets")?.gate, "DoR");
   assert.equal(config.columns.find((c) => c.id === "done")?.gate, "DoD");
@@ -189,7 +192,7 @@ for (const invalid of INVALID_CASES) {
 
 // reconcileCardRefs — the base card references the SECOND entry of each
 // collection so a fallback to the first entry is observable.
-const BASE_REFS = { laneId: "laneB", columnId: "col2", domain: "beta", typeId: "t2" };
+const BASE_REFS = { laneId: "laneB", columnId: "col2", domain: "beta", typeId: "t2", subDomain: null };
 
 const RECONCILE_CASES: {
   name: string;
@@ -210,3 +213,31 @@ for (const entry of RECONCILE_CASES) {
     assert.deepEqual(reconcileCardRefs(card, testConfig()), entry.expected);
   });
 }
+
+test("domains.subDomains: kept when declared, absent otherwise, malformed refused (table)", () => {
+  const kept = validateBoardConfig(rawConfig());
+  assert.deepEqual(kept.domains[1]?.subDomains, [{ id: "b1", name: "Beta 1" }, { id: "b2", name: "Beta 2" }]);
+  assert.equal("subDomains" in (kept.domains[0] as object), false);
+  const cases: [string, (raw: any) => void, RegExp][] = [
+    ["empty array", (raw) => (raw.domains[1].subDomains = []), /subDomains doit être absent ou un tableau non vide/],
+    ["not an array", (raw) => (raw.domains[1].subDomains = "b1"), /subDomains doit être absent ou un tableau non vide/],
+    ["duplicate id", (raw) => raw.domains[1].subDomains.push({ id: "b1", name: "Encore" }), /id dupliqué « b1 »/],
+    ["missing name", (raw) => (raw.domains[1].subDomains = [{ id: "b1" }]), /subDomains\[0\]\.name/],
+  ];
+  for (const [name, mutate, message] of cases) {
+    const raw = rawConfig();
+    mutate(raw);
+    assert.throws(() => validateBoardConfig(raw), message, name);
+  }
+});
+
+test("reconcileCardRefs keeps a sub-domain only while its domain declares it", () => {
+  const config = testConfig();
+  const kept = reconcileCardRefs(testCard({ domain: "beta", subDomain: "b2" }), config);
+  assert.equal(kept.subDomain, "b2");
+  // Unknown sub-domain, or a sub-domain of another domain: dropped to null.
+  assert.equal(reconcileCardRefs(testCard({ domain: "beta", subDomain: "ghost" }), config).subDomain, null);
+  assert.equal(reconcileCardRefs(testCard({ domain: "alpha", subDomain: "b1" }), config).subDomain, null);
+  // A remapped domain (stale reference) never keeps the old sub-domain.
+  assert.equal(reconcileCardRefs(testCard({ domain: "gone", subDomain: "b1" }), config).subDomain, null);
+});

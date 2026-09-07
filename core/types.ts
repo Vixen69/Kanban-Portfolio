@@ -57,8 +57,13 @@ export interface Risk {
 export interface Card {
   id: string;
   title: string;
-  /** Domain (RDOM) id — see BoardConfig.domains. */
+  /** Domain id — see BoardConfig.domains. */
   domain: string;
+  /**
+   * Sub-domain id within `domain` (see Domain.subDomains), null when the
+   * domain is not detailed or the card carries none (ADR 022).
+   */
+  subDomain: string | null;
   laneId: string;
   columnId: string;
   /** Chef de projet. */
@@ -182,6 +187,7 @@ export type CardPatch = Partial<
     | "title"
     | "owner"
     | "domain"
+    | "subDomain"
     | "criticality"
     | "typeId"
     | "codename"

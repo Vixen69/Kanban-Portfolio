@@ -208,7 +208,7 @@ function CritRows({ draft, patch }: TabProps) {
 export function CategoriesTab({ draft, patch }: TabProps) {
   return (
     <div className="apane">
-      <div className="asection-label">Domaines RDOM</div>
+      <div className="asection-label">Domaines (les sous-domaines se déclarent dans config/board.json — ADR 022)</div>
       <PaletteRows items={draft.domains} onChange={(domains) => patch({ domains })} shortTitle="Code court (3 lettres)" addLabel="+ Ajouter un domaine" makeNew={(i) => ({ id: slugId("domaine"), name: "Nouveau domaine", short: "NEW", color: paletteColor(i) })} />
       <div className="asection-label">Types de projet (plus visibles que le domaine sur la carte)</div>
       <PaletteRows items={draft.types} onChange={(types) => patch({ types })} shortTitle="Code court" addLabel="+ Ajouter un type" makeNew={(i) => ({ id: slugId("type"), name: "Nouveau type", short: "NEW", color: paletteColor(i) })} />

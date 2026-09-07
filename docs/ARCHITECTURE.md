@@ -637,6 +637,34 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-04 — Module filtres : 4 types, 10 domaines Orga, sous-domaines dépliables (ADR 022)
+- **Le sous-domaine entre dans le modèle** : `Domain.subDomains?` en
+  config (déclaré seulement sur A&D et CORPORATE), `Card.subDomain: string
+  | null` (éditable, validé côté middle, journalisé dans `edited`),
+  `reconcileCardRefs` qui ne garde un sous-domaine que si son domaine le
+  déclare encore. Les instantanés antérieurs se lisent avec `null`.
+- **Filtres** : groupe `subDomain` (clés `domaine/sous-domaine`) ; un
+  domaine coché = tous ses sous-domaines (`withDomainToggled`,
+  `withDomainsSet` dans `core/filters.ts`). **Sidebar** : chevron à gauche
+  des domaines détaillés, ligne de sous-pills dépliée, domaine « partiel »
+  en pointillé ; `Sidebar.tsx` scindé (`sidebarParts.tsx`,
+  `SidebarDomains.tsx`) pour le plafond de 300 lignes. Fiche : tag
+  sous-domaine ; formulaire : select dépendant du domaine.
+- **Vocabulaire par défaut** (`config/board.json`) : les 10 « Domaine
+  (Orga) » du client (A&D, CORPORATE, ERP, INDUSTRIE, INFRA, ING, IT4IT,
+  PLM, SOUTIEN, SUPPORT OFFICE) et les 4 types retenus (Étude, Projet de
+  gestion d'obsolescence, Projet de mise en œuvre, Projet IA) ; le groupe
+  « Type de projet » reste piloté par la config. Libellé « Domaine RDOM » →
+  « Domaine » partout.
+- **Fixtures** re-réparties (10 domaines / 4 types, somme 150),
+  sous-domaines semés par index sans toucher au flux aléatoire. Les tests
+  des contrats d'import de juillet lisent un instantané figé de l'ancienne
+  config (`adapters/csv-import/test-board.legacy.json`) jusqu'à leur
+  retrait par la révision des contrats.
+- Hors périmètre, assumé : édition des sous-domaines dans le panneau admin
+  (panneau à reconcevoir), sous-domaine dans QuickAdd. Pipeline vert :
+  typecheck, 463 tests, conventions.
+
 ### 2026-09-04 — Retours PMO : révision du mapping d'import (classeur de consolidation)
 - **Documentation seulement** — rien de codé à cette date. La séance PMO
   du 2026-09-04 révise plusieurs décisions « tranchées » de juillet ; la

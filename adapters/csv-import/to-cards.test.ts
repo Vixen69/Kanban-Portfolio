@@ -10,7 +10,7 @@ import { IMPORT_ACTOR, cardId, planLoad } from "./to-cards.ts";
 import type { EnrichedCard } from "./enrich.ts";
 
 const CONFIG = JSON.parse(
-  readFileSync(new URL("../../config/board.json", import.meta.url), "utf8"),
+  readFileSync(new URL("./test-board.legacy.json", import.meta.url), "utf8"),
 ) as BoardConfig;
 
 const NOW = new Date("2026-08-01T09:00:00.000Z");

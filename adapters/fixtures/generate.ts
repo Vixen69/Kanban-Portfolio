@@ -5,6 +5,7 @@
 // blocked events, follow-up comments become commented events.
 
 import type { BoardConfig, Criticality, Financials, NatureKey } from "../../core/types.ts";
+import { subDomainsOf } from "../../core/config.ts";
 import type { Subject } from "../../core/ports.ts";
 import { lifecycleEvent, movedEvent, type CardEventInput } from "../../core/events.ts";
 import {
@@ -130,15 +131,25 @@ function rollCardData(rng: SeededRandom, laneId: string, columnId: string, nowMs
   };
 }
 
+// Sub-domain of the i-th card (ADR 022): cycles through the domain's
+// declared sub-domains plus one "not detailed" slot, by card index — never
+// through the RNG, so the design's random stream stays byte-identical.
+function subDomainFor(config: BoardConfig, domainId: string, index: number): string | null {
+  const subs = subDomainsOf(config, domainId);
+  if (subs.length === 0) return null;
+  const slot = index % (subs.length + 1);
+  return slot === subs.length ? null : (subs[slot] as { id: string }).id;
+}
+
 function draftCard(
   rng: SeededRandom,
   spec: { laneId: string; nature: NatureKey; criticality: Criticality },
-  assign: { id: string; title: string; columnId: string; domain: string; typeId: string },
+  assign: { id: string; title: string; columnId: string; domain: string; subDomain: string | null; typeId: string },
   nowMs: number,
 ): Draft {
   const data = rollCardData(rng, spec.laneId, assign.columnId, nowMs);
   const subject: Subject = {
-    id: assign.id, title: assign.title, domain: assign.domain,
+    id: assign.id, title: assign.title, domain: assign.domain, subDomain: assign.subDomain,
     laneId: spec.laneId, columnId: assign.columnId, owner: data.owner,
     criticality: spec.criticality, typeId: assign.typeId, codename: data.codename,
     nature: spec.nature, tags: [], dependencies: [],
@@ -261,6 +272,7 @@ export function generatePortfolio(config: BoardConfig, now: Date, seed = FIXTURE
       title: titles[i] ?? `${titles[i % titles.length] as string} (lot ${Math.floor(i / titles.length) + 1})`,
       columnId: columns[i] as string,
       domain: domains[i] as string,
+      subDomain: subDomainFor(config, domains[i] as string, i),
       typeId: typeIds[i] as string,
     }, nowMs),
   );

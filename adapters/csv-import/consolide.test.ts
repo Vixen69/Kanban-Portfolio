@@ -16,7 +16,7 @@ import type { RdomTable } from "./rdom.ts";
 import type { ImportReport } from "./report.ts";
 
 const CONFIG = JSON.parse(
-  readFileSync(new URL("../../config/board.json", import.meta.url), "utf8"),
+  readFileSync(new URL("./test-board.legacy.json", import.meta.url), "utf8"),
 ) as BoardConfig;
 
 const HEADER =

@@ -27,15 +27,15 @@ export const COLUMN_FILL: [string, number][] = [
   ["actifs", 37], ["done", 15], ["exploitation", 18],
 ];
 
-/** Domain (RDOM) fills, ingenierie…cyber (sum 150). */
+/** Domain fills over the client's Orga vocabulary (ADR 022; sum 150). */
 export const DOMAIN_FILL: [string, number][] = [
-  ["ingenierie", 23], ["soutien", 15], ["industrie", 15], ["corporate", 21],
-  ["erp", 18], ["plm", 15], ["infra", 18], ["archi_dev", 15], ["cyber", 10],
+  ["ad", 20], ["corporate", 24], ["erp", 16], ["industrie", 15], ["infra", 20],
+  ["ing", 16], ["it4it", 10], ["plm", 13], ["soutien", 11], ["support_office", 5],
 ];
 
-/** Project-type fills (sum 150). */
-export const TYPE_FILL: [string, number][] = [["mise_en_oeuvre", 40], ["evolution_tma", 35],
-  ["etude", 25], ["obsolescence", 20], ["tma_corrective", 18], ["achat", 12]];
+/** Project-type fills over the four retained types (ADR 022; sum 150). */
+export const TYPE_FILL: [string, number][] =
+  [["mise_en_oeuvre", 62], ["etude", 40], ["obsolescence", 30], ["ia", 18]];
 
 /** Blocked-card quotas per column, applied in this order (design step 3). */
 export const BLOCKED_FILL: [string, number][] =

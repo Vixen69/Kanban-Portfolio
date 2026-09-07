@@ -30,6 +30,16 @@
 .pill.on { color: var(--tx-1); border-color: #8794a6; background: #dde3ee; font-weight: 600; }
 .pill-dot { width: 7px; height: 7px; border-radius: 50%; opacity: .35; }
 .pill.on .pill-dot { opacity: 1; }
+
+/* Domain pills with sub-domains (ADR 022): a chevron on the left of the
+   pill unfolds a full-width sub-row of smaller pills; a lit domain whose
+   sub-domains are only partly selected wears a dashed border. */
+.pill-with-chev { display: inline-flex; align-items: center; gap: 2px; }
+.pill-chev { font-size: 9px; line-height: 1; color: var(--tx-4); background: none; border: none; cursor: pointer; padding: 2px 1px; font-family: inherit; }
+.pill-chev:hover, .pill-chev.open { color: var(--tx-1); }
+.pill-sub-row { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 4px; margin-left: 5px; padding: 1px 0 3px 10px; border-left: 2px solid var(--bd-sub); }
+.pill.sub { font-size: 9px; padding: 2px 7px; }
+.pill.on.partial { background: #eef1f6; border-style: dashed; }
 .sb-stats { padding: 13px; margin-top: auto; }
 .stat-row { display: flex; justify-content: space-between; font-size: 10px; color: var(--tx-3); padding: 2px 0; }
 .stat-row b { color: var(--tx-1); font-variant-numeric: tabular-nums; }

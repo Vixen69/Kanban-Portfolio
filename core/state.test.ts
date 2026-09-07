@@ -27,7 +27,7 @@ test("EDITABLE_FIELDS is exactly the v2 CardPatch key set", () => {
       "chargeByProfile", "codename", "contentionNote", "contentionProfiles",
       "criticality", "custom", "dateRdr", "domain", "effortConsumed",
       "effortEstimated", "loadPlan", "notes", "owner",
-      "projectConstraints", "resources", "risks", "tags", "title", "typeId",
+      "projectConstraints", "resources", "risks", "subDomain", "tags", "title", "typeId",
     ].sort(),
   );
 });

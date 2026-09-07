@@ -124,8 +124,8 @@ function toCard(
     id,
     title: card.title,
     domain: card.domainId ?? config.domains[0]?.id ?? "",
-    laneId: card.laneId,
-    columnId: card.columnId,
+    subDomain: null, // filled by the revised contracts (IMPORT-MAPPING.md 2026-09-04, R4)
+    laneId: card.laneId, columnId: card.columnId,
     owner: card.owner ?? "",
     criticality: "normal",
     typeId: card.typeId,

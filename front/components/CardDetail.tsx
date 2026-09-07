@@ -6,7 +6,7 @@
 
 import { useEffect, useState } from "react";
 import type { BoardConfig, CardPatch, CardState } from "../../core/types.ts";
-import { reconcileCardRefs } from "../../core/config.ts";
+import { reconcileCardRefs, subDomainsOf } from "../../core/config.ts";
 import type { HistoryEntry } from "../../core/history.ts";
 import type { FlowAnchors, FlowTimes } from "../../core/flow.ts";
 import { TypeTag } from "./cardParts.tsx";
@@ -55,21 +55,24 @@ function TopBar({ card, onClose, onPatch }: { card: CardState; onClose: () => vo
   );
 }
 
-// Tag row: type (big), domain, colonne, criticality crown/star,
-// project-constraint tags and the + button opening the constraint editor.
-// No nature tag and, since design v12, no canal tag either: the canal IS
-// the nature and it is already read spatially from the board row, so the
-// tag was restating the card's position. Stale config references are
-// remapped for display only (never an event).
+// Tag row: type (big), domain (+ its sub-domain when detailed, ADR 022),
+// colonne, criticality crown/star, project-constraint tags and the +
+// button opening the constraint editor. No nature tag and, since design
+// v12, no canal tag either: the canal IS the nature and it is already read
+// spatially from the board row, so the tag was restating the card's
+// position. Stale config references are remapped for display only (never
+// an event).
 function TagRow({ card, config, onToggleConstraints }: { card: CardState; config: BoardConfig; onToggleConstraints: () => void }) {
   const refs = reconcileCardRefs(card, config);
   const domain = config.domains.find((entry) => entry.id === refs.domain)!;
+  const sub = subDomainsOf(config, refs.domain).find((entry) => entry.id === refs.subDomain) ?? null;
   const column = config.columns.find((entry) => entry.id === refs.columnId)!;
   const type = refs.typeId === null ? null : (config.types.find((entry) => entry.id === refs.typeId) ?? null);
   return (
     <div className="tag-row">
       <TypeTag type={type} big />
       <Tag color={domain.color}>{domain.name}</Tag>
+      {sub && <Tag color={domain.color}>{sub.name}</Tag>}
       <Tag color="#94a3b8">{column.name}</Tag>
       {card.criticality === "top" && <Tag color="#d4a017" solid>♛ TOP</Tag>}
       {card.criticality === "major" && <Tag color="#d4a017">★ MAJOR</Tag>}

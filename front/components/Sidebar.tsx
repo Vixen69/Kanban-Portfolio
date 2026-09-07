@@ -1,11 +1,16 @@
 // The sidebar (design v11 chrome.jsx): search, live read-out, codes-projet
-// toggle, the Blocage toggle, three filter pill groups, the stats block and
+// toggle, the Blocage toggle, the filter pill groups, the stats block and
 // the keyboard hints. Filters dim cards on the board, they never remove
 // them (spatial truth). Pure view over core/filters state owned by App.
+// The pill/section building blocks live in sidebarParts.tsx and the
+// Domaine group (with its unfoldable sub-domains, ADR 022) in
+// SidebarDomains.tsx.
 
-import type { ReactNode, Ref } from "react";
+import type { Ref } from "react";
 import type { BoardConfig } from "../../core/types.ts";
 import type { FilterGroup, FilterState, ViewCounts } from "../../core/filters.ts";
+import { GroupSection, Pill } from "./sidebarParts.tsx";
+import { DomainSection } from "./SidebarDomains.tsx";
 
 /** Props of the sidebar. All state and callbacks are owned by App. */
 export interface SidebarProps {
@@ -31,30 +36,6 @@ export interface SidebarProps {
   setShowCodes: (value: boolean) => void;
 }
 
-// One filter pill: optional colored dot + label, lit when active.
-function Pill(props: { active: boolean; onClick: () => void; color?: string; children: ReactNode }) {
-  return (
-    <button className={"pill" + (props.active ? " on" : "")} onClick={props.onClick}>
-      {props.color && <span className="pill-dot" style={{ background: props.color }} />}
-      {props.children}
-    </button>
-  );
-}
-
-// Category header: label + tout/rien quick toggles (matters most for 9 RDOM).
-function CatHead(props: { label: string; allOn: boolean; noneOn: boolean; onAll: () => void; onNone: () => void }) {
-  return (
-    <div className="cat-head">
-      <span className="sb-label">{props.label}</span>
-      <div className="cat-actions">
-        <button className="mini-act" disabled={props.allOn} onClick={props.onAll}>tout</button>
-        <span className="cat-sep">·</span>
-        <button className="mini-act" disabled={props.noneOn} onClick={props.onNone}>rien</button>
-      </div>
-    </div>
-  );
-}
-
 // One stat row. When filtering, the visible count leads; total trails muted.
 function StatRow(props: { label: string; value: number; total: number; active: boolean; alert?: boolean }) {
   return (
@@ -64,30 +45,6 @@ function StatRow(props: { label: string; value: number; total: number; active: b
         {props.value}
         {props.active && <i className="ref"> / {props.total}</i>}
       </b>
-    </div>
-  );
-}
-
-// One filter section: CatHead wired to the group + a pill row.
-function GroupSection(props: {
-  label: string;
-  group: FilterGroup;
-  wrap?: boolean;
-  filters: FilterState;
-  onSetGroup: SidebarProps["onSetGroup"];
-  children: ReactNode;
-}) {
-  const values = Object.values(props.filters[props.group]);
-  return (
-    <div className="sb-section">
-      <CatHead
-        label={props.label}
-        allOn={values.every((enabled) => enabled)}
-        noneOn={values.every((enabled) => !enabled)}
-        onAll={() => props.onSetGroup(props.group, true)}
-        onNone={() => props.onSetGroup(props.group, false)}
-      />
-      <div className={"pill-row" + (props.wrap ? " wrap" : "")}>{props.children}</div>
     </div>
   );
 }
@@ -139,6 +96,8 @@ function CodesSection(props: SidebarProps) {
   );
 }
 
+// Type de projet: the config's types — the four retained ones since the
+// 2026-09-04 PMO revision (ADR 022); the list stays config-driven.
 function TypeSection(props: SidebarProps) {
   return (
     <GroupSection label="Type de projet" group="type" wrap filters={props.filters} onSetGroup={props.onSetGroup}>
@@ -211,23 +170,6 @@ function CritSection(props: SidebarProps) {
   );
 }
 
-function DomainSection(props: SidebarProps) {
-  return (
-    <GroupSection label="Domaine RDOM" group="domain" wrap filters={props.filters} onSetGroup={props.onSetGroup}>
-      {props.config.domains.map((domain) => (
-        <Pill
-          key={domain.id}
-          active={props.filters.domain[domain.id] !== false}
-          onClick={() => props.onToggle("domain", domain.id)}
-          color={domain.color}
-        >
-          {domain.short}
-        </Pill>
-      ))}
-    </GroupSection>
-  );
-}
-
 function StatsBlock(props: SidebarProps) {
   const { view, stats, filtersActive: active, config } = props;
   return (
@@ -258,8 +200,9 @@ function Shortcuts() {
 /**
  * The sidebar. Hidden (zero width) when closed; S or the ≡ button toggles
  * it, "/" opens it and focuses the search box. Sections in design-v11
- * order: search, live result row, codes-projet switch, Blocage, Type de
- * projet, Criticité, Domaine RDOM, the stats block, keyboard shortcuts.
+ * order: search, live result row, codes-projet switch, Contrainte, Blocage,
+ * Type de projet, Criticité, Domaine (with unfoldable sub-domains), the
+ * stats block, keyboard shortcuts.
  * Inputs: SidebarProps (open flag, config, filter state + callbacks,
  * portfolio/visible counts, codes toggle, search ref).
  * Output: the aside element. Failure: none.
@@ -274,7 +217,7 @@ export function Sidebar(props: SidebarProps) {
       <BlocageSection {...props} />
       <TypeSection {...props} />
       <CritSection {...props} />
-      <DomainSection {...props} />
+      <DomainSection config={props.config} filters={props.filters} onToggle={props.onToggle} onSetGroup={props.onSetGroup} />
       <StatsBlock {...props} />
       <Shortcuts />
     </aside>

@@ -249,6 +249,7 @@ test("an edited patch is rejected field by field in French", async () => {
     [{ tags: "pas-un-tableau" }, /Valeur invalide pour le champ « tags »/],
     [{ custom: { a: {} } }, /Valeur invalide pour le champ « custom »/],
     [{ domain: "ghost" }, /Valeur invalide pour le champ « domain »/],
+    [{ subDomain: "ghost" }, /Valeur invalide pour le champ « subDomain »/],
     [{ typeId: "ghost" }, /Valeur invalide pour le champ « typeId »/],
     [{ nature: "complex" }, /Champ d’édition non autorisé/],
     [{ criticality: "mega" }, /Valeur invalide pour le champ « criticality »/],

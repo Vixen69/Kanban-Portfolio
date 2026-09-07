@@ -7,7 +7,7 @@
 
 import { useState } from "react";
 import type { BoardConfig, CardPatch, CardState, Criticality, CustomValue, FieldDef } from "../../core/types.ts";
-import { reconcileCardRefs } from "../../core/config.ts";
+import { reconcileCardRefs, subDomainsOf } from "../../core/config.ts";
 import { CRITICALITY_KEYS, CustomInput, Field, SelectField } from "./modalParts.tsx";
 
 /** Move intent computed on save when the card changed cell. */
@@ -36,7 +36,7 @@ export interface CardEditProps {
 // Form state: numeric fields kept as strings for controlled inputs.
 interface Draft {
   title: string; typeId: string; codename: string;
-  domain: string; laneId: string; columnId: string;
+  domain: string; subDomain: string; laneId: string; columnId: string;
   criticality: Criticality; owner: string;
   effortEstimated: string; effortConsumed: string;
   loadPlan: string; resourcesCsv: string; dateRdr: string;
@@ -63,7 +63,7 @@ function toDraft(card: CardState, config: BoardConfig): Draft {
   const refs = reconcileCardRefs(card, config);
   return {
     title: card.title, typeId: refs.typeId ?? "", codename: card.codename ?? "",
-    domain: refs.domain, laneId: refs.laneId, columnId: refs.columnId,
+    domain: refs.domain, subDomain: refs.subDomain ?? "", laneId: refs.laneId, columnId: refs.columnId,
     criticality: card.criticality, owner: card.owner,
     effortEstimated: numText(card.effortEstimated), effortConsumed: numText(card.effortConsumed),
     loadPlan: card.loadPlan ?? "", resourcesCsv: card.resources.join(", "),
@@ -78,7 +78,8 @@ function toDraft(card: CardState, config: BoardConfig): Draft {
 function fullPatch(draft: Draft): CardPatch {
   return {
     title: draft.title.trim(), owner: draft.owner.trim(),
-    domain: draft.domain, criticality: draft.criticality,
+    domain: draft.domain, subDomain: draft.subDomain === "" ? null : draft.subDomain,
+    criticality: draft.criticality,
     typeId: draft.typeId === "" ? null : draft.typeId,
     codename: draft.codename.trim() === "" ? null : draft.codename.trim(),
     effortEstimated: numOrNull(draft.effortEstimated), effortConsumed: numOrNull(draft.effortConsumed),
@@ -118,13 +119,19 @@ function TypeCodeRow({ draft, config, set }: { draft: Draft; config: BoardConfig
   );
 }
 
-// Domaine / Canal / Colonne / Criticité / Chef de projet grid. No Nature
-// select (design v11): nature follows the canal — changing the canal IS the
+// Domaine (+ Sous-domaine when the domain is detailed, ADR 022) / Canal /
+// Colonne / Criticité / Chef de projet grid. Changing the domain clears the
+// sub-domain: a sub-domain never survives its domain. No Nature select
+// (design v11): nature follows the canal — changing the canal IS the
 // requalification.
 function RefsGrid({ draft, config, set }: { draft: Draft; config: BoardConfig; set: SetDraft }) {
+  const subs = subDomainsOf(config, draft.domain);
   return (
     <div className="field-2col">
-      <SelectField label="Domaine RDOM" value={draft.domain} options={config.domains.map((d) => ({ value: d.id, label: d.name }))} onChange={(v) => set({ domain: v })} />
+      <SelectField label="Domaine" value={draft.domain} options={config.domains.map((d) => ({ value: d.id, label: d.name }))} onChange={(v) => set({ domain: v, subDomain: "" })} />
+      {subs.length > 0 && (
+        <SelectField label="Sous-domaine" value={draft.subDomain} options={[{ value: "", label: "— non détaillé —" }, ...subs.map((s) => ({ value: s.id, label: s.name }))]} onChange={(v) => set({ subDomain: v })} />
+      )}
       <SelectField label="Canal" value={draft.laneId} options={config.lanes.map((l) => ({ value: l.id, label: l.name }))} onChange={(v) => set({ laneId: v })} />
       <SelectField label="Colonne" value={draft.columnId} options={config.columns.map((c) => ({ value: c.id, label: c.name }))} onChange={(v) => set({ columnId: v })} />
       <SelectField label="Criticité" value={draft.criticality} options={CRITICALITY_KEYS.map((k) => ({ value: k, label: config.criticalities[k].label }))} onChange={(v) => set({ criticality: v as Criticality })} />
