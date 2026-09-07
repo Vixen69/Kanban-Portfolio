@@ -17,7 +17,7 @@ import { loadServerConfig } from "../middle/config.ts";
 import { createConfigStore } from "../middle/config-store.ts";
 import { planLoad, renderReport, runImportAudit } from "../adapters/csv-import/index.ts";
 import type { InputFile, LoadPlan } from "../adapters/csv-import/index.ts";
-import type { EnrichedCard } from "../adapters/csv-import/index.ts";
+import type { CapacityBuild, EnrichedCard } from "../adapters/csv-import/index.ts";
 import type { BoardConfig } from "../core/types.ts";
 
 const USAGE = "usage : node sync/import.ts <dossier> [--out <rapport>] [--charger]";
@@ -76,7 +76,7 @@ function readInputFiles(folder: string): InputFile[] {
 // cards and their events in one atomic batch. The storage module is loaded
 // LAZILY: audit mode must keep running with no node_modules at all (the
 // parser is dependency-free by design; only the pg driver needs an install).
-async function load(deck: EnrichedCard[], config: BoardConfig): Promise<LoadPlan> {
+async function load(deck: EnrichedCard[], config: BoardConfig, capacity: CapacityBuild | null): Promise<LoadPlan> {
   const cfg = loadServerConfig(process.env);
   mkdirSync(dirname(cfg.dataPath), { recursive: true });
   // Say the destination BEFORE writing: the driver defaults to jsonl, so a
@@ -88,6 +88,7 @@ async function load(deck: EnrichedCard[], config: BoardConfig): Promise<LoadPlan
     const [events, baseCards] = await Promise.all([storage.listEvents(), storage.listBaseCards()]);
     const plan = planLoad(deck, config, baseCards, events, new Date());
     await storage.importCards(plan.cards, plan.events);
+    if (capacity !== null) await storage.importCapacity(capacity.snapshot);
     return plan;
   } finally {
     await storage.close();
@@ -127,7 +128,7 @@ if (args === null) {
 try {
   const boardConfig = loadRuntimeBoardConfig();
   const files = readInputFiles(args.folder);
-  const { report, cards } = runImportAudit(files, boardConfig, new Date());
+  const { report, cards, capacity } = runImportAudit(files, boardConfig, new Date());
   const outPath = resolve(args.out ?? join(args.folder, "rapport-import.md"));
   mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, renderReport(report, new Date()), "utf8");
@@ -146,7 +147,11 @@ try {
       console.error("chargement refusé : aucune carte assemblée (le fichier `projets` manque ?).");
       process.exit(1);
     }
-    console.log(loadSummary(await load(cards.cards, boardConfig)));
+    console.log(loadSummary(await load(cards.cards, boardConfig, capacity)));
+    if (capacity !== null) {
+      const { persons, assignments } = capacity.snapshot;
+      console.log(`capacité ${capacity.snapshot.exerciseYear} : ${persons.length} personne(s), ${assignments.length} affectation(s) enregistrées.`);
+    }
   }
 } catch (error) {
   const detail = error instanceof Error ? error.message : String(error);

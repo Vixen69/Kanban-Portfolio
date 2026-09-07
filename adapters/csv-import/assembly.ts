@@ -10,6 +10,8 @@ import type { SpTable } from "./sp.ts";
 import type { CardAssembly } from "./enrich.ts";
 import { cardDistribution } from "./enrich.ts";
 import type { PdcTable } from "./pdc.ts";
+import type { ProfilsTable } from "./profils.ts";
+import type { CapacityBuild } from "./capacity.ts";
 import { formatJh } from "./charges.ts";
 import type { ChargeStats } from "./charges.ts";
 import type { ImportReport } from "./report.ts";
@@ -21,6 +23,7 @@ export interface Presence {
   jalons: boolean;
   sp: boolean;
   pdc: boolean;
+  profils: boolean;
 }
 
 /**
@@ -34,7 +37,8 @@ export function emitMissing(report: ImportReport, present: Presence): void {
     ["param", "PARAM", "responsables de domaine (exclus du chef de projet) et traduction des chemins d'organisation"],
     ["jalons", "ProjetsJalons", "position initiale (RDO / RDLI / RDR franchi) — sans lui, tout en colonne d'entrée"],
     ["sp", "SP (2026 ou total)", "coûts 2026 : meilleur estimé, réel, engagé"],
-    ["pdc", "Ressources_PdC", "plan de charge 2026 par profil (+ consolidation nominative)"],
+    ["pdc", "Ressources_PdC", "plan de charge de l'exercice par profil et par personne (+ consolidation nominative)"],
+    ["profils", "Ress.Profils", "personnes de la DSI (domaine, métier, capacité) — sans lui, la vue capacité ne connaît que la demande"],
   ];
   for (const [key, name, note] of expected) {
     if (!present[key]) report.missingExpected.push({ name, note });
@@ -48,8 +52,10 @@ export interface AssemblyData {
   jalons: JalonsTable | null;
   sp: SpTable | null;
   pdc: PdcTable | null;
+  profils: ProfilsTable | null;
   cards: CardAssembly | null;
   chargeStats: ChargeStats | null;
+  capacity: CapacityBuild | null;
 }
 
 /**
@@ -67,6 +73,18 @@ export function emitAssembly(report: ImportReport, data: AssemblyData, config: B
   if (data.cards !== null && data.projets !== null) emitDeck(report, data, data.cards, data.projets, config);
   else emitWaiting(report, data);
   report.assembly.push({ subject: "plan de charge", status: chargeStatus(data) });
+  report.assembly.push({ subject: "capacité", status: capacityStatus(data) });
+}
+
+// The capacity snapshot (ADR 024): who, how much capacity, how much demand.
+function capacityStatus(data: AssemblyData): string {
+  if (data.capacity === null) return "en attente de `Ress.Profils` (personnes) et de `Ressources_PdC` (affectations)";
+  const s = data.capacity.stats;
+  const people = data.profils === null
+    ? "sans `Ress.Profils` — personnes connues par le plan de charge seul, capacité inconnue"
+    : `${s.persons} personne(s) dont ${s.external} externe(s) · capacité ${formatJh(s.capacityJh)} j.h`;
+  return `${people} · ${s.stubs} sans fiche · affectations : ${s.assignments} sur ${s.cardsCovered} carte(s)` +
+    ` · demande ${formatJh(s.demandJh)} j.h`;
 }
 
 function paramStatus(param: ParamTable | null): string {

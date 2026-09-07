@@ -4,7 +4,7 @@
 // stays hard-coded.
 
 import type {
-  AgeThresholds, BoardConfig, Column, CriticalityStyle,
+  AgeThresholds, BoardConfig, Column, CriticalityStyle, ExerciseConfig,
   FieldDef, FieldOption, FieldType, GateCode, GateDef, Lane, NatureKey,
   NatureStyle, RiskSeverityStyle,
 } from "./types.ts";
@@ -23,6 +23,21 @@ const GATE_CODES: readonly GateCode[] = ["DoR", "DoD"];
 const FIELD_TYPES: readonly FieldType[] = ["text", "number", "date", "select", "checkbox", "person"];
 const AGE_KEYS = ["freshMaxDays", "recentMaxDays", "agingMaxDays"] as const;
 const RISK_SEVERITY_KEYS = ["faible", "moyen", "eleve"] as const;
+
+/** Exercise year assumed by a config that predates ADR 024 (runtime overrides stored before). */
+export const DEFAULT_EXERCISE_YEAR = 2026;
+
+// exercise.year: an integer year; absent = the pre-ADR-024 default, so an
+// admin override stored earlier keeps validating.
+function parseExercise(value: unknown): ExerciseConfig {
+  if (value === undefined) return { year: DEFAULT_EXERCISE_YEAR };
+  const record = requireExactKeys(value, "exercise", ["year"]);
+  const year = record.year;
+  if (typeof year !== "number" || !Number.isInteger(year) || year < 2000 || year > 2100) {
+    fail("exercise.year doit être une année entière (2000–2100)");
+  }
+  return { year };
+}
 
 // natureKey: one of the three fixed keys; absent defaults to "complicated"
 // (back-compat with runtime overrides stored before design v11).
@@ -205,7 +220,7 @@ function parseAge(value: unknown): AgeThresholds {
  * a missing column wip or gate defaults to null; a missing fields array
  * defaults to []; a missing showOnCard defaults to false; options are kept
  * only on "select" fields; a domain's subDomains is kept only when declared
- * (ADR 022).
+ * (ADR 022); a missing exercise defaults to DEFAULT_EXERCISE_YEAR (ADR 024).
  * Failure: throws ConfigError with a French message naming the first
  * offending field; never returns a partially valid config.
  */
@@ -258,6 +273,7 @@ export function validateBoardConfig(raw: unknown): BoardConfig {
     ...parseVocabularies(raw),
     age: parseAge(raw.age),
     andonThresholdDays: andon,
+    exercise: parseExercise(raw.exercise),
   };
 }
 

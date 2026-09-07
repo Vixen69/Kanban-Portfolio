@@ -84,6 +84,7 @@
   "domains": [
     {
       "id": "ad",
+      "transverse": true,
       "name": "A&D",
       "short": "A&D",
       "color": "#14b8a6",
@@ -164,6 +165,7 @@
     },
     {
       "id": "infra",
+      "transverse": true,
       "name": "INFRA",
       "short": "INF",
       "color": "#ec4899"
@@ -488,5 +490,8 @@
     "recentMaxDays": 28,
     "agingMaxDays": 60
   },
-  "andonThresholdDays": 5
+  "andonThresholdDays": 5,
+  "exercise": {
+    "year": 2026
+  }
 }

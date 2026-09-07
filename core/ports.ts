@@ -5,7 +5,7 @@
 // PostgreSQL driver (pg, the delivery default — ADR 016) and the JSONL file
 // driver (selectable single-writer fallback — ADR 008/009).
 
-import type { Card, CardEvent, Financials } from "./types.ts";
+import type { CapacitySnapshot, Card, CardEvent, Financials } from "./types.ts";
 import type { CardEventInput } from "./events.ts";
 
 /**
@@ -73,6 +73,17 @@ export interface BoardStorage {
    * Failure: rejects on storage errors.
    */
   listBaseCards(): Promise<Card[]>;
+  /**
+   * Replaces the capacity snapshot (persons + assignments, ADR 024) as a
+   * whole, atomically — a fact table refreshed by each import, never
+   * event-sourced. Failure: rejects on storage errors; nothing partial.
+   */
+  importCapacity(snapshot: CapacitySnapshot): Promise<void>;
+  /**
+   * Returns the last capacity snapshot, or null when none was imported.
+   * Failure: rejects on storage errors.
+   */
+  getCapacity(): Promise<CapacitySnapshot | null>;
   /** Releases the underlying resources. Idempotent. Failure: none. */
   close(): Promise<void>;
 }

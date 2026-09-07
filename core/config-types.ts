@@ -54,6 +54,12 @@ export interface Domain {
   short: string;
   color: string;
   subDomains?: SubDomain[];
+  /**
+   * A shared-resource domain (ADR 024: Architecture & Développement,
+   * Infrastructure) — every subject draws on it, so its capacity is the
+   * portfolio's binding constraint and the arbitration read-outs single it out.
+   */
+  transverse?: boolean;
 }
 
 /** A project type ("Achat", "Étude"…) — more visible than the domain on cards. */
@@ -145,6 +151,11 @@ export interface FieldDef {
   options?: FieldOption[];
 }
 
+/** The exercise (budget year) the board reads: charges, costs and capacity are that year's. */
+export interface ExerciseConfig {
+  year: number;
+}
+
 /** Day thresholds separating fresh / recent / aging / stale. */
 export interface AgeThresholds {
   freshMaxDays: number;
@@ -182,4 +193,6 @@ export interface BoardConfig {
   age: AgeThresholds;
   /** Blocked longer than this many days gets the static escalation marker. */
   andonThresholdDays: number;
+  /** The exercise year (ADR 024) — the PdC / SP window the import reads. */
+  exercise: ExerciseConfig;
 }

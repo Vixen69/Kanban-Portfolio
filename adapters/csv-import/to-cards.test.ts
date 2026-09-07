@@ -32,6 +32,7 @@ function card(over: Partial<EnrichedCard> = {}): EnrichedCard {
     budgetRdli: 150, budgetEstimated: 120.5, budgetConsumed: 80, budgetEngaged: 30,
     effortEstimated: 110, effortConsumed: 70,
     charges: [{ profileId: "pmo", jh: 40, done: 25 }],
+    pdcKey: "modernisation atelier",
     positioned: true,
     ref: { file: "Projets.csv", line: 2 },
     ...over,

@@ -12,7 +12,8 @@ import express, {
   type Response,
 } from "express";
 import type { BoardStorage } from "../core/ports.ts";
-import { BadRequest, getBoard, getConfig, postEvent, putConfig } from "./api.ts";
+import { BadRequest, getBoard,
+  getCapacity, getConfig, postEvent, putConfig } from "./api.ts";
 import { postCard } from "./cards.ts";
 import type { ConfigStore } from "./config-store.ts";
 import { logError, logRequest } from "./log.ts";
@@ -72,7 +73,7 @@ function errorHandler(err: unknown, req: Request, res: Response, _next: NextFunc
   res.status(500).json({ error: "Erreur interne." });
 }
 
-// Mounts the six API routes. Handlers throw BadRequest on invalid input;
+// Mounts the seven API routes. Handlers throw BadRequest on invalid input;
 // Express 5 forwards both a synchronous throw and a rejected promise from an
 // async handler to errorHandler (→ 400/500). The storage-backed routes are
 // async (the BoardStorage port is async — e.g. the Postgres driver).
@@ -91,6 +92,10 @@ function mountRoutes(app: Express, deps: MiddleDeps): void {
   });
   app.get("/api/board", async (_req: Request, res: Response) => {
     const result = await getBoard(deps.storage);
+    res.status(result.status).json(result.body);
+  });
+  app.get("/api/capacity", async (_req: Request, res: Response) => {
+    const result = await getCapacity(deps.storage);
     res.status(result.status).json(result.body);
   });
   app.post("/api/cards", async (req: Request, res: Response) => {

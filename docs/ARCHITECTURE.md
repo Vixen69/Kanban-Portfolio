@@ -637,6 +637,50 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-07 — Module capacité : personnes, affectations, année d'exercice (ADR 024)
+
+- **Pourquoi** : l'outil sert les arbitrages inter-domaines entre les
+  responsables de domaines ; la sur-affectation des personnes, des équipes
+  et des domaines est une aide directe à l'arbitrage (auteur, 2026-09-07).
+  Première marche du plan d'automne (S1) : faire entrer les personnes et
+  leurs affectations dans le produit, et vérifier dans le rapport d'import
+  que « les chiffres collent » avant toute vue.
+- **Modèle** : une **table de faits `capacity`** à côté du journal —
+  `{ exerciseYear, persons, assignments }`, remplacée entière à chaque
+  import (`BoardStorage.importCapacity` / `getCapacity`, pilotes JSONL et
+  PostgreSQL, test de conformance commun). Les cartes restent
+  event-sourcées ; les personnes n'ont pas de flux à tracer.
+  `core/capacity.ts` (pur, testé) : charge par personne, par groupe
+  (profil, équipe, domaine), demande croisée « domaine de la personne ×
+  domaine de la carte », surcharges ; 200 j.h = 1 ETP.
+- **Config** : `exercise.year` (2026) — plus d'année en dur : le contrat du
+  plan de charge est construit pour l'exercice (`pdcContract(year)`,
+  registre `contractsFor(year)`), le rapport la cite ;
+  `domains[].transverse` (A&D, INFRA) marque les domaines dont les
+  personnes servent tout le portefeuille.
+- **Import** : nouveau contrat `Ress.Profils` (personnes ; Email et Coût
+  déclarés ignorés, jamais lus) ; le plan de charge conserve, par projet,
+  ses lignes nominatives ; l'assembleur joint par matricule (Id / pk
+  Contact), forge un **id opaque** (hachage FNV-1a du matricule normalisé),
+  crée des stubs signalés pour les personnes du PdC sans fiche et produit
+  une affectation par personne × carte. Ligne « capacité » dans l'état
+  d'assemblage ; `--charger` enregistre le snapshot. `contract.ts` scindé :
+  registre `registry.ts` + moteur (cap de 300 lignes).
+- **API / fixtures** : `GET /api/capacity` ; générateur déterministe de
+  personnes et d'affectations dans les fixtures (les affectations retombent
+  exactement sur les charges par profil des cartes), enregistré par le seed.
+- **Vérification** : typecheck, suite complète verte (conformance capacité
+  JSONL + PostgreSQL, fixtures, route, lecteurs), rapport d'audit produit
+  sur les squelettes synthétiques (`fixtures/import/`, dont un
+  `Ress.Profils.csv` inventé), conventions.
+- **Risques / limites** : jointure tributaire des colonnes Id / pk Contact
+  réelles (Q26) ; unité de « Disponibilité » à confirmer (≤ 5 lu en ETP,
+  Q24) ; une photo par import, pas d'historique de capacité (assumé).
+- **Suite** (sprints d'automne, revue utilisateur à chaque fin) : S2 vue
+  capacité v0.1 dans le panneau analytics ; S3 décision sur carte, « absente
+  du dernier import », clôture d'exercice ; S4 import par l'UI ; S5 panneau
+  de configuration.
+
 ### 2026-09-07 — Module contrats d'import : PARAM, Projets, ProjetsJalons, SP (ADR 023)
 - **Le registre de juillet est remplacé** (R1/R9) : `param` → `sp` →
   `projets_jalons` → `projets` → `ressources_pdc` ; `rdom` reste

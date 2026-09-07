@@ -2,7 +2,7 @@
 
 import type { BoardStorage } from "../core/ports.ts";
 import type { CardEventInput } from "../core/events.ts";
-import type { Card, CardEvent } from "../core/types.ts";
+import type { CapacitySnapshot, Card, CardEvent } from "../core/types.ts";
 import { testCard } from "../core/test-helpers.ts";
 
 /**
@@ -14,6 +14,7 @@ import { testCard } from "../core/test-helpers.ts";
 export function stubStorage(cards: Card[] = [testCard({ id: "S001" })]): BoardStorage {
   const baseCards = cards.map((card) => ({ ...card }));
   const events: CardEvent[] = [];
+  let capacity: CapacitySnapshot | null = null;
   let seq = 0;
   const append = (input: CardEventInput): CardEvent => {
     seq += 1;
@@ -35,6 +36,12 @@ export function stubStorage(cards: Card[] = [testCard({ id: "S001" })]): BoardSt
     },
     async listEvents() {
       return events.slice();
+    },
+    async importCapacity(snapshot: CapacitySnapshot) {
+      capacity = structuredClone(snapshot);
+    },
+    async getCapacity() {
+      return capacity === null ? null : structuredClone(capacity);
     },
     async listBaseCards() {
       return baseCards.map((card) => ({ ...card }));

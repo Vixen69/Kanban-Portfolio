@@ -8,8 +8,8 @@
 import { decodeCsvBytes } from "./decode.ts";
 import { parseCsv } from "./csv.ts";
 import type { CsvRow } from "./csv.ts";
-import { identifyHeader } from "./contract.ts";
-import type { HeaderDeviation, HeaderIdentification, HeaderMatch, HeaderNearMiss } from "./contract.ts";
+import { CONTRACTS, identifyHeader } from "./contract.ts";
+import type { FileContract, HeaderDeviation, HeaderIdentification, HeaderMatch, HeaderNearMiss } from "./contract.ts";
 import { warn } from "./report.ts";
 import type { FileInventoryEntry, ImportReport } from "./report.ts";
 
@@ -32,13 +32,17 @@ const HEADER_SEARCH_ROWS = 20;
 
 /**
  * Classifies one received file and feeds the inventory.
- * Inputs: the file and the report. Non-.csv files are inventoried and
+ * Inputs: the file, the report and the contract registry (defaults to the
+ * default exercise year's; the orchestrator passes the configured year's).
+ * Non-.csv files are inventoried and
  * skipped; .csv files are decoded (encoding signaled), parsed, and their
  * header searched among the first rows.
  * Outputs: the header match and data rows for recognized files, else null.
  * Failure modes: none — every rejection lands in the inventory.
  */
-export function processFile(file: InputFile, report: ImportReport): ParsedCsvFile | null {
+export function processFile(
+  file: InputFile, report: ImportReport, contracts: readonly FileContract[] = CONTRACTS,
+): ParsedCsvFile | null {
   if (!file.name.toLowerCase().endsWith(".csv")) {
     addInventory(report, file, "not-csv", {});
     return null;
@@ -52,7 +56,7 @@ export function processFile(file: InputFile, report: ImportReport): ParsedCsvFil
   const encoding = encodingLabel(decoded.encoding);
   const parsed = parseCsv(decoded.text);
   for (const message of parsed.warnings) warn(report, message, file.name);
-  const pick = pickHeader(parsed.rows);
+  const pick = pickHeader(parsed.rows, contracts);
   if (pick === null) {
     addInventory(report, file, "unknown", { encoding, detail: "fichier vide" });
     return null;
@@ -75,7 +79,7 @@ interface HeaderPick {
 // First full match among the candidates wins; else the near-miss with the
 // most required columns found (first on ties); else the first non-empty
 // row, kept so its labels can be listed.
-function pickHeader(rows: CsvRow[]): HeaderPick | null {
+function pickHeader(rows: CsvRow[], contracts: readonly FileContract[]): HeaderPick | null {
   const candidates: number[] = [];
   for (let i = 0; i < rows.length && candidates.length < HEADER_SEARCH_ROWS; i++) {
     if ((rows[i]?.cells ?? []).some((c) => c.trim() !== "")) candidates.push(i);
@@ -83,7 +87,7 @@ function pickHeader(rows: CsvRow[]): HeaderPick | null {
   const capped = candidates.length === HEADER_SEARCH_ROWS;
   let best: HeaderPick | null = null;
   for (const rowIndex of candidates) {
-    const identification = identifyHeader(rows[rowIndex]?.cells ?? []);
+    const identification = identifyHeader(rows[rowIndex]?.cells ?? [], contracts);
     if (identification.status === "match") return { rowIndex, identification, capped: false };
     if (best === null || nearMissScore(identification) > nearMissScore(best.identification)) {
       best = { rowIndex, identification, capped };

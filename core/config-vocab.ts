@@ -66,5 +66,9 @@ export function parseDomain(value: unknown, index: number): Domain {
   const record = value as Record<string, unknown>;
   const subDomains = parseSubDomains(record.subDomains, `domains[${index}].subDomains`);
   if (subDomains !== undefined) domain.subDomains = subDomains;
+  if (record.transverse !== undefined) {
+    if (typeof record.transverse !== "boolean") fail(`domains[${index}].transverse doit être un booléen`);
+    if (record.transverse) domain.transverse = true;
+  }
   return domain;
 }

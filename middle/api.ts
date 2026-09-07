@@ -91,6 +91,17 @@ export async function getBoard(storage: BoardStorage): Promise<ApiResult> {
 }
 
 /**
+ * GET /api/capacity — the last imported capacity snapshot (persons +
+ * assignments, ADR 024), or null when no import carried one yet. The
+ * read-outs are derived client-side by core/capacity.ts.
+ * Inputs: the storage. Output: 200 with { capacity }.
+ * Failure: propagates storage errors (→ 500).
+ */
+export async function getCapacity(storage: BoardStorage): Promise<ApiResult> {
+  return { status: 200, body: { capacity: await storage.getCapacity() } };
+}
+
+/**
  * POST /api/events — validates an event intent against the live (folded)
  * board and the runtime config, stamps server id/ts/actor, and appends it.
  * The read-fold-validate-append section runs serialized (see

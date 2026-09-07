@@ -59,6 +59,23 @@ export function createTypeLookup(config: BoardConfig): Lookup {
   return (cell) => lookup(typeBaseLabel(cell));
 }
 
+/**
+ * Builds a tolerant profile lookup (id or name), retrying with the first
+ * dot-prefix stripped (« Externe.Développeur » — prefixes surveyed, Q9).
+ * Inputs: the board config. Outputs: cell -> hit or null. Failure: none.
+ */
+export function createProfileLookup(config: BoardConfig): Lookup {
+  const lookup = createTolerantLookup(
+    config.profiles.flatMap((p): Array<[string, string]> => [[p.id, p.id], [p.name, p.id]]),
+  );
+  return (cell) => {
+    const direct = lookup(cell);
+    if (direct !== null) return direct;
+    const dot = cell.indexOf(".");
+    return dot > 0 ? lookup(cell.slice(dot + 1).trim()) : null;
+  };
+}
+
 // The identifying words of a person cell: normalized, letters only, at
 // least three characters — matricules and initials never count.
 function nameWords(cell: string): string[] {

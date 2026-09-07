@@ -13,7 +13,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { BoardStorage } from "../core/ports.ts";
 import type { CardEventInput } from "../core/events.ts";
-import type { BoardConfig, Card, CardEvent } from "../core/types.ts";
+import type { BoardConfig, CapacitySnapshot, Card, CardEvent } from "../core/types.ts";
 import { testCard, testConfig } from "../core/test-helpers.ts";
 import { createConfigStore } from "./config-store.ts";
 import { createApp } from "./app.ts";
@@ -22,6 +22,7 @@ import { createApp } from "./app.ts";
 function stubStorage(cards: Card[] = [testCard({ id: "S001" })]): BoardStorage {
   const baseCards = cards.map((card) => ({ ...card }));
   const events: CardEvent[] = [];
+  let capacity: CapacitySnapshot | null = null;
   let seq = 0;
   const append = (input: CardEventInput): CardEvent => {
     seq += 1;
@@ -47,6 +48,8 @@ function stubStorage(cards: Card[] = [testCard({ id: "S001" })]): BoardStorage {
     async listBaseCards() {
       return baseCards.map((card) => ({ ...card }));
     },
+    async importCapacity(snapshot: CapacitySnapshot) { capacity = structuredClone(snapshot); },
+    async getCapacity() { return capacity === null ? null : structuredClone(capacity); },
     async close() {},
   };
 }
@@ -279,4 +282,15 @@ test("a storage failure is a 500 whose body never leaks the internal error", asy
     assert.doesNotMatch(text, /TITRE_SECRET|secret\.sql/);
     assert.equal((JSON.parse(text) as { error: string }).error, "Erreur interne.");
   }, failing);
+});
+
+test("GET /api/capacity serves null, then the imported snapshot", async () => {
+  const storage = stubStorage();
+  await withServer(async (base) => {
+    assert.equal(((await (await fetch(`${base}/api/capacity`)).json()) as { capacity: unknown }).capacity, null);
+    await storage.importCapacity({ exerciseYear: 2026, persons: [], assignments: [{ personId: "p-1", cardId: "S001", jh: 12, done: 3 }] });
+    const res = await fetch(`${base}/api/capacity`);
+    const body = (await res.json()) as { capacity: { exerciseYear: number; assignments: unknown[] } };
+    assert.deepEqual([res.status, body.capacity.exerciseYear, body.capacity.assignments.length], [200, 2026, 1]);
+  }, storage);
 });

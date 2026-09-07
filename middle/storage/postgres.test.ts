@@ -23,7 +23,7 @@ const TS = "2026-06-01T10:00:00.000Z";
 async function reset(): Promise<void> {
   const pool = new Pool({ connectionString: URL });
   await pool.query(
-    "DROP TABLE IF EXISTS card_events; DROP TABLE IF EXISTS cards; " +
+    "DROP TABLE IF EXISTS card_events; DROP TABLE IF EXISTS cards; DROP TABLE IF EXISTS capacity; " +
       "DROP SEQUENCE IF EXISTS card_events_seq; DROP FUNCTION IF EXISTS card_events_immutable() CASCADE;",
   );
   await pool.end();
@@ -233,3 +233,11 @@ test("[pg] reopening with the default RESTORES the append-only guard after a dem
     await restored.close();
   }
 });
+
+test("[pg] capacity snapshot: null until imported, replaced whole", { skip: SKIP }, () =>
+  withStore(async (s) => {
+    assert.equal(await s.getCapacity(), null);
+    await s.importCapacity({ exerciseYear: 2026, persons: [], assignments: [{ personId: "p-1", cardId: "S001", jh: 1, done: 0 }] });
+    await s.importCapacity({ exerciseYear: 2027, persons: [], assignments: [] });
+    assert.deepEqual(await s.getCapacity(), { exerciseYear: 2027, persons: [], assignments: [] });
+  }));

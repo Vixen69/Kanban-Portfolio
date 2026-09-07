@@ -7,6 +7,10 @@ import type { PortfolioDataSource } from "../../core/ports.ts";
 import type { CardEventInput } from "../../core/events.ts";
 import { FIXTURES_SEED, generatePortfolio } from "./generate.ts";
 
+export { FIXTURES_SEED } from "./generate.ts";
+export { generateCapacity } from "./capacity.ts";
+export type { ChargedCard } from "./capacity.ts";
+
 /** The port implementation plus the fixtures-only event seed. */
 export interface FixturesBundle {
   dataSource: PortfolioDataSource;

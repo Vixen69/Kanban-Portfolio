@@ -42,6 +42,9 @@ export interface EnrichedCard {
   effortConsumed: number | null;
   /** 2026 charges by profile, attached by charges.ts (empty until then). */
   charges: CardCharge[];
+  /** The PdC project key the card joined (charges.ts), for the capacity
+   * assignments (ADR 024); null until then or when uncovered. */
+  pdcKey: string | null;
   ref: RowRef;
 }
 
@@ -145,7 +148,7 @@ function buildCard(ctx: JoinContext, entry: ProjetEntry): EnrichedCard {
     budgetConsumed: spEntry?.budgetConsumed ?? null,
     budgetEngaged: spEntry?.budgetEngaged ?? null,
     effortEstimated: entry.effortEstimated, effortConsumed: entry.effortConsumed,
-    charges: [], ref: entry.ref,
+    charges: [], pdcKey: null, ref: entry.ref,
   };
   const columnName = ctx.columnNames.get(card.columnId) ?? card.columnId;
   const domain = entry.domainId === null ? "sans domaine"

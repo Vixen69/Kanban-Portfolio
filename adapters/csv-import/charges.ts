@@ -87,6 +87,7 @@ export function attachCharges(
     }
     consumed.add(project.normalizedName);
     card.charges = attach(project, stats);
+    card.pdcKey = project.normalizedName;
     stats.covered++;
   }
   stats.pdcOutside = pdc.projects.size - consumed.size;

@@ -1,9 +1,10 @@
 // Reader for the plan de charge (Ressources_PdC): one row = one resource ×
 // project assignment, years as two-level headers (« 2026 » over a
-// Prév./Réel pair — reconstructed here). Only 2026 is read (annual window,
-// 200 j.h = 1 ETP). Rows are SUMMED per project × profile, never assumed
-// unique; the per-person 2026 totals feed the nominative consolidation in
-// the report (names never leave the machine). docs/IMPORT-MAPPING.md.
+// Prév./Réel pair — reconstructed here). Only the exercise year of the
+// config is read (annual window, 200 j.h = 1 ETP). Rows are SUMMED per
+// project × profile, never assumed unique; the per-person totals feed the
+// nominative consolidation in the report and, per project, the capacity
+// snapshot's assignments (ADR 024). docs/IMPORT-MAPPING.md.
 
 import type { BoardConfig } from "../../core/types.ts";
 import { createTolerantLookup, normalizeLabel } from "./normalize.ts";
@@ -24,6 +25,8 @@ export interface PdcProject {
   normalizedTitle: string;
   codename: string | null;
   charges: Map<string, { jh: number; done: number }>;
+  /** Matricule-keyed rows of this project (name, jh, done) — ADR 024. */
+  persons: Map<string, { name: string; jh: number; done: number }>;
   ref: RowRef;
 }
 
@@ -38,6 +41,8 @@ export interface PdcTable {
 interface PdcContext {
   report: ImportReport;
   fileName: string;
+  /** The exercise year, as the PdC header spells it. */
+  year: string;
   prevIdx: number;
   reelIdx: number;
   nameIdx: number;
@@ -64,9 +69,10 @@ export function parsePdc(
   rows: CsvRow[], match: HeaderMatch, config: BoardConfig,
   report: ImportReport, fileName: string,
 ): PdcTable {
-  const prevIdx = match.columnIndex.get("2026") ?? -1;
+  const year = String(config.exercise.year);
+  const prevIdx = match.columnIndex.get(year) ?? -1;
   const ctx: PdcContext = {
-    report, fileName,
+    report, fileName, year,
     prevIdx, reelIdx: prevIdx + 1,
     nameIdx: match.columnIndex.get("Nom Projet") ?? 0,
     profileLookup: createTolerantLookup(
@@ -97,7 +103,7 @@ function consumeSubHeader(ctx: PdcContext, rows: CsvRow[]): CsvRow[] {
     return rows.filter((row) => row !== first);
   }
   warn(ctx.report,
-    "sous-en-têtes Prév./Réel non trouvés sous « 2026 » — appariement par position (Prév. = colonne de l'année, Réel = suivante)",
+    `sous-en-têtes Prév./Réel non trouvés sous « ${ctx.year} » — appariement par position (Prév. = colonne de l'année, Réel = suivante)`,
     ctx.fileName);
   return rows;
 }
@@ -116,9 +122,11 @@ function readPdcRow(ctx: PdcContext, match: HeaderMatch, row: CsvRow): void {
       "ligne de total/sous-total — exclue (risque de double compte)", { ref, value: nameCell });
     return;
   }
-  const jh = amountCell(row.cells[ctx.prevIdx] ?? "", "2026 Prév.", row.line, ctx.tallies) ?? 0;
-  const done = amountCell(row.cells[ctx.reelIdx] ?? "", "2026 Réel", row.line, ctx.tallies) ?? 0;
-  if (done > jh) tallyInto(ctx.tallies, "réel 2026 > prévisionnel 2026 (cas réel, conservé)", row.line);
+  const jh = amountCell(row.cells[ctx.prevIdx] ?? "", `${ctx.year} Prév.`, row.line, ctx.tallies) ?? 0;
+  const done = amountCell(row.cells[ctx.reelIdx] ?? "", `${ctx.year} Réel`, row.line, ctx.tallies) ?? 0;
+  if (done > jh) {
+    tallyInto(ctx.tallies, `réel ${ctx.year} > prévisionnel ${ctx.year} (cas réel, conservé)`, row.line);
+  }
   const profileId = resolveMetier(ctx, match, row);
   addToProject(ctx, match, row, ref, nameCell, profileId, jh, done);
   addToPerson(ctx, match, row, jh, done);
@@ -169,7 +177,7 @@ function addToProject(
       name: nameCell, normalizedName,
       normalizedTitle: normalizeLabel(splitSubjectName(nameCell).title),
       codename: code === null ? null : `PE${code[1]}`,
-      charges: new Map(), ref,
+      charges: new Map(), persons: new Map(), ref,
     };
     ctx.projects.set(normalizedName, project);
   }
@@ -178,6 +186,19 @@ function addToProject(
   bucket.jh = roundJh(bucket.jh + jh);
   bucket.done = roundJh(bucket.done + done);
   project.charges.set(key, bucket);
+  addProjectPerson(project, match, row, jh, done);
+}
+
+// The project's matricule-keyed rows feed the capacity snapshot's
+// assignments (ADR 024); generic rows carry no matricule and stay out.
+function addProjectPerson(project: PdcProject, match: HeaderMatch, row: CsvRow, jh: number, done: number): void {
+  const matricule = (row.cells[match.columnIndex.get("Matricule") ?? -1] ?? "").trim();
+  if (matricule === "") return;
+  const name = (row.cells[match.columnIndex.get("Ressource") ?? -1] ?? "").trim() || matricule;
+  const person = project.persons.get(matricule) ?? { name, jh: 0, done: 0 };
+  person.jh = roundJh(person.jh + jh);
+  person.done = roundJh(person.done + done);
+  project.persons.set(matricule, person);
 }
 
 // Nominative consolidation: matricule-keyed rows only (generic lines have
@@ -210,6 +231,6 @@ function finalize(ctx: PdcContext): void {
   const zero = [...ctx.projects.values()]
     .filter((p) => [...p.charges.values()].every((c) => c.jh === 0 && c.done === 0)).length;
   if (zero > 0) {
-    warn(ctx.report, `${zero} projet(s) du plan de charge sans aucune charge 2026`, ctx.fileName);
+    warn(ctx.report, `${zero} projet(s) du plan de charge sans aucune charge ${ctx.year}`, ctx.fileName);
   }
 }

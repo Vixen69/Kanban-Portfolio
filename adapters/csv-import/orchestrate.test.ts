@@ -25,7 +25,7 @@ function fixture(name: string): InputFile {
   return { name, bytes: readFileSync(new URL(`../../fixtures/import/${name}`, import.meta.url)) };
 }
 
-const ALL = ["PARAM.csv", "Projets.csv", "ProjetsJalons.csv", "SP_2026.csv", "Ressources_PdC.csv"];
+const ALL = ["PARAM.csv", "Projets.csv", "ProjetsJalons.csv", "SP_2026.csv", "Ressources_PdC.csv", "Ress.Profils.csv"];
 
 function audit(files: InputFile[]) {
   return runImportAudit(files, CONFIG, NOW);
@@ -37,14 +37,14 @@ test("a July RDOM file is inventoried as a retired contract, never parsed", () =
   assert.equal(report.inventory[0]?.contractId, "rdom");
   assert.equal(param, null);
   assert.deepEqual(report.missingExpected.map((m) => m.name),
-    ["Projets", "PARAM", "ProjetsJalons", "SP (2026 ou total)", "Ressources_PdC"]);
+    ["Projets", "PARAM", "ProjetsJalons", "SP (2026 ou total)", "Ressources_PdC", "Ress.Profils"]);
 });
 
 test("the five fixture files assemble the full deck", () => {
-  const { report, cards, projets, jalons, sp, chargeStats } = audit(ALL.map(fixture));
+  const { report, cards, projets, jalons, sp, chargeStats, capacity } = audit(ALL.map(fixture));
   assert.deepEqual(report.inventory.map((f) => [f.name, f.status]), [
     ["PARAM.csv", "recognized-with-deviations"], ["Projets.csv", "recognized"],
-    ["ProjetsJalons.csv", "recognized"], ["Ressources_PdC.csv", "recognized-with-deviations"], ["SP_2026.csv", "recognized"],
+    ["ProjetsJalons.csv", "recognized"], ["Ress.Profils.csv", "recognized"], ["Ressources_PdC.csv", "recognized-with-deviations"], ["SP_2026.csv", "recognized"],
   ]);
   assert.deepEqual(report.missingExpected, []);
   assert.ok(report.warnings.some((w) => w.file === "SP_2026.csv" && /en-têtes reconnus ligne 2 — 1 ligne\(s\) ignorée\(s\)/.test(w.message)));
@@ -64,6 +64,13 @@ test("the five fixture files assemble the full deck", () => {
   assert.match(byLabel.get("coûts 2026 (SP)") ?? "", /^4\/6 jointes \(Id 3 · nom 1 · code 0\) · sans correspondance : 2 · sujets SP hors périmètre : 1 · RDLI/);
   assert.match(byLabel.get("plan de charge") ?? "", /^3\/6 cartes couvertes .* projets PdC hors périmètre : 1 · cartes sans charge : 3$/);
   assert.equal(chargeStats?.covered, 3);
+  const snapshot = capacity?.snapshot;
+  assert.ok(snapshot);
+  assert.equal(snapshot.exerciseYear, 2026);
+  assert.ok(snapshot.assignments.every((a) => /^p-[0-9a-f]{16}$/.test(a.personId)));
+  assert.ok(snapshot.assignments.every((a) => snapshot.persons.some((p) => p.id === a.personId)));
+  assert.deepEqual(snapshot.persons.map((p) => p.source), ["profils", "profils", "profils", "profils", "profils"]);
+  assert.equal(byLabel.get("capacité"), "5 personne(s) dont 1 externe(s) · capacité 780 j.h · 0 sans fiche · affectations : 3 sur 3 carte(s) · demande 85 j.h");
 });
 
 test("each card carries the right position, vocabulary and costs", () => {

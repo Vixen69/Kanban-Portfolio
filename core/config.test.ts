@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { ConfigError, reconcileCardRefs, validateBoardConfig } from "./config.ts";
+import { ConfigError, DEFAULT_EXERCISE_YEAR, reconcileCardRefs, validateBoardConfig } from "./config.ts";
 import { testCard, testConfig } from "./test-helpers.ts";
 import type { Card } from "./types.ts";
 
@@ -240,4 +240,25 @@ test("reconcileCardRefs keeps a sub-domain only while its domain declares it", (
   assert.equal(reconcileCardRefs(testCard({ domain: "alpha", subDomain: "b1" }), config).subDomain, null);
   // A remapped domain (stale reference) never keeps the old sub-domain.
   assert.equal(reconcileCardRefs(testCard({ domain: "gone", subDomain: "b1" }), config).subDomain, null);
+});
+
+test("exercise year and transverse domains (ADR 024): parsed, defaulted, refused when malformed", () => {
+  const config = validateBoardConfig(rawConfig());
+  assert.deepEqual(config.exercise, { year: 2026 });
+  assert.equal(config.domains[1]?.transverse, true);
+  assert.equal("transverse" in (config.domains[0] as object), false);
+  const legacy = rawConfig();
+  delete legacy.exercise;
+  assert.deepEqual(validateBoardConfig(legacy).exercise, { year: DEFAULT_EXERCISE_YEAR });
+  const cases: [string, (raw: any) => void][] = [
+    ["year not an integer", (raw) => (raw.exercise.year = 2026.5)],
+    ["year out of range", (raw) => (raw.exercise.year = 1999)],
+    ["extra exercise key", (raw) => (raw.exercise.month = 1)],
+    ["transverse not a boolean", (raw) => (raw.domains[0].transverse = "oui")],
+  ];
+  for (const [name, mutate] of cases) {
+    const raw = rawConfig();
+    mutate(raw);
+    assert.throws(() => validateBoardConfig(raw), ConfigError, name);
+  }
 });

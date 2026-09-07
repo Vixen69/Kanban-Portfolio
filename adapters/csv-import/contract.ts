@@ -1,12 +1,17 @@
 // Header-contract registry and identification engine. Files are recognized
 // by their header row, never by their filename (docs/IMPORT-MAPPING.md
 // « Contrat d'en-têtes » — the number-one long-term killer is header drift,
-// so every deviation is named precisely). Live registry since the PMO
-// revision of 2026-09-04 (R1/R9): PARAM, SP (2026 or total), ProjetsJalons,
-// Projets (the perimeter) and Ressources_PdC. The July RDOM table stays
-// registered as RETIRED: such a file is inventoried by name, never parsed.
+// so every deviation is named precisely). The contracts themselves live in
+// registry.ts (re-exported here so callers keep one import); this module
+// owns the FileContract shape and the matching engine.
 
 import { damageTolerantPattern, normalizeLabel } from "./normalize.ts";
+import { CONTRACTS } from "./registry.ts";
+
+export {
+  CONTRACTS, JALONS_CONTRACT, PARAM_CONTRACT, PDC_CONTRACT, PROFILS_CONTRACT, PROJETS_CONTRACT,
+  RDOM_CONTRACT, SP_CONTRACT, contractsFor, pdcContract,
+} from "./registry.ts";
 
 /** One recognizable source file: canonical column labels. */
 export interface FileContract {
@@ -23,126 +28,6 @@ export interface FileContract {
    * shown in the inventory. Such a file is never parsed. */
   retired?: string;
 }
-
-/** The PMO's PARAM sheet (R5): four tables side by side, row 1 = titles,
- * row 2 = headers. Only DOMAINES (Domaine, Responsable) and ORGANISATION
- * (Domaine (Orga), Sous-domaine (Orga), preceded by an unlabeled
- * organisation-path column) are read. « Responsable » repeats per table —
- * the reader locates each one by position. */
-export const PARAM_CONTRACT: FileContract = {
-  id: "param",
-  displayName: "PARAM",
-  columns: ["Domaine", "Responsable", "Domaine (Orga)", "Sous-domaine (Orga)"],
-  optional: ["Organisation", "Domaine (Ptf)", "Sous domaine (Ptf)"],
-  ignored: ["Domaine Projets Vendus", "Nom", "PDSI", "Colonne1"],
-};
-
-/** The SP sheet — the 2026 costs (R8). Accepts the SP_2026 onglet (with an
- * « Id ») as well as the raw SP_total export (no Id, join by name). */
-export const SP_CONTRACT: FileContract = {
-  id: "sp",
-  displayName: "SP (2026 ou total)",
-  columns: ["Nom", "Coût prév (ME)", "Coût réel", "Engagé Achats"],
-  optional: ["Id", "* Budget validé RDLI", "Type Gpe", "Type", "État du processus", "Sous domaine"],
-  ignored: [
-    "Notes", "Menu", "Score criblage", "Priorité", "Top projet", "Responsable 1",
-    "État suivant autorisé", "Catégorie", "Début", "Jalon RVSR ou Fin", "Jalon RDLI validé",
-    "Jalon RDR validé (Réf.8)", "Jalon RDR prévisionnel", "Budget présenté PDSI",
-    "Budget validé PDSI", "* CAT global projet", "ME Achats", "Réel Achats",
-    "Lignes Arbitrages", "RAF Achats", "% Reste à engager", "% Engagé ou Réalisé",
-    "Seuil Engagé ou Réalisé",
-  ],
-};
-
-/** The ProjetsJalons onglet — the initial position (R7): RDO / RDLI / RDR
- * « franchi » cells (their exact format is surveyed, Q21). */
-export const JALONS_CONTRACT: FileContract = {
-  id: "projets_jalons",
-  displayName: "ProjetsJalons",
-  columns: ["Id", "Nom du projet", "RDO franchi", "RDLI franchi", "RDR franchi"],
-  optional: [
-    "RDO (Statut)", "RDLI (Statut)", "RDR (Statut)", "Jalon en cours", "Next jalon",
-    "Etat du processus", "Type", "Domaine (Ptf)", "Sous domaine (Ptf)",
-  ],
-  ignored: [
-    "Début", "Fin", "CAT", "Début T0", "Budg", "Pré", "RDO", "RDLI", "RDR", "RVAV", "RVSR",
-    "Process RTM", "Planif next jalon", "Début (calculé)", "Fin (calculé)", "MEF Fin calc",
-    "Année ID PE", "PDSI2026 O/N",
-  ],
-};
-
-/** The Projets sheet — THE perimeter (R2): every row is a retained card.
- * One contract covers both shapes (R4): the consolidated onglet carries the
- * resolved Orga columns; the raw Sciforma export only the organisation
- * path (« Domaine »), translated through PARAM. Id + Type + État du
- * processus keep an old SP_total (Nom + Type) from posing as the perimeter. */
-export const PROJETS_CONTRACT: FileContract = {
-  id: "projets",
-  displayName: "Projets",
-  columns: ["Id", "Nom", "Type", "État du processus"],
-  optional: [
-    "Domaine (Orga)", "Ss-Daine (Orga)", "Domaine",
-    "Responsable 1", "Responsable 2", "Responsable 3",
-    "Début", "Fin", "Jalon en cours", "Projet.Actif",
-    "Budget RDLI Total Coût (Res+Trans)", "Charge finale ME (Res) (J)",
-    "Charge réelle ME (Res) (J)", "Charge JH",
-  ],
-  ignored: [
-    "Domaine (Ptf)", "Ss-Daine (Ptf)", "Catégorie", "Type Gpe", "Complexité du projet",
-    "Priorité.", "Score total", "Date T0", "isProjetSIS", "Responsable portefeuilles",
-    "Budget Validé PDSI Charge (Res) (J)", "Budget Validé PDSI Coût (Res)",
-    "Budget Validé PDSI Coût (Trans)", "Budget Validé PDSI Total coût (Res+Trans)",
-    "Budget RDLI Charge (Res) (J)", "Budget RDLI Coût (Trans)",
-    "Coût final ME (Res.+Trans)", "Coût réel ME (Res.+Trans)", "Engagé 2026 (Trans)",
-    "Coût final ME (Trans)", "Coût réel ME (Trans)", "Coût réel ME (Res)", "Coût final ME (Res)",
-    "Référence active (Réf.)", "Catégorisation", "Date d'export", "PDSI2026 O/N",
-    "ME 2026 (Res|Trans)", "ME 2026 (Res)", "ME2026 (Trans)", "ME2026 (Trans CAPEX)",
-    "ME2026 (Trans OPEX)", "Réel 2026 (Res|Trans)", "Réel 2026 (Trans)", "Réel 2026 (Res)(€)",
-    "Réel 2026 (Res)(J)", "RAF 2026 (Res|Trans)", "Budget validé PDSI2026", "Budg.2026 (Res)",
-    "Budg.2026 (Trans)", "Budg.2026 (Trans.CAPEX)", "Budg.2026 (Trans.OPEX)",
-    "Fichier", "Portefeuille", "Nature", "État du budget", "Nature du projet", "Criticité",
-    "Date prévisionnelle de démarrage (RDO)", "Date prévisionnelle de déploiement",
-    "Descriptions texte riche", "Objectifs", "Impact si report du projet",
-    "Entité demandeur", "Entité payeur", "Entité payeur mutualisée",
-    "Directions Participantes", "Programme métier", "Outils",
-    "Exigences légales et/ou de sécurité", "Taux TUO",
-    "Budget PDSI Présenté Charge (Res) (J)", "Budget Présenté PDSI Coût (Res)",
-    "Budget Présenté PDSI Coût (Trans)", "Budget Présenté PDSI Total Coût (Res+Trans)",
-    "Créateur", "Top projet", "Date création", "CAT",
-  ],
-};
-
-/** The plan de charge (Ressources_PdC): two-level headers — the year row
- * carries « 2026 » over a Prév./Réel pair, reconstructed by the reader
- * from the sub-header row (real labels, survey of 2026-07-31). */
-export const PDC_CONTRACT: FileContract = {
-  id: "ressources_pdc",
-  displayName: "Ressources_PdC",
-  columns: ["Matricule", "Ressource", "Métier", "Nom Projet", "2026"],
-  optional: ["Organisation", "Id Projet", "Total Prév.", "Total Réel"],
-  ignored: [
-    "Type projet", "Portefeuille", "2023", "2024", "2025", "2027", "2028",
-    "2029", "2030", "Etat du processus", "Date de publication",
-    "Projet.Actif", "Date export",
-  ],
-};
-
-/** The July RDOM table (domaine ↔ nom), retired by PARAM (R5). Kept so a
- * stray RDOM.csv is named for what it is instead of « inconnu ». */
-export const RDOM_CONTRACT: FileContract = {
-  id: "rdom",
-  displayName: "RDOM",
-  columns: ["Domaine", "Nom"],
-  retired: "table RDOM de juillet — remplacée par PARAM (révision 2026-09-04), non lue",
-};
-
-/** Every registered contract, **from the most specific to the most
- * generic**: when a file fully matches several contracts, the first one
- * here wins (registry order IS the priority). Live contracts first; the
- * retired RDOM table last — its two generic columns exist in almost every
- * rich export, and PARAM itself carries both. */
-export const CONTRACTS: readonly FileContract[] =
-  [PARAM_CONTRACT, SP_CONTRACT, JALONS_CONTRACT, PROJETS_CONTRACT, PDC_CONTRACT, RDOM_CONTRACT];
 
 /** A tolerated header anomaly (the file is still readable). */
 export interface HeaderDeviation {

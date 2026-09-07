@@ -1,6 +1,6 @@
 // Shared factories for core and adapter tests (test-only module).
 
-import type { BoardConfig, Card } from "./types.ts";
+import type { BoardConfig, Card, Person } from "./types.ts";
 
 // The design-v10 typologies for tests (roles, profiles, risks, constraints,
 // severities). Split out so testConfig stays within the 40-line function cap.
@@ -55,7 +55,7 @@ export function testConfig(): BoardConfig {
     ],
     domains: [
       { id: "alpha", name: "Alpha", short: "ALP", color: "#10b981" },
-      { id: "beta", name: "Beta", short: "BET", color: "#6366f1", subDomains: [{ id: "b1", name: "Beta 1" }, { id: "b2", name: "Beta 2" }] },
+      { id: "beta", name: "Beta", short: "BET", color: "#6366f1", subDomains: [{ id: "b1", name: "Beta 1" }, { id: "b2", name: "Beta 2" }], transverse: true },
     ],
     types: [
       { id: "t1", name: "Type 1", short: "T1", color: "#0369a1" },
@@ -79,6 +79,19 @@ export function testConfig(): BoardConfig {
     ...testVocabularies(),
     age: { freshMaxDays: 7, recentMaxDays: 28, agingMaxDays: 60 },
     andonThresholdDays: 5,
+    exercise: { year: 2026 },
+  };
+}
+
+/**
+ * A person with sane defaults (alpha domain, profile pA, 200 j.h), overridable.
+ * Input: partial Person overrides. Output: a complete Person. Failure: none.
+ */
+export function testPerson(overrides: Partial<Person> = {}): Person {
+  return {
+    id: "p-0001", name: "Alice MERLE", domain: "alpha", subDomain: null,
+    profileId: "pA", metier: "Profil A", external: false, capacityJh: 200, source: "profils",
+    ...overrides,
   };
 }
 

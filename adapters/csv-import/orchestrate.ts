@@ -6,8 +6,10 @@
 // filesystem-free; stateless by design.
 
 import type { BoardConfig } from "../../core/types.ts";
-import { JALONS_CONTRACT, PARAM_CONTRACT, PDC_CONTRACT, PROJETS_CONTRACT, SP_CONTRACT } from "./contract.ts";
-import type { HeaderMatch } from "./contract.ts";
+import {
+  JALONS_CONTRACT, PARAM_CONTRACT, PDC_CONTRACT, PROFILS_CONTRACT, PROJETS_CONTRACT, SP_CONTRACT, contractsFor,
+} from "./contract.ts";
+import type { FileContract, HeaderMatch } from "./contract.ts";
 import type { CsvRow } from "./csv.ts";
 import { processFile } from "./identify.ts";
 import type { InputFile } from "./identify.ts";
@@ -27,6 +29,10 @@ import { parsePdc } from "./pdc.ts";
 import type { PdcTable } from "./pdc.ts";
 import { attachCharges } from "./charges.ts";
 import type { ChargeStats } from "./charges.ts";
+import { parseProfils } from "./profils.ts";
+import type { ProfilsTable } from "./profils.ts";
+import { buildCapacity } from "./capacity.ts";
+import type { CapacityBuild } from "./capacity.ts";
 import { emitAssembly, emitMissing } from "./assembly.ts";
 
 export type { InputFile } from "./identify.ts";
@@ -39,8 +45,10 @@ export interface AuditResult {
   jalons: JalonsTable | null;
   sp: SpTable | null;
   pdc: PdcTable | null;
+  profils: ProfilsTable | null;
   cards: CardAssembly | null;
   chargeStats: ChargeStats | null;
+  capacity: CapacityBuild | null;
 }
 
 interface Candidate {
@@ -66,15 +74,7 @@ interface Candidate {
  */
 export function runImportAudit(files: InputFile[], config: BoardConfig, now: Date): AuditResult {
   const report = createReport();
-  const sorted = [...files].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
-  const byContract = new Map<string, Candidate[]>();
-  for (const file of sorted) {
-    const parsed = processFile(file, report);
-    if (parsed === null) continue;
-    const list = byContract.get(parsed.match.contract.id) ?? [];
-    list.push({ file, ...parsed });
-    byContract.set(parsed.match.contract.id, list);
-  }
+  const byContract = classifyFiles(files, report, contractsFor(config.exercise.year));
   const pick = (id: string): Candidate | null => elect(byContract.get(id) ?? [], report);
   const paramBest = pick(PARAM_CONTRACT.id);
   const param = paramBest === null ? null
@@ -90,14 +90,36 @@ export function runImportAudit(files: InputFile[], config: BoardConfig, now: Dat
   const pdcBest = pick(PDC_CONTRACT.id);
   const pdc = pdcBest === null ? null
     : parsePdc(pdcBest.dataRows, pdcBest.match, config, report, pdcBest.file.name);
+  const profilsBest = pick(PROFILS_CONTRACT.id);
+  const profils = profilsBest === null ? null
+    : parseProfils(profilsBest.dataRows, profilsBest.match, config, report, profilsBest.file.name);
   const cards = assembleCards(projets, jalons, sp, config, report);
   const chargeStats = attachCharges(cards?.cards ?? [], pdc, report);
+  const capacity = buildCapacity(profils, pdc, cards?.cards ?? [], config, report);
   emitMissing(report, {
     param: param !== null, projets: projets !== null, jalons: jalons !== null,
-    sp: sp !== null, pdc: pdc !== null,
+    sp: sp !== null, pdc: pdc !== null, profils: profils !== null,
   });
-  emitAssembly(report, { param, projets, jalons, sp, pdc, cards, chargeStats }, config);
-  return { report, param, projets, jalons, sp, pdc, cards, chargeStats };
+  const result: AuditResult = { report, param, projets, jalons, sp, pdc, profils, cards, chargeStats, capacity };
+  emitAssembly(report, result, config);
+  return result;
+}
+
+// Recognition by header contract (the registry names the PdC column after
+// the exercise year); files are visited in name order for determinism.
+function classifyFiles(
+  files: InputFile[], report: ImportReport, contracts: readonly FileContract[],
+): Map<string, Candidate[]> {
+  const sorted = [...files].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  const byContract = new Map<string, Candidate[]>();
+  for (const file of sorted) {
+    const parsed = processFile(file, report, contracts);
+    if (parsed === null) continue;
+    const list = byContract.get(parsed.match.contract.id) ?? [];
+    list.push({ file, ...parsed });
+    byContract.set(parsed.match.contract.id, list);
+  }
+  return byContract;
 }
 
 // Several files can carry a contract's required columns. The cleanest

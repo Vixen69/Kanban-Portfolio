@@ -23,8 +23,9 @@ onglet** par LibreOffice (`soffice --headless --convert-to csv:…:-1`,
 UTF-8, `;` — commande à valider au premier passage puis inscrite au
 RUNBOOK). Onglets lus : **`PARAM`**, **`Projets`**, **`ProjetsJalons`**,
 **`SP_2026`**. `TE_Activites` : ignoré (retiré de l'export).
-`Ress.Profils` : **mis de côté** (ressources internes nominatives,
-200 j.h/an — matière du futur module nominatif, cf. Extension future).
+`Ress.Profils` : **lu depuis le 2026-09-07** (ADR 024) — personnes de la
+DSI (domaine Orga, métier, Int/Ext, disponibilité) ; Email et Coût jamais
+lus (cf. « `Ress.Profils` — structure et mapping »).
 Le plan de charge reste le CSV séparé **`Ressources_PdC`**, inchangé
 (l'onglet PdC de l'export n'a pas encore les bonnes informations).
 *Remplace* : « le consolidé contient tout » (2026-07-31) et le registre
@@ -312,14 +313,14 @@ lignes (plusieurs ressources).
 
 | Colonne | Usage |
 |---|---|
-| Matricule | **Discriminant nominatif** : rempli = ligne personne, vide = ligne générique. Non stocké dans le produit. Candidat id opaque stable si le module nominatif est construit (voir plus bas) |
+| Matricule | **Discriminant nominatif** : rempli = ligne personne, vide = ligne générique. Jamais stocké en clair : haché en id opaque `p-…` (ADR 024) et joint à `Ress.Profils` (« Id » ou « pk Contact ») |
 | Ressource | Nom de la personne (si nominatif), ou libellé générique/rôle. Les rôles exotiques (ex. « Concepteur développeur Low Code ») ne bloquent pas : le profil vient de la colonne Métier ; signalés au rapport |
 | Organisation | Ignorée (le domaine vient de `projet` + table `RDOM`) |
 | Métier | → **profil DSI** (`profileId`). Liste blanche des 19 profils, normalisation : casse, espaces, points, retrait des préfixes (« Externe. », noms de société type « Nexter. »). Préfixes rencontrés listés au rapport (signification à confirmer, Q9) |
 | ID projet | Toujours rempli, semble-t-il. Récolté comme `codename` + **contrôle croisé** avec la jointure par nom (désaccord = drapeau) |
 | Nom projet | **Clé de jointure** (le nom fait foi, stable entre fichiers) |
 | Type projet, Portefeuille | Ignorés (redondants) |
-| Années 2023, 2024, 2025(, 2026 — Q7), chacune en 2 colonnes prévisionnel / réel | **Seul 2026 est lu** : prévisionnel 2026 → `jh` (planifié), réel 2026 → `done` (consommé). Unité attendue : jours (Q8) |
+| Années 2023, 2024, 2025(, 2026 — Q7), chacune en 2 colonnes prévisionnel / réel | **Seule l'année d'exercice est lue** (`exercise.year` de la config, 2026) : prévisionnel → `jh` (planifié), réel → `done` (consommé). Unité attendue : jours (Q8) |
 | Total (pluriannuel) | Ignoré |
 
 **Agrégation** : les lignes d'un même projet × métier (× personne) sont
@@ -336,6 +337,36 @@ inconnu ou vide → seau « non attribué », questionné ; réel > prévisionne
 jointure sur les cartes nom > code (« Id Projet ») > titre ; consolidation
 nominative au rapport (top 15, j.h/200 → taux ETP) — les noms restent sur
 la machine d'exécution.
+
+**Révision 2026-09-07 (ADR 024)** : la colonne d'année du contrat vient de
+`exercise.year` (`pdcContract(year)`) — plus d'année en dur ; chaque projet
+conserve ses lignes nominatives (matricule → jh/réel) pour les
+affectations de la table capacité (section suivante).
+
+## `Ress.Profils` — structure et mapping (ADR 024, 2026-09-07)
+
+Une ligne = une personne de la DSI (interne ou externe). Onglet du classeur
+de consolidation, converti en CSV comme les autres ; en-têtes en ligne 2
+(ligne 1 vide) — la recherche d'en-têtes l'absorbe.
+
+| Colonne | Usage |
+|---|---|
+| pk Contact, Id | **Matricule** (l'un ou l'autre, les deux acceptés) : clé de jointure avec « Matricule » du plan de charge ; haché en id opaque `p-…`, jamais stocké en clair (Q26) |
+| Nom de famille, Prénom | Nom affiché (« Prénom NOM ») — porté par la table capacité, jamais par le journal |
+| Int/Ext | Externe si la cellule dit « Externe » / « Ext… » / oui (Q25) |
+| Domaine (Orga), Sous-domaine (Orga) | Domaine / sous-domaine de la personne (mêmes règles que `projets`, ADR 022) ; inconnu → douteux, personne sans domaine |
+| Métier | → profil DSI (liste blanche tolérante, préfixe pointé décollé) ; inconnu → douteux |
+| Profil, Statut | Optionnels, non lus pour l'instant (Statut : candidat filtre « actif ») |
+| Disponibilité | Capacité de l'exercice : ≤ 5 → ETP × 200 j.h (signalé) ; au-delà, j.h ; vide ou illisible → capacité inconnue (Q24) |
+| Email, Coût | **Déclarés ignorés — jamais lus, jamais stockés** |
+
+**Assemblage** (`adapters/csv-import/capacity.ts`) : personnes = fiches
+Profils ; affectations = lignes nominatives du PdC des projets joints aux
+cartes (une par personne × carte, prévisionnel / réel de l'exercice) ;
+personne du PdC sans fiche → **stub** (nom, capacité inconnue), signalé.
+Ligne « capacité » de l'état d'assemblage : personnes, externes, capacité,
+sans fiche, affectations, demande. Enregistré par `--charger` (table
+`capacity`, remplacée entière — ADR 024), servi par `GET /api/capacity`.
 
 ## Règles de dérivation
 
@@ -501,9 +532,15 @@ en silence). Attention au « CSV » d'Excel français : séparateur `;` et
 virgule décimale — le lecteur les attend, et signale tout fichier qui
 dévie.
 
-## Extension future : module nominatif (décision de principe, non planifiée)
+## Module nominatif : construit comme table de capacité (ADR 024, 2026-09-07)
 
-Direction validée par l'auteur (2026-07-29), construction après le parseur :
+Direction de 2026-07-29, **réalisée autrement** : les personnes ne vont
+ni dans la config ni dans `ChargeEntry`, mais dans une **table de faits
+`capacity`** (`persons` + `assignments`), remplacée entière à chaque
+import ; les agrégations par profil des cartes sont inchangées ; la vue
+capacité (panneau analytics) se construit sur `core/capacity.ts`. Les
+principes ci-dessous restent vrais (noms hors journal, matricule → id
+opaque, 200 j.h = 1 ETP) :
 
 - `ChargeEntry` gagne un `personId` **optionnel** — une carte mélange lignes
   génériques (profil seul) et nominatives (profil + personne). Les
@@ -686,6 +723,9 @@ office de vérification sur site.
 | Q14 | Projet de `SP_total` sans ligne dans `projet` (domaine/chef inconnus) : carte créée avec placeholders ou écartée ? (portée réduite depuis que le consolidé est la source unique) | Auteur |
 | Q20 | **Chef de projet** : absent du consolidé — source à définir (réintroduire l'export `projet`, ajouter une colonne au consolidé, ou saisie dans l'outil ?) | Auteur |
 | Q15 | Sémantique du jalon RDLI : la date peut-elle être future (prévue, pas passée) ? Règle : ≤ aujourd'hui pour valoir Actifs ? | PMO |
+| Q24 | `Ress.Profils` « Disponibilité » : unité (ETP ou j.h ?) et fenêtre (capacité annuelle ou résiduelle ?) — le parseur lit ≤ 5 en ETP × 200 et le signale | PMO |
+| Q25 | `Ress.Profils` « Int/Ext » : valeurs exactes (Interne/Externe ? O/N ?) | PMO |
+| Q26 | Matricule joint au plan de charge : « Id » ou « pk Contact » ? (les deux sont acceptés, l'un des deux doit correspondre) | PMO |
 
 **Révision 2026-09-04** : Q14 et Q20 sont sans objet (R2, R6) ; Q3 était
 déjà tranchée (canal « Projets ») ; Q15 se reporte sur les colonnes

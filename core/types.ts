@@ -211,3 +211,43 @@ export type CardPatch = Partial<
     | "custom"
   >
 >;
+
+/**
+ * One person of the DSI (Ress.Profils), pseudonymized for the tool (ADR
+ * 024): an opaque id derived from the matricule, a display name, the Orga
+ * domain / sub-domain and the DSI profile. Email and cost never enter the
+ * tool; the event log only ever carries the opaque id.
+ */
+export interface Person {
+  id: string;
+  name: string;
+  domain: string | null;
+  subDomain: string | null;
+  /** DSI profile id (BoardConfig.profiles), null when the métier is unresolved. */
+  profileId: string | null;
+  /** Raw métier label of the source (vocabulary, kept for the read-out). */
+  metier: string;
+  external: boolean;
+  /** Capacity for the exercise year, jours-homme (200 ≈ 1 ETP); null when unknown. */
+  capacityJh: number | null;
+  /** "profils" = from Ress.Profils; "pdc" = stub built from an assignment without a profils row. */
+  source: "profils" | "pdc";
+}
+
+/** One person's planned / actual load on one card for the exercise year (j.h). */
+export interface Assignment {
+  personId: string;
+  cardId: string;
+  jh: number;
+  done: number;
+}
+
+/**
+ * The capacity snapshot an import replaces as a whole — a fact table, never
+ * event-sourced (ADR 024): persons, their assignments, the exercise year.
+ */
+export interface CapacitySnapshot {
+  exerciseYear: number;
+  persons: Person[];
+  assignments: Assignment[];
+}

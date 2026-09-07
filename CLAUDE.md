@@ -192,6 +192,10 @@ fields, append-only enforced by table grants/triggers):
   never count as stage entries, ADR 019).
 - `users`: id, login, scrypt_hash, role (viewer/editor/admin), created_at,
   disabled.
+- `capacity` (ADR 024): one row, the last imported `CapacitySnapshot`
+  (exerciseYear, persons with opaque ids, assignments person × card),
+  replaced whole at each import — a fact table beside the log, not an
+  event stream. Names never enter `card_events`.
 
 `card_events` is both the audit trail and the single source for all flow
 metrics. Do not create a separate metrics store. Metrics are queries on
@@ -204,9 +208,11 @@ INSERT/SELECT. Courtesy heads-up to the tech lead: the schema is append-only
 Config (`config/board.json`, versioned in git — the NMO default model):
 lanes (name, nature subtitle, `natureKey` — the nature the canal confers to
 its cards, ADR 018 — detail), columns (name, `wip`, `gate` DoR/DoD, note),
-domains and types (name, short, color), nature/criticality labels, custom
-field definitions, `age` thresholds (fresh/recent/aging/stale), and
-`andonThresholdDays`. `wip: null` shows the bare count and enforces nothing;
+domains and types (name, short, color; a domain may be `transverse` — its
+people serve the whole portfolio, ADR 024), nature/criticality labels,
+custom field definitions, `age` thresholds (fresh/recent/aging/stale),
+`andonThresholdDays`, and `exercise.year` (the year the import reads and
+the capacity is counted in, ADR 024). `wip: null` shows the bare count and enforces nothing;
 a set WIP shows count/limit, warns at ≥ 80 %, reddens beyond 100 % (warns,
 never hard-blocks). An admin-panel override is persisted server-side with an
 append-only history; « Réinitialiser le modèle » returns to board.json

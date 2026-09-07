@@ -11,6 +11,8 @@ export type { JalonsTable } from "./jalons.ts";
 export type { SpTable } from "./sp.ts";
 export type { CardAssembly, EnrichedCard } from "./enrich.ts";
 export type { PdcTable } from "./pdc.ts";
+export type { ProfilsTable, ProfilEntry } from "./profils.ts";
+export type { CapacityBuild, CapacityStats } from "./capacity.ts";
 export type { CardCharge, ChargeStats } from "./charges.ts";
 export { IMPORT_ACTOR, planLoad } from "./to-cards.ts";
 export type { LoadPlan } from "./to-cards.ts";

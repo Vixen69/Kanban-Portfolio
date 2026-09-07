@@ -8,7 +8,7 @@
 import { Pool, type PoolClient } from "pg";
 import type { BoardStorage } from "../../core/ports.ts";
 import type { CardEventInput } from "../../core/events.ts";
-import type { Card, CardEvent } from "../../core/types.ts";
+import type { CapacitySnapshot, Card, CardEvent } from "../../core/types.ts";
 import { logError } from "../log.ts";
 
 const SCHEMA = `
@@ -20,6 +20,10 @@ CREATE TABLE IF NOT EXISTS cards (
 CREATE SEQUENCE IF NOT EXISTS card_events_seq;
 CREATE TABLE IF NOT EXISTS card_events (
   seq  bigint PRIMARY KEY,
+  data jsonb NOT NULL
+);
+CREATE TABLE IF NOT EXISTS capacity (
+  id   text PRIMARY KEY,
   data jsonb NOT NULL
 );
 `;
@@ -89,6 +93,22 @@ async function pgListEvents(pool: Pool): Promise<CardEvent[]> {
   return res.rows.map((row) => (row as { data: CardEvent }).data);
 }
 
+// The capacity snapshot (ADR 024) lives in one row, replaced whole.
+const UPSERT_CAPACITY =
+  "INSERT INTO capacity (id, data) VALUES ('current', $1) ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data";
+
+async function pgImportCapacity(runTx: Tx, snapshot: CapacitySnapshot): Promise<void> {
+  await runTx(async (client) => {
+    await client.query(UPSERT_CAPACITY, [snapshot]);
+  });
+}
+
+async function pgGetCapacity(pool: Pool): Promise<CapacitySnapshot | null> {
+  const res = await pool.query<{ data: CapacitySnapshot }>("SELECT data FROM capacity WHERE id = 'current'");
+  const row = res.rows[0];
+  return row === undefined ? null : row.data;
+}
+
 async function pgListBaseCards(pool: Pool): Promise<Card[]> {
   const res = await pool.query<{ data: Card }>("SELECT data FROM cards ORDER BY ord ASC");
   return res.rows.map((row) => (row as { data: Card }).data);
@@ -113,6 +133,24 @@ function makeTx(pool: Pool): Tx {
   };
 }
 
+// The read side of the port: plain queries on the pool, no transaction.
+function pgReaders(pool: Pool, assertOpen: () => void): Pick<BoardStorage, "listEvents" | "listBaseCards" | "getCapacity"> {
+  return {
+    async listEvents() {
+      assertOpen();
+      return pgListEvents(pool);
+    },
+    async listBaseCards() {
+      assertOpen();
+      return pgListBaseCards(pool);
+    },
+    async getCapacity() {
+      assertOpen();
+      return pgGetCapacity(pool);
+    },
+  };
+}
+
 // The BoardStorage object over an open pool; `open` guards use-after-close.
 function buildStorage(pool: Pool, runTx: Tx): BoardStorage {
   let open = true;
@@ -132,13 +170,10 @@ function buildStorage(pool: Pool, runTx: Tx): BoardStorage {
       assertOpen();
       return runTx((client) => insertEvent(client, input));
     },
-    async listEvents() {
+    ...pgReaders(pool, assertOpen),
+    async importCapacity(snapshot) {
       assertOpen();
-      return pgListEvents(pool);
-    },
-    async listBaseCards() {
-      assertOpen();
-      return pgListBaseCards(pool);
+      await pgImportCapacity(runTx, snapshot);
     },
     async close() {
       if (!open) return;

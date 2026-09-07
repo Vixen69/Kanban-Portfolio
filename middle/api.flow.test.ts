@@ -43,6 +43,12 @@ function stubStorage(cards: Card[] = [testCard({ id: "S001" })]): BoardStorage {
     async listBaseCards() {
       return baseCards.map((card) => ({ ...card }));
     },
+    async importCapacity() {
+      throw new Error("importCapacity non utilisé dans ces tests");
+    },
+    async getCapacity() {
+      return null;
+    },
     async close() {},
   };
 }

@@ -8,7 +8,7 @@ import { mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { validateBoardConfig } from "../core/config.ts";
 import { toCard } from "../core/state.ts";
-import { createFixtures } from "../adapters/fixtures/index.ts";
+import { FIXTURES_SEED, createFixtures, generateCapacity } from "../adapters/fixtures/index.ts";
 import { createStorage } from "../middle/storage/select.ts";
 import { loadServerConfig } from "../middle/config.ts";
 
@@ -39,7 +39,12 @@ try {
       .listSubjects()
       .map((subject) => toCard(subject, dataSource.getFinancials(subject.id)));
     await storage.importCards(cards, seedEvents);
-    console.log(`seed: ${cards.length} cartes, ${seedEvents.length} évènements importés.`);
+    const capacity = generateCapacity(boardConfig, cards, FIXTURES_SEED);
+    await storage.importCapacity(capacity);
+    console.log(
+      `seed: ${cards.length} cartes, ${seedEvents.length} évènements, ` +
+        `${capacity.persons.length} personnes et ${capacity.assignments.length} affectations importés.`,
+    );
   }
 } finally {
   await storage.close();
