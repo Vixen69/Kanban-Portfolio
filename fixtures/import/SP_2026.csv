@@ -1,0 +1,8 @@
+;;;;;;;;;;;;;;;123456;98765;;;;;;;;
+Sous domaine;Id;Nom;État du processus;Type Gpe;Score criblage;Début;Jalon RVSR ou Fin;Jalon RDLI validé;Jalon RDR validé (Réf.8);Jalon RDR prévisionnel;Budget présenté PDSI;Budget validé PDSI;* Budget validé RDLI;* CAT global projet;Coût prév (ME);Coût réel;ME Achats;Engagé Achats;Réel Achats;Lignes Arbitrages;RAF Achats;% Reste à engager;% Engagé ou Réalisé;Seuil Engagé ou Réalisé
+INFRA OPE;PE10001;Modernisation atelier;En cours;Projets MOE;;12/01/2025;;;;;;;150;;120 500 €;80 000 €;;30 000 €;;;;;;
+DEVELOPPEMENTS RAPIDES;PE10002;Refonte portail interne;Nouveau;Etudes;;05/02/2025;;;;;;;90;;75;22,5;;5;;;;;;
+ING SYSTEMES;PE10003;Montée de version calcul;Nouveau;Projets MOE;;10/03/2026;;;;;;;60;;45;0;;0;;;;;;
+ACHATS;;Étude connectivité site B;Nouveau;Etudes;;01/07/2026;;;;;;;40;;30;;;;;;;;;
+;PE10009;Sujet hors périmètre;En cours;Projets MOE;;;;;;;;;;;10;;;;;;;;;
+;;Total;;;;;;;;;;;;;500;200;;50;;;;;;

@@ -1,27 +1,26 @@
 // The audit pass the CLI calls: classify every received file (identify.ts),
-// elect the cleanest candidate per contract, run the contract readers,
-// assemble the cards (enrich.ts — the consolidated sheet is the perimeter
-// master), then describe what is missing and the assembly state
-// (assembly.ts). Pure and filesystem-free; stateless by design.
+// elect the cleanest candidate per contract, run the contract readers in
+// dependency order (PARAM before Projets), assemble the cards (enrich.ts
+// — the `projets` sheet is the perimeter), attach the charges, then
+// describe what is missing and the assembly state (assembly.ts). Pure and
+// filesystem-free; stateless by design.
 
 import type { BoardConfig } from "../../core/types.ts";
-import {
-  CONSOLIDE_CONTRACT, PDC_CONTRACT, PROJETS_CONTRACT, RDOM_CONTRACT, SP_TOTAL_CONTRACT,
-} from "./contract.ts";
+import { JALONS_CONTRACT, PARAM_CONTRACT, PDC_CONTRACT, PROJETS_CONTRACT, SP_CONTRACT } from "./contract.ts";
 import type { HeaderMatch } from "./contract.ts";
 import type { CsvRow } from "./csv.ts";
 import { processFile } from "./identify.ts";
 import type { InputFile } from "./identify.ts";
 import { createReport, doubt } from "./report.ts";
 import type { ImportReport } from "./report.ts";
-import { parseRdom } from "./rdom.ts";
-import type { RdomTable } from "./rdom.ts";
-import { parseSpTotal } from "./sp-total.ts";
-import type { SpTotalTable } from "./sp-total.ts";
-import { parseConsolide } from "./consolide.ts";
-import type { ConsolideTable } from "./consolide.ts";
+import { parseParam } from "./param.ts";
+import type { ParamTable } from "./param.ts";
 import { parseProjets } from "./projets.ts";
 import type { ProjetsTable } from "./projets.ts";
+import { parseJalons } from "./jalons.ts";
+import type { JalonsTable } from "./jalons.ts";
+import { parseSp } from "./sp.ts";
+import type { SpTable } from "./sp.ts";
 import { assembleCards } from "./enrich.ts";
 import type { CardAssembly } from "./enrich.ts";
 import { parsePdc } from "./pdc.ts";
@@ -35,10 +34,10 @@ export type { InputFile } from "./identify.ts";
 /** The audit outcome: the report, the parsed tables, the assembled deck. */
 export interface AuditResult {
   report: ImportReport;
-  rdom: RdomTable | null;
-  spTotal: SpTotalTable | null;
-  consolide: ConsolideTable | null;
+  param: ParamTable | null;
   projets: ProjetsTable | null;
+  jalons: JalonsTable | null;
+  sp: SpTable | null;
   pdc: PdcTable | null;
   cards: CardAssembly | null;
   chargeStats: ChargeStats | null;
@@ -47,6 +46,7 @@ export interface AuditResult {
 interface Candidate {
   file: InputFile;
   match: HeaderMatch;
+  headerCells: string[];
   dataRows: CsvRow[];
 }
 
@@ -54,12 +54,13 @@ interface Candidate {
  * Runs the full audit pass over the received files.
  * Inputs: the files (any set — recognition is by header contract, never by
  * filename), the board config actually served (runtime override), and
- * `now` (injected for determinism; bounds the milestone-in-the-future
- * rule). When several files match one contract, the cleanest header wins
- * (fewest deviations, then first name); the others are flagged douteux.
- * Outputs: the report, the four tables and the assembled cards (non-null
- * when the consolidated perimeter master is present). Deterministic for
- * identical inputs and `now`.
+ * `now` (injected for determinism; dates a « franchi » milestone against
+ * the run day). When several files match one contract, the cleanest
+ * header wins (fewest deviations, then first name); the others are flagged
+ * douteux.
+ * Outputs: the report, the parsed tables and the assembled cards (non-null
+ * when the `projets` perimeter is present). Deterministic for identical
+ * inputs and `now`.
  * Failure modes: none — unreadable or alien files land in the inventory
  * with a reason, nothing throws.
  */
@@ -75,35 +76,33 @@ export function runImportAudit(files: InputFile[], config: BoardConfig, now: Dat
     byContract.set(parsed.match.contract.id, list);
   }
   const pick = (id: string): Candidate | null => elect(byContract.get(id) ?? [], report);
-  const rdomBest = pick(RDOM_CONTRACT.id);
-  const spBest = pick(SP_TOTAL_CONTRACT.id);
-  const consolideBest = pick(CONSOLIDE_CONTRACT.id);
-  const rdom = rdomBest === null ? null
-    : parseRdom(rdomBest.dataRows, rdomBest.match, config.domains, report, rdomBest.file.name);
-  const consolide = consolideBest === null ? null
-    : parseConsolide(consolideBest.dataRows, consolideBest.match, config, rdom, report, consolideBest.file.name);
-  const spTotal = spBest === null ? null
-    : parseSpTotal(spBest.dataRows, spBest.match, config, report, spBest.file.name, now, consolide !== null);
+  const paramBest = pick(PARAM_CONTRACT.id);
+  const param = paramBest === null ? null
+    : parseParam(paramBest.dataRows, paramBest.match, paramBest.headerCells, config, report, paramBest.file.name);
   const projetsBest = pick(PROJETS_CONTRACT.id);
   const projets = projetsBest === null ? null
-    : parseProjets(projetsBest.dataRows, projetsBest.match, rdom, report, projetsBest.file.name);
+    : parseProjets(projetsBest.dataRows, projetsBest.match, config, param, report, projetsBest.file.name);
+  const jalonsBest = pick(JALONS_CONTRACT.id);
+  const jalons = jalonsBest === null ? null
+    : parseJalons(jalonsBest.dataRows, jalonsBest.match, config, report, jalonsBest.file.name, now);
+  const spBest = pick(SP_CONTRACT.id);
+  const sp = spBest === null ? null : parseSp(spBest.dataRows, spBest.match, report, spBest.file.name);
   const pdcBest = pick(PDC_CONTRACT.id);
   const pdc = pdcBest === null ? null
     : parsePdc(pdcBest.dataRows, pdcBest.match, config, report, pdcBest.file.name);
-  const cards = assembleCards(consolide, spTotal, projets, config, report);
+  const cards = assembleCards(projets, jalons, sp, config, report);
   const chargeStats = attachCharges(cards?.cards ?? [], pdc, report);
   emitMissing(report, {
-    rdom: rdom !== null, consolide: consolide !== null,
-    projets: projets !== null, pdc: pdc !== null,
+    param: param !== null, projets: projets !== null, jalons: jalons !== null,
+    sp: sp !== null, pdc: pdc !== null,
   });
-  emitAssembly(report, { rdom, spTotal, consolide, projets, pdc, cards, chargeStats }, config);
-  return { report, rdom, spTotal, consolide, projets, pdc, cards, chargeStats };
+  emitAssembly(report, { param, projets, jalons, sp, pdc, cards, chargeStats }, config);
+  return { report, param, projets, jalons, sp, pdc, cards, chargeStats };
 }
 
-// Several files can carry a contract's required columns — a rich `projet`
-// export does (seen on the real 2026-07-29 run, where it stole the RDOM
-// match by name order). The cleanest header wins: fewest deviations, then
-// first name; the others are flagged douteux, never silently parsed.
+// Several files can carry a contract's required columns. The cleanest
+// header wins: fewest deviations, then first name; the others are flagged
+// douteux, never silently parsed.
 function elect(candidates: Candidate[], report: ImportReport): Candidate | null {
   const best = candidates.reduce<Candidate | null>(
     (acc, c) => (acc === null || c.match.deviations.length < acc.match.deviations.length ? c : acc),

@@ -4,6 +4,20 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { identifyHeader, RDOM_CONTRACT } from "./contract.ts";
+import type { FileContract } from "./contract.ts";
+
+// The July SP_total shape, kept as a private registry: these engine tests
+// exercise accent repair on a rich contract, independently of the live
+// registry (which now reads SP through a shorter, tolerant contract).
+const LEGACY_SP: FileContract = {
+  id: "legacy_sp",
+  displayName: "SP_total (juillet)",
+  columns: [
+    "Nom", "Type", "Début", "Jalon RDLI validé", "Jalon RDR validé (Réf.8)", "Jalon RDR prévisionnel",
+    "* Budget validé RDLI", "Coût prév (ME)", "Coût réel", "Engagé Achats",
+  ],
+  optional: ["État suivant autorisé"],
+};
 
 const BOM = String.fromCharCode(0xfeff);
 
@@ -54,7 +68,7 @@ test("a duplicated column matches on its first occurrence and is reported", () =
 });
 
 test("a missing column is a near-miss with the precise missing list", () => {
-  const result = identifyHeader(["Domaine"]);
+  const result = identifyHeader(["Domaine"], [RDOM_CONTRACT]);
   assert.equal(result.status, "near-miss");
   if (result.status !== "near-miss") return;
   assert.equal(result.contract.id, RDOM_CONTRACT.id);
@@ -67,10 +81,10 @@ test("destroyed accents in headers are repaired, and the repair is listed", () =
     "Nom", "Type", "D?but", `Jalon RDLI valid${REPL}`, "Jalon RDR valid (R?f.8)",
     "Jalon RDR pr?visionnel", "* Budget valid? RDLI", "Co?t pr?v (ME)",
     "Co?t r?el", "Engag? Achats", "?tat suivant autoris?",
-  ]);
+  ], [LEGACY_SP]);
   assert.equal(result.status, "match");
   if (result.status !== "match") return;
-  assert.equal(result.contract.id, "sp_total");
+  assert.equal(result.contract.id, "legacy_sp");
   assert.ok(result.repaired.includes("Début"));
   assert.ok(result.repaired.includes("Jalon RDR validé (Réf.8)"));
   assert.ok(result.repaired.includes("État suivant autorisé"));
@@ -82,10 +96,10 @@ test("accent-stripped headers still match (Excel CSV exports lose accents)", () 
     "Nom", "Type", "Debut", "Jalon RDLI valide", "Jalon RDR valide (Ref.8)",
     "Jalon RDR previsionnel", "* Budget valide RDLI", "Cout prev (ME)",
     "Cout reel", "Engage Achats", "Etat suivant autorise",
-  ]);
+  ], [LEGACY_SP]);
   assert.equal(result.status, "match");
   if (result.status !== "match") return;
-  assert.equal(result.contract.id, "sp_total");
+  assert.equal(result.contract.id, "legacy_sp");
   assert.deepEqual(result.deviations, []);
 });
 
@@ -100,4 +114,24 @@ test("alien or empty headers are unknown", () => {
   assert.equal(identifyHeader(["Projet", "Budget"]).status, "unknown");
   assert.equal(identifyHeader([]).status, "unknown");
   assert.equal(identifyHeader([""]).status, "unknown");
+});
+
+test("the 2026-09-04 registry discriminates the five live sheets and the retired RDOM table", () => {
+  const cases: Array<[string, string]> = [
+    ["Domaine;Responsable;;;Domaine (Orga);Sous-domaine (Orga);Responsable", "param"],
+    ["Sous domaine;Id;Nom;État du processus;Type Gpe;* Budget validé RDLI;Coût prév (ME);Coût réel;Engagé Achats", "sp"],
+    ["Notes;Menu;Nom;Type;Début;Jalon RDLI validé;Jalon RDR validé (Réf.8);Jalon RDR prévisionnel;* Budget validé RDLI;Coût prév (ME);Coût réel;Engagé Achats", "sp"],
+    ["Id;Nom du projet;Etat du processus;Type;RDO franchi;RDLI franchi;RDR franchi", "projets_jalons"],
+    ["Id;Nom;Domaine (Orga);Ss-Daine (Orga);Type;État du processus;Responsable 1", "projets"],
+    ["Fichier;Id;Nom;Domaine;Type;État du processus;Responsable 1;Responsable 2;Responsable 3", "projets"],
+    ["Matricule;Ressource;Métier;Nom Projet;2026", "ressources_pdc"],
+    ["Domaine;Nom", "rdom"],
+  ];
+  for (const [header, expected] of cases) {
+    const result = identifyHeader(header.split(";"));
+    assert.equal(result.status, "match", header);
+    if (result.status === "match") assert.equal(result.contract.id, expected, header);
+  }
+  const retired = identifyHeader(["Domaine", "Nom"]);
+  assert.ok(retired.status === "match" && retired.contract.retired !== undefined);
 });

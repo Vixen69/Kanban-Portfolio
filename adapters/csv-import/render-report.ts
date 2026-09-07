@@ -68,6 +68,7 @@ function statusLabel(entry: FileInventoryEntry): string {
     case "recognized": return `reconnu (${contract})`;
     case "recognized-with-deviations": return `reconnu (${contract}), écarts d'en-têtes`;
     case "near-miss": return `incomplet (proche de ${contract})`;
+    case "retired": return `contrat retiré (${contract}) — non lu`;
     case "unknown": return "en-têtes non reconnus";
     case "not-csv": return "hors CSV — ignoré";
     case "unsupported": return "refusé";

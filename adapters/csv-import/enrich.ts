@@ -1,34 +1,37 @@
-// The card assembly: the consolidated file IS the deck — every entry is a
-// card (title, code, domain, owner, budgets, efforts come from it) — and
-// SP_total, when present, only fills the gaps (position by dated
-// milestones, missing budgets). Join keys, in order of trust: full name,
-// PE code, then title; every miss and conflict is counted, never silent.
-// The report's « pris » lines ARE the cards.
+// The card assembly (R2/R7/R8): the `projets` sheet IS the deck — every
+// entry is a card (identity, type, domain, sub-domain, owner, dates come
+// from it); ProjetsJalons gives the position, SP the 2026 costs. Join
+// keys, in order of trust: Id, then full name, then the PE code embedded
+// in the name (SP only). Every miss is counted, never silent. The report's
+// « pris » lines ARE the cards.
 
 import type { BoardConfig } from "../../core/types.ts";
 import { resolveFlowAnchors } from "../../core/flow.ts";
-import { normalizeLabel } from "./normalize.ts";
 import { tallyInto, tallyLabel } from "./tallies.ts";
 import type { Tally } from "./tallies.ts";
-import type { ConsolideEntry, ConsolideTable } from "./consolide.ts";
-import type { SpTotalTable, SubjectDraft } from "./sp-total.ts";
 import type { ProjetEntry, ProjetsTable } from "./projets.ts";
+import type { JalonEntry, JalonsTable, Stage } from "./jalons.ts";
+import type { SpEntry, SpTable } from "./sp.ts";
 import type { CardCharge } from "./charges.ts";
-import { doubt, take, warn } from "./report.ts";
+import { take, warn } from "./report.ts";
 import type { ImportReport, RowRef } from "./report.ts";
 
 /** One card, fully enriched — what the real import will load. */
 export interface EnrichedCard {
   title: string;
   normalizedName: string;
+  /** The Sciforma Id (stable identity), else a PE code, else null. */
   codename: string | null;
-  /** Canal: every imported card lands in the « complicated » lane (Q3,
-   * author 2026-07-31 — « Complexité » has nothing to do with it). */
+  /** Canal: every imported card lands in the « complicated » lane (Q3). */
   laneId: string;
   domainId: string | null;
+  subDomainId: string | null;
+  domainSource: "orga" | "param" | null;
   owner: string | null;
   typeId: string | null;
   columnId: string;
+  /** True when ProjetsJalons positioned the card (else entry column). */
+  positioned: boolean;
   createdAt: string | null;
   dateRdr: string | null;
   budgetRdli: number | null;
@@ -39,8 +42,6 @@ export interface EnrichedCard {
   effortConsumed: number | null;
   /** 2026 charges by profile, attached by charges.ts (empty until then). */
   charges: CardCharge[];
-  /** True when SP_total milestones positioned the card. */
-  positioned: boolean;
   ref: RowRef;
 }
 
@@ -48,236 +49,148 @@ export interface EnrichedCard {
 export interface CardStats {
   total: number;
   positioned: number;
-  /** Cards positioned by the « Jalon en cours » rule (Q19). */
-  byJalon: number;
-  joinByName: number;
-  joinByCode: number;
-  joinByTitle: number;
+  stageCounts: Map<Stage, number>;
+  withoutJalons: number;
+  jalonsOutside: number;
+  spById: number;
+  spByName: number;
+  spByCode: number;
   withoutSp: number;
+  spOutside: number;
   withDomain: number;
+  withSubDomain: number;
   withOwner: number;
-  /** Cards whose chef de projet came from the raw `projet` export. */
-  ownerFromProjets: number;
-  /** Cards with no row in the raw `projet` export (owner unresolved). */
-  withoutProjets: number;
-  spOutsidePerimeter: number;
+  withType: number;
 }
 
-/** The assembled deck, or null when the consolidated file is absent. */
+/** The assembled deck, or null when the `projets` sheet is absent. */
 export interface CardAssembly {
   cards: EnrichedCard[];
   stats: CardStats;
 }
 
-/**
- * Assembles the cards from the consolidated file and the optional SP_total
- * gap-filler.
- * Inputs: the consolidated table (null -> no assembly), the SP_total table
- * (nullable), the board config (entry column anchor, column names), and
- * the report.
- * Outputs: the cards + stats; side effects: one « pris » line per card,
- * aggregated signalements for join misses and code mismatches, a douteux
- * when the code join and the title join disagree.
- * Failure modes: none.
- */
-export function assembleCards(
-  consolide: ConsolideTable | null, spTotal: SpTotalTable | null,
-  projets: ProjetsTable | null, config: BoardConfig, report: ImportReport,
-): CardAssembly | null {
-  if (consolide === null) return null;
-  const ctx = createJoin(spTotal, projets, config, report);
-  const cards = consolide.entries.map((entry) => buildCard(ctx, entry));
-  ctx.stats.total = cards.length;
-  ctx.stats.spOutsidePerimeter = (spTotal?.drafts.length ?? 0) - ctx.consumedSp.size;
-  for (const [message, t] of ctx.tallies) {
-    warn(report, `${message} : ${tallyLabel(t)}`, "assemblage");
-  }
-  return { cards, stats: ctx.stats };
-}
-
 interface JoinContext {
   report: ImportReport;
-  hasSp: boolean;
-  spByName: ReadonlyMap<string, SubjectDraft>;
-  spByCode: Map<string, SubjectDraft>;
-  spByTitle: Map<string, SubjectDraft | "ambiguous">;
-  hasProjets: boolean;
-  pjByName: ReadonlyMap<string, ProjetEntry>;
-  pjByTitle: Map<string, ProjetEntry | "ambiguous">;
-  entryColumnId: string;
+  jalons: JalonsTable | null;
+  sp: SpTable | null;
   laneId: string;
-  /** « Jalon en cours » value (normalized) -> target column id (Q19). */
-  jalonColumns: Map<string, string>;
+  entryColumnId: string;
   columnNames: Map<string, string>;
-  consumedSp: Set<string>;
+  consumedJalons: Set<JalonEntry>;
+  consumedSp: Set<SpEntry>;
   stats: CardStats;
   tallies: Map<string, Tally>;
 }
 
-// Q19 (author, 2026-07-31): « Jalon en cours » is the NEXT milestone, so
-// it tells where the project stands — RDO -> Qualification, RDLI ->
-// Études, RDR -> Actifs (RDLI passed), RVSR -> Exploitation. Column ids
-// come from the config anchors, never hardcoded blindly: missing targets
-// degrade to the entry column.
-function jalonColumnMap(config: BoardConfig, entryId: string): Map<string, string> {
-  const anchors = resolveFlowAnchors(config);
-  const byId = (id: string): string | undefined => config.columns.find((c) => c.id === id)?.id;
-  const qualification = anchors?.qualification?.id ?? entryId;
-  const etudes = byId("etudes") ?? qualification;
-  const actifs = anchors?.activation?.id ?? entryId;
-  const exploitation = config.columns[config.columns.length - 1]?.id ?? entryId;
-  return new Map([
-    ["rdo", qualification], ["rdli", etudes], ["rdr", actifs], ["rvsr", exploitation],
-  ]);
+/**
+ * Assembles the cards from the perimeter and its two enrichments.
+ * Inputs: the `projets` table (null -> no assembly), the ProjetsJalons and
+ * SP tables (nullable), the board config (lane, entry column, names), the
+ * report.
+ * Outputs: the cards + stats; side effects: one « pris » line per card and
+ * aggregated signalements for every join miss.
+ * Failure modes: none.
+ */
+export function assembleCards(
+  projets: ProjetsTable | null, jalons: JalonsTable | null, sp: SpTable | null,
+  config: BoardConfig, report: ImportReport,
+): CardAssembly | null {
+  if (projets === null) return null;
+  const ctx = createContext(jalons, sp, config, report);
+  const cards = projets.entries.map((entry) => buildCard(ctx, entry));
+  ctx.stats.total = cards.length;
+  ctx.stats.jalonsOutside = (jalons?.entries.length ?? 0) - ctx.consumedJalons.size;
+  ctx.stats.spOutside = (sp?.entries.length ?? 0) - ctx.consumedSp.size;
+  for (const [message, t] of ctx.tallies) warn(report, `${message} : ${tallyLabel(t)}`, "assemblage");
+  return { cards, stats: ctx.stats };
 }
 
-function createJoin(
-  spTotal: SpTotalTable | null, projets: ProjetsTable | null,
-  config: BoardConfig, report: ImportReport,
+function createContext(
+  jalons: JalonsTable | null, sp: SpTable | null, config: BoardConfig, report: ImportReport,
 ): JoinContext {
-  const spByCode = new Map<string, SubjectDraft>();
-  const spByTitle = new Map<string, SubjectDraft | "ambiguous">();
-  for (const draft of spTotal?.drafts ?? []) {
-    if (draft.codename !== null && !spByCode.has(draft.codename)) spByCode.set(draft.codename, draft);
-    spByTitle.set(draft.normalizedTitle, spByTitle.has(draft.normalizedTitle) ? "ambiguous" : draft);
-  }
-  const pjByTitle = new Map<string, ProjetEntry | "ambiguous">();
-  for (const entry of projets?.entries ?? []) {
-    pjByTitle.set(entry.normalizedTitle, pjByTitle.has(entry.normalizedTitle) ? "ambiguous" : entry);
-  }
-  const entryColumnId = resolveFlowAnchors(config)?.entry.id ?? config.columns[0]?.id ?? "";
   return {
-    report,
-    hasSp: spTotal !== null,
-    spByName: spTotal?.byName ?? new Map(),
-    spByCode, spByTitle,
-    hasProjets: projets !== null,
-    pjByName: projets?.byName ?? new Map(),
-    pjByTitle,
-    entryColumnId,
+    report, jalons, sp,
     laneId: config.lanes.find((l) => l.natureKey === "complicated")?.id ?? config.lanes[0]?.id ?? "",
-    jalonColumns: jalonColumnMap(config, entryColumnId),
+    entryColumnId: resolveFlowAnchors(config)?.entry.id ?? config.columns[0]?.id ?? "",
     columnNames: new Map(config.columns.map((c) => [c.id, c.name])),
-    consumedSp: new Set(),
+    consumedJalons: new Set(), consumedSp: new Set(),
     stats: {
-      total: 0, positioned: 0, byJalon: 0, joinByName: 0, joinByCode: 0, joinByTitle: 0,
-      withoutSp: 0, withDomain: 0, withOwner: 0, ownerFromProjets: 0,
-      withoutProjets: 0, spOutsidePerimeter: 0,
+      total: 0, positioned: 0, stageCounts: new Map(), withoutJalons: 0, jalonsOutside: 0,
+      spById: 0, spByName: 0, spByCode: 0, withoutSp: 0, spOutside: 0,
+      withDomain: 0, withSubDomain: 0, withOwner: 0, withType: 0,
     },
     tallies: new Map(),
   };
 }
 
-// One consolidated row -> one card; the consolidated sheet is the primary
-// value source, SP_total fills the gaps. The pris line is the card.
-function buildCard(ctx: JoinContext, entry: ConsolideEntry): EnrichedCard {
-  const sp = spMatch(ctx, entry);
-  const pj = ctx.hasProjets ? joinPj(ctx, entry) : null;
-  if (ctx.hasProjets && pj === null) {
-    ctx.stats.withoutProjets++;
-    tallyInto(ctx.tallies, "carte sans ligne dans l'export `projet` — chef de projet inconnu", entry.ref.line);
-  }
-  const domainId = entry.domainId ?? pj?.domainId ?? null;
-  const owner = entry.owner ?? pj?.owner ?? null;
-  if (domainId !== null) ctx.stats.withDomain++;
-  if (owner !== null) ctx.stats.withOwner++;
-  if (entry.owner === null && pj?.owner != null) ctx.stats.ownerFromProjets++;
+// One perimeter row -> one card. The pris line names the column and the
+// domain read-out so the ~20-project manual check reads in one glance.
+function buildCard(ctx: JoinContext, entry: ProjetEntry): EnrichedCard {
+  const jalon = joinJalons(ctx, entry);
+  const spEntry = joinSp(ctx, entry);
+  const s = ctx.stats;
+  if (entry.domainId !== null) s.withDomain++;
+  if (entry.subDomainId !== null) s.withSubDomain++;
+  if (entry.owner !== null) s.withOwner++;
+  if (entry.typeId !== null) s.withType++;
   const card: EnrichedCard = {
-    title: entry.name,
-    normalizedName: entry.normalizedName,
-    codename: entry.codename ?? sp?.codename ?? null,
+    title: entry.name, normalizedName: entry.normalizedName, codename: entry.codename,
     laneId: ctx.laneId,
-    domainId,
-    owner,
-    typeId: entry.typeId ?? sp?.typeId ?? null,
-    columnId: sp?.columnId ?? jalonColumn(ctx, entry),
-    createdAt: entry.createdAt ?? sp?.createdAt ?? null,
-    dateRdr: entry.dateRdr ?? sp?.dateRdr ?? null,
-    budgetRdli: entry.budgetRdli ?? sp?.budgetRdli ?? null,
-    budgetEstimated: entry.budgetEstimated ?? sp?.budgetEstimated ?? null,
-    budgetConsumed: entry.budgetConsumed ?? sp?.budgetConsumed ?? null,
-    budgetEngaged: entry.budgetEngaged ?? sp?.budgetEngaged ?? null,
+    domainId: entry.domainId, subDomainId: entry.subDomainId, domainSource: entry.domainSource,
+    owner: entry.owner, typeId: entry.typeId,
+    columnId: jalon?.columnId ?? ctx.entryColumnId, positioned: jalon !== null,
+    createdAt: entry.createdAt, dateRdr: entry.dateRdr,
+    budgetRdli: entry.budgetRdli ?? spEntry?.budgetRdli ?? null,
+    budgetEstimated: spEntry?.budgetEstimated ?? null,
+    budgetConsumed: spEntry?.budgetConsumed ?? null,
+    budgetEngaged: spEntry?.budgetEngaged ?? null,
     effortEstimated: entry.effortEstimated, effortConsumed: entry.effortConsumed,
-    charges: [], positioned: sp !== null, ref: entry.ref,
+    charges: [], ref: entry.ref,
   };
   const columnName = ctx.columnNames.get(card.columnId) ?? card.columnId;
-  take(ctx.report, card.ref, card.title, `carte → colonne « ${columnName} »`, card.codename ?? undefined);
+  const domain = entry.domainId === null ? "sans domaine"
+    : `${entry.domainId}${entry.subDomainId === null ? "" : ` / ${entry.subDomainId}`}`;
+  take(ctx.report, card.ref, card.title, `carte → colonne « ${columnName} » · ${domain}`, card.codename ?? undefined);
   return card;
 }
 
-// The SP_total gap-filler, with its counters and code cross-check.
-function spMatch(ctx: JoinContext, entry: ConsolideEntry): SubjectDraft | null {
-  const sp = ctx.hasSp ? joinSp(ctx, entry) : null;
-  if (sp === null) {
-    ctx.stats.withoutSp++;
-    if (ctx.hasSp) {
-      tallyInto(ctx.tallies, "carte sans correspondance SP_total — position par défaut (Demandes)", entry.ref.line);
-    }
+// ProjetsJalons by Id, then by name; a hit counts the stage it implies.
+function joinJalons(ctx: JoinContext, entry: ProjetEntry): JalonEntry | null {
+  if (ctx.jalons === null) return null;
+  const hit = (entry.id === "" ? undefined : ctx.jalons.byId.get(entry.id))
+    ?? ctx.jalons.byName.get(entry.normalizedName);
+  if (hit === undefined) {
+    ctx.stats.withoutJalons++;
+    tallyInto(ctx.tallies, "carte sans ligne dans ProjetsJalons — colonne d'entrée", entry.ref.line);
     return null;
   }
+  ctx.consumedJalons.add(hit);
   ctx.stats.positioned++;
-  ctx.consumedSp.add(sp.normalizedName);
-  if (entry.codename !== null && sp.codename !== null && entry.codename !== sp.codename) {
-    tallyInto(ctx.tallies, "code du consolidé ≠ code SP_total — drapeau", entry.ref.line);
-  }
-  return sp;
+  ctx.stats.stageCounts.set(hit.stage, (ctx.stats.stageCounts.get(hit.stage) ?? 0) + 1);
+  return hit;
 }
 
-// The raw `projet` export, by name then title (its rows are never cards).
-function joinPj(ctx: JoinContext, entry: ConsolideEntry): ProjetEntry | null {
-  const byName = ctx.pjByName.get(entry.normalizedName);
-  if (byName !== undefined) return byName;
-  const titled = ctx.pjByTitle.get(entry.normalizedName);
-  if (titled === "ambiguous") {
-    tallyInto(ctx.tallies, "titre ambigu dans l'export `projet` (plusieurs lignes)", entry.ref.line);
+// SP by Id, then by name, then by PE code; the key used is counted, and a
+// name/Id disagreement inside SP is left to the SP reader's own doubts.
+function joinSp(ctx: JoinContext, entry: ProjetEntry): SpEntry | null {
+  if (ctx.sp === null) return null;
+  const byId = entry.id === "" ? undefined : ctx.sp.byId.get(entry.id);
+  const byName = ctx.sp.byName.get(entry.normalizedName);
+  const byCode = entry.codename === null ? undefined : ctx.sp.byCode.get(entry.codename);
+  const hit = byId ?? byName ?? byCode;
+  if (hit === undefined) {
+    ctx.stats.withoutSp++;
+    tallyInto(ctx.tallies, "carte sans correspondance SP — coûts 2026 inconnus", entry.ref.line);
     return null;
   }
-  return titled ?? null;
-}
-
-// The Q19 fallback: map « Jalon en cours » to its column; unknown labels
-// are tallied and land in the entry column.
-function jalonColumn(ctx: JoinContext, entry: ConsolideEntry): string {
-  if (entry.jalonEnCours === null) return ctx.entryColumnId;
-  const target = ctx.jalonColumns.get(normalizeLabel(entry.jalonEnCours));
-  if (target === undefined) {
-    tallyInto(ctx.tallies, `« Jalon en cours » non reconnu (« ${entry.jalonEnCours} ») — Demandes`, entry.ref.line);
-    return ctx.entryColumnId;
+  if (byId !== undefined) ctx.stats.spById++;
+  else if (byName !== undefined) ctx.stats.spByName++;
+  else ctx.stats.spByCode++;
+  if (byId !== undefined && byName !== undefined && byId !== byName) {
+    tallyInto(ctx.tallies, "SP : l'Id et le nom désignent deux sujets différents — Id retenu", entry.ref.line);
   }
-  ctx.stats.byJalon++;
-  return target;
-}
-
-// Name first, then PE code, then title; a code/title disagreement is a
-// question, and the code wins (it is the stronger identity).
-function joinSp(ctx: JoinContext, entry: ConsolideEntry): SubjectDraft | null {
-  const byName = ctx.spByName.get(entry.normalizedName);
-  if (byName !== undefined) {
-    ctx.stats.joinByName++;
-    return byName;
-  }
-  const byCode = entry.codename === null ? undefined : ctx.spByCode.get(entry.codename);
-  const titled = ctx.spByTitle.get(entry.normalizedName);
-  const byTitle = titled === "ambiguous" ? undefined : titled;
-  if (byCode !== undefined && byTitle !== undefined && byCode !== byTitle) {
-    doubt(ctx.report, "assemblage",
-      `« ${entry.name} » : la jointure par code (${entry.codename}) et par titre désignent deux ` +
-        `sujets SP_total différents (lignes ${byCode.ref.line} et ${byTitle.ref.line}) — code retenu`,
-      { ref: entry.ref });
-  }
-  if (byCode !== undefined) {
-    ctx.stats.joinByCode++;
-    return byCode;
-  }
-  if (titled === "ambiguous") {
-    tallyInto(ctx.tallies, "titre SP_total ambigu (plusieurs sujets partagent le titre)", entry.ref.line);
-    return null;
-  }
-  if (byTitle !== undefined) {
-    ctx.stats.joinByTitle++;
-    return byTitle;
-  }
-  return null;
+  ctx.consumedSp.add(hit);
+  return hit;
 }
 
 /** Card counts per column id, in board order (for the assembly line). */

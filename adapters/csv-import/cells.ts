@@ -42,3 +42,28 @@ export function dateCell(
   if (parsed.kind !== "empty") tallyInto(tallies, `« ${column} » illisible`, line);
   return null;
 }
+
+/**
+ * Reads a money cell into k€: a value written in euros (« 120 500 € »)
+ * is divided by 1000 and tallied; « k€ » or no unit is taken as k€.
+ * Empty -> null; unreadable -> null + tally; negatives tallied.
+ * Inputs: the raw cell, its column label, the 1-based line, the tallies.
+ * Outputs: the k€ amount or null. Failure modes: none.
+ */
+export function moneyCell(
+  raw: string, column: string, line: number, tallies: Map<string, Tally>,
+): number | null {
+  const parsed = parseFrenchAmount(raw);
+  if (parsed.kind === "empty") return null;
+  if (parsed.kind === "invalid") {
+    tallyInto(tallies, `« ${column} » illisible`, line);
+    return null;
+  }
+  let value = parsed.value;
+  if (parsed.unit !== undefined && /^(€|eur)$/i.test(parsed.unit)) {
+    value = Math.round(value) / 1000;
+    tallyInto(tallies, `« ${column} » en euros — converti en k€`, line);
+  }
+  if (value < 0) tallyInto(tallies, `« ${column} » négatif`, line);
+  return value;
+}

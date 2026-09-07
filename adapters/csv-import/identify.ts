@@ -9,7 +9,7 @@ import { decodeCsvBytes } from "./decode.ts";
 import { parseCsv } from "./csv.ts";
 import type { CsvRow } from "./csv.ts";
 import { identifyHeader } from "./contract.ts";
-import type { HeaderDeviation, HeaderIdentification, HeaderMatch } from "./contract.ts";
+import type { HeaderDeviation, HeaderIdentification, HeaderMatch, HeaderNearMiss } from "./contract.ts";
 import { warn } from "./report.ts";
 import type { FileInventoryEntry, ImportReport } from "./report.ts";
 
@@ -22,6 +22,8 @@ export interface InputFile {
 /** A recognized file, ready for its contract reader. */
 export interface ParsedCsvFile {
   match: HeaderMatch;
+  /** The raw header row (PARAM locates its side-by-side tables in it). */
+  headerCells: string[];
   dataRows: CsvRow[];
 }
 
@@ -102,19 +104,13 @@ function classify(
   const headerRow = rows[pick.rowIndex];
   const identification = pick.identification;
   if (headerRow === undefined) return null;
-  if (identification.status === "unknown") {
-    addInventory(report, file, "unknown", {
-      encoding,
-      detail: `aucune colonne connue — en-têtes vus : ${headersSample(headerRow.cells)}`,
-    });
+  if (identification.status !== "match") {
+    inventoryMiss(file, report, encoding, headerRow, identification);
     return null;
   }
-  if (identification.status === "near-miss") {
-    addInventory(report, file, "near-miss", {
-      encoding,
-      contractId: identification.contract.id,
-      detail: `ligne ${headerRow.line} ; colonnes manquantes : ${identification.missing.join(", ")}` +
-        ` ; en-têtes vus : ${headersSample(headerRow.cells)}`,
+  if (identification.contract.retired !== undefined) {
+    addInventory(report, file, "retired", {
+      encoding, contractId: identification.contract.id, detail: identification.contract.retired,
     });
     return null;
   }
@@ -130,7 +126,29 @@ function classify(
     contractId: identification.contract.id,
     detail: deviationsLabel(identification.deviations),
   });
-  return { match: identification, dataRows: rows.slice(pick.rowIndex + 1) };
+  return { match: identification, headerCells: headerRow.cells, dataRows: rows.slice(pick.rowIndex + 1) };
+}
+
+// An unrecognized header: the inventory carries the verbatim labels (the
+// report doubles as the on-site structure survey) and, for a near-miss,
+// the precise missing columns.
+function inventoryMiss(
+  file: InputFile, report: ImportReport, encoding: string, headerRow: CsvRow,
+  identification: HeaderNearMiss | { status: "unknown" },
+): void {
+  if (identification.status === "unknown") {
+    addInventory(report, file, "unknown", {
+      encoding,
+      detail: `aucune colonne connue — en-têtes vus : ${headersSample(headerRow.cells)}`,
+    });
+    return;
+  }
+  addInventory(report, file, "near-miss", {
+    encoding,
+    contractId: identification.contract.id,
+    detail: `ligne ${headerRow.line} ; colonnes manquantes : ${identification.missing.join(", ")}` +
+      ` ; en-têtes vus : ${headersSample(headerRow.cells)}`,
+  });
 }
 
 // The tolerated header particularities of a matched file, said once each.

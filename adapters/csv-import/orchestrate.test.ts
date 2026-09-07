@@ -1,6 +1,8 @@
 // End-to-end checks of the audit pass against the real board config:
-// inventory classification, per-contract election, header search under a
-// preamble, the full four-file assembly, and determinism.
+// inventory classification (retired contract included), per-contract
+// election, header search under a preamble, the full five-file assembly
+// (perimeter + jalons + SP + PdC through PARAM), the raw-export path, and
+// determinism.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -10,27 +12,10 @@ import { runImportAudit } from "./orchestrate.ts";
 import type { InputFile } from "./orchestrate.ts";
 
 const CONFIG = JSON.parse(
-  readFileSync(new URL("./test-board.legacy.json", import.meta.url), "utf8"),
+  readFileSync(new URL("../../config/board.json", import.meta.url), "utf8"),
 ) as BoardConfig;
 
-const NOW = new Date("2026-07-29T12:00:00.000Z");
-
-const FULL_RDOM =
-  "Domaine;Nom\nIngénierie;ALPHA\nSoutien;BRAVO\nIndustrie;CHARLIE\nCorporate;DELTA\n" +
-  "erp;ECHO\nPLM;FOXTROT\nINF;GOLF\nA&D;HOTEL\nCyber;INDIA\n";
-
-// The real SP_total layout: filter preamble, then the 23 real columns.
-const SP_PREAMBLE =
-  ";;;Afficher les montants calculés pour :;;Toute période;;;;;Afficher les lignes sans montants :;;;FAUX;;;;;;;;;";
-const SP_HEADER =
-  "Notes;Menu;Nom;Type;Score criblage;Priorité;Top projet;Responsable 1;État suivant autorisé;" +
-  "Catégorie;Début;Jalon RVSR ou Fin;Jalon RDLI validé;Jalon RDR validé (Réf.8);Jalon RDR prévisionnel;" +
-  "Budget présenté PDSI;* Budget validé RDLI;* CAT global projet;Coût prév (ME);Coût réel;ME Achats;" +
-  "Engagé Achats;Réel Achats";
-const SP_ROWS =
-  ";;PE20001 Sujet Un;Achat;;;;;;;01/01/2026;;15/02/2026;;;;100;;80;20;;10;\n" +
-  ";;Sujet Deux;;;;;;;;;;;;;;;;;;;;\n";
-const FULL_SP = `${SP_PREAMBLE}\n${SP_HEADER}\n${SP_ROWS}`;
+const NOW = new Date("2026-09-04T12:00:00.000Z");
 
 function file(name: string, content: string): InputFile {
   return { name, bytes: Buffer.from(content, "utf8") };
@@ -40,199 +25,112 @@ function fixture(name: string): InputFile {
   return { name, bytes: readFileSync(new URL(`../../fixtures/import/${name}`, import.meta.url)) };
 }
 
+const ALL = ["PARAM.csv", "Projets.csv", "ProjetsJalons.csv", "SP_2026.csv", "Ressources_PdC.csv"];
+
 function audit(files: InputFile[]) {
   return runImportAudit(files, CONFIG, NOW);
 }
 
-test("a clean RDOM file covers the nine domains without any anomaly", () => {
-  const { report, rdom } = audit([file("RDOM.csv", FULL_RDOM)]);
-  assert.equal(report.inventory[0]?.status, "recognized");
-  assert.equal(report.taken.length, 9);
-  assert.deepEqual(report.warnings, []);
-  assert.equal(rdom?.namesByDomain.size, 9);
-  assert.equal(report.assembly[0]?.status, "prête (9 noms, 9 domaines)");
+test("a July RDOM file is inventoried as a retired contract, never parsed", () => {
+  const { report, param } = audit([file("RDOM.csv", "Domaine;Nom\nA&D;BERGER\n")]);
+  assert.equal(report.inventory[0]?.status, "retired");
+  assert.equal(report.inventory[0]?.contractId, "rdom");
+  assert.equal(param, null);
   assert.deepEqual(report.missingExpected.map((m) => m.name),
-    ["consolidé", "Projets (export brut)", "Ressources_PdC"]);
+    ["Projets", "PARAM", "ProjetsJalons", "SP (2026 ou total)", "Ressources_PdC"]);
 });
 
-test("SP_total alone: preamble skipped, cards waiting for the perimeter", () => {
-  const { report, spTotal, cards } = audit([file("SP_total.csv", FULL_SP)]);
-  assert.equal(report.inventory[0]?.status, "recognized");
-  assert.ok(report.warnings.some((w) => /en-têtes reconnus ligne 2 — 1 ligne\(s\) ignorée\(s\) au-dessus/.test(w.message)));
-  assert.equal(spTotal?.drafts.length, 2);
-  assert.equal(cards, null);
-  const cartes = report.assembly.find((a) => a.subject === "cartes");
-  assert.match(cartes?.status ?? "", /en attente du `consolidé` — 2 sujet\(s\) SP_total lus/);
-  const profile = report.assembly.find((a) => a.subject === "profil `SP_total`");
-  assert.equal(profile?.status, "code PE : 1/2 · type : 1/2 · budget : 1/2 · date de début : 1/2");
-});
-
-test("the three fixture files assemble a full deck, SP_total as gap-filler", () => {
-  const { report, cards, consolide } = audit([
-    fixture("RDOM.csv"), fixture("SP_total.csv"), fixture("Consolide.csv"),
+test("the five fixture files assemble the full deck", () => {
+  const { report, cards, projets, jalons, sp, chargeStats } = audit(ALL.map(fixture));
+  assert.deepEqual(report.inventory.map((f) => [f.name, f.status]), [
+    ["PARAM.csv", "recognized-with-deviations"], ["Projets.csv", "recognized"],
+    ["ProjetsJalons.csv", "recognized"], ["Ressources_PdC.csv", "recognized-with-deviations"], ["SP_2026.csv", "recognized"],
   ]);
-  assert.equal(consolide?.entries.length, 6);
-  assert.deepEqual(consolide?.sisCounts, { yes: 1, no: 5, blank: 0 });
+  assert.deepEqual(report.missingExpected, []);
+  assert.ok(report.warnings.some((w) => w.file === "SP_2026.csv" && /en-têtes reconnus ligne 2 — 1 ligne\(s\) ignorée\(s\)/.test(w.message)));
+  assert.equal(projets?.entries.length, 6);
+  assert.equal(jalons?.entries.length, 6);
+  assert.equal(sp?.entries.length, 5);
   assert.equal(cards?.cards.length, 6);
+  assert.equal(report.taken.length, 6, "the pris lines are the cards");
   const byLabel = new Map(report.assembly.map((a) => [a.subject, a.status]));
-  assert.equal(byLabel.get("périmètre `consolidé`"),
-    "6 carte(s) — le fichier fait foi · exclus : 3 (Domaine (Ptf) TMA CORRECTIVES / IT4IT / PROJETS VENDUS)" +
-      " · isProjetSIS (informatif) : VRAI 1 · FAUX 5 · vide 0");
-  assert.equal(report.discarded.filter((d) => /« Domaine \(Ptf\) » exclu/.test(d.reason)).length, 3);
-  assert.equal(byLabel.get("cartes"), "6 — répartition : Demandes 3 · Actifs 1 · Exploitation 2");
+  assert.equal(byLabel.get("table PARAM"), "prête (5 responsable(s) de domaine · 7 ligne(s) organisation, 7 avec chemin)");
+  assert.match(byLabel.get("périmètre `projets`") ?? "", /^6 carte\(s\) — la liste fait foi · types : .*Étude 2.*hors des quatre retenus 1 · domaine : colonnes Orga \(direct\)$/);
+  assert.equal(byLabel.get("cartes"), "6 — répartition : Demandes 2 · Études 1 · Actifs 1 · Exploitation 2");
   assert.equal(byLabel.get("position"),
-    "jalons datés SP_total 5 (nom 1 · code 4 · titre 0) · « Jalon en cours » 0 " +
-      "(RDO→Qualification, RDLI→Études, RDR→Actifs, RVSR→Exploitation — Q19) · défaut Demandes : 1");
-  assert.equal(byLabel.get("domaine"), "5/6 · manquant : 1");
-  assert.equal(byLabel.get("chef de projet"), "0/6");
-  assert.equal(byLabel.get("hors périmètre"), "3 sujet(s) SP_total non retenus par le consolidé");
-  const first = cards?.cards[0];
-  assert.equal(first?.title, "Modernisation atelier");
-  assert.equal(first?.codename, "PE10001");
-  assert.equal(first?.domainId, "infra");
-  assert.equal(first?.owner, null);
-  assert.equal(first?.columnId, "exploitation");
-  assert.equal(first?.budgetRdli, 150);
-  // SP_total is quiet: the pris lines are the 12 RDOM names + the 6 cards.
-  assert.equal(report.taken.length, 18);
-  assert.equal(report.discarded.filter((d) => /hors périmètre/.test(d.reason)).length, 0);
+    "jalons 5/6 (Exploitation 2 · Actifs 1 · Études 1 · entrée 1) · sans jalon : 1 → colonne d'entrée · lignes jalons hors périmètre : 1");
+  assert.equal(byLabel.get("domaine"), "6/6 (direct 6 · via PARAM 0 · manquant 0) · sous-domaine : 3 détaillé(s), 2 replié(s) dans leur domaine");
+  assert.equal(byLabel.get("chef de projet"), "5/6 · responsables de domaine exclus : 2");
+  assert.match(byLabel.get("coûts 2026 (SP)") ?? "", /^4\/6 jointes \(Id 3 · nom 1 · code 0\) · sans correspondance : 2 · sujets SP hors périmètre : 1 · RDLI/);
+  assert.match(byLabel.get("plan de charge") ?? "", /^3\/6 cartes couvertes .* projets PdC hors périmètre : 1 · cartes sans charge : 3$/);
+  assert.equal(chargeStats?.covered, 3);
 });
 
-test("consolidé alone (the 2026-07-31 shape): jalon en cours positions (Q19)", () => {
-  const { report, cards } = audit([fixture("RDOM.csv"), fixture("Consolide.csv")]);
-  assert.equal(cards?.cards.length, 6);
-  const byLabel = new Map(report.assembly.map((a) => [a.subject, a.status]));
-  assert.equal(byLabel.get("cartes"),
-    "6 — répartition : Demandes 1 · Qualification 2 · Études 1 · Actifs 2");
-  assert.equal(byLabel.get("position"),
-    "« Jalon en cours » 5 (RDO→Qualification, RDLI→Études, RDR→Actifs," +
-      " RVSR→Exploitation — Q19) · défaut Demandes : 1");
-  assert.equal(byLabel.get("domaine"), "5/6 · manquant : 1");
-  assert.equal(byLabel.get("chef de projet"), "0/6");
-  const first = cards?.cards[0];
-  assert.equal(first?.budgetRdli, 150);
-  assert.equal(first?.budgetEstimated, 120.5);
-  assert.equal(first?.effortEstimated, 110);
-  assert.equal(first?.effortConsumed, 70);
-  assert.equal(first?.dateRdr, "2026-09-15");
-  assert.equal(first?.columnId, "actifs");
-  assert.equal(first?.laneId, "projets");
-  assert.equal(first?.owner, null);
-  assert.equal(cards?.cards[1]?.columnId, "etudes");
-  assert.equal(cards?.cards[2]?.columnId, "qualification");
-  assert.equal(cards?.cards[3]?.domainId, null);
-  assert.equal(cards?.cards[5]?.columnId, "demandes");
-  const jalons = report.warnings.find((w) => /« Jalon en cours » — valeurs vues/.test(w.message));
-  assert.match(jalons?.message ?? "", /« RDR » \(2\) ; « RDLI » \(1\) ; « RDO » \(2\)/);
+test("each card carries the right position, vocabulary and costs", () => {
+  const { cards } = audit(ALL.map(fixture));
+  const byCode = new Map(cards?.cards.map((c) => [c.codename, c]));
+  const atelier = byCode.get("PE10001");
+  assert.equal(atelier?.columnId, "exploitation");
+  assert.deepEqual([atelier?.domainId, atelier?.subDomainId, atelier?.domainSource], ["infra", null, "orga"]);
+  assert.equal(atelier?.owner, "Alice MERLE", "LAMBERT Luc is a domain lead");
+  assert.equal(atelier?.typeId, "mise_en_oeuvre");
+  assert.deepEqual([atelier?.budgetEstimated, atelier?.budgetConsumed, atelier?.budgetEngaged, atelier?.budgetRdli], [120.5, 80, 30, 150]);
+  assert.deepEqual([atelier?.effortEstimated, atelier?.effortConsumed], [110, 70]);
+  assert.equal(atelier?.charges.length, 2);
+  const portail = byCode.get("PE10002");
+  assert.deepEqual([portail?.columnId, portail?.typeId, portail?.subDomainId], ["actifs", "etude", "developpements_rapides"]);
+  const connectivite = byCode.get("MEWTBN7Q");
+  assert.deepEqual([connectivite?.columnId, connectivite?.domainId, connectivite?.subDomainId], ["demandes", "corporate", "achats"]);
+  assert.equal(connectivite?.budgetEstimated, 30, "SP joined by name (no Id in that SP row)");
+  const carto = byCode.get("PE10008");
+  assert.deepEqual([carto?.columnId, carto?.typeId, carto?.subDomainId, carto?.owner, carto?.budgetEstimated],
+    ["demandes", null, null, null, null]);
+  assert.equal(byCode.get("PE10007")?.columnId, "exploitation", "RDR dated 01/06/2026, past");
 });
 
-test("the raw `projet` export supplies the chefs de projet (2026-08-01)", () => {
-  const { report, cards } = audit([
-    fixture("RDOM.csv"), fixture("Consolide.csv"), fixture("Projets.csv"),
+test("the doubts name the vocabulary questions to settle", () => {
+  const { report } = audit(ALL.map(fixture));
+  const questions = report.doubtful.map((d) => d.question);
+  assert.ok(questions.some((q) => /« Domaine \(Orga\) » inconnu du board : « CYBER »/.test(q)));
+  assert.ok(questions.some((q) => /type hors des quatre retenus : « TMA Corrective \(Run\) »/.test(q)));
+  assert.ok(questions.some((q) => /sous-domaine inconnu de la config : « corporate \/ INEXISTANT »/.test(q)));
+  assert.ok(report.warnings.some((w) => /RDR franchi sans RDLI franchi/.test(w.message)));
+  assert.ok(report.warnings.some((w) => /cellules « franchi » — valeurs vues/.test(w.message)));
+});
+
+test("a raw Sciforma export is translated through PARAM", () => {
+  const raw =
+    "Fichier;Id;Nom;Domaine;Portefeuille;Type;État du processus;Responsable 1;Responsable 2;Responsable 3;Responsable portefeuilles\n" +
+    "x;PE10001;Modernisation atelier;DSI NEXTER.DOMAINE INFRASTRUCTURE;P;Projet de mise en oeuvre (Projet);En cours;LAMBERT Luc;Alice MERLE;;\n" +
+    "x;MEWTBN7Q;Étude connectivité site B;DSI NEXTER.DOMAINE METIER.CORPORATE.ACHATS;P;Etude (Projet);Nouveau;Dan ROY;;;\n";
+  const { cards, projets } = audit([fixture("PARAM.csv"), file("Projets_brut.csv", raw)]);
+  assert.equal(projets?.shape, "path");
+  assert.deepEqual(cards?.cards.map((c) => [c.domainId, c.subDomainId, c.domainSource]), [
+    ["infra", null, "param"], ["corporate", "achats", "param"],
   ]);
-  const byLabel = new Map(report.assembly.map((a) => [a.subject, a.status]));
-  // Owners: CARPENTIER/MASSON/DURAND/BLANCHARD are RDOM -> excluded.
-  assert.equal(byLabel.get("chef de projet"), "6/6 (dont 6 via l'export `projet`)");
-  assert.deepEqual(cards?.cards.map((c) => c.owner),
-    ["Alice MERLE", "Bob NOEL", "Chloé PETIT", "David GRAND", "Emma FAVRE", "Franck LEGRIS"]);
-  // « Sécurisation accès » joins « PE10007 Sécurisation accès » by title.
-  assert.equal(cards?.cards[4]?.owner, "Emma FAVRE");
-  // The empty « Domaine (Ptf) » falls back to the RDOM of BLANCHARD.
-  assert.equal(byLabel.get("domaine"), "6/6 · manquant : 0");
-  assert.equal(cards?.cards[3]?.domainId, "cyber");
-  assert.ok(report.warnings.some((w) => /« Responsable 1 » est un RDOM — exclu/.test(w.message)));
+  assert.equal(cards?.cards[0]?.owner, "Alice MERLE");
 });
 
-test("the full four-file set attaches the 2026 charges to the cards", () => {
-  const { report, cards, chargeStats } = audit([
-    fixture("RDOM.csv"), fixture("SP_total.csv"), fixture("Consolide.csv"), fixture("Ressources_PdC.csv"),
-  ]);
-  // The file total covers the whole DSI; the cards' own load is a subset.
-  assert.deepEqual(chargeStats, {
-    covered: 3, uncovered: 3, pdcOutside: 1,
-    totalJh: 170, totalDone: 78, cardsJh: 145, cardsDone: 73,
-  });
-  const byLabel = new Map(report.assembly.map((a) => [a.subject, a.status]));
-  assert.equal(byLabel.get("plan de charge"),
-    "3/6 cartes couvertes · charge 2026 des cartes : 145 j.h prév. · 73 réel" +
-      " · total du fichier PdC (toute la DSI) : 170 / 78" +
-      " · projets PdC hors périmètre : 1 · cartes sans charge : 3");
-  const first = cards?.cards[0];
-  assert.deepEqual(first?.charges.find((c) => c.profileId === "pmo"), { profileId: "pmo", jh: 40, done: 25 });
-  assert.deepEqual(first?.charges.find((c) => c.profileId === "concept_dev"),
-    { profileId: "concept_dev", jh: 60, done: 20 });
-  assert.ok(report.warnings.some((w) => /mobilisation 2026 : « Jean ROCA » 0,35 ETP \(70 j.h/.test(w.message)));
-  assert.ok(report.warnings.some((w) => /réel 2026 > prévisionnel 2026/.test(w.message)));
+test("two files matching one contract: the cleanest header wins, the other is questioned", () => {
+  const clean = "Id;Nom;Type;État du processus\nPE1;Un;Etude;Nouveau\n";
+  const dirty = "Id;Nom;Type;État du processus;Extra\nPE2;Deux;Etude;Nouveau;x\n";
+  const { report, projets } = audit([file("b.csv", dirty), file("a.csv", clean)]);
+  assert.equal(projets?.entries[0]?.name, "Un");
+  assert.ok(report.doubtful.some((d) => d.file === "b.csv" && /non retenu/.test(d.question)));
 });
 
-test("a rich export carrying Domaine+Nom does not steal the RDOM contract", () => {
-  const decoy =
-    "Domaine;Nom;Colonne A;Responsable 1;Budget\n" +
-    "Portefeuille X;Projet Alpha;a;M. Untel;12\n";
-  const { report, rdom } = audit([file("a_projets.csv", decoy), file("z_rdom.csv", FULL_RDOM)]);
-  assert.equal(rdom?.entries.length, 9);
-  const doubt = report.doubtful.find((d) => d.file === "a_projets.csv");
-  assert.match(doubt?.question ?? "", /écart\(s\) d'en-têtes, contre 0 pour « z_rdom\.csv »/);
-});
-
-test("two clean RDOM matches: first name wins the tie, second is doubtful", () => {
-  const { report, rdom } = audit(
-    [file("b.csv", FULL_RDOM), file("a.csv", "Domaine;Nom\nInfra;SOLO\n")],
-  );
-  assert.equal(rdom?.entries.length, 1);
-  assert.equal(report.doubtful[0]?.file, "b.csv");
-  assert.match(report.doubtful[0]?.question ?? "", /non retenu/);
-});
-
-test("a Windows-1252 file is read, flagged, and its accents decoded", () => {
-  const bytes = Buffer.concat([
-    Buffer.from("Domaine;Nom\nIng", "latin1"),
-    Buffer.from([0xe9]),
-    Buffer.from("nierie;DUPONT\n", "latin1"),
-  ]);
-  const { report, rdom } = runImportAudit([{ name: "RDOM.csv", bytes }], CONFIG, NOW);
-  assert.equal(report.inventory[0]?.encoding, "windows-1252");
-  assert.equal(rdom?.entries[0]?.domainId, "ingenierie");
-});
-
-test("UTF-16 and non-csv files are inventoried and skipped", () => {
-  const { report, rdom } = audit([
-    { name: "seize.csv", bytes: Buffer.from([0xff, 0xfe, 0x41, 0x00]) },
-    file("notes.txt", "pas un csv"),
-  ]);
-  assert.equal(rdom, null);
-  const statuses = new Map(report.inventory.map((f) => [f.name, f.status]));
-  assert.equal(statuses.get("seize.csv"), "unsupported");
-  assert.equal(statuses.get("notes.txt"), "not-csv");
-});
-
-test("a near-miss header is inventoried and NOT parsed", () => {
-  const { report, rdom } = audit([file("RDOM.csv", "Domaine\nInfra\n")]);
-  assert.equal(rdom, null);
-  assert.equal(report.inventory[0]?.status, "near-miss");
-  assert.match(report.inventory[0]?.detail ?? "", /colonnes manquantes : Nom/);
-});
-
-test("empty lines above the header are skipped and flagged, file still read", () => {
-  const { report, rdom } = audit([file("RDOM.csv", "\n\nDomaine;Nom\nInfra;SOLO\n")]);
-  assert.equal(rdom?.entries.length, 1);
-  assert.ok(report.warnings.some((w) => /en-têtes reconnus ligne 3 — 2 ligne\(s\) ignorée\(s\) au-dessus/.test(w.message)));
-});
-
-test("no files at all: everything is expected, assembly says waiting", () => {
-  const { report, cards } = audit([]);
+test("without the perimeter, the other tables wait", () => {
+  const { report, cards } = audit([fixture("ProjetsJalons.csv"), fixture("SP_2026.csv")]);
   assert.equal(cards, null);
-  assert.deepEqual(report.missingExpected.map((m) => m.name),
-    ["consolidé", "RDOM", "Projets (export brut)", "Ressources_PdC"]);
-  assert.equal(report.assembly.length, 3);
-  assert.match(report.assembly[1]?.status ?? "", /en attente du `consolidé` \(source unique des cartes\)/);
+  const byLabel = new Map(report.assembly.map((a) => [a.subject, a.status]));
+  assert.equal(byLabel.get("cartes"), "en attente de `projets` (le périmètre)");
+  assert.equal(byLabel.get("jalons"), "6 ligne(s) lue(s) — en attente de `projets`");
+  assert.equal(byLabel.get("coûts 2026 (SP)"), "5 sujet(s) lu(s) — en attente de `projets`");
 });
 
 test("the audit is deterministic for identical inputs", () => {
-  const inputs = (): InputFile[] => [
-    fixture("RDOM.csv"), fixture("SP_total.csv"), fixture("Consolide.csv"),
-  ];
-  const first = runImportAudit(inputs(), CONFIG, NOW);
-  const second = runImportAudit(inputs(), CONFIG, NOW);
+  const first = audit(ALL.map(fixture));
+  const second = audit(ALL.map(fixture));
   assert.deepEqual(second.report, first.report);
+  assert.deepEqual(second.cards, first.cards);
 });

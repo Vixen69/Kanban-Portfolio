@@ -10,7 +10,7 @@ import { IMPORT_ACTOR, cardId, planLoad } from "./to-cards.ts";
 import type { EnrichedCard } from "./enrich.ts";
 
 const CONFIG = JSON.parse(
-  readFileSync(new URL("./test-board.legacy.json", import.meta.url), "utf8"),
+  readFileSync(new URL("../../config/board.json", import.meta.url), "utf8"),
 ) as BoardConfig;
 
 const NOW = new Date("2026-08-01T09:00:00.000Z");
@@ -22,8 +22,10 @@ function card(over: Partial<EnrichedCard> = {}): EnrichedCard {
     codename: "PE10001",
     laneId: "projets",
     domainId: "infra",
+    subDomainId: null,
+    domainSource: "orga",
     owner: "Alice MERLE",
-    typeId: "achat",
+    typeId: "etude",
     columnId: "actifs",
     createdAt: "2025-01-12",
     dateRdr: "2026-09-15",
@@ -31,7 +33,7 @@ function card(over: Partial<EnrichedCard> = {}): EnrichedCard {
     effortEstimated: 110, effortConsumed: 70,
     charges: [{ profileId: "pmo", jh: 40, done: 25 }],
     positioned: true,
-    ref: { file: "Consolide.csv", line: 2 },
+    ref: { file: "Projets.csv", line: 2 },
     ...over,
   };
 }

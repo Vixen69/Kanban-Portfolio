@@ -44,7 +44,7 @@ export interface WarningEntry {
 export interface FileInventoryEntry {
   name: string;
   sizeBytes: number;
-  status: "recognized" | "recognized-with-deviations" | "near-miss" | "unknown" | "not-csv" | "unsupported";
+  status: "recognized" | "recognized-with-deviations" | "near-miss" | "retired" | "unknown" | "not-csv" | "unsupported";
   /** French label: "utf-8", "utf-8 (BOM)", "windows-1252", "indéterminé". */
   encoding?: string;
   contractId?: string;

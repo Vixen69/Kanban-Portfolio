@@ -143,7 +143,7 @@ try {
   );
   if (args.charger) {
     if (cards === null) {
-      console.error("chargement refusé : aucune carte assemblée (le consolidé manque ?).");
+      console.error("chargement refusé : aucune carte assemblée (le fichier `projets` manque ?).");
       process.exit(1);
     }
     console.log(loadSummary(await load(cards.cards, boardConfig)));

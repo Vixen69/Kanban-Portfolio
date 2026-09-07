@@ -1,7 +1,7 @@
-Nom;Responsable 1;Responsable 2;Responsable 3;Responsable portefeuilles;Projet.Actif;État du processus;Id
-Modernisation atelier;CARPENTIER;Alice MERLE;;CARPENTIER;VRAI;En cours;PE10001
-Refonte portail interne;Bob NOEL;;;DURAND;VRAI;En cours;PE10002
-Montée de version calcul;Chloé PETIT;;;DURAND;VRAI;Nouveau;PE10003
-Étude connectivité site B;;David GRAND;;BLANCHARD;VRAI;Nouveau;
-PE10007 Sécurisation accès;Emma FAVRE;;;MASSON;VRAI;En cours;PE10007
-Vieux projet clos;Franck LEGRIS;;;ROUSSEL;FAUX;Clos;PE10999
+Id;Nom;Domaine (Ptf);Ss-Daine (Ptf);Domaine (Orga);Ss-Daine (Orga);Catégorie;Type;Type Gpe;État du processus;Responsable 1;Responsable 2;Responsable 3;Début;Fin;Domaine;Charge JH;Budget RDLI Total Coût (Res+Trans);Coût final ME (Res.+Trans);Coût réel ME (Res.+Trans);Charge finale ME (Res) (J);Charge réelle ME (Res) (J);Jalon en cours;isProjetSIS
+PE10001;Modernisation atelier;INFRA;INFRA OPE;INFRA;INFRA BUILD;BUILD;Projet de mise en oeuvre (Projet);Projets MOE;En cours;LAMBERT Luc;Alice MERLE;;12/01/2025;15/09/2026;DSI NEXTER.DOMAINE INFRASTRUCTURE;120;150;999;80;110;70;RDR;FAUX
+PE10002;Refonte portail interne;A&D;DEVELOPPEMENTS RAPIDES;A&D;DEVELOPPEMENTS RAPIDES;BUILD;Etude (Opportunité);Etudes;Nouveau;Bob NOEL;;;05/02/2025;15/12/2026;DSI NEXTER.ARCHITECTURE APPLICATIVE & DEVELOPPEMENT.GROUPE : Développements rapides;90;90;999;22,5;85;20;RDLI;FAUX
+PE10003;Montée de version calcul;ING;ING SYSTEMES;ING;ING SYSTEMES;BUILD;Projet de gestion d'obsolescence (Projet);Projets MOE;Nouveau;DURAND Eve;Chloé PARIS;;10/03/2026;;DSI NEXTER.DOMAINE METIER.INGENIERIE;60;60;999;0;55;0;RDO;VRAI
+MEWTBN7Q;Étude connectivité site B;CORPORATE;ACHATS;CORPORATE;ACHATS;BUILD;Etude (Projet);Etudes;Nouveau;Dan ROY;;;01/07/2026;;DSI NEXTER.DOMAINE METIER.CORPORATE.ACHATS;40;40;999;;35;;RDO;FAUX
+PE10007;Sécurisation accès;CORPORATE;QUALITE;CORPORATE;QUALITE;BUILD;Projet IA (Projet);Projets MOE;En cours;Emma LIN;;;20/03/2025;02/05/2026;DSI NEXTER.DOMAINE METIER.CORPORATE.QUALITE;115;110;999;95;100;80;RDR;FAUX
+PE10008;Cartographie applicative;CORPORATE;;CORPORATE;INEXISTANT;BUILD;TMA Corrective (Run);TMA Corrective;En cours;;;;01/04/2026;;DSI NEXTER.DOMAINE METIER.CORPORATE;20;20;999;3;18;3;;FAUX

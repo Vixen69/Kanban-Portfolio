@@ -3,10 +3,10 @@
 // French, user-facing; consumed by render-report.ts as-is.
 
 import type { BoardConfig } from "../../core/types.ts";
-import type { ConsolideTable } from "./consolide.ts";
+import type { ParamTable } from "./param.ts";
 import type { ProjetsTable } from "./projets.ts";
-import type { RdomTable } from "./rdom.ts";
-import type { SpTotalTable } from "./sp-total.ts";
+import type { JalonsTable } from "./jalons.ts";
+import type { SpTable } from "./sp.ts";
 import type { CardAssembly } from "./enrich.ts";
 import { cardDistribution } from "./enrich.ts";
 import type { PdcTable } from "./pdc.ts";
@@ -14,87 +14,81 @@ import { formatJh } from "./charges.ts";
 import type { ChargeStats } from "./charges.ts";
 import type { ImportReport } from "./report.ts";
 
+/** Presence flags of the expected sources. */
+export interface Presence {
+  param: boolean;
+  projets: boolean;
+  jalons: boolean;
+  sp: boolean;
+  pdc: boolean;
+}
+
 /**
  * Lists the expected-but-missing source files, with what each brings.
  * Inputs: the report and the presence flags. Outputs: none (mutates the
  * report). Failure modes: none.
  */
-export function emitMissing(
-  report: ImportReport,
-  present: { rdom: boolean; consolide: boolean; projets: boolean; pdc: boolean },
-): void {
-  if (!present.consolide) {
-    report.missingExpected.push({
-      name: "consolidé",
-      note: "source unique des cartes (révision 2026-07-31) — sans lui, pas d'assemblage",
-    });
-  }
-  if (!present.rdom) {
-    report.missingExpected.push({ name: "RDOM", note: "table domaine ↔ nom (fournie par l'auteur)" });
-  }
-  if (!present.projets) {
-    report.missingExpected.push(
-      { name: "Projets (export brut)", note: "chef de projet — absent du consolidé" },
-    );
-  }
-  if (!present.pdc) {
-    report.missingExpected.push(
-      { name: "Ressources_PdC", note: "plan de charge 2026 par profil (+ consolidation nominative)" },
-    );
+export function emitMissing(report: ImportReport, present: Presence): void {
+  const expected: Array<[keyof Presence, string, string]> = [
+    ["projets", "Projets", "le périmètre et les cartes (identité, type, domaine, chef de projet) — sans lui, pas d'assemblage"],
+    ["param", "PARAM", "responsables de domaine (exclus du chef de projet) et traduction des chemins d'organisation"],
+    ["jalons", "ProjetsJalons", "position initiale (RDO / RDLI / RDR franchi) — sans lui, tout en colonne d'entrée"],
+    ["sp", "SP (2026 ou total)", "coûts 2026 : meilleur estimé, réel, engagé"],
+    ["pdc", "Ressources_PdC", "plan de charge 2026 par profil (+ consolidation nominative)"],
+  ];
+  for (const [key, name, note] of expected) {
+    if (!present[key]) report.missingExpected.push({ name, note });
   }
 }
 
-interface AssemblyData {
-  rdom: RdomTable | null;
-  spTotal: SpTotalTable | null;
-  consolide: ConsolideTable | null;
+/** The parsed tables and the deck, for the assembly read-out. */
+export interface AssemblyData {
+  param: ParamTable | null;
   projets: ProjetsTable | null;
+  jalons: JalonsTable | null;
+  sp: SpTable | null;
   pdc: PdcTable | null;
   cards: CardAssembly | null;
   chargeStats: ChargeStats | null;
 }
 
 /**
- * Describes the assembly state: perimeter, card distribution, join and
- * coverage counters — or what is still blocking the assembly.
+ * Describes the assembly state: PARAM, perimeter, card distribution, join
+ * and coverage counters — or what is still blocking the assembly.
  * Inputs: the report, the parsed tables and the deck, the board config
- * (column names and order). Outputs: none (mutates the report).
+ * (column and type names). Outputs: none (mutates the report).
  * Failure modes: none.
  */
 export function emitAssembly(report: ImportReport, data: AssemblyData, config: BoardConfig): void {
-  const rdomStatus = data.rdom === null
-    ? "absente — fournir le CSV « Domaine;Nom »"
-    : `prête (${data.rdom.entries.length} noms, ${data.rdom.namesByDomain.size} domaines)`;
-  report.assembly.push({ subject: "table RDOM", status: rdomStatus });
-  if (data.consolide !== null) {
-    const sis = data.consolide.sisCounts;
-    const excluded = data.consolide.excluded === 0
-      ? "" : ` · exclus : ${data.consolide.excluded} (Domaine (Ptf) TMA CORRECTIVES / IT4IT / PROJETS VENDUS)`;
-    report.assembly.push({
-      subject: "périmètre `consolidé`",
-      status: `${data.consolide.entries.length} carte(s) — le fichier fait foi${excluded}` +
-        ` · isProjetSIS (informatif) : VRAI ${sis.yes} · FAUX ${sis.no} · vide ${sis.blank}`,
-    });
+  report.assembly.push({ subject: "table PARAM", status: paramStatus(data.param) });
+  if (data.projets !== null) {
+    report.assembly.push({ subject: "périmètre `projets`", status: perimeterStatus(data.projets, config) });
   }
-  if (data.cards !== null) emitDeck(report, data.cards, config, data.spTotal !== null);
+  if (data.cards !== null && data.projets !== null) emitDeck(report, data, data.cards, data.projets, config);
   else emitWaiting(report, data);
   report.assembly.push({ subject: "plan de charge", status: chargeStatus(data) });
 }
 
-// Where the chefs de projet came from: the raw `projet` export is their
-// only source (the consolidated sheet has no Responsable columns).
-function ownerStatus(s: CardAssembly["stats"]): string {
-  const source = s.ownerFromProjets === 0
-    ? "" : ` (dont ${s.ownerFromProjets} via l'export \`projet\`)`;
-  const missing = s.withoutProjets === 0
-    ? "" : ` · ${s.withoutProjets} carte(s) sans ligne dans l'export \`projet\``;
-  return `${s.withOwner}/${s.total}${source}${missing}`;
+function paramStatus(param: ParamTable | null): string {
+  if (param === null) return "absente — responsables de domaine non exclus, export brut non traduisible";
+  const c = param.counts;
+  return `prête (${c.leads} responsable(s) de domaine · ${c.orgaRows} ligne(s) organisation, ${c.withPath} avec chemin)`;
+}
+
+// The perimeter line: the list rules; types are counted by config name.
+function perimeterStatus(projets: ProjetsTable, config: BoardConfig): string {
+  const names = new Map(config.types.map((t) => [t.id, t.name]));
+  const parts = [...projets.typeCounts.entries()]
+    .map(([id, count]) => `${id === "?" ? "hors des quatre retenus" : (names.get(id) ?? id)} ${count}`);
+  const shape = projets.shape === "orga" ? "colonnes Orga (direct)"
+    : projets.shape === "path" ? "chemin d'organisation (via PARAM)" : "aucune colonne de domaine";
+  return `${projets.entries.length} carte(s) — la liste fait foi · types : ${parts.join(" · ")} · domaine : ${shape}`;
 }
 
 function chargeStatus(data: AssemblyData): string {
   if (data.pdc === null) return "en attente de `Ressources_PdC`";
   if (data.chargeStats === null || data.cards === null) {
-    return `chargé (${data.pdc.projects.size} projets) — en attente du \`consolidé\``;
+    return `chargé (${data.pdc.projects.size} projets) — en attente de \`projets\``;
   }
   const s = data.chargeStats;
   return `${s.covered}/${data.cards.cards.length} cartes couvertes · charge 2026 des cartes : ` +
@@ -103,63 +97,57 @@ function chargeStatus(data: AssemblyData): string {
     ` · projets PdC hors périmètre : ${s.pdcOutside} · cartes sans charge : ${s.uncovered}`;
 }
 
-// The assembled deck: distribution + join and coverage counters.
-function emitDeck(report: ImportReport, deck: CardAssembly, config: BoardConfig, hasSp: boolean): void {
+// The assembled deck: distribution, position, domain, owner, costs.
+function emitDeck(
+  report: ImportReport, data: AssemblyData, deck: CardAssembly, projets: ProjetsTable, config: BoardConfig,
+): void {
   const distribution = cardDistribution(deck.cards);
   const parts = config.columns
     .filter((c) => (distribution.get(c.id) ?? 0) > 0)
     .map((c) => `${c.name} ${distribution.get(c.id)}`);
   const s = deck.stats;
-  report.assembly.push({
-    subject: "cartes",
-    status: `${s.total}${parts.length === 0 ? "" : ` — répartition : ${parts.join(" · ")}`}`,
-  });
-  const defaults = s.total - s.positioned - s.byJalon;
-  report.assembly.push({
-    subject: "position",
-    status: (hasSp ? `jalons datés SP_total ${s.positioned} (nom ${s.joinByName} · code ${s.joinByCode}` +
-        ` · titre ${s.joinByTitle}) · ` : "") +
-      `« Jalon en cours » ${s.byJalon} (RDO→Qualification, RDLI→Études, RDR→Actifs,` +
-      ` RVSR→Exploitation — Q19) · défaut Demandes : ${defaults}`,
-  });
+  const c = projets.counts;
   report.assembly.push(
+    { subject: "cartes", status: `${s.total}${parts.length === 0 ? "" : ` — répartition : ${parts.join(" · ")}`}` },
+    { subject: "position", status: positionStatus(data, deck) },
     {
       subject: "domaine",
-      status: `${s.withDomain}/${s.total} · manquant : ${s.total - s.withDomain}`,
+      status: `${s.withDomain}/${s.total} (direct ${c.domainDirect} · via PARAM ${c.domainViaParam} · manquant ${c.domainMissing})` +
+        ` · sous-domaine : ${s.withSubDomain} détaillé(s), ${c.subFolded} replié(s) dans leur domaine`,
     },
-    { subject: "chef de projet", status: ownerStatus(s) },
+    { subject: "chef de projet", status: `${s.withOwner}/${s.total} · responsables de domaine exclus : ${c.leadsExcluded}` },
+    { subject: "coûts 2026 (SP)", status: spStatus(data.sp, deck) },
   );
-  if (hasSp) {
-    report.assembly.push({
-      subject: "hors périmètre",
-      status: `${s.spOutsidePerimeter} sujet(s) SP_total non retenus par le consolidé`,
-    });
-  }
+}
+
+function positionStatus(data: AssemblyData, deck: CardAssembly): string {
+  const s = deck.stats;
+  if (data.jalons === null) return `en attente de \`ProjetsJalons\` — ${s.total} carte(s) en colonne d'entrée`;
+  const stages: Array<[string, string]> = [
+    ["exploitation", "Exploitation"], ["actifs", "Actifs"], ["etudes", "Études"], ["entree", "entrée"],
+  ];
+  const detail = stages.map(([key, label]) => `${label} ${s.stageCounts.get(key as never) ?? 0}`).join(" · ");
+  return `jalons ${s.positioned}/${s.total} (${detail}) · sans jalon : ${s.withoutJalons} → colonne d'entrée` +
+    ` · lignes jalons hors périmètre : ${s.jalonsOutside}`;
+}
+
+function spStatus(sp: SpTable | null, deck: CardAssembly): string {
+  const s = deck.stats;
+  const q = " · RDLI et charges j.h lus dans `projets` (pluriannuels — Q22/Q23 en suspens)";
+  if (sp === null) return `en attente de SP — coûts 2026 inconnus${q}`;
+  const joined = s.spById + s.spByName + s.spByCode;
+  return `${joined}/${s.total} jointes (Id ${s.spById} · nom ${s.spByName} · code ${s.spByCode})` +
+    ` · sans correspondance : ${s.withoutSp} · sujets SP hors périmètre : ${s.spOutside}` +
+    `${sp.hasIds ? "" : " · fichier sans colonne Id (forme SP_total)"}${q}`;
 }
 
 // No deck yet: say what each present table waits for.
 function emitWaiting(report: ImportReport, data: AssemblyData): void {
-  if (data.spTotal !== null) {
-    const profile = spTotalProfile(data.spTotal);
-    report.assembly.push(
-      { subject: "cartes", status: `en attente du \`consolidé\` — ${data.spTotal.drafts.length} sujet(s) SP_total lus, non filtrés` },
-      { subject: "profil `SP_total`", status: profile },
-    );
-  } else {
-    report.assembly.push({ subject: "cartes", status: "en attente du `consolidé` (source unique des cartes)" });
+  report.assembly.push({ subject: "cartes", status: "en attente de `projets` (le périmètre)" });
+  if (data.jalons !== null) {
+    report.assembly.push({ subject: "jalons", status: `${data.jalons.entries.length} ligne(s) lue(s) — en attente de \`projets\`` });
   }
-}
-
-// Ventilation of the drafts along the candidate perimeter discriminants:
-// the counts point at where the real-project boundary lies.
-function spTotalProfile(spTotal: SpTotalTable): string {
-  const total = spTotal.drafts.length;
-  const coded = spTotal.drafts.filter((d) => d.codename !== null).length;
-  const typed = spTotal.drafts.filter((d) => d.typeId !== null).length;
-  const budgeted = spTotal.drafts.filter((d) =>
-    d.budgetRdli !== null || d.budgetEstimated !== null
-    || d.budgetConsumed !== null || d.budgetEngaged !== null).length;
-  const dated = spTotal.drafts.filter((d) => d.createdAt !== null).length;
-  return `code PE : ${coded}/${total} · type : ${typed}/${total}` +
-    ` · budget : ${budgeted}/${total} · date de début : ${dated}/${total}`;
+  if (data.sp !== null) {
+    report.assembly.push({ subject: "coûts 2026 (SP)", status: `${data.sp.entries.length} sujet(s) lu(s) — en attente de \`projets\`` });
+  }
 }
