@@ -5,6 +5,7 @@
 // remove them: the spatial structure of the board is always the truth.
 // Pure logic, rendered by front/components/Sidebar.tsx.
 
+import { reviewOverdue } from "./decisions.ts";
 import type { BoardConfig, Card, CardState, Criticality } from "./types.ts";
 import { isStale } from "./aging.ts";
 
@@ -71,6 +72,10 @@ export interface ViewCounts {
   top: number;
   major: number;
   normal: number;
+  /** Cards the last import did not list (ADR 026). */
+  absent: number;
+  /** Cards whose last decision's review date is past (ADR 026). */
+  toReview: number;
 }
 
 /**
@@ -194,13 +199,15 @@ export function dimmedCardIds(cards: CardState[], filters: FilterState): Set<str
 }
 
 function emptyCounts(total: number): ViewCounts {
-  return { shown: 0, total, blocked: 0, stale: 0, top: 0, major: 0, normal: 0 };
+  return { shown: 0, total, blocked: 0, stale: 0, top: 0, major: 0, normal: 0, absent: 0, toReview: 0 };
 }
 
 function tally(counts: ViewCounts, card: CardState, config: BoardConfig, now: Date): void {
   counts.shown++;
   if (card.blocked) counts.blocked++;
   if (isStale(card, config, now)) counts.stale++;
+  if (card.absentFromLastImport !== null) counts.absent++;
+  if (reviewOverdue(card, now)) counts.toReview++;
   counts[card.criticality]++;
 }
 

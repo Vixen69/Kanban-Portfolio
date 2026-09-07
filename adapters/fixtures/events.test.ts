@@ -115,10 +115,10 @@ test("blocked cards carry exactly one blocked event, after column entry", () => 
   }
 });
 
-test("the seed only contains imported, moved, blocked and commented events", () => {
+test("the seed only contains imported, moved, blocked, commented and decided events", () => {
   const types = new Set(PORTFOLIO.events.map((event) => event.type));
   for (const type of types) {
-    assert.ok(["imported", "moved", "blocked", "commented"].includes(type), type);
+    assert.ok(["imported", "moved", "blocked", "commented", "decided"].includes(type), type);
   }
 });
 

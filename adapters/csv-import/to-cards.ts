@@ -7,7 +7,7 @@
 // divergence being reported instead of overwritten.
 // Pure: no storage, no clock of its own — the caller passes both.
 
-import type { BoardConfig, Card, CardEvent, ChargeEntry } from "../../core/types.ts";
+import type { BoardConfig, Card, CardEvent, CardState, ChargeEntry } from "../../core/types.ts";
 import type { CardEventInput } from "../../core/events.ts";
 import { lifecycleEvent, movedEvent } from "../../core/events.ts";
 import { laneNature } from "../../core/config.ts";
@@ -26,6 +26,10 @@ export interface LoadPlan {
   created: number;
   updated: number;
   moved: number;
+  /** Stored csv cards the export no longer lists — marked, never deleted (ADR 026). */
+  unlisted: number;
+  /** Cards marked absent earlier that the export lists again. */
+  relisted: number;
   /** Cards the export would move but a human already placed by hand. */
   divergences: Array<{ title: string; fromColumn: string; toColumn: string }>;
   /** Charges dropped because their métier stayed unresolved. */
@@ -47,10 +51,7 @@ export function planLoad(
 ): LoadPlan {
   const current = new Map(foldEvents(existingCards, existingEvents).map((c) => [c.id, c]));
   const movedByHand = handMovedIds(existingEvents);
-  const plan: LoadPlan = {
-    cards: [], events: [], created: 0, updated: 0, moved: 0,
-    divergences: [], chargesWithoutProfile: 0,
-  };
+  const plan = emptyPlan();
   for (const card of deck) {
     const id = cardId(card);
     const existing = current.get(id);
@@ -79,7 +80,34 @@ export function planLoad(
       IMPORT_ACTOR, now.toISOString(),
     ));
   }
+  markAbsences(plan, current, new Set(deck.map(cardId)), now);
   return plan;
+}
+
+// « Rien n'est écrasé » (ADR 026): a stored csv card the export no longer
+// lists is marked absent (unlisted), never deleted; one that comes back is
+// relisted. Manual cards and archived cards are left alone.
+function markAbsences(plan: LoadPlan, current: Map<string, CardState>, deckIds: Set<string>, now: Date): void {
+  const ts = now.toISOString();
+  for (const state of current.values()) {
+    if (deckIds.has(state.id)) {
+      if (state.absentFromLastImport !== null) {
+        plan.relisted++;
+        plan.events.push(lifecycleEvent("relisted", state.id, IMPORT_ACTOR, ts));
+      }
+      continue;
+    }
+    if (state.archived || state.source !== "csv" || state.absentFromLastImport !== null) continue;
+    plan.unlisted++;
+    plan.events.push(lifecycleEvent("unlisted", state.id, IMPORT_ACTOR, ts));
+  }
+}
+
+function emptyPlan(): LoadPlan {
+  return {
+    cards: [], events: [], created: 0, updated: 0, moved: 0, unlisted: 0, relisted: 0,
+    divergences: [], chargesWithoutProfile: 0,
+  };
 }
 
 /** Ids of cards a human (not this loader) positioned by hand. */

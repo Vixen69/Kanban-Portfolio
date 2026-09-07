@@ -169,6 +169,26 @@ export interface AgeThresholds {
  * append-only history (ADR 013). Behavior stays hard-coded — only topology,
  * vocabulary and thresholds live here.
  */
+/** Family of a grid term (ADR 026): what protects a subject, what pauses it. */
+export type DecisionGroundFamily = "proteger" | "pause";
+
+/** One of the portfolio decisions (Référentiel V3.1 D1–D6, ADR 026). */
+export interface DecisionType {
+  id: string;
+  name: string;
+  short: string;
+  color: string;
+  /** The reason (grid terms or text) is mandatory — « non tracée = non prise ». */
+  traced: boolean;
+}
+
+/** One term of the arbitration grid a decision is motivated with. */
+export interface DecisionGround {
+  id: string;
+  name: string;
+  family: DecisionGroundFamily;
+}
+
 export interface BoardConfig {
   lanes: Lane[];
   columns: Column[];
@@ -195,4 +215,8 @@ export interface BoardConfig {
   andonThresholdDays: number;
   /** The exercise year (ADR 024) — the PdC / SP window the import reads. */
   exercise: ExerciseConfig;
+  /** The portfolio decisions D1–D6 (ADR 026). */
+  decisions: DecisionType[];
+  /** The arbitration grid's terms (ADR 026). */
+  decisionGrounds: DecisionGround[];
 }

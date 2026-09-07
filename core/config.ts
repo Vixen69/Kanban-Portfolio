@@ -13,6 +13,7 @@ import {
   requireExactKeys, requireRecord, requireText, uniqueIds,
 } from "./config-parse.ts";
 import { parseColored, parseDomain, parseIdNameColor } from "./config-vocab.ts";
+import { parseDecisionGrounds, parseDecisions } from "./config-decisions.ts";
 
 export { ConfigError } from "./config-parse.ts";
 export { laneNature, reconcileCardRefs, subDomainsOf } from "./config-derive.ts";
@@ -274,6 +275,8 @@ export function validateBoardConfig(raw: unknown): BoardConfig {
     age: parseAge(raw.age),
     andonThresholdDays: andon,
     exercise: parseExercise(raw.exercise),
+    decisions: parseDecisions(raw.decisions),
+    decisionGrounds: parseDecisionGrounds(raw.decisionGrounds),
   };
 }
 

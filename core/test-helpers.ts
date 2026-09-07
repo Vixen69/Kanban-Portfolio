@@ -7,6 +7,7 @@ import type { BoardConfig, Card, Person } from "./types.ts";
 type Vocabularies = Pick<
   BoardConfig,
   "roleFamilies" | "profiles" | "roleOf" | "riskTypes" | "projectConstraints" | "riskSeverity"
+  | "decisions" | "decisionGrounds"
 >;
 function testVocabularies(): Vocabularies {
   return {
@@ -32,6 +33,14 @@ function testVocabularies(): Vocabularies {
       moyen: { label: "Moyen", color: "#b45309", rank: 2 },
       eleve: { label: "Élevé", color: "#b91c1c", rank: 3 },
     },
+    decisions: [
+      { id: "D2", name: "Continuer", short: "D2", color: "#15803d", traced: false },
+      { id: "D4", name: "Mettre en pause", short: "D4", color: "#7c3aed", traced: true },
+    ],
+    decisionGrounds: [
+      { id: "fin_proche", name: "Proche de la fin", family: "proteger" },
+      { id: "n_avance_pas", name: "N’avance pas", family: "pause" },
+    ],
   };
 }
 

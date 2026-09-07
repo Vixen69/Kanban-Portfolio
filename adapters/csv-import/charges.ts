@@ -58,7 +58,7 @@ export function formatJh(value: number): string {
  * Failure modes: none.
  */
 export function attachCharges(
-  cards: EnrichedCard[], pdc: PdcTable | null, report: ImportReport,
+  cards: EnrichedCard[], pdc: PdcTable | null, report: ImportReport, year: number,
 ): ChargeStats | null {
   if (pdc === null) return null;
   const stats: ChargeStats = {
@@ -82,7 +82,7 @@ export function attachCharges(
     const project = key === null ? undefined : pdc.projects.get(key);
     if (project === undefined) {
       stats.uncovered++;
-      tallyInto(tallies, "carte sans plan de charge 2026", card.ref.line);
+      tallyInto(tallies, `carte sans plan de charge ${year}`, card.ref.line);
       continue;
     }
     consumed.add(project.normalizedName);
@@ -94,7 +94,7 @@ export function attachCharges(
   for (const [message, t] of tallies) {
     warn(report, `${message} : ${tallyLabel(t)}`, "assemblage");
   }
-  emitPersons(report, pdc);
+  emitPersons(report, pdc, year);
   return stats;
 }
 
@@ -123,12 +123,12 @@ function joinKey(
 }
 
 // The overload demonstrator: top mobilized persons, jh 2026 / 200 = ETP.
-function emitPersons(report: ImportReport, pdc: PdcTable): void {
+function emitPersons(report: ImportReport, pdc: PdcTable, year: number): void {
   const top = pdc.persons.slice(0, TOP_PERSONS);
   for (const person of top) {
     const etp = (person.jh / ETP_BASE).toFixed(2).replace(".", ",");
     warn(report,
-      `mobilisation 2026 : « ${person.name} » ${etp} ETP (${formatJh(person.jh)} j.h prévisionnel` +
+      `mobilisation ${year} : « ${person.name} » ${etp} ETP (${formatJh(person.jh)} j.h prévisionnel` +
         ` · ${formatJh(person.done)} réel)`,
       "consolidation nominative");
   }

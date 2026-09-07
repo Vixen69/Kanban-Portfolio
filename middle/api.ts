@@ -12,6 +12,8 @@ import { validateBoardConfig } from "../core/config.ts";
 import type { BoardConfig, CardEventType, CardState } from "../core/types.ts";
 import type { ConfigStore } from "./config-store.ts";
 import { patchValidators } from "./validation.ts";
+import { BadRequest } from "./errors.ts";
+import { buildDecided } from "./decisions.ts";
 
 export { isCriticality } from "./validation.ts";
 
@@ -45,11 +47,10 @@ export function serializedWrite<T>(task: () => Promise<T>): Promise<T> {
   return run;
 }
 
-/** Thrown when a request body fails validation; the transport maps it to 400. */
-export class BadRequest extends Error {}
+export { BadRequest };
 
 const POSTABLE: ReadonlySet<string> = new Set([
-  "moved", "blocked", "unblocked", "edited", "commented", "archived", "unarchived", "deleted",
+  "moved", "blocked", "unblocked", "edited", "commented", "archived", "unarchived", "deleted", "decided",
 ]);
 
 /**
@@ -179,6 +180,8 @@ function buildByType(
       return lifecycleEvent("unarchived", state.id, SERVER_ACTOR, ts);
     case "deleted":
       return lifecycleEvent("deleted", state.id, SERVER_ACTOR, ts);
+    case "decided":
+      return buildDecided(config, state, body, ts, SERVER_ACTOR);
     default:
       throw new BadRequest("Type d’évènement non autorisé.");
   }

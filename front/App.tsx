@@ -9,7 +9,7 @@ import { laneNature, reconcileCardRefs } from "../core/config.ts";
 import { dimmedCardIds, portfolioCounts, viewCounts } from "../core/filters.ts";
 import { flowTimes, resolveFlowAnchors } from "../core/flow.ts";
 import { cardHistory } from "../core/history.ts";
-import type { MoveTarget } from "./api.ts";
+import type { DecisionInput, MoveTarget } from "./api.ts";
 import { columnById } from "./lookup.ts";
 import { useBoardStore, type BoardStore } from "./useBoardStore.ts";
 import { useFilters, type Filters } from "./useFilters.ts";
@@ -134,6 +134,7 @@ function CardModals({ ctx }: { ctx: Ctx }) {
       onBlock={(reason: string) => void store.blockCard(detailCard.id, reason)}
       onUnblock={() => void store.unblockCard(detailCard.id)}
       onComment={(text: string) => void store.commentCard(detailCard.id, text)}
+      onDecide={(input: DecisionInput) => void store.decideCard(detailCard.id, input)}
       onArchive={() => { void store.archiveCard(detailCard.id); closeAll(); }}
       onUnarchive={() => void store.unarchiveCard(detailCard.id)} />
   );

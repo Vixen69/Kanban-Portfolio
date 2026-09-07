@@ -493,5 +493,96 @@
   "andonThresholdDays": 5,
   "exercise": {
     "year": 2026
-  }
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "name": "Faire entrer",
+      "short": "D1",
+      "color": "#0f766e",
+      "traced": false
+    },
+    {
+      "id": "D2",
+      "name": "Continuer",
+      "short": "D2",
+      "color": "#15803d",
+      "traced": false
+    },
+    {
+      "id": "D3",
+      "name": "Réduire",
+      "short": "D3",
+      "color": "#b45309",
+      "traced": false
+    },
+    {
+      "id": "D4",
+      "name": "Mettre en pause",
+      "short": "D4",
+      "color": "#7c3aed",
+      "traced": true
+    },
+    {
+      "id": "D5",
+      "name": "Requalifier",
+      "short": "D5",
+      "color": "#2563eb",
+      "traced": true
+    },
+    {
+      "id": "D6",
+      "name": "Stopper",
+      "short": "D6",
+      "color": "#b91c1c",
+      "traced": true
+    }
+  ],
+  "decisionGrounds": [
+    {
+      "id": "fin_proche",
+      "name": "Proche de la fin",
+      "family": "proteger"
+    },
+    {
+      "id": "valeur_forte",
+      "name": "Forte valeur métier",
+      "family": "proteger"
+    },
+    {
+      "id": "debloque",
+      "name": "Débloque d’autres sujets",
+      "family": "proteger"
+    },
+    {
+      "id": "engagement",
+      "name": "Engagement pris",
+      "family": "proteger"
+    },
+    {
+      "id": "strategique",
+      "name": "Stratégique",
+      "family": "proteger"
+    },
+    {
+      "id": "n_avance_pas",
+      "name": "N’avance pas",
+      "family": "pause"
+    },
+    {
+      "id": "valeur_faible",
+      "name": "Valeur faible au regard du reste à faire",
+      "family": "pause"
+    },
+    {
+      "id": "affame",
+      "name": "Affame un fournisseur saturé",
+      "family": "pause"
+    },
+    {
+      "id": "peut_attendre",
+      "name": "Peut attendre",
+      "family": "pause"
+    }
+  ]
 }

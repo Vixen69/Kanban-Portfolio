@@ -16,7 +16,7 @@ const NOW = Date.parse("2026-06-01T00:00:00.000Z");
 // A folded CardState from the shared Card factory (detailModel reads only
 // Card fields, but its signatures take CardState).
 function state(overrides: Partial<Card> = {}): CardState {
-  return { ...testCard(overrides), enteredColumnAt: "2026-01-01T00:00:00.000Z", comments: [], archived: false };
+  return { ...testCard(overrides), enteredColumnAt: "2026-01-01T00:00:00.000Z", comments: [], archived: false, decisions: [], absentFromLastImport: null };
 }
 
 // A dateRdr `days` from NOW, as an ISO string (what a card stores).

@@ -132,7 +132,10 @@ export type CardEventType =
   | "archived"
   | "unarchived"
   | "deleted"
-  | "imported";
+  | "imported"
+  | "decided"
+  | "unlisted"
+  | "relisted";
 
 /**
  * One row of the append-only `card_events` log: audit trail AND the single
@@ -159,6 +162,19 @@ export interface CardComment {
   text: string;
 }
 
+/** One decision on a card (D1–D6, ADR 026), projected from a "decided" event. */
+export interface CardDecision {
+  actor: string;
+  /** ISO timestamp. */
+  ts: string;
+  decisionId: string;
+  /** Grid terms (config decisionGrounds ids) the decision is motivated with. */
+  grounds: string[];
+  reason: string;
+  /** Planned review, ISO day (YYYY-MM-DD); null when none. */
+  reviewDate: string | null;
+}
+
 /**
  * A card with its event-derived runtime state: current position, blocked
  * state, archived flag, comments, and the timestamp it entered its current
@@ -173,6 +189,10 @@ export interface CardState extends Card {
   comments: CardComment[];
   /** True after an "archived" event (reversible via "unarchived"). */
   archived: boolean;
+  /** Decisions in chronological order, from "decided" events (ADR 026). */
+  decisions: CardDecision[];
+  /** ISO ts of the import that did not list the card (ADR 026); null when listed. */
+  absentFromLastImport: string | null;
 }
 
 /**

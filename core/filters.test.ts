@@ -23,6 +23,8 @@ function state(overrides: Parameters<typeof testCard>[0] = {}, daysHere = 1): Ca
     enteredColumnAt: new Date(NOW.getTime() - daysHere * 86_400_000).toISOString(),
     comments: [],
     archived: false,
+    decisions: [],
+    absentFromLastImport: null,
   };
 }
 
@@ -182,6 +184,8 @@ test("viewCounts tallies only non-dimmed cards against the portfolio total", () 
     top: 1,
     major: 1,
     normal: 0,
+    absent: 0,
+    toReview: 0,
   });
 });
 
@@ -194,6 +198,8 @@ test("portfolioCounts ignores filters: shown equals total", () => {
     top: 1,
     major: 1,
     normal: 2,
+    absent: 0,
+    toReview: 0,
   });
 });
 

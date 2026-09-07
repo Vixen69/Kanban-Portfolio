@@ -21,6 +21,8 @@ function fill(laneId: string, columnId: string, count: number): CardState[] {
     enteredColumnAt: "2026-06-01T00:00:00.000Z",
     comments: [],
     archived: false,
+    decisions: [],
+    absentFromLastImport: null,
   }));
 }
 

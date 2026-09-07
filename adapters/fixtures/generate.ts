@@ -8,6 +8,7 @@ import type { BoardConfig, Criticality, Financials, NatureKey } from "../../core
 import { subDomainsOf } from "../../core/config.ts";
 import type { Subject } from "../../core/ports.ts";
 import { lifecycleEvent, movedEvent, type CardEventInput } from "../../core/events.ts";
+import { decisionEvents } from "./decisions.ts";
 import {
   BLOCK_REASONS,
   COMMENTS,
@@ -282,7 +283,7 @@ export function generatePortfolio(config: BoardConfig, now: Date, seed = FIXTURE
   for (const draft of drafts) seedExtras(rng, config, draft.subject, draft.financials, nowMs);
   const out: FixturesPortfolio = { subjects: [], financialsById: new Map(), events: [] };
   for (const draft of drafts) {
-    const all = [...draft.events, ...commentEvents(draft)];
+    const all = [...draft.events, ...commentEvents(draft), ...decisionEvents(rng, config, draft.subject, nowMs)];
     all.sort((a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0));
     out.subjects.push(draft.subject);
     out.financialsById.set(draft.subject.id, draft.financials);

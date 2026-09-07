@@ -26,7 +26,7 @@ export const PARAM_CONTRACT: FileContract = {
  * « Id ») as well as the raw SP_total export (no Id, join by name). */
 export const SP_CONTRACT: FileContract = {
   id: "sp",
-  displayName: "SP (2026 ou total)",
+  displayName: "SP (exercice ou total)",
   columns: ["Nom", "Coût prév (ME)", "Coût réel", "Engagé Achats"],
   optional: ["Id", "* Budget validé RDLI", "Type Gpe", "Type", "État du processus", "Sous domaine"],
   ignored: [

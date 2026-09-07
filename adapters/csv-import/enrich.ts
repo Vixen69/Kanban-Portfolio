@@ -183,7 +183,7 @@ function joinSp(ctx: JoinContext, entry: ProjetEntry): SpEntry | null {
   const hit = byId ?? byName ?? byCode;
   if (hit === undefined) {
     ctx.stats.withoutSp++;
-    tallyInto(ctx.tallies, "carte sans correspondance SP — coûts 2026 inconnus", entry.ref.line);
+    tallyInto(ctx.tallies, "carte sans correspondance SP — coûts de l'exercice inconnus", entry.ref.line);
     return null;
   }
   if (byId !== undefined) ctx.stats.spById++;

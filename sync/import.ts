@@ -116,7 +116,8 @@ function loadSummary(plan: LoadPlan): string {
       plan.divergences.slice(0, 5)
         .map((d) => `\n  · « ${d.title} » : tableau ${d.fromColumn} / export ${d.toColumn}`).join("");
   return `chargement : ${plan.created} carte(s) créée(s) · ${plan.updated} mise(s) à jour` +
-    ` · ${plan.moved} déplacée(s) par l'export${divergences}`;
+    ` · ${plan.moved} déplacée(s) par l'export` +
+    ` · ${plan.unlisted} absente(s) de l'export (marquées, jamais supprimées) · ${plan.relisted} de retour${divergences}`;
 }
 
 const args = parseArgs(process.argv.slice(2));

@@ -46,3 +46,8 @@
 .ec-stat { font-size: 9px; color: var(--tx-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ec-stat b { color: var(--tx-1); font-weight: 700; }
 .ec-sep { width: 1px; height: 9px; background: var(--bd-sub); }
+
+/* ---------- Décision et absence d'import (ADR 026) ---------- */
+.dec-pill { font-size: 8px; font-weight: 700; color: #fff; border-radius: 3px; padding: 0 4px; line-height: 12px; flex: 0 0 auto; margin-left: 3px; }
+.dec-pill.overdue { box-shadow: 0 0 0 2px var(--danger); }
+.absent-pill { font-size: 9px; color: var(--tx-4); border: 1px dashed var(--tx-4); border-radius: 3px; padding: 0 3px; line-height: 11px; flex: 0 0 auto; margin-left: 3px; }

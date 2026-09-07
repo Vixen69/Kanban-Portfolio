@@ -403,6 +403,14 @@ sans fiche, affectations, demande. Enregistré par `--charger` (table
 
 ## Chargement réel (décisions auteur, 2026-08-01)
 
+**Révision 2026-09-08 (ADR 026) — rien n'est écrasé.** Une carte importée
+(`source: csv`), non archivée, absente du nouvel export reçoit un évènement
+`unlisted` (acteur `import-csv`) et reste sur le tableau avec le marqueur
+« ∅ » ; à son retour dans un export, `relisted`. Les cartes créées à la
+main ne sont jamais marquées. L'année lue est `exercise.year` ; la clôture
+d'exercice (`sync/cloture.ts`) archive les étapes terminales et passe
+l'année suivante.
+
 Le mode audit reste le défaut ; l'écriture dans le board demande le
 drapeau explicite `--charger` (`node sync/import.ts <dossier> --charger`).
 

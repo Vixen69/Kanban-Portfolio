@@ -94,12 +94,12 @@ export function runImportAudit(files: InputFile[], config: BoardConfig, now: Dat
   const profils = profilsBest === null ? null
     : parseProfils(profilsBest.dataRows, profilsBest.match, config, report, profilsBest.file.name);
   const cards = assembleCards(projets, jalons, sp, config, report);
-  const chargeStats = attachCharges(cards?.cards ?? [], pdc, report);
+  const chargeStats = attachCharges(cards?.cards ?? [], pdc, report, config.exercise.year);
   const capacity = buildCapacity(profils, pdc, cards?.cards ?? [], config, report);
   emitMissing(report, {
     param: param !== null, projets: projets !== null, jalons: jalons !== null,
     sp: sp !== null, pdc: pdc !== null, profils: profils !== null,
-  });
+  }, config.exercise.year);
   const result: AuditResult = { report, param, projets, jalons, sp, pdc, profils, cards, chargeStats, capacity };
   emitAssembly(report, result, config);
   return result;

@@ -23,10 +23,10 @@ const EVENTS: CardEvent[] = [
 
 test("history narrates movements and blockages, most recent first (design v11)", () => {
   assert.deepEqual(cardHistory(EVENTS, "S001", CONFIG), [
-    { kind: "unblock", fromName: null, toName: null, reason: null, ts: "2026-03-05T00:00:00.000Z", actor: "sciforma-sync" },
-    { kind: "block", fromName: null, toName: null, reason: "attente", ts: "2026-03-01T00:00:00.000Z", actor: "sciforma-sync" },
-    { kind: "move", fromName: "Colonne 1", toName: "Colonne 2", reason: null, ts: "2026-02-01T00:00:00.000Z", actor: "anonymous" },
-    { kind: "move", fromName: null, toName: "Colonne 1", reason: null, ts: "2026-01-01T00:00:00.000Z", actor: "sciforma-sync" },
+    { kind: "unblock", fromName: null, toName: null, reason: null, detail: null, ts: "2026-03-05T00:00:00.000Z", actor: "sciforma-sync" },
+    { kind: "block", fromName: null, toName: null, reason: "attente", detail: null, ts: "2026-03-01T00:00:00.000Z", actor: "sciforma-sync" },
+    { kind: "move", fromName: "Colonne 1", toName: "Colonne 2", reason: null, detail: null, ts: "2026-02-01T00:00:00.000Z", actor: "anonymous" },
+    { kind: "move", fromName: null, toName: "Colonne 1", reason: null, detail: null, ts: "2026-01-01T00:00:00.000Z", actor: "sciforma-sync" },
   ]);
 });
 
@@ -37,7 +37,7 @@ test("created behaves like imported: fromName null, destination named", () => {
     CONFIG,
   );
   assert.deepEqual(history, [
-    { kind: "move", fromName: null, toName: "Colonne 2", reason: null, ts: "2026-05-01T00:00:00.000Z", actor: "anonymous" },
+    { kind: "move", fromName: null, toName: "Colonne 2", reason: null, detail: null, ts: "2026-05-01T00:00:00.000Z", actor: "anonymous" },
   ]);
 });
 
@@ -48,7 +48,7 @@ test("a blocked event without a string reason yields reason null", () => {
     CONFIG,
   );
   assert.deepEqual(history, [
-    { kind: "block", fromName: null, toName: null, reason: null, ts: "2026-05-01T00:00:00.000Z", actor: "sciforma-sync" },
+    { kind: "block", fromName: null, toName: null, reason: null, detail: null, ts: "2026-05-01T00:00:00.000Z", actor: "sciforma-sync" },
   ]);
 });
 

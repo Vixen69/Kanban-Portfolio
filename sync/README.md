@@ -36,3 +36,17 @@ Codes de sortie : 0 = audit produit (même avec douteux), 1 = exécution
 impossible (arguments, dossier, config, stockage). La config du board est lue
 via le magasin d'exécution (`getRuntime`) : un override admin appliqué sur la
 plateforme est respecté.
+
+## Clôture d'exercice (sync/cloture.ts) — ADR 026
+
+```
+node sync/cloture.ts                              # simulation : liste les sujets à archiver
+node sync/cloture.ts --appliquer                  # archive les sujets des étapes terminales
+node sync/cloture.ts --appliquer --annee 2027     # … et passe la config à l'exercice 2027
+node sync/cloture.ts --colonnes done              # restreint aux colonnes données
+```
+
+Les sujets archivés le sont par des évènements `archived` (acteur
+`cloture-<année>`), réversibles depuis la vue Archives. Étape suivante :
+importer les fichiers du nouvel exercice — les sujets absents de cet import
+sont marqués `unlisted` (jamais supprimés), `relisted` à leur retour.

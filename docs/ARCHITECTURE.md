@@ -637,6 +637,38 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-08 — Décision tracée, sujets absents, clôture d'exercice (ADR 026, sprint S3)
+
+- **Mode autonome** (« go S3 S4 ») : choix de Claude, consignés dans
+  l'ADR 026, à contester à la revue.
+- **Décision sur la carte** : un évènement `decided` (décision D1–D6,
+  termes de la grille, raison, date de réexamen). Vocabulaire dans la
+  config (`decisions`, `decisionGrounds`, défauts = référentiel V3.1) ;
+  le middle refuse une décision tracée (D4/D5/D6) sans raison — « non
+  tracée = non prise ». Fiche : section « Décision » (dernière décision,
+  liste, formulaire) et lignes d'historique ; ticket : pastille D-code,
+  cerclée de rouge quand le réexamen est dépassé ; barre latérale : compte
+  des réexamens dépassés. Aucun déplacement automatique : la décision dit
+  pourquoi, le tableau dit où.
+- **Rien n'est écrasé** : le chargement marque `unlisted` toute carte
+  importée absente du nouvel export (jamais supprimée), `relisted` à son
+  retour ; marqueur « ∅ » sur le ticket, bandeau dans la fiche, compte dans
+  la barre latérale. Cartes manuelles et archivées non concernées.
+- **Clôture d'exercice** : `node sync/cloture.ts` (simulation par défaut ;
+  `--appliquer` archive les étapes terminales dérivées de la config,
+  `--annee` écrit l'année suivante dans la config d'exécution). Les
+  libellés « 2026 » de l'importeur et du rapport suivent désormais
+  `exercise.year` (SP « exercice ou total »).
+- **Code** : `core/config-decisions.ts`, `core/decisions.ts`, fold et
+  historique étendus, `middle/decisions.ts` (+ `errors.ts`),
+  `front/components/DetailDecision.tsx` + `cardMarks.tsx`, `to-cards.ts`
+  (absences), `sync/cloture.ts`, décisions synthétiques dans les fixtures.
+- **Vérification** : suite complète, typecheck, conventions ; fiche et
+  tickets vérifiés en aperçu ; clôture exécutée en simulation sur le
+  magasin de dev.
+- **Suite** : S4 — import depuis l'outil (dépôt des CSV, rapport affiché,
+  bouton Charger, secret admin).
+
 ### 2026-09-08 — La vue ☷ devient la vue capacité (ADR 025, sprint S2)
 
 - **Décisions de l'auteur** : la vue Metrics v12 (espace réservé sans

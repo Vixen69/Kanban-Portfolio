@@ -281,3 +281,16 @@ test("the capacity snapshot is deterministic and sums back to the cards' charges
     assert.equal(byCard.get(card.id) ?? 0, expected, card.id);
   }
 });
+
+test("decisions (ADR 026): Pause subjects carry a traced D4; no decision predates its subject", () => {
+  const decided = PORTFOLIO.events.filter((e) => e.type === "decided");
+  assert.ok(decided.length >= 3, String(decided.length));
+  const created = new Map(PORTFOLIO.subjects.map((s) => [s.id, s.createdAt]));
+  for (const e of decided) assert.ok(e.ts > (created.get(e.cardId) ?? ""), e.cardId);
+  for (const s of PORTFOLIO.subjects.filter((s) => s.columnId === "pause")) {
+    const own = decided.filter((e) => e.cardId === s.id);
+    assert.equal(own.length, 1, s.id);
+    assert.equal(own[0]?.payload["decisionId"], "D4");
+    assert.ok(typeof own[0]?.payload["reason"] === "string" && own[0].payload["reason"] !== "");
+  }
+});

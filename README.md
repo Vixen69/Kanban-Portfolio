@@ -67,6 +67,17 @@ vivant) et `docs/adr/` (décisions). Le contrat de travail est `CLAUDE.md`.
   par domaine et par profil, les cartes qui pèsent sur chaque transverse,
   les personnes au-delà de 100 % et la couverture des chiffres. Lecture
   annuelle : prévisionnel de l'exercice contre capacité déclarée.
+- **Décision tracée** (ADR 026) : dans la fiche, une décision D1–D6 du
+  référentiel (faire entrer, continuer, réduire, mettre en pause,
+  requalifier, stopper) se trace avec sa raison dans les termes de la
+  grille d'arbitrage et une date de réexamen ; D4/D5/D6 exigent la raison.
+  Le ticket porte le code de la dernière décision (cerclé de rouge quand le
+  réexamen est dépassé) ; la barre latérale compte les réexamens dépassés.
+- **Rien n'est écrasé** (ADR 026) : un ré-import ne supprime jamais une
+  carte ; celles que le nouvel export ne liste plus sont marquées « ∅
+  absente du dernier import » (ticket, fiche, barre latérale) jusqu'à leur
+  retour ou leur archivage. La clôture d'exercice est outillée
+  (`node sync/cloture.ts`, simulation par défaut).
 - Source des données : adaptateur `fixtures` (150 sujets synthétiques
   déterministes, seed 20260609) derrière le port `PortfolioDataSource`.
   csv-import / sciforma à venir (RP4).

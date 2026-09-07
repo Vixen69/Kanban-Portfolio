@@ -8,7 +8,7 @@ import type { BoardConfig, CardEvent } from "./types.ts";
 import { isReorder } from "./events.ts";
 
 /** What a history line narrates — a movement or a blocking event. */
-export type HistoryKind = "move" | "block" | "unblock";
+export type HistoryKind = "move" | "block" | "unblock" | "decision" | "unlisted" | "relisted";
 
 /** One entry in a card's history, ready for the detail modal list. */
 export interface HistoryEntry {
@@ -17,13 +17,17 @@ export interface HistoryEntry {
   fromName: string | null;
   /** Column display name the card arrived in ("Entrée" fallback) — movements only. */
   toName: string | null;
-  /** Blocking motif — block lines only (null when none was recorded). */
+  /** Blocking motif (block lines) or decision reason (decision lines); null when none. */
   reason: string | null;
+  /** Decision code and name, grid terms, review date — decision lines only. */
+  detail: string | null;
   ts: string;
   actor: string;
 }
 
-const NARRATED_TYPES: ReadonlySet<CardEvent["type"]> = new Set(["created", "imported", "moved", "blocked", "unblocked"]);
+const NARRATED_TYPES: ReadonlySet<CardEvent["type"]> = new Set([
+  "created", "imported", "moved", "blocked", "unblocked", "decided", "unlisted", "relisted",
+]);
 
 /** French fallback when an event carries no destination column at all. */
 const ENTRY_LABEL = "Entrée";
@@ -43,8 +47,31 @@ function newestFirst(a: CardEvent, b: CardEvent): number {
   return numericSuffix(b.id) - numericSuffix(a.id);
 }
 
+function frDay(isoDate: string): string {
+  const [year, month, day] = isoDate.split("-");
+  return `${day}/${month}/${year}`;
+}
+
+// A decision line (ADR 026): code and name, the known grid terms in config
+// order, the review date; the free-text reason travels in `reason`.
+function decisionEntry(config: BoardConfig, event: CardEvent, base: Omit<HistoryEntry, "kind">): HistoryEntry {
+  const id = typeof event.payload["decisionId"] === "string" ? event.payload["decisionId"] : "?";
+  const decision = config.decisions.find((d) => d.id === id);
+  const raw = event.payload["grounds"];
+  const wanted = new Set(Array.isArray(raw) ? raw.filter((g): g is string => typeof g === "string") : []);
+  const parts = [decision === undefined ? id : `${decision.short} ${decision.name}`];
+  for (const ground of config.decisionGrounds) if (wanted.has(ground.id)) parts.push(ground.name);
+  const review = event.payload["reviewDate"];
+  if (typeof review === "string" && review !== "") parts.push(`réexamen le ${frDay(review)}`);
+  const reason = event.payload["reason"];
+  return { ...base, kind: "decision", detail: parts.join(" · "), reason: typeof reason === "string" && reason !== "" ? reason : null };
+}
+
 function toEntry(config: BoardConfig, event: CardEvent): HistoryEntry {
-  const base = { fromName: null, toName: null, reason: null, ts: event.ts, actor: event.actor };
+  const base = { fromName: null, toName: null, reason: null, detail: null, ts: event.ts, actor: event.actor };
+  if (event.type === "decided") return decisionEntry(config, event, base);
+  if (event.type === "unlisted") return { ...base, kind: "unlisted" };
+  if (event.type === "relisted") return { ...base, kind: "relisted" };
   if (event.type === "blocked") {
     const reason = event.payload["reason"];
     return { ...base, kind: "block", reason: typeof reason === "string" ? reason : null };
@@ -63,7 +90,8 @@ function toEntry(config: BoardConfig, event: CardEvent): HistoryEntry {
  * Inputs: the full event list, the card id, the board config (column
  * display names). Narrated events: created/imported/moved (kind "move"),
  * blocked (kind "block", with the motif from the payload) and unblocked
- * (kind "unblock").
+ * (kind "unblock"), decided (kind "decision", code/name/grid terms/review
+ * date in `detail`, the free text in `reason`), unlisted / relisted (ADR 026).
  * Output: HistoryEntry[] sorted by ts descending, ties broken by the
  * numeric suffix of the event id (the fold order, reversed). Unknown
  * column ids fall back to the raw id; a missing destination becomes

@@ -8,6 +8,7 @@ import type { BoardConfig, CardState } from "../../core/types.ts";
 import { daysInColumn } from "../../core/aging.ts";
 import { domainById, typeById } from "../lookup.ts";
 import { AgeText, CritMark, CustomBadges, EstimeBar, TypeTag } from "./cardParts.tsx";
+import { AbsentMark, DecisionMark } from "./cardMarks.tsx";
 
 /** Shared props of both card renderings (pinned build-spec contract). */
 export interface CardItemProps {
@@ -93,6 +94,8 @@ export function MiniCard(props: CardItemProps) {
       {props.showCodes && card.codename !== null && <span className="mini-code">{card.codename}</span>}
       <span className="mini-name">{card.title}</span>
       <CritMark c={card.criticality} />
+      <DecisionMark card={card} config={config} now={props.now} />
+      <AbsentMark card={card} />
       <span className="card-fill" />
       <AgeText days={days} age={config.age} />
     </div>
@@ -127,6 +130,8 @@ export function FocusCard(props: CardItemProps) {
         <div className="focus-line1">
           <span className="focus-name">{card.title}</span>
           <CritMark c={card.criticality} big />
+          <DecisionMark card={card} config={config} now={props.now} />
+          <AbsentMark card={card} />
           <span className="card-fill" />
           <AgeText days={days} age={config.age} />
         </div>

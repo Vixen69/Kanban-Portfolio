@@ -114,13 +114,25 @@ export function DelaysSection({ flow, anchors }: { flow: FlowTimes; anchors: Flo
 }
 
 // One history line: a movement (from → to) or a block/unblock event.
+const DOT_CLASS: Record<HistoryEntry["kind"], string> = {
+  move: "", block: " blk", unblock: " okd", decision: " dec", unlisted: " abs", relisted: " okd",
+};
+
+// The narrated text of one history line (movement, blockage, decision, import absence).
+function histBody(entry: HistoryEntry) {
+  switch (entry.kind) {
+    case "block": return <><b>Bloqué</b>{entry.reason ? ` — ${entry.reason}` : ""}</>;
+    case "unblock": return <b>Blocage levé</b>;
+    case "decision": return <><b>Décision {entry.detail}</b>{entry.reason ? ` — ${entry.reason}` : ""}</>;
+    case "unlisted": return <b>Absente du dernier import</b>;
+    case "relisted": return <b>De retour dans l’import</b>;
+    default: return <>{entry.fromName ? `${entry.fromName} → ` : ""}<b>{entry.toName}</b></>;
+  }
+}
+
 function HistRow({ entry }: { entry: HistoryEntry }) {
-  const dot = entry.kind === "block" ? " blk" : entry.kind === "unblock" ? " okd" : "";
-  const body = entry.kind === "block"
-    ? <><b>Bloqué</b>{entry.reason ? ` — ${entry.reason}` : ""}</>
-    : entry.kind === "unblock"
-      ? <b>Blocage levé</b>
-      : <>{entry.fromName ? `${entry.fromName} → ` : ""}<b>{entry.toName}</b></>;
+  const dot = DOT_CLASS[entry.kind];
+  const body = histBody(entry);
   return (
     <div className="hist">
       <span className={"hist-dot" + dot} />

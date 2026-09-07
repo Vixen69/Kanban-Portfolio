@@ -9,6 +9,7 @@ import {
   ApiError,
   fetchBoard,
   fetchCapacity,
+  postDecision,
   fetchConfig,
   fetchDefaultConfig,
   postBlock,
@@ -205,5 +206,15 @@ test("an unreachable server becomes ApiError status 0, « Serveur injoignable. �
         return true;
       },
     );
+  });
+});
+
+test("postDecision POSTs a decided intent carrying the decision fields", async () => {
+  await withFetch({ ok: true, status: 201, json: { id: "evt-1" } }, async (calls) => {
+    await postDecision("S001", { decisionId: "D4", grounds: ["n_avance_pas"], reason: "Bloqué.", reviewDate: "2026-10-01" });
+    assert.equal(calls[0]?.url, "/api/events");
+    assert.deepEqual(calls[0]?.body, {
+      type: "decided", cardId: "S001", decisionId: "D4", grounds: ["n_avance_pas"], reason: "Bloqué.", reviewDate: "2026-10-01",
+    });
   });
 });

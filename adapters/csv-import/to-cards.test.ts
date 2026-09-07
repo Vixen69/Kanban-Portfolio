@@ -109,3 +109,21 @@ test("a hand-moved card keeps its column: the divergence is reported", () => {
     { title: "Modernisation atelier", fromColumn: "prets", toColumn: "actifs" },
   ]);
 });
+
+test("re-import: a stored csv card missing from the export is marked absent, never deleted; relisted when back", () => {
+  const second = card({ title: "Second sujet", normalizedName: "second sujet", codename: "PE10002" });
+  const first = planLoad([card(), second], CONFIG, [], [], NOW);
+  const stored = first.cards;
+  const events = first.events.map((e, i) => ({ ...e, id: `evt-${i + 1}` }));
+  const later = planLoad([card()], CONFIG, stored, events, new Date("2026-09-01T09:00:00.000Z"));
+  assert.equal(later.unlisted, 1);
+  assert.equal(later.cards.length, 1, "the absent card's snapshot is left as stored");
+  const unlisted = later.events.find((e) => e.type === "unlisted");
+  assert.deepEqual([unlisted?.cardId, unlisted?.actor], ["PE10002", IMPORT_ACTOR]);
+  const events2 = [...events, ...later.events.map((e, i) => ({ ...e, id: `evt-${events.length + i + 1}` }))];
+  const again = planLoad([card()], CONFIG, stored, events2, new Date("2026-09-15T09:00:00.000Z"));
+  assert.equal(again.unlisted, 0, "already marked: no second unlisted event");
+  const back = planLoad([card(), second], CONFIG, stored, events2, new Date("2026-10-01T09:00:00.000Z"));
+  assert.deepEqual([back.relisted, back.unlisted], [1, 0]);
+  assert.equal(back.events.find((e) => e.type === "relisted")?.cardId, "PE10002");
+});

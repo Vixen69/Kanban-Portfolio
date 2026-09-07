@@ -105,6 +105,7 @@ export function toCard(subject: Subject, financials: Financials | null): Card {
 // diverged from its record.
 function applyPosition(state: CardState, event: CardEvent): void {
   if (isReorder(event)) return;
+  if (event.type !== "moved") state.absentFromLastImport = null; // a (re)import lists the card
   if (event.toColumn !== null) state.columnId = event.toColumn;
   const laneId = event.payload["laneId"];
   if (typeof laneId === "string") state.laneId = laneId;
@@ -158,6 +159,19 @@ function applyEdited(state: CardState, event: CardEvent): void {
   }
 }
 
+// A decision (ADR 026): the payload is re-checked on read so a malformed
+// row can never corrupt the projection (grounds keep their string ids).
+function applyDecided(state: CardState, event: CardEvent): void {
+  const { decisionId, grounds, reason, reviewDate } = event.payload;
+  if (typeof decisionId !== "string") return;
+  state.decisions.push({
+    actor: event.actor, ts: event.ts, decisionId,
+    grounds: Array.isArray(grounds) ? grounds.filter((g): g is string => typeof g === "string") : [],
+    reason: typeof reason === "string" ? reason : "",
+    reviewDate: typeof reviewDate === "string" ? reviewDate : null,
+  });
+}
+
 function applyEvent(state: CardState, event: CardEvent): void {
   switch (event.type) {
     case "created":
@@ -182,6 +196,15 @@ function applyEvent(state: CardState, event: CardEvent): void {
       break;
     case "unarchived":
       state.archived = false;
+      break;
+    case "decided":
+      applyDecided(state, event);
+      break;
+    case "unlisted":
+      state.absentFromLastImport = event.ts;
+      break;
+    case "relisted":
+      state.absentFromLastImport = null;
       break;
     // "deleted" is handled by foldEvents itself: it removes the whole card.
   }
@@ -227,7 +250,10 @@ export function foldEvents(cards: Card[], events: CardEvent[]): CardState[] {
   for (const card of cards) {
     // Snapshots stored before ADR 022 carry no subDomain: read them as null.
     const subDomain = card.subDomain ?? null;
-    byId.set(card.id, { ...card, subDomain, enteredColumnAt: card.createdAt, comments: [], archived: false });
+    byId.set(card.id, {
+      ...card, subDomain, enteredColumnAt: card.createdAt, comments: [], archived: false,
+      decisions: [], absentFromLastImport: null,
+    });
   }
   const order = cards.map((card) => card.id);
   const ordered = events

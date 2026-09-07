@@ -37,7 +37,7 @@ test("a July RDOM file is inventoried as a retired contract, never parsed", () =
   assert.equal(report.inventory[0]?.contractId, "rdom");
   assert.equal(param, null);
   assert.deepEqual(report.missingExpected.map((m) => m.name),
-    ["Projets", "PARAM", "ProjetsJalons", "SP (2026 ou total)", "Ressources_PdC", "Ress.Profils"]);
+    ["Projets", "PARAM", "ProjetsJalons", "SP (exercice ou total)", "Ressources_PdC", "Ress.Profils"]);
 });
 
 test("the five fixture files assemble the full deck", () => {

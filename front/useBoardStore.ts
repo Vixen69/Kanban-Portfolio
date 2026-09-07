@@ -15,6 +15,7 @@ import {
   postBlock,
   postCard,
   postComment,
+  postDecision,
   postDelete,
   postEdit,
   postMove,
@@ -22,6 +23,7 @@ import {
   postUnblock,
   putConfig,
   type BoardData,
+  type DecisionInput,
   type MoveTarget,
   type NewCardInput,
 } from "./api.ts";
@@ -55,6 +57,8 @@ export interface BoardStore {
   unblockCard(cardId: string): Promise<boolean>;
   editCard(cardId: string, patch: CardPatch): Promise<boolean>;
   commentCard(cardId: string, text: string): Promise<boolean>;
+  /** Records a decision D1–D6 with its reason (ADR 026). */
+  decideCard(cardId: string, input: DecisionInput): Promise<boolean>;
   archiveCard(cardId: string): Promise<boolean>;
   unarchiveCard(cardId: string): Promise<boolean>;
   deleteCard(cardId: string): Promise<boolean>;
@@ -158,6 +162,7 @@ function useCardActions(reload: () => Promise<void>, setLastError: (m: string | 
       unblockCard: (cardId: string) => perform(() => postUnblock(cardId)),
       editCard: (cardId: string, patch: CardPatch) => perform(() => postEdit(cardId, patch)),
       commentCard: (cardId: string, text: string) => perform(() => postComment(cardId, text)),
+      decideCard: (cardId: string, input: DecisionInput) => perform(() => postDecision(cardId, input)),
       archiveCard: (cardId: string) => perform(() => postArchive(cardId)),
       unarchiveCard: (cardId: string) => perform(() => postUnarchive(cardId)),
       deleteCard: (cardId: string) => perform(() => postDelete(cardId)),

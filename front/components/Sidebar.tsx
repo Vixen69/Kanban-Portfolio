@@ -182,6 +182,8 @@ function StatsBlock(props: SidebarProps) {
       <StatRow label={`♛ ${config.criticalities.top.label}`} value={view.top} total={stats.top} active={active} />
       <StatRow label={`★ ${config.criticalities.major.label}`} value={view.major} total={stats.major} active={active} />
       <StatRow label={config.criticalities.normal.label} value={view.normal} total={stats.normal} active={active} />
+      <StatRow label="Réexamen de décision dépassé" value={view.toReview} total={stats.toReview} alert active={active} />
+      <StatRow label="Absentes du dernier import" value={view.absent} total={stats.absent} active={active} />
     </div>
   );
 }

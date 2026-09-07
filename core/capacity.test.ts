@@ -7,7 +7,7 @@ import type { CapacitySnapshot, CardState } from "./types.ts";
 const CONFIG = testConfig();
 
 function state(overrides: Parameters<typeof testCard>[0]): CardState {
-  return { ...testCard(overrides), enteredColumnAt: "2026-01-01T00:00:00.000Z", comments: [], archived: false };
+  return { ...testCard(overrides), enteredColumnAt: "2026-01-01T00:00:00.000Z", comments: [], archived: false, decisions: [], absentFromLastImport: null };
 }
 
 // Two transverse (beta) persons, one alpha person, one without capacity.

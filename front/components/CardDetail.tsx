@@ -12,6 +12,8 @@ import type { FlowAnchors, FlowTimes } from "../../core/flow.ts";
 import { TypeTag } from "./cardParts.tsx";
 import { CustomKV, Tag } from "./modalParts.tsx";
 import { CommentList, DelaysSection, HistoryList } from "./DetailSections.tsx";
+import { AbsentBanner, DecisionSection } from "./DetailDecision.tsx";
+import type { DecisionInput } from "../api.ts";
 import { ConstraintEditor, InlineEdit } from "./modalEditors.tsx";
 import { ContentionSection, OwnerStrip, PlanDeCharge, RdrStrip } from "./DetailPlan.tsx";
 import { BudgetGraph, RisksSection } from "./DetailRisk.tsx";
@@ -36,6 +38,8 @@ export interface CardDetailProps {
   onBlock: (reason: string) => void;
   onUnblock: () => void;
   onComment: (text: string) => void;
+  /** Records a decision D1–D6 with its reason (ADR 026). */
+  onDecide: (input: DecisionInput) => void;
   /** Archives the subject (event intent) and closes the modal. */
   onArchive: () => void;
   /** Restores an archived subject to the board (fiche opened from Archives). */
@@ -231,9 +235,11 @@ export function CardDetail(props: CardDetailProps) {
         <div className="modal-body">
           <TopBar card={card} onClose={props.onClose} onPatch={onPatch} />
           <TagRow card={card} config={config} onToggleConstraints={() => setConstraintEdit((open) => !open)} />
+          <AbsentBanner card={card} />
           {constraintEdit && <ConstraintPop card={card} config={config} onPatch={onPatch} onClose={() => setConstraintEdit(false)} />}
           <MidSections card={card} config={config} now={props.now} onPatch={onPatch}
             onBlock={props.onBlock} onUnblock={props.onUnblock} />
+          <DecisionSection key={"dc" + card.id} card={card} config={config} now={props.now} onDecide={props.onDecide} />
           <CommentList key={card.id} comments={card.comments} onAdd={props.onComment} />
           <DelaysSection key={"dl" + card.id} flow={props.flow} anchors={props.anchors} />
           <HistoryList key={"hi" + card.id} entries={props.history} />

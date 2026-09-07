@@ -182,7 +182,8 @@ fields, append-only enforced by table grants/triggers):
   the card.
 - `card_events` : append-only. seq (bigint sequence, ordering), id
   (evt-<seq>), ts, actor, card_id, type (created/moved/blocked/unblocked/
-  edited/commented/archived/unarchived/deleted/imported), from_column,
+  edited/commented/archived/unarchived/deleted/imported/decided/unlisted/
+  relisted), from_column,
   to_column, payload (jsonb). Never updated, never deleted. Comments are a
   projection of `commented` events; deletion is a `deleted` event (the fold
   excludes the card, the log keeps everything — ADR 012); archiving is a
@@ -212,7 +213,8 @@ domains and types (name, short, color; a domain may be `transverse` — its
 people serve the whole portfolio, ADR 024), nature/criticality labels,
 custom field definitions, `age` thresholds (fresh/recent/aging/stale),
 `andonThresholdDays`, and `exercise.year` (the year the import reads and
-the capacity is counted in, ADR 024). `wip: null` shows the bare count and enforces nothing;
+the capacity is counted in, ADR 024), `decisions` / `decisionGrounds` (the
+referential's D1–D6 and the arbitration grid's terms, ADR 026). `wip: null` shows the bare count and enforces nothing;
 a set WIP shows count/limit, warns at ≥ 80 %, reddens beyond 100 % (warns,
 never hard-blocks). An admin-panel override is persisted server-side with an
 append-only history; « Réinitialiser le modèle » returns to board.json
@@ -265,7 +267,8 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
 - Card detail: charge j.h + budget k€ bars (budget before plan de charge),
   no canal tag (v12: the canal is read spatially from the board row),
   per-profile consumed editing, ressources, commentaires (event-backed),
-  BLOCAGE section (mandatory motif, « Lever »), Délais + Historique
+  BLOCAGE section (mandatory motif, « Lever »), Décision section (D1–D6
+  traced with the grid's terms and a review date, ADR 026), Délais + Historique
   (collapsible, event-backed, incl. block/unblock lines), full edit
   (no Nature select, no Bloqué toggle), archive (« Archiver »), delete
   (as `deleted` event).

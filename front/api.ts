@@ -176,6 +176,20 @@ export function postComment(cardId: string, text: string): Promise<CardEvent> {
   return postIntent({ type: "commented", cardId, text });
 }
 
+/** A decision to record on a card (ADR 026): D-code, grid terms, reason, review day. */
+export interface DecisionInput {
+  decisionId: string;
+  grounds: string[];
+  reason: string;
+  /** ISO day (YYYY-MM-DD) or null. */
+  reviewDate: string | null;
+}
+
+/** POST a decision intent. Inputs: card id, the DecisionInput. Output: the stored event. Failure: throws ApiError. */
+export function postDecision(cardId: string, input: DecisionInput): Promise<CardEvent> {
+  return postIntent({ type: "decided", cardId, ...input });
+}
+
 /**
  * POST an archive intent — archiving is itself an event (ADR 017): the card
  * leaves the board but stays in the fold for the archive view.

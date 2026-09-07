@@ -28,15 +28,15 @@ export interface Presence {
 
 /**
  * Lists the expected-but-missing source files, with what each brings.
- * Inputs: the report and the presence flags. Outputs: none (mutates the
+ * Inputs: the report, the presence flags, the exercise year. Outputs: none (mutates the
  * report). Failure modes: none.
  */
-export function emitMissing(report: ImportReport, present: Presence): void {
+export function emitMissing(report: ImportReport, present: Presence, year: number): void {
   const expected: Array<[keyof Presence, string, string]> = [
     ["projets", "Projets", "le périmètre et les cartes (identité, type, domaine, chef de projet) — sans lui, pas d'assemblage"],
     ["param", "PARAM", "responsables de domaine (exclus du chef de projet) et traduction des chemins d'organisation"],
     ["jalons", "ProjetsJalons", "position initiale (RDO / RDLI / RDR franchi) — sans lui, tout en colonne d'entrée"],
-    ["sp", "SP (2026 ou total)", "coûts 2026 : meilleur estimé, réel, engagé"],
+    ["sp", "SP (exercice ou total)", `coûts ${year} : meilleur estimé, réel, engagé`],
     ["pdc", "Ressources_PdC", "plan de charge de l'exercice par profil et par personne (+ consolidation nominative)"],
     ["profils", "Ress.Profils", "personnes de la DSI (domaine, métier, capacité) — sans lui, la vue capacité ne connaît que la demande"],
   ];
@@ -71,8 +71,8 @@ export function emitAssembly(report: ImportReport, data: AssemblyData, config: B
     report.assembly.push({ subject: "périmètre `projets`", status: perimeterStatus(data.projets, config) });
   }
   if (data.cards !== null && data.projets !== null) emitDeck(report, data, data.cards, data.projets, config);
-  else emitWaiting(report, data);
-  report.assembly.push({ subject: "plan de charge", status: chargeStatus(data) });
+  else emitWaiting(report, data, config.exercise.year);
+  report.assembly.push({ subject: "plan de charge", status: chargeStatus(data, config.exercise.year) });
   report.assembly.push({ subject: "capacité", status: capacityStatus(data) });
 }
 
@@ -103,13 +103,13 @@ function perimeterStatus(projets: ProjetsTable, config: BoardConfig): string {
   return `${projets.entries.length} carte(s) — la liste fait foi · types : ${parts.join(" · ")} · domaine : ${shape}`;
 }
 
-function chargeStatus(data: AssemblyData): string {
+function chargeStatus(data: AssemblyData, year: number): string {
   if (data.pdc === null) return "en attente de `Ressources_PdC`";
   if (data.chargeStats === null || data.cards === null) {
     return `chargé (${data.pdc.projects.size} projets) — en attente de \`projets\``;
   }
   const s = data.chargeStats;
-  return `${s.covered}/${data.cards.cards.length} cartes couvertes · charge 2026 des cartes : ` +
+  return `${s.covered}/${data.cards.cards.length} cartes couvertes · charge ${year} des cartes : ` +
     `${formatJh(s.cardsJh)} j.h prév. · ${formatJh(s.cardsDone)} réel` +
     ` · total du fichier PdC (toute la DSI) : ${formatJh(s.totalJh)} / ${formatJh(s.totalDone)}` +
     ` · projets PdC hors périmètre : ${s.pdcOutside} · cartes sans charge : ${s.uncovered}`;
@@ -134,7 +134,7 @@ function emitDeck(
         ` · sous-domaine : ${s.withSubDomain} détaillé(s), ${c.subFolded} replié(s) dans leur domaine`,
     },
     { subject: "chef de projet", status: `${s.withOwner}/${s.total} · responsables de domaine exclus : ${c.leadsExcluded}` },
-    { subject: "coûts 2026 (SP)", status: spStatus(data.sp, deck) },
+    { subject: `coûts ${config.exercise.year} (SP)`, status: spStatus(data.sp, deck, config.exercise.year) },
   );
 }
 
@@ -149,10 +149,10 @@ function positionStatus(data: AssemblyData, deck: CardAssembly): string {
     ` · lignes jalons hors périmètre : ${s.jalonsOutside}`;
 }
 
-function spStatus(sp: SpTable | null, deck: CardAssembly): string {
+function spStatus(sp: SpTable | null, deck: CardAssembly, year: number): string {
   const s = deck.stats;
   const q = " · RDLI et charges j.h lus dans `projets` (pluriannuels — Q22/Q23 en suspens)";
-  if (sp === null) return `en attente de SP — coûts 2026 inconnus${q}`;
+  if (sp === null) return `en attente de SP — coûts ${year} inconnus${q}`;
   const joined = s.spById + s.spByName + s.spByCode;
   return `${joined}/${s.total} jointes (Id ${s.spById} · nom ${s.spByName} · code ${s.spByCode})` +
     ` · sans correspondance : ${s.withoutSp} · sujets SP hors périmètre : ${s.spOutside}` +
@@ -160,12 +160,12 @@ function spStatus(sp: SpTable | null, deck: CardAssembly): string {
 }
 
 // No deck yet: say what each present table waits for.
-function emitWaiting(report: ImportReport, data: AssemblyData): void {
+function emitWaiting(report: ImportReport, data: AssemblyData, year: number): void {
   report.assembly.push({ subject: "cartes", status: "en attente de `projets` (le périmètre)" });
   if (data.jalons !== null) {
     report.assembly.push({ subject: "jalons", status: `${data.jalons.entries.length} ligne(s) lue(s) — en attente de \`projets\`` });
   }
   if (data.sp !== null) {
-    report.assembly.push({ subject: "coûts 2026 (SP)", status: `${data.sp.entries.length} sujet(s) lu(s) — en attente de \`projets\`` });
+    report.assembly.push({ subject: `coûts ${year} (SP)`, status: `${data.sp.entries.length} sujet(s) lu(s) — en attente de \`projets\`` });
   }
 }

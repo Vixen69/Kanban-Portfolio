@@ -35,6 +35,8 @@ function state(overrides: Parameters<typeof testCard>[0] = {}, daysHere = 1): Ca
     enteredColumnAt: ago(daysHere),
     comments: [],
     archived: false,
+    decisions: [],
+    absentFromLastImport: null,
   };
 }
 

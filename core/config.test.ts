@@ -262,3 +262,21 @@ test("exercise year and transverse domains (ADR 024): parsed, defaulted, refused
     assert.throws(() => validateBoardConfig(raw), ConfigError, name);
   }
 });
+
+test("decisions and grid terms default to the referential when absent, validate when given", () => {
+  const raw = rawConfig();
+  delete raw.decisions;
+  delete raw.decisionGrounds;
+  const config = validateBoardConfig(raw);
+  assert.deepEqual(config.decisions.map((d) => [d.id, d.traced]),
+    [["D1", false], ["D2", false], ["D3", false], ["D4", true], ["D5", true], ["D6", true]]);
+  assert.equal(config.decisionGrounds.length, 9);
+  const explicit = validateBoardConfig({
+    ...rawConfig(),
+    decisions: [{ id: "X", name: "X", short: "X", color: "#000", traced: true }],
+    decisionGrounds: [{ id: "g", name: "G", family: "pause" }],
+  });
+  assert.deepEqual(explicit.decisions.map((d) => d.id), ["X"]);
+  assert.throws(() => validateBoardConfig({ ...rawConfig(), decisions: [{ id: "X", name: "X", short: "X", color: "#000" }] }), ConfigError);
+  assert.throws(() => validateBoardConfig({ ...rawConfig(), decisionGrounds: [{ id: "g", name: "G", family: "autre" }] }), ConfigError);
+});
