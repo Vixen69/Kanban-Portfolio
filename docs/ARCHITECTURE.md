@@ -637,6 +637,34 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-08 — Import depuis l'outil (ADR 027, sprint S4)
+
+- **Mode autonome** (« go S3 S4 ») : choix de Claude, consignés dans
+  l'ADR 027, à contester à la revue.
+- **Deux routes** `POST /api/import/audit` et `POST /api/import/load`,
+  fichiers en JSON base64 (pas de multipart, aucune dépendance) ; plafonds
+  12 fichiers / 20 Mo / corps 40 Mo sur ces routes seulement. Même moteur
+  que la ligne de commande (`runImportAudit`, `renderReport`, `planLoad`) :
+  le rapport lu dans l'outil est celui que le CLI écrit ; le chargement
+  écrit cartes + évènements en un lot puis le snapshot de capacité.
+- **Secret partagé** (`X-Import-Secret` ↔ `KANBAN_IMPORT_SECRET`, comparé
+  en temps constant via SHA-256) : variable absente = routes désactivées
+  (403 explicite). Jamais journalisé, jamais persisté côté front.
+  `npm run serve:dev` pose un secret jetable pour le développement.
+- **Écran d'import** (bouton ⬆) : secret, dépôt des CSV, « Auditer » →
+  rapport et compte rendu ; « Charger » actif après un audit assemblé et la
+  case « j'ai lu le rapport » ; le tableau se recharge après chargement.
+- **Code** : `core/import-types.ts` (formes partagées), `middle/import.ts`
+  (+ routes dans `app.ts`, `Forbidden` → 403, `importSecret` dans la
+  config), `front/components/ImportView.tsx`, `scripts/serve-dev.ts`.
+- **Vérification** : tests des routes (403 sans/mauvais secret, audit et
+  chargement sur les squelettes synthétiques, plafond 40 Mo confiné),
+  suite complète, typecheck, conventions ; écran vérifié en aperçu avec
+  les CSV de `fixtures/import`.
+- **Suite** : S5 — panneau de configuration refait pour que le PMO
+  continue seul (vocabulaire, colonnes/canaux, seuils, limites d'encours,
+  profils, personnes et capacités).
+
 ### 2026-09-08 — Décision tracée, sujets absents, clôture d'exercice (ADR 026, sprint S3)
 
 - **Mode autonome** (« go S3 S4 ») : choix de Claude, consignés dans

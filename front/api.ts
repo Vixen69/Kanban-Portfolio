@@ -3,6 +3,7 @@
 // reading this one file. The server owns event id/ts/actor and every
 // validation — the client posts intents, never stored shapes.
 
+import type { ImportAuditResult, ImportFilePayload, ImportLoadResult } from "../core/import-types.ts";
 import type {
   CapacitySnapshot,
   BoardConfig,
@@ -183,6 +184,33 @@ export interface DecisionInput {
   reason: string;
   /** ISO day (YYYY-MM-DD) or null. */
   reviewDate: string | null;
+}
+
+function importInit(files: ImportFilePayload[], secret: string): RequestInit {
+  return {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-import-secret": secret },
+    body: JSON.stringify({ files }),
+  };
+}
+
+/**
+ * POST /api/import/audit — audits a set of PPM export files (ADR 027);
+ * nothing is written. Inputs: the files (base64), the shared secret.
+ * Output: the report and its counts. Failure: throws ApiError (403 on a
+ * missing/wrong secret, 400 on bad files).
+ */
+export function postImportAudit(files: ImportFilePayload[], secret: string): Promise<ImportAuditResult> {
+  return request<ImportAuditResult>("/api/import/audit", importInit(files, secret));
+}
+
+/**
+ * POST /api/import/load — audits then loads the files into the board.
+ * Inputs: the files, the shared secret. Output: the report plus what the
+ * load wrote. Failure: throws ApiError.
+ */
+export function postImportLoad(files: ImportFilePayload[], secret: string): Promise<ImportLoadResult> {
+  return request<ImportLoadResult>("/api/import/load", importInit(files, secret));
 }
 
 /** POST a decision intent. Inputs: card id, the DecisionInput. Output: the stored event. Failure: throws ApiError. */

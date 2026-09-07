@@ -1,7 +1,8 @@
 // Express transport for the middle (ADR 010/011/012/013). Wraps the
 // transport-agnostic API logic (api.ts, cards.ts) in routes; all domain logic
-// stays in core/. Security headers on every response, a 64 KB JSON body cap,
-// same-origin only (no CORS). Zero egress: the middle only listens and
+// stays in core/. Security headers on every response, a 64 KB JSON body cap
+// (40 MB on the two import routes, ADR 027), same-origin only (no CORS).
+// Zero egress: the middle only listens and
 // responds. The front is served by its own container (nginx), so the middle
 // has no static serving.
 
@@ -17,6 +18,7 @@ import { BadRequest, getBoard,
 import { postCard } from "./cards.ts";
 import type { ConfigStore } from "./config-store.ts";
 import { logError, logRequest } from "./log.ts";
+import { auditImport, checkSecret, Forbidden, loadImport, parseFiles } from "./import.ts";
 
 const SECURITY_HEADERS: Record<string, string> = {
   "Content-Security-Policy":
@@ -29,11 +31,16 @@ const SECURITY_HEADERS: Record<string, string> = {
 };
 
 const MAX_BODY = "64kb";
+/** The import routes carry whole CSV exports, base64 in JSON (ADR 027). */
+const IMPORT_MAX_BODY = "40mb";
+const IMPORT_PATH = "/api/import/";
 
 /** What the transport needs to answer requests. */
 export interface MiddleDeps {
   storage: BoardStorage;
   configStore: ConfigStore;
+  /** Shared secret of the import routes (ADR 027); absent/null = disabled. */
+  importSecret?: string | null;
 }
 
 // HTTP status carried by express.json's own errors (413 too large, 400 parse).
@@ -60,6 +67,10 @@ function errorHandler(err: unknown, req: Request, res: Response, _next: NextFunc
     res.status(400).json({ error: err.message });
     return;
   }
+  if (err instanceof Forbidden) {
+    res.status(403).json({ error: err.message });
+    return;
+  }
   const status = bodyErrorStatus(err);
   if (status === 413) {
     res.status(413).json({ error: "Corps de requête trop volumineux." });
@@ -71,6 +82,21 @@ function errorHandler(err: unknown, req: Request, res: Response, _next: NextFunc
   }
   logError(`${req.method} ${req.path}`, err);
   res.status(500).json({ error: "Erreur interne." });
+}
+
+// The import routes (ADR 027): the shared secret first, then the same audit
+// and load as the CLI. Their own JSON parser carries the larger cap.
+function mountImportRoutes(app: Express, deps: MiddleDeps): void {
+  const body = express.json({ limit: IMPORT_MAX_BODY });
+  app.post("/api/import/audit", body, (req: Request, res: Response) => {
+    checkSecret(deps.importSecret ?? null, req.header("x-import-secret"));
+    res.status(200).json(auditImport(deps.configStore.getRuntime(), parseFiles(req.body), new Date()));
+  });
+  app.post("/api/import/load", body, async (req: Request, res: Response) => {
+    checkSecret(deps.importSecret ?? null, req.header("x-import-secret"));
+    const result = await loadImport(deps.storage, deps.configStore.getRuntime(), parseFiles(req.body), new Date());
+    res.status(200).json(result);
+  });
 }
 
 // Mounts the seven API routes. Handlers throw BadRequest on invalid input;
@@ -126,8 +152,13 @@ export function createApp(deps: MiddleDeps): Express {
     res.on("finish", () => logRequest(req.method, req.path, res.statusCode));
     next();
   });
-  app.use(express.json({ limit: MAX_BODY }));
+  const json = express.json({ limit: MAX_BODY });
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (req.path.startsWith(IMPORT_PATH)) next(); // parsed by the import routes' own cap
+    else json(req, res, next);
+  });
   mountRoutes(app, deps);
+  mountImportRoutes(app, deps);
   app.use((_req: Request, res: Response) => {
     res.status(404).json({ error: "Ressource introuvable." });
   });

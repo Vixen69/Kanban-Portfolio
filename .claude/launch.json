@@ -4,20 +4,38 @@
     {
       "name": "portfolio-kanban",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 5173
     },
     {
       "name": "kanban-server",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "serve"],
+      "runtimeArgs": [
+        "run",
+        "serve"
+      ],
       "port": 8787
     },
     {
       "name": "kanban-preview",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "preview"],
+      "runtimeArgs": [
+        "run",
+        "preview"
+      ],
       "port": 4173
+    },
+    {
+      "name": "kanban-server-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "serve:dev"
+      ],
+      "port": 8787
     }
   ]
 }

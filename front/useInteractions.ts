@@ -25,6 +25,7 @@ export function useUiState() {
   const [archive, setArchive] = useState(false);
   const [admin, setAdmin] = useState(false);
   const [metrics, setMetrics] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [showCodes, setShowCodes] = useState(false);
   const [dragOver, setDragOver] = useState<MoveTarget | null>(null);
   const [dropCardId, setDropCardId] = useState<string | null>(null);
@@ -32,7 +33,7 @@ export function useUiState() {
     sidebar, setSidebar, focusCol, setFocusCol,
     collapsedLanes, setCollapsedLanes, collapsedCols, setCollapsedCols,
     detailId, setDetailId, editing, setEditing, adding, setAdding,
-    archive, setArchive, admin, setAdmin, metrics, setMetrics,
+    archive, setArchive, admin, setAdmin, metrics, setMetrics, importing, setImporting,
     showCodes, setShowCodes, dragOver, setDragOver,
     dropCardId, setDropCardId,
   };

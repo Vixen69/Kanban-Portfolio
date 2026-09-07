@@ -78,6 +78,11 @@ vivant) et `docs/adr/` (décisions). Le contrat de travail est `CLAUDE.md`.
   absente du dernier import » (ticket, fiche, barre latérale) jusqu'à leur
   retour ou leur archivage. La clôture d'exercice est outillée
   (`node sync/cloture.ts`, simulation par défaut).
+- **Import depuis l'outil** (⬆, ADR 027) : déposer les CSV du classeur,
+  lire le rapport d'audit, charger — même moteur et même rapport que la
+  ligne de commande. Routes protégées par un secret partagé
+  (`KANBAN_IMPORT_SECRET` sur le middle ; absent = import par l'outil
+  désactivé) en attendant les comptes (RP3).
 - Source des données : adaptateur `fixtures` (150 sujets synthétiques
   déterministes, seed 20260609) derrière le port `PortfolioDataSource`.
   csv-import / sciforma à venir (RP4).
@@ -122,6 +127,8 @@ KANBAN_ALLOW_SEED=1 npm run seed     # écrit data/board.jsonl (150 cartes)
 
 # 2. Terminal A — l'API (middle Express, :8787, pilote JSONL) :
 npm run serve
+#    (ou `npm run serve:dev` pour activer l'import par l'outil avec le
+#     secret de développement « dev-import » — ADR 027)
 
 # 3. Terminal B — le front (Vite, :5173, proxie /api → :8787) :
 npm run dev

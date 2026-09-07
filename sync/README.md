@@ -50,3 +50,9 @@ Les sujets archivés le sont par des évènements `archived` (acteur
 `cloture-<année>`), réversibles depuis la vue Archives. Étape suivante :
 importer les fichiers du nouvel exercice — les sujets absents de cet import
 sont marqués `unlisted` (jamais supprimés), `relisted` à leur retour.
+
+## Import depuis l'outil (ADR 027)
+
+Le bouton ⬆ de l'en-tête fait la même chose que `node sync/import.ts`
+(audit puis `--charger`), avec le même rapport, sans terminal : le middle
+doit porter `KANBAN_IMPORT_SECRET` (sinon les routes répondent 403).

@@ -24,6 +24,8 @@ export interface HeaderProps {
   /** Number of archived subjects — the badge hides at zero. */
   archivedCount: number;
   onAdmin: () => void;
+  /** Opens the import overlay (ADR 027). */
+  onImport: () => void;
   onAdd: () => void;
 }
 
@@ -80,6 +82,7 @@ export function Header(props: HeaderProps) {
           </svg>
           {props.archivedCount > 0 && <span className="arch-count">{props.archivedCount}</span>}
         </button>
+        <button className="icon-btn" onClick={props.onImport} title="Importer un export PPM">⬆</button>
         <button className="icon-btn" onClick={props.onAdmin} title="Configuration du tableau">⚙</button>
         <button className="add-btn" onClick={props.onAdd} title="Nouveau sujet (N)">+ Sujet</button>
       </div>

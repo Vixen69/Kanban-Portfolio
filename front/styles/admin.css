@@ -30,3 +30,17 @@
 .crit-key { width: 22px; text-align: center; color: var(--tx-3); font-size: 12px; }
 /* Inline failure line for a refused « Appliquer » / reset (server message). */
 .a-error { font-size: 10px; font-weight: 600; color: var(--danger-strong); background: #fdecec; border: 1px solid #f3c4c4; border-radius: 5px; padding: 6px 9px; margin-top: 10px; }
+
+/* ---------- Import depuis l'outil (ADR 027) ---------- */
+.import-modal { width: 840px; }
+.import-note { font-size: 10.5px; color: var(--tx-3); line-height: 1.45; margin-bottom: 10px; }
+.import-form { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.import-row { display: flex; flex-direction: column; gap: 3px; }
+.import-files { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; font-size: 10px; color: var(--tx-2); }
+.import-files li { background: #f1f5f9; border-radius: 4px; padding: 2px 7px; }
+.import-files small { color: var(--tx-4); margin-left: 3px; }
+.import-actions { display: flex; align-items: center; gap: 10px; }
+.import-error { font-size: 11px; color: var(--danger-strong); margin: 6px 0; }
+.import-summary { font-size: 11px; color: var(--tx-2); margin: 8px 0; line-height: 1.45; }
+.import-summary.ok { color: var(--ok); }
+.import-report { max-height: 46vh; overflow: auto; white-space: pre-wrap; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 10.5px; line-height: 1.45; background: #f7f9fc; border: 1px solid var(--bd-sub); border-radius: 6px; padding: 8px 10px; margin-top: 8px; }

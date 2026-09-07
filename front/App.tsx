@@ -28,6 +28,7 @@ import { CardDetail } from "./components/CardDetail.tsx";
 import { CardEdit } from "./components/CardEdit.tsx";
 import { Header } from "./components/Chrome.tsx";
 import { EmptyOverlay } from "./components/EmptyOverlay.tsx";
+import { ImportView } from "./components/ImportView.tsx";
 import { CapacityView } from "./components/CapacityView.tsx";
 import { QuickAdd } from "./components/QuickAdd.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
@@ -165,6 +166,9 @@ function ShellModals({ ctx }: { ctx: Ctx }) {
       {ui.metrics && (
         <CapacityView cards={ctx.cards} config={config} onClose={() => ui.setMetrics(false)} />
       )}
+      {ui.importing && (
+        <ImportView onClose={() => ui.setImporting(false)} onLoaded={() => void store.reload()} />
+      )}
       {ui.archive && (
         <ArchiveView cards={ctx.archivedCards} config={config}
           onUnarchive={(id: string) => void store.unarchiveCard(id)}
@@ -206,6 +210,7 @@ function Screen({ ctx }: { ctx: Ctx }) {
         onResetFilters={filters.reset} onClearFocus={() => ui.setFocusCol(null)}
         onToggleSidebar={() => ui.setSidebar((open) => !open)}
         onMetrics={() => ui.setMetrics(true)} onAdmin={() => ui.setAdmin(true)}
+        onImport={() => ui.setImporting(true)}
         onArchive={() => ui.setArchive(true)} archivedCount={ctx.archivedCards.length}
         onAdd={() => ui.setAdding(true)} />
       <Sidebar open={ui.sidebar} config={config} search={filters.state.search}
