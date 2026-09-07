@@ -1,7 +1,9 @@
-/* Metrics view (design v12) — full-screen governance read-out: KPI header,
-   budget croisé, contention, charge par rôle, flux, encours, risques,
-   blocages. Ported from the « Metrics v2 » section of
-   design/Portfolio kanban/Portefeuille DSI - Kanban NMO.html.
+/* Capacity view (☷, ADR 024/025) — full-screen arbitration read-out: KPI
+   header, transverse matrix, load bars per domain and profile, weighing
+   cards, overloaded persons, coverage. The shell, KPI tiles, panel grid and
+   bar primitives were ported from the « Metrics v2 » section of
+   design/Portfolio kanban/Portefeuille DSI - Kanban NMO.html (ADR 020) and
+   keep their m2-/mb-/mkpi- names; the cap- classes are the capacity view's.
 
    Cross-file dependencies (metrics.css is imported LAST in front/main.tsx):
    - .bgraph / .bg-row / .bg-label / .bg-track / .bg-fill / .bg-ref / .bg-val
@@ -80,3 +82,26 @@
 .blk-name { font-size: 11px; font-weight: 600; color: var(--tx-1); flex: 0 0 auto; max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .blk-reason { font-size: 10px; color: var(--tx-3); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .blk-meta { font-size: 9px; color: var(--tx-4); flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+
+/* ---------- Capacité (ADR 024/025) ---------- */
+.cap-val { width: 210px; }
+.cap-val small { display: block; font-weight: 400; color: var(--tx-4); }
+.cap-over { color: var(--danger-strong); font-weight: 700; }
+.cap-scroll { overflow-x: auto; }
+.cap-table { border-collapse: collapse; width: 100%; font-size: 10px; }
+.cap-table th, .cap-table td { padding: 5px 8px; text-align: right; border-bottom: 1px solid var(--bd-sub); white-space: nowrap; font-variant-numeric: tabular-nums; vertical-align: top; }
+.cap-table th { font-weight: 600; color: var(--tx-2); }
+.cap-table thead th { font-size: 9px; text-transform: uppercase; letter-spacing: .04em; color: var(--tx-4); }
+.cap-table th:first-child, .cap-table td:first-child { text-align: left; }
+.cap-table th .lg-sw { margin-left: 0; margin-right: 5px; }
+.cap-table td small { display: block; font-size: 8.5px; font-weight: 400; color: var(--tx-4); }
+.cap-empty-cell { color: var(--tx-4); }
+.cap-sub { font-size: 10px; font-weight: 700; color: var(--tx-2); margin: 8px 0 3px; }
+.cap-item { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--bd-sub); }
+.cap-item:last-child { border-bottom: none; }
+.cap-name { font-size: 11px; font-weight: 600; color: var(--tx-1); flex: 0 0 auto; max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cap-name small { font-weight: 400; color: var(--tx-4); }
+.cap-meta { font-size: 10px; color: var(--tx-3); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 4px; }
+.cap-meta .lg-sw { margin-left: 0; }
+.cap-fig { font-size: 10px; color: var(--tx-2); flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+.cap-lines { display: flex; flex-direction: column; gap: 5px; font-size: 10px; color: var(--tx-2); line-height: 1.4; }

@@ -43,7 +43,7 @@ function Legend({ config }: { config: BoardConfig }) {
 
 /**
  * App header: sidebar toggle, title, the "Filtré"/"Focus" chips, subject
- * and blocked counts, the domain legend, and the metrics (☷), admin (⚙)
+ * and blocked counts, the domain legend, and the capacity (☷), admin (⚙)
  * and "+ Sujet" actions.
  * Inputs: HeaderProps (config, counts, chip state, callbacks).
  * Output: the header element. Failure: none.
@@ -73,7 +73,7 @@ export function Header(props: HeaderProps) {
           <span className="blk-dot-static" /> <b>{stats.blocked}</b> bloqués
         </div>
         <Legend config={props.config} />
-        <button className="icon-btn" onClick={props.onMetrics} title="Métriques de flux">☷</button>
+        <button className="icon-btn" onClick={props.onMetrics} title="Capacité de l’exercice">☷</button>
         <button className="icon-btn arch-btn" onClick={props.onArchive} title="Archives">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3" y="4" width="18" height="4" rx="1" /><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8" /><path d="M10 12h4" />

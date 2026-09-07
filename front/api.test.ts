@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import {
   ApiError,
   fetchBoard,
+  fetchCapacity,
   fetchConfig,
   fetchDefaultConfig,
   postBlock,
@@ -88,6 +89,18 @@ test("the config and board reads GET their same-origin relative URLs", async () 
 test("fetchBoard returns the parsed body as-is", async () => {
   await withFetch({ ok: true, status: 200, json: { cards: [], events: [] } }, async () => {
     assert.deepEqual(await fetchBoard(), { cards: [], events: [] });
+  });
+});
+
+test("fetchCapacity GETs /api/capacity and unwraps the snapshot (null when none)", async () => {
+  await withFetch({ ok: true, status: 200, json: { capacity: null } }, async (calls) => {
+    assert.equal(await fetchCapacity(), null);
+    assert.equal(calls[0]?.url, "/api/capacity");
+    assert.equal(calls[0]?.method, "GET");
+  });
+  const snapshot = { exerciseYear: 2026, persons: [], assignments: [] };
+  await withFetch({ ok: true, status: 200, json: { capacity: snapshot } }, async () => {
+    assert.deepEqual(await fetchCapacity(), snapshot);
   });
 });
 

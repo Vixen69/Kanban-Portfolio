@@ -274,13 +274,15 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
 - QuickAdd (« + Sujet », touche N): always enters the first column; the
   canal confers the nature.
 - Admin panel (⚙): topology/vocabulary only (ADR 013), incl. per-lane
-  natureKey. Metrics view (☷, « Metrics », design v12/ADR 020): a governance
-  read-out computed from cards + events — 6 KPIs then budget croisé, risque
-  de contention, charge restante par rôle, flux (débit 30/90 j + lead/cycle),
-  encours vs limites (limit = lanes × column.wip), risques par entité +
-  contraintes, blocages. Terminal stages are derived from the config, never
-  hardcoded. Reorders excluded. The v11 flow diagnostics (temps moyen par
-  étape, composition d'âge, goulot) were dropped — author's call.
+  natureKey. Capacity view (☷, ADR 024/025 — replaces the v12 Metrics
+  read-out, author's call 2026-09-07): the arbitration read-out computed
+  from the imported capacity snapshot + the active cards by
+  `core/capacity-view.ts` — 6 KPIs, then demande sur les domaines
+  transverses (matrix domain × consumer domain), charge par domaine, charge
+  par profil, cartes qui pèsent (top 5 per transverse domain), personnes
+  au-delà de 100 % (names shown), couverture des chiffres. Annual reading
+  (planned j.h vs declared capacity). `core/metrics*.ts` stay in core
+  (pure, tested) without a view.
 
 ## 6. Security posture (shapes every choice)
 

@@ -60,11 +60,13 @@ vivant) et `docs/adr/` (décisions). Le contrat de travail est `CLAUDE.md`.
   repliés : estimé k€ + charge RAF j.h ; dépliés : enveloppe RDLI, meilleur
   estimé, engagé, réalisé, plan de charge et ventilation par profil. Deux
   bascules Σ dans le coin du tableau, mémorisées par navigateur.
-- **Metrics** (☷, ADR 007 et 020) : lecture de gouvernance calculée
-  exclusivement depuis cartes + journal d'événements — 6 indicateurs, puis
-  budget croisé, risque de contention, charge restante par rôle, flux (débit
-  30/90 j, lead/cycle moyens), encours vs limites, risques par entité et
-  contraintes, blocages.
+- **Capacité** (☷, ADR 024/025) : la lecture d'arbitrage entre responsables
+  de domaines, calculée depuis le snapshot de capacité importé (personnes,
+  affectations de l'exercice) et les cartes — six chiffres de tête, puis la
+  demande sur les domaines transverses (qui consomme A&D et INFRA), la charge
+  par domaine et par profil, les cartes qui pèsent sur chaque transverse,
+  les personnes au-delà de 100 % et la couverture des chiffres. Lecture
+  annuelle : prévisionnel de l'exercice contre capacité déclarée.
 - Source des données : adaptateur `fixtures` (150 sujets synthétiques
   déterministes, seed 20260609) derrière le port `PortfolioDataSource`.
   csv-import / sciforma à venir (RP4).

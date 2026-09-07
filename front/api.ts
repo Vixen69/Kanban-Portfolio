@@ -4,6 +4,7 @@
 // validation — the client posts intents, never stored shapes.
 
 import type {
+  CapacitySnapshot,
   BoardConfig,
   Card,
   CardEvent,
@@ -123,6 +124,15 @@ export function putConfig(config: BoardConfig): Promise<BoardConfig> {
  */
 export function fetchBoard(): Promise<BoardData> {
   return request<BoardData>("/api/board");
+}
+
+/**
+ * GET /api/capacity — the last imported capacity snapshot (ADR 024).
+ * Output: the CapacitySnapshot, or null when no import carried one yet.
+ * Failure: throws ApiError (unreachable or non-2xx).
+ */
+export function fetchCapacity(): Promise<CapacitySnapshot | null> {
+  return request<{ capacity: CapacitySnapshot | null }>("/api/capacity").then((body) => body.capacity);
 }
 
 /**

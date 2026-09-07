@@ -637,6 +637,33 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-08 — La vue ☷ devient la vue capacité (ADR 025, sprint S2)
+
+- **Décisions de l'auteur** : la vue Metrics v12 (espace réservé sans
+  vision design) est **remplacée** par la vue capacité ; les noms des
+  personnes en surcharge sont affichés d'emblée (pas d'authentification,
+  accès réglé par le réseau) ; lecture annuelle — prévisionnel de
+  l'exercice contre capacité déclarée (le « reste à faire contre capacité
+  restante » attend la réponse Q24 sur « Disponibilité »).
+- **Contenu** : six chiffres de tête (capacité, demande, charge globale,
+  personnes > 100 %, cartes sans affectation, réalisé indicatif), puis la
+  matrice **demande sur les domaines transverses** (qui consomme A&D et
+  INFRA, en j.h et en part de leur capacité), charge par domaine, charge
+  par profil, **cartes qui pèsent** sur chaque transverse (les leviers
+  d'arbitrage), personnes au-delà de 100 %, **couverture des chiffres** (ce
+  que la vue ne voit pas : charge générique, stubs, capacités inconnues,
+  affectations hors tableau).
+- **Code** : `core/capacity-view.ts` (pur, testé) sur `core/capacity.ts` ;
+  `front/components/CapacityView.tsx` + `capacityPanels.tsx` +
+  `capacityTables.tsx` ; `fetchCapacity()` lu à l'ouverture de la vue (le
+  snapshot ne change qu'à l'import) ; `MetricsView` / `metricsPanels`
+  supprimés ; `core/metrics*.ts` conservés (purs, testés, sans rendu).
+- **Vérification** : suite complète, typecheck, conventions ; aperçu
+  navigateur à 1920×1080 sur le magasin de dev re-seedé (fixtures : 105
+  personnes, 432 affectations, charge globale ≈ 1,0).
+- **Suite** : S3 — décision sur la carte, « absente du dernier import »,
+  clôture d'exercice.
+
 ### 2026-09-07 — Module capacité : personnes, affectations, année d'exercice (ADR 024)
 
 - **Pourquoi** : l'outil sert les arbitrages inter-domaines entre les

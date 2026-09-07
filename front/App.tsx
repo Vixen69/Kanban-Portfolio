@@ -28,7 +28,7 @@ import { CardDetail } from "./components/CardDetail.tsx";
 import { CardEdit } from "./components/CardEdit.tsx";
 import { Header } from "./components/Chrome.tsx";
 import { EmptyOverlay } from "./components/EmptyOverlay.tsx";
-import { MetricsView } from "./components/MetricsView.tsx";
+import { CapacityView } from "./components/CapacityView.tsx";
 import { QuickAdd } from "./components/QuickAdd.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
 
@@ -162,8 +162,7 @@ function ShellModals({ ctx }: { ctx: Ctx }) {
           onClose={() => ui.setAdmin(false)} />
       )}
       {ui.metrics && (
-        <MetricsView cards={ctx.cards} events={store.events} config={config}
-          now={ctx.nowMs} onClose={() => ui.setMetrics(false)} />
+        <CapacityView cards={ctx.cards} config={config} onClose={() => ui.setMetrics(false)} />
       )}
       {ui.archive && (
         <ArchiveView cards={ctx.archivedCards} config={config}
