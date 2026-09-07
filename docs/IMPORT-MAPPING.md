@@ -1,9 +1,124 @@
 # Spécification du mapping d'import — exports PPM (Sciforma)
 
-> Document de travail, préparé avec le PMO. Version du 2026-07-29.
+> Document de travail, préparé avec le PMO. Version du 2026-07-29,
+> **révisée le 2026-09-04** (retours PMO — la révision, en tête, prime sur
+> tout ce qui la contredit plus bas ; les sections de juillet sont
+> conservées comme historique des décisions).
 > Contrat de l'adaptateur `csv-import` (phase RP4). Évoluera au fil des
 > séances d'analyse des exports ; les questions ouvertes sont en fin de
 > document. L'ADR de l'adaptateur sera rédigé au moment de sa construction.
+
+## Révision 2026-09-04 — retours PMO : le classeur de consolidation
+
+Séance PMO du 2026-09-04. Deux constats de terrain déclenchent la révision :
+les budgets affichés étaient **pluriannuels** (« Coût final ME » du
+consolidé cumule toutes les années — d'où des sommes énormes) alors que le
+tableau veut le **2026** ; et le PMO (Serge) a produit une **table de
+correspondance** (onglet `PARAM`) qui rend la table `RDOM` composée à la
+main inutile. Le PMO livre désormais un **classeur de consolidation** dont
+les onglets remplacent les exports bruts. Décisions de l'auteur :
+
+**R1 — Sources.** Le classeur est converti sur la VM en **un CSV par
+onglet** par LibreOffice (`soffice --headless --convert-to csv:…:-1`,
+UTF-8, `;` — commande à valider au premier passage puis inscrite au
+RUNBOOK). Onglets lus : **`PARAM`**, **`Projets`**, **`ProjetsJalons`**,
+**`SP_2026`**. `TE_Activites` : ignoré (retiré de l'export).
+`Ress.Profils` : **mis de côté** (ressources internes nominatives,
+200 j.h/an — matière du futur module nominatif, cf. Extension future).
+Le plan de charge reste le CSV séparé **`Ressources_PdC`**, inchangé
+(l'onglet PdC de l'export n'a pas encore les bonnes informations).
+*Remplace* : « le consolidé contient tout » (2026-07-31) et le registre
+`RDOM` / `SP_total` / `projet` — ces contrats sont retirés du registre
+(un fichier qui y correspond est inventorié « contrat retiré »).
+
+**R2 — Périmètre.** Les lignes du CSV **`projets` SONT le périmètre** : le
+PMO garantit qu'il ne contient que les projets 2026 des types retenus.
+Plus aucune exclusion par « Domaine (Ptf) » ni par `isProjetSIS`. Le
+parseur contrôle malgré tout le type (R3) et signale tout écart — jamais
+d'exclusion silencieuse.
+
+**R3 — Types.** Clé = colonne **« Type »** de `projets` (pas « Type Gpe »,
+pas SP_2026). Le suffixe parenthésé est retiré avant comparaison —
+« (Projet) », « (Opportunité) », « (Run) » ne distinguent rien. Quatre
+types retenus → `typeId` : **Etude** → `etude` ; **Projet de gestion
+d'obsolescence** → `obsolescence` ; **Projet de mise en oeuvre** →
+`mise_en_oeuvre` ; **Projet IA** → `ia`. Libellés exclus connus (signalés
+s'ils apparaissent) : Achat, Evolution - TMA, TMA Corrective. Tout autre
+libellé → douteux. La config `types` ne porte plus que ces quatre.
+
+**R4 — Domaine et sous-domaine : le vocabulaire Orga.** Le domaine de la
+carte = **« Domaine (Orga) »** (10 valeurs : A&D, CORPORATE, ERP,
+INDUSTRIE, INFRA, ING, IT4IT, PLM, SOUTIEN, SUPPORT OFFICE — la config
+`domains` devient cette liste). Le sous-domaine = **« Sous-domaine
+(Orga) »** (écrit « Ss-Daine (Orga) » dans l'onglet consolidé) ; il n'est
+**retenu que pour A&D** (ARCHITECTURE APPLICATIVE, DATA WAREHOUSE & BI,
+DEVELOPPEMENTS RAPIDES, FORGE LOGICIELS) **et CORPORATE** (ACHATS,
+COMMERCES & MARKETING, COMMUNICATIONS & RELATION ETATIQUE, FINANCES &
+JURIDIQUES, INNOVATION & TRANSFORMATION DIGITALE, MANAGEMENT & PROGRAMME,
+QUALITE, RESSOURCE HUMAINE, STRATEGIE ; une ligne CORPORATE sans
+sous-domaine existe) ; ailleurs il est replié dans le domaine (non
+stocké). **Deux chemins prévus** : si `projets` porte les colonnes Orga,
+lecture directe, `PARAM` ne fait que valider ; sinon, traduction du chemin
+d'organisation Sciforma (colonne « Domaine », ex. « DSI NEXTER.… ») par la
+table ORGA de `PARAM`. Le rapport dit quel chemin a servi ; les inconnus
+sont douteux. *Remplace* : domaine via « Responsable portefeuilles » ×
+`RDOM` (Q4/Q5) et Q16 (« Domaine » ignoré). La table ORGA de `PARAM` est
+l'ex-`CORRESP.csv`, revenu par la grande porte.
+
+**R5 — Contrat `PARAM`.** Un seul onglet, **quatre tables côte à côte**
+(ligne 1 = titres, ligne 2 = en-têtes) : DOMAINES (Domaine, Responsable) ;
+CORRESPONDANCE ORGANISATION (Organisation, Domaine (Orga), Sous-domaine
+(Orga), Responsable) ; CORRESPONDANCE PORTEFEUILLE (Domaine (Ptf), Sous
+domaine (Ptf), Responsable) ; PROJETS VENDUS ; Projets SIS. Le parseur
+repère chaque table par ses en-têtes de ligne 2 (plage de colonnes) et lit
+vers le bas jusqu'au vide. Lues : DOMAINES et ORGANISATION. Ignorées
+connues : PORTEFEUILLE, PROJETS VENDUS, Projets SIS. Les colonnes
+Responsable contiennent des **noms** : clés de jointure et d'exclusion sur
+la machine d'exécution, **jamais stockées** (même règle que `RDOM`).
+
+**R6 — Chef de projet.** Principe inchangé, source simplifiée : l'onglet
+consolidé `Projets` porte lui-même Responsable 1/2/3 ; `owner` = le premier
+qui n'est **pas** un responsable de domaine (colonne Responsable de la
+table DOMAINES de `PARAM`), exclusions comptées. L'export brut `projet`
+n'est plus nécessaire (Q20 sans objet).
+
+**R7 — Position initiale : `ProjetsJalons`.** Jointure par Id (nom en
+contrôle). Règle ordonnée sur les colonnes **« RDR franchi »**,
+**« RDLI franchi »**, **« RDO franchi »** : RDR franchi → **Exploitation** ;
+sinon RDLI franchi → **Actifs** ; sinon RDO franchi → **Études** ; sinon
+**Demandes**. « Prêts » n'est jamais dérivé (ne se sait qu'à l'oral).
+Les colonnes « (Statut) », « Jalon en cours », « Next jalon » sont relevées
+au rapport. *Remplace* : Q19 (« Jalon en cours ») et les jalons datés de
+`SP_total`. Cibles toujours ancrées sur la config, jamais un id en dur.
+
+**R8 — Budgets 2026 : `SP_2026`.** Jointure par **Id** (SP_2026 en a un,
+contrairement à SP_total ; nom en contrôle croisé). « Coût prév (ME) » →
+`budgetEstimated` ; « Coût réel » → `budgetConsumed` ; « Engagé Achats » →
+`budgetEngaged`. « Réel Achats » non retenu. Unités écrites dans les
+cellules : lues et signalées comme avant. *Remplace* : « Coût final ME
+(Res.+Trans) », « Coût réel ME (Res.+Trans) » et « Engagé 2026 (Trans) »
+du consolidé (2026-07-31), qui ne sont plus lus.
+
+**R9 — Registre des contrats (priorité, du plus spécifique au plus
+générique).** `param` → `projets` (consolidé) → `projets_jalons` →
+`sp_2026` → `ressources_pdc`. Le modèle d'invocation ne change pas :
+sans état, un rapport à chaque passage, inventaire en tête.
+
+**R10 — Conséquences config / UI.** `config/board.json` : `domains` = les
+10 domaines Orga, avec un champ `subDomains` sur A&D et CORPORATE ;
+`types` = les 4 types. Sidebar : le groupe « Type de projet » ne montre
+que ces quatre ; le groupe domaine gagne un **chevron** à gauche de A&D et
+de CORPORATE qui déplie leurs sous-domaines, sélectionnables un à un (un
+domaine coché = tous ses sous-domaines). La carte gagne un `subDomain`
+optionnel. Modélisation à formaliser par ADR au moment de la construction.
+
+**Questions ouvertes nées de la révision** (ne pas inventer) :
+
+| # | Question | Avec qui |
+|---|---|---|
+| Q21 | Sémantique des cellules « RDO/RDLI/RDR franchi » : date, oui/x, booléen ? Et « (Statut) » ? — à verrouiller par l'audit | PMO |
+| Q22 | Charge j.h de la carte (`effortEstimated` / `effortConsumed`) : « Charge finale/réelle ME (Res) (J) » du consolidé sont pluriannuelles comme les coûts ; source 2026 à désigner (« Réel 2026 (Res)(J) » existe, pas d'estimé 2026 en jours) | Auteur + PMO |
+| Q23 | Enveloppe RDLI (`budgetRdli`) : garder « Budget RDLI Total Coût (Res+Trans) » du consolidé ou passer à « * Budget validé RDLI » de SP_2026 ? | Auteur |
 
 ## Principes
 
@@ -125,6 +240,9 @@ recollage (« domaine : en attente du fichier `projet` »). Idempotent,
 re-jouable, rien à mémoriser entre deux exécutions.
 
 ## Fichiers sources
+
+> **Révision 2026-09-04** : ce registre est remplacé par R1/R9 en tête
+> (onglets du classeur de consolidation) ; conservé comme historique.
 
 | Fichier | Contenu | Rôle |
 |---|---|---|
@@ -550,3 +668,8 @@ office de vérification sur site.
 | Q14 | Projet de `SP_total` sans ligne dans `projet` (domaine/chef inconnus) : carte créée avec placeholders ou écartée ? (portée réduite depuis que le consolidé est la source unique) | Auteur |
 | Q20 | **Chef de projet** : absent du consolidé — source à définir (réintroduire l'export `projet`, ajouter une colonne au consolidé, ou saisie dans l'outil ?) | Auteur |
 | Q15 | Sémantique du jalon RDLI : la date peut-elle être future (prévue, pas passée) ? Règle : ≤ aujourd'hui pour valoir Actifs ? | PMO |
+
+**Révision 2026-09-04** : Q14 et Q20 sont sans objet (R2, R6) ; Q3 était
+déjà tranchée (canal « Projets ») ; Q15 se reporte sur les colonnes
+« franchi » de `ProjetsJalons` (Q21). Nouvelles questions Q21–Q23 en tête
+de document.

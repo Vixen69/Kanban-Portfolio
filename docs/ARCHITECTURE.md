@@ -637,6 +637,39 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-04 — Retours PMO : révision du mapping d'import (classeur de consolidation)
+- **Documentation seulement** — rien de codé à cette date. La séance PMO
+  du 2026-09-04 révise plusieurs décisions « tranchées » de juillet ; la
+  révision datée est en tête de `docs/IMPORT-MAPPING.md` (R1–R10, Q21–Q23)
+  et prime sur les sections historiques conservées dessous.
+- **Sources** : le PMO livre un **classeur de consolidation** converti sur
+  la VM en un CSV par onglet (LibreOffice headless). Onglets lus : `PARAM`
+  (table de correspondance du PMO — **remplace `RDOM`**, fin du fichier de
+  noms composé à la main), `Projets` (**= le périmètre**, plus d'exclusion
+  par portefeuille ni `isProjetSIS`), `ProjetsJalons` (position initiale
+  par RDO/RDLI/RDR « franchi » → Études/Actifs/Exploitation), `SP_2026`
+  (les **coûts 2026** : les « Coût final ME » du consolidé étaient
+  pluriannuels, d'où les sommes énormes). `Ressources_PdC` inchangé ;
+  `Ress.Profils` mis de côté pour le futur module nominatif.
+- **Vocabulaire** : types = colonne « Type » (suffixe (Projet)/
+  (Opportunité)/(Run) ignoré), **4 retenus** (Etude, Projet de gestion
+  d'obsolescence, Projet de mise en oeuvre, Projet IA) ; domaines = les
+  **10 « Domaine (Orga) »** ; **sous-domaines** retenus pour A&D (4) et
+  CORPORATE (9) seulement. Deux chemins pour le domaine (colonnes Orga
+  présentes → direct ; sinon traduction du chemin d'organisation via
+  `PARAM`, l'ex-`CORRESP`).
+- **À construire ensuite** (plan soumis à l'auteur) : contrats `param` /
+  `projets` / `projets_jalons` / `sp_2026`, retrait des contrats `rdom` /
+  `sp_total` / `projet` / `consolide` ; config (`domains` × 10 avec
+  `subDomains`, `types` × 4) ; sidebar (4 types ; chevron A&D / CORPORATE
+  dépliant les sous-domaines) ; `subDomain` optionnel sur la carte ; ADR du
+  modèle sous-domaine.
+- **Incident de méthode, consigné** : un classeur annoncé « en-têtes
+  seulement » contenait l'export complet ; copies locales purgées, règle
+  ajoutée — inventaire aveugle (onglets + comptages, zéro cellule) avant
+  toute lecture d'un fichier client. Voie sûre : `structure.txt` fabriqué
+  sur la VM, ou le rapport d'audit.
+
 ### 2026-08-24 — Affichage des nombres normalisé
 - **Deux règles, un seul module** (`front/format.ts`) : les **agrégats**
   (en-têtes de colonne, étiquettes de canal, KPI Metrics) s'affichent en
