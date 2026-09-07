@@ -53,11 +53,21 @@ ne peuvent pas porter le même nom.
 
 | Fichier | Ce qu'il apporte |
 |---|---|
-| `Projets_consolide.csv` **(requis)** | Le périmètre et les cartes : titre, domaine, type, dates, budgets, charges. Chaque ligne devient une carte. |
-| `Projets.csv` | L'export brut — seule source du **chef de projet** (premier responsable qui n'est pas un RDOM). |
-| `RDOM.csv` | Table domaine ↔ nom : résout les domaines et exclut les RDOM du chef de projet. |
+| `Projets.csv` **(requis)** | Le périmètre : chaque ligne est une carte (Id, nom, type, domaine et sous-domaine, chef de projet, dates). L'onglet consolidé (colonnes « Domaine (Orga) ») ou l'export brut (chemin d'organisation, traduit par PARAM). |
+| `PARAM.csv` | La table de correspondance du PMO : responsables de domaine (exclus du chef de projet) et chemins d'organisation → domaine / sous-domaine. |
+| `ProjetsJalons.csv` | La position initiale : RDO / RDLI / RDR « franchi » → Études / Actifs / Exploitation, sinon Demandes. |
+| `SP_2026.csv` | Les coûts 2026 : meilleur estimé, réel, engagé (l'export `SP_total` est accepté aussi, jointure par nom). |
 | `Ressources_PdC.csv` | Plan de charge 2026 par profil, plus la consolidation nominative (taux ETP). |
-| `SP_total.csv` *(optionnel)* | Comble les trous : ses jalons datés positionnent les cartes plus finement. |
+
+Un `RDOM.csv` de juillet est inventorié « contrat retiré » et n'est pas lu.
+
+**0. Convertir le classeur de consolidation** — un CSV par onglet, UTF-8, séparateur `;`
+
+```bash
+soffice --headless -env:UserInstallation=file:///tmp/lo_conv --convert-to 'csv:Text - txt - csv (StarCalc):59,34,76,1,,0,false,true,true,false,false,-1' --outdir imports/ Classeur.xlsx
+```
+
+> Le `-1` final exporte **tous les onglets** (LibreOffice ≥ 7.2) ; les fichiers s'appellent `Classeur-Onglet.csv`, la reconnaissance se fait par les en-têtes. Commande à valider au premier passage sur la VM.
 
 **1. Auditer** — n'écrit rien dans le tableau
 
@@ -146,9 +156,10 @@ pas transmise à `node` : le pilote reste `jsonl` et les cartes partent dans
 un fichier au lieu de la base. Contrôler la ligne `destination :` affichée
 juste avant l'écriture.
 
-**3. Deux fichiers, deux noms** — le consolidé et l'export brut ne peuvent
-pas s'appeler tous les deux `Projets.csv` dans `imports/` ; l'un écraserait
-l'autre.
+**3. Deux fichiers, deux noms** — deux fichiers ne peuvent pas porter le
+même nom dans `imports/`. Et si deux fichiers correspondent au même contrat
+(l'onglet consolidé ET l'export brut, par exemple), seul le plus propre est
+lu, l'autre est signalé « non retenu ».
 
 **4. L'audit est le défaut** — rien n'est écrit dans le tableau tant que
 `--charger` n'est pas passé. Le rapport, lui, est produit à chaque exécution
@@ -163,10 +174,13 @@ d'une carte déplacée à la main — la divergence est signalée, jamais écras
 
 ## Règles de fond
 
-- **Identité des cartes** : le code PE, sinon le nom.
+- **Identité des cartes** : l'Id Sciforma, sinon le code PE, sinon le nom.
+- **Périmètre** : la liste `Projets.csv` fait foi — aucune exclusion par
+  portefeuille ; un type hors des quatre retenus est signalé, jamais exclu.
+- **Position** : le dernier jalon franchi (RDR → Exploitation, RDLI →
+  Actifs, RDO → Études), sinon Demandes.
 - **Âge** : depuis la date de début du projet.
 - **Canal** : toutes les cartes importées entrent en « Projets ».
-- **Hors board** : TMA CORRECTIVES · IT4IT · PROJETS VENDUS.
 
 Le détail des décisions d'import est dans `docs/IMPORT-MAPPING.md` ; la
 livraison conteneurisée dans `LIVRAISON.md`.

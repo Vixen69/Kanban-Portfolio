@@ -19,10 +19,12 @@ npm run import -- <dossier> [--out <chemin-du-rapport>] [--charger]
 Essai sur l'échantillon synthétique :
 `npm run import -- fixtures/import --out data/rapport-import.md`
 
-Fichiers reconnus : le **consolidé** (source unique des cartes et du
-périmètre), l'export **projet** brut (chef de projet), la table **RDOM**
-(domaines, exclusion des RDOM), **Ressources_PdC** (plan de charge 2026) et
-**SP_total** (comblement des trous, optionnel).
+Fichiers reconnus (révision 2026-09-04) : **Projets** (le périmètre —
+onglet consolidé ou export brut), **PARAM** (responsables de domaine,
+chemins d'organisation → domaine / sous-domaine), **ProjetsJalons**
+(position initiale), **SP** (coûts 2026 ; `SP_2026` ou `SP_total`),
+**Ressources_PdC** (plan de charge 2026). Un `RDOM.csv` de juillet est
+inventorié « contrat retiré » et n'est pas lu.
 
 Avec `--charger` : les cartes et leurs évènements sont écrits via
 `BoardStorage.importCards`. Âge des cartes = date de début du projet ;

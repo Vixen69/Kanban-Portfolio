@@ -112,6 +112,24 @@ de CORPORATE qui déplie leurs sous-domaines, sélectionnables un à un (un
 domaine coché = tous ses sous-domaines). La carte gagne un `subDomain`
 optionnel. Modélisation à formaliser par ADR au moment de la construction.
 
+**Implémenté (2026-09-07, ADR 023).** Registre `param` → `sp` →
+`projets_jalons` → `projets` → `ressources_pdc`, RDOM conservé comme
+contrat retiré (inventorié, jamais lu). `PARAM` : tables DOMAINES et
+ORGANISATION repérées par leurs en-têtes de ligne 2, chemin d'organisation
+lu dans la colonne sans en-tête à gauche de « Domaine (Orga) » ; les
+responsables de domaine deviennent des listes de mots (exclusion par mots
+entiers, matricules ignorés). `projets` : reconnu par Id + Nom + Type +
+État du processus (les deux formes) ; type par liste blanche des quatre
+(suffixe retiré), inconnu gardé et questionné ; sous-domaine résolu
+seulement dans A&D et CORPORATE, replié ailleurs et compté.
+`projets_jalons` : VRAI / oui / x / 1 / date = franchi (date future
+signalée), FAUX / non / 0 / vide = non ; valeurs brutes relevées (Q21).
+`sp` : Nom + trois coûts requis, Id optionnel (jointure Id > nom > code
+PE) ; **montants en euros convertis en k€** et signalés, k€ ou sans unité
+pris tels quels. Q22/Q23 : statu quo, dit dans la ligne « coûts 2026 (SP) »
+du rapport. Squelettes synthétiques dans `fixtures/import/` (PARAM,
+Projets, ProjetsJalons, SP_2026, Ressources_PdC).
+
 **Questions ouvertes nées de la révision** (ne pas inventer) :
 
 | # | Question | Avec qui |

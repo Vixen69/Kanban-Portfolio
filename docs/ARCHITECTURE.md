@@ -637,6 +637,32 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-07 — Module contrats d'import : PARAM, Projets, ProjetsJalons, SP (ADR 023)
+- **Le registre de juillet est remplacé** (R1/R9) : `param` → `sp` →
+  `projets_jalons` → `projets` → `ressources_pdc` ; `rdom` reste
+  enregistré comme **contrat retiré** (inventorié « non lu », jamais parsé) ;
+  `sp_total`, `consolide` et l'export brut `projet` sont absorbés par les
+  nouveaux contrats (`sp` accepte SP_2026 et SP_total ; `projets` accepte
+  l'onglet consolidé et l'export brut, la présence de « Domaine (Orga) »
+  décidant du chemin).
+- **Lecteurs** : `param.ts` (tables côte à côte repérées par leurs
+  en-têtes, chemin d'organisation dans la colonne sans en-tête,
+  responsables → listes de mots), `projets.ts` (le périmètre — la liste
+  fait foi, type par liste blanche des quatre, sous-domaine résolu seulement
+  dans les domaines détaillés, chef de projet hors responsables de domaine),
+  `jalons.ts` (dernier jalon franchi → ancres de config, relevé Q21),
+  `sp.ts` (coûts 2026, euros convertis en k€). `enrich.ts`, `assembly.ts`
+  et `orchestrate.ts` réécrits ; `domains.ts` extrait de l'ex-`rdom.ts`.
+- **Retirés** : `rdom.ts`, `sp-total.ts`, `consolide.ts` et leurs tests,
+  l'instantané `test-board.legacy.json`, les anciens squelettes. Nouveaux
+  squelettes `fixtures/import/{PARAM,Projets,ProjetsJalons,SP_2026}.csv`.
+- **Vérifié** : 429 tests (82 sur l'adaptateur), typecheck, conventions ;
+  audit CLI sur les squelettes (6 cartes, rapport lisible) et chargement
+  `--charger` de bout en bout dans un JSONL de test (sous-domaine
+  persisté, ré-import sans changement).
+- RUNBOOK : nouvelle table des fichiers + commande LibreOffice (un CSV par
+  onglet), à valider au premier passage sur la VM.
+
 ### 2026-09-04 — Module filtres : 4 types, 10 domaines Orga, sous-domaines dépliables (ADR 022)
 - **Le sous-domaine entre dans le modèle** : `Domain.subDomains?` en
   config (déclaré seulement sur A&D et CORPORATE), `Card.subDomain: string
