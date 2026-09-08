@@ -51,6 +51,9 @@ services:
       KANBAN_PG_APPEND_ONLY: "${KANBAN_PG_APPEND_ONLY:-1}"
       # dataDir for the admin config override + its history (small, persisted).
       KANBAN_DATA_PATH: /app/data/board.jsonl
+      # Import from the tool (ADR 027): the shared secret, from docker/.env.
+      # Empty = the import routes answer 403 (CLI import still works).
+      KANBAN_IMPORT_SECRET: "${KANBAN_IMPORT_SECRET:-}"
     volumes:
       - config-data:/app/data
     # Loopback-bound: the write API is unauthenticated (auth is RP3), so it is
