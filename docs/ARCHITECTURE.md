@@ -658,7 +658,11 @@ de son ADR.
   « franchi ») correspond au contrat. Les Responsable de Projets étant
   vides, un contrat **`ProjetsCdP`** (Id, Nom, Responsable 1→3, même règle
   d'exclusion des responsables de domaine de PARAM) complète les chefs de
-  projet manquants (`cdp.ts`, `owners.ts`).
+  projet manquants (`cdp.ts`, `owners.ts`). Second audit du jour, trois
+  formats de plus lus : « o » / « n » dans les cellules « franchi » des
+  jalons (535 jalons attendaient), l'unité « ke » des montants SP, et un
+  export Projets complet déposé en second qui prête ses Responsable au
+  chef de projet.
 
 ### 2026-09-08 — Import depuis l'outil (ADR 027, sprint S4)
 

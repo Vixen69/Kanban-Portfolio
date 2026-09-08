@@ -21,7 +21,7 @@ const NNBSP = String.fromCharCode(0x202f);
  * Parses a French-formatted amount cell.
  * Inputs: the raw cell text.
  * Outputs: value (comma or dot decimals, space/NBSP thousand separators;
- * a stray unit suffix like « € »/« k€ » is stripped, kept in `unit` so the
+ * a stray unit suffix like « € »/« k€ »/« ke » is stripped, kept in `unit` so the
  * caller can signal it — the column's unit is the contract's, never the
  * cell's), empty (blank cell), or invalid (dashes, N/A, question marks,
  * formula errors, anything unreadable). Negative values are returned as
@@ -36,7 +36,8 @@ export function parseFrenchAmount(raw: string): ParsedAmount {
     return { kind: "invalid", raw: cell };
   }
   const compact = cell.replaceAll(NBSP, "").replaceAll(NNBSP, "").replaceAll(" ", "");
-  const unitMatch = compact.match(/(k?€|eur)$/i);
+  // Units seen: € / k€, « eur », and « ke » (the August SP export's k€).
+  const unitMatch = compact.match(/(k?€|k?eur(?:os?)?|ke)$/i);
   const cleaned = (unitMatch === null ? compact : compact.slice(0, -unitMatch[0].length))
     .replace(",", ".");
   if (!/^-?\d+(\.\d+)?$/.test(cleaned)) return { kind: "invalid", raw: cell };
@@ -57,8 +58,9 @@ export type ParsedDate =
 // the usual epoch trick: days since 1899-12-30.
 const EXCEL_EPOCH_MS = Date.UTC(1899, 11, 30);
 
-const YES_FLAGS = ["oui", "x", "vrai", "true", "ok"];
-const NO_FLAGS = ["non", "faux", "false"];
+// « o »/« n » are how the August ProjetsJalons export writes oui/non.
+const YES_FLAGS = ["oui", "o", "x", "vrai", "true", "ok", "yes", "y"];
+const NO_FLAGS = ["non", "n", "faux", "false", "no"];
 
 /**
  * Parses a boolean-ish cell (Excel FR renders VRAI/FAUX; OUI/NON, 1/0 and

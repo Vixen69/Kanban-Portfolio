@@ -348,8 +348,9 @@ affectations de la table capacité (section suivante).
 L'export Projets d'août porte les colonnes Responsable vides sur toutes les
 lignes. Le PMO produit un fichier séparé à partir de la même liste (le
 périmètre fait foi) : **Id ; Nom ; Responsable 1 ; Responsable 2 ;
-Responsable 3** — et rien d'autre (avec Type et État du processus, il
-passerait pour un second périmètre). Contrat `projets_cdp` : requis Id,
+Responsable 3**. Un export Projets complet portant les Responsable convient
+aussi : déposé en second, il est lu comme ProjetsCdP (le premier fichier
+Projets, par ordre de nom, reste le périmètre — signalé). Contrat `projets_cdp` : requis Id,
 Responsable 1 ; optionnels Nom, Responsable 2, Responsable 3. Même règle
 que Projets (R6) : le chef de projet est le premier Responsable qui n'est
 pas un responsable de domaine de PARAM. Jointure par Id (le code de la
@@ -748,7 +749,8 @@ office de vérification sur site.
 | Q24 | `Ress.Profils` « Disponibilité » : unité **tranchée par l'export d'août (jours ; 0 = non déclarée)** ; reste la fenêtre (capacité annuelle ou résiduelle ?) | PMO |
 | Q27 | Domaines Orga vus dans PARAM / Ress.Profils hors vocabulaire du tableau : « CONTROLE DE GESTION », « ING & PLM » — à ajouter, ou à rattacher à un domaine existant ? | PMO |
 | Q28 | `Projets` d'août : « Responsable » vide sur toutes les lignes — l'export peut-il porter le chef de projet ? | PMO |
-| Q29 | `SP_2026` d'août : « Engagé Achats » et « * Budget validé RDLI » illisibles sur la plupart des lignes — le rapport montre désormais des exemples de valeurs brutes pour trancher le format | PMO / auteur |
+| Q29 | `SP_2026` d'août : « Engagé Achats » et « * Budget validé RDLI » — **tranchée** : les cellules portent l'unité « ke » (« 400 ke »), lue comme k€ depuis le 2026-09-08 | — |
+| Q21 | `ProjetsJalons` « franchi » — **tranchée par l'export d'août** : « o » / « n » (535 / 186) et vide ; lus comme oui / non | — |
 | Q25 | `Ress.Profils` « Int/Ext » : valeurs exactes (Interne/Externe ? O/N ?) | PMO |
 | Q26 | Matricule joint au plan de charge : « Id » ou « pk Contact » ? (les deux sont acceptés, l'un des deux doit correspondre) | PMO |
 

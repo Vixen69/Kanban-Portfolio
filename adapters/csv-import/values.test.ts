@@ -3,7 +3,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseFrenchAmount, parseFrenchDate } from "./values.ts";
+import { parseFrenchAmount, parseFrenchBoolean, parseFrenchDate } from "./values.ts";
 
 const NBSP = String.fromCharCode(0xa0);
 const NNBSP = String.fromCharCode(0x202f);
@@ -72,4 +72,14 @@ test("dates: yes-flags, explicit noes, blanks, impossible calendars, junk", () =
   for (const raw of JUNK) {
     assert.equal(parseFrenchDate(raw).kind, "invalid", raw);
   }
+});
+
+test("August export shapes: « ke » amounts and « o »/« n » booleans", () => {
+  assert.deepEqual(parseFrenchAmount("400 ke"), { kind: "value", value: 400, unit: "ke" });
+  assert.deepEqual(parseFrenchAmount("9 519 ke"), { kind: "value", value: 9519, unit: "ke" });
+  assert.deepEqual(parseFrenchAmount("0 ke"), { kind: "value", value: 0, unit: "ke" });
+  assert.equal(parseFrenchBoolean("o"), true);
+  assert.equal(parseFrenchBoolean("O"), true);
+  assert.equal(parseFrenchBoolean("n"), false);
+  assert.equal(parseFrenchBoolean("peut-être"), "invalid");
 });

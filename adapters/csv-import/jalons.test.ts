@@ -77,3 +77,14 @@ test("rows without id nor name are discarded; duplicate ids keep the first; name
   assert.equal(report.discarded[0]?.reason, "ligne sans Id ni nom");
   assert.ok(report.doubtful.some((d) => /Id « A » en double/.test(d.question)));
 });
+
+test("« o » / « n » cells (August export) count as passed / not passed", () => {
+  const { table, report } = run([
+    "A;Un;;o;;o;;o;;",
+    "B;Deux;;o;;o;;n;;",
+    "C;Trois;;o;;n;;n;;",
+    "D;Quatre;;n;;;;;;",
+  ]);
+  assert.deepEqual(table.entries.map((e) => e.stage), ["exploitation", "actifs", "etudes", "entree"]);
+  assert.ok(!report.warnings.some((w) => /illisible/.test(w.message)));
+});

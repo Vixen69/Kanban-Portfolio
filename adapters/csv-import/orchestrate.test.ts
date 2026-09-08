@@ -144,3 +144,14 @@ test("the audit is deterministic for identical inputs", () => {
   assert.deepEqual(second.report, first.report);
   assert.deepEqual(second.cards, first.cards);
 });
+
+test("a second full Projets export lends its chefs de projet when no ProjetsCdP file came", () => {
+  const files = ALL.filter((name) => name !== "ProjetsCdP.csv").map(fixture);
+  const { report, cdp, projets } = audit([...files, { ...fixture("Projets.csv"), name: "ProjetsExport.csv" }]);
+  assert.ok(cdp);
+  assert.equal(projets?.entries.length, 6, "the perimeter is still the first Projets file");
+  assert.ok(report.warnings.some((w) => w.file === "ProjetsExport.csv" && /lu comme ProjetsCdP/.test(w.message)));
+  const byLabel = new Map(report.assembly.map((a) => [a.subject, a.status]));
+  assert.equal(byLabel.get("chef de projet"),
+    "5/6 (dont 0 via ProjetsCdP · 0 ligne(s) ProjetsCdP hors périmètre) · responsables de domaine exclus : 4");
+});

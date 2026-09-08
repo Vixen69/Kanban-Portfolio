@@ -45,7 +45,7 @@ export function dateCell(
 
 /**
  * Reads a money cell into k€: a value written in euros (« 120 500 € »)
- * is divided by 1000 and tallied; « k€ » or no unit is taken as k€.
+ * is divided by 1000 and tallied; « k€ », « ke » or no unit is taken as k€.
  * Empty -> null; unreadable -> null + tally; negatives tallied.
  * Inputs: the raw cell, its column label, the 1-based line, the tallies.
  * Outputs: the k€ amount or null. Failure modes: none.
@@ -60,7 +60,7 @@ export function moneyCell(
     return null;
   }
   let value = parsed.value;
-  if (parsed.unit !== undefined && /^(€|eur)$/i.test(parsed.unit)) {
+  if (parsed.unit !== undefined && /^(€|euros?)$/i.test(parsed.unit)) {
     value = Math.round(value) / 1000;
     tallyInto(tallies, `« ${column} » en euros — converti en k€`, line);
   }

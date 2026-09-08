@@ -14,7 +14,7 @@ import type { FileContract, HeaderMatch } from "./contract.ts";
 import type { CsvRow } from "./csv.ts";
 import { processFile } from "./identify.ts";
 import type { InputFile } from "./identify.ts";
-import { createReport, doubt } from "./report.ts";
+import { createReport, doubt, warn } from "./report.ts";
 import type { ImportReport } from "./report.ts";
 import { parseParam } from "./param.ts";
 import type { ParamTable } from "./param.ts";
@@ -100,7 +100,7 @@ export function runImportAudit(files: InputFile[], config: BoardConfig, now: Dat
   const profilsBest = pick(PROFILS_CONTRACT.id);
   const profils = profilsBest === null ? null
     : parseProfils(profilsBest.dataRows, profilsBest.match, config, report, profilsBest.file.name);
-  const cdpBest = pick(CDP_CONTRACT.id);
+  const cdpBest = pick(CDP_CONTRACT.id) ?? secondProjets(byContract.get(PROJETS_CONTRACT.id) ?? [], projetsBest, report);
   const cdp = cdpBest === null ? null : parseCdp(cdpBest.dataRows, cdpBest.match, param, report, cdpBest.file.name);
   const cards = assembleCards(projets, jalons, sp, config, report);
   const ownerStats = attachOwners(cards, cdp, report);
@@ -132,6 +132,17 @@ function classifyFiles(
     byContract.set(parsed.match.contract.id, list);
   }
   return byContract;
+}
+
+// A second file matching Projets (a full export carrying the Responsable
+// columns, as the August ProjetsCdP was) feeds the chefs de projet when no
+// dedicated ProjetsCdP file came: the elected perimeter stays, the other
+// one only lends its owners.
+function secondProjets(candidates: Candidate[], elected: Candidate | null, report: ImportReport): Candidate | null {
+  const other = candidates.find((c) => c !== elected && c.match.columnIndex.has("Responsable 1"));
+  if (other === undefined) return null;
+  warn(report, "second fichier Projets — lu comme ProjetsCdP (chefs de projet), non retenu comme périmètre", other.file.name);
+  return other;
 }
 
 // Several files can carry a contract's required columns. The cleanest
