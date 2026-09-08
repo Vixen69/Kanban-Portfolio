@@ -6,7 +6,7 @@
 // sync/import.ts (adapters/csv-import), so the report the PMO reads in the
 // tool is the report the CLI writes. Logs carry counts only.
 
-import { basename } from "node:path";
+import { win32 } from "node:path";
 import type { BoardStorage } from "../core/ports.ts";
 import type { BoardConfig } from "../core/types.ts";
 import type { ImportAuditResult, ImportLoadResult, ImportSummary } from "../core/import-types.ts";
@@ -18,7 +18,9 @@ const MAX_FILES = 12;
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
 const MAX_NAME = 200;
 
-// One file entry of the body: a safe name (no path) and decoded bytes.
+// One file entry of the body: a safe name (no path — both separators are
+// stripped whatever the server OS, browsers on Windows may send one) and
+// decoded bytes.
 function parseFile(raw: unknown, index: number): InputFile {
   if (typeof raw !== "object" || raw === null) throw new BadRequest(`Fichier ${index + 1} invalide.`);
   const { name, base64 } = raw as { name?: unknown; base64?: unknown };
@@ -27,11 +29,11 @@ function parseFile(raw: unknown, index: number): InputFile {
   }
   if (typeof base64 !== "string") throw new BadRequest(`Fichier ${index + 1} : contenu manquant.`);
   if (base64.length > Math.ceil((MAX_FILE_BYTES * 4) / 3) + 4) {
-    throw new BadRequest(`Fichier « ${basename(name)} » trop volumineux (20 Mo max).`);
+    throw new BadRequest(`Fichier « ${win32.basename(name)} » trop volumineux (20 Mo max).`);
   }
   const bytes = Buffer.from(base64, "base64");
-  if (bytes.length === 0) throw new BadRequest(`Fichier « ${basename(name)} » vide ou illisible.`);
-  return { name: basename(name.trim()), bytes: new Uint8Array(bytes) };
+  if (bytes.length === 0) throw new BadRequest(`Fichier « ${win32.basename(name)} » vide ou illisible.`);
+  return { name: win32.basename(name.trim()), bytes: new Uint8Array(bytes) };
 }
 
 /**
