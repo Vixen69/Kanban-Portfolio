@@ -24,12 +24,26 @@ server {
     add_header Cross-Origin-Opener-Policy "same-origin" always;
     add_header Permissions-Policy "geolocation=(), camera=(), microphone=(), payment=(), usb=()" always;
 
-    # Match the middle's 64 KB JSON body cap at the edge.
+    # Match the middle's 64 KB JSON body cap at the edge (the import routes
+    # below raise it to 40 MB, like the middle does).
     client_max_body_size 64k;
 
     # SPA history fallback: unknown client routes render index.html.
     location / {
         try_files $uri $uri/ /index.html;
+    }
+
+    # The import routes carry whole CSV exports, base64 in JSON (ADR 027):
+    # the middle caps them at 40 MB, the edge must let them through. Longest
+    # prefix wins, so this block takes precedence over /api/ below.
+    location /api/import/ {
+        client_max_body_size 40m;
+        proxy_pass         http://${MIDDLE_HOST}:${MIDDLE_PORT};
+        proxy_http_version 1.1;
+        proxy_set_header   Host $host;
+        proxy_set_header   X-Forwarded-For $remote_addr;
+        proxy_read_timeout 120s;
+        proxy_request_buffering off;
     }
 
     # Same-origin API proxy to the middle (Express).
