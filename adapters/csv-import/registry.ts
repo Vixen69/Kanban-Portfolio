@@ -39,18 +39,20 @@ export const SP_CONTRACT: FileContract = {
   ],
 };
 
-/** The ProjetsJalons onglet — the initial position (R7): RDO / RDLI / RDR
- * « franchi » cells (their exact format is surveyed, Q21). */
+/** The ProjetsJalons onglet — the initial position (R7): the RDO / RDLI /
+ * RDR date columns, passed or not at the audit day (author, 2026-09-08);
+ * the « franchi » cells (o/n) only decide when the date is missing. */
 export const JALONS_CONTRACT: FileContract = {
   id: "projets_jalons",
   displayName: "ProjetsJalons",
   columns: ["Id", "Nom du projet", "RDO franchi", "RDLI franchi", "RDR franchi"],
   optional: [
+    "RDO", "RDLI", "RDR",
     "RDO (Statut)", "RDLI (Statut)", "RDR (Statut)", "Jalon en cours", "Next jalon",
     "Etat du processus", "Type", "Domaine (Ptf)", "Sous domaine (Ptf)",
   ],
   ignored: [
-    "Début", "Fin", "CAT", "Début T0", "Budg", "Pré", "RDO", "RDLI", "RDR", "RVAV", "RVSR",
+    "Début", "Fin", "CAT", "Début T0", "Budg", "Pré", "RVAV", "RVSR",
     "Process RTM", "Planif next jalon", "Début (calculé)", "Fin (calculé)", "MEF Fin calc",
     "Année ID PE", "PDSI2026 O/N",
   ],

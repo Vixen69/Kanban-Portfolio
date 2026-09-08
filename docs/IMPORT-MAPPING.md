@@ -84,10 +84,12 @@ table DOMAINES de `PARAM`), exclusions comptées. L'export brut `projet`
 n'est plus nécessaire (Q20 sans objet).
 
 **R7 — Position initiale : `ProjetsJalons`.** Jointure par Id (nom en
-contrôle). Règle ordonnée sur les colonnes **« RDR franchi »**,
-**« RDLI franchi »**, **« RDO franchi »** : RDR franchi → **Exploitation** ;
-sinon RDLI franchi → **Actifs** ; sinon RDO franchi → **Études** ; sinon
-**Demandes**. « Prêts » n'est jamais dérivé (ne se sait qu'à l'oral).
+contrôle). Un jalon est franchi quand sa **date** (colonnes **« RDO »**,
+**« RDLI »**, **« RDR »**) est passée au jour de l'audit (auteur,
+2026-09-08) ; la cellule « … franchi » (o/n) ne décide qu'à défaut de date,
+et un désaccord date / franchi est signalé. Règle ordonnée : RDR franchi →
+**Exploitation** ; sinon RDLI franchi → **Actifs** ; sinon RDO franchi →
+**Études** ; sinon **Demandes**. « Prêts » n'est jamais dérivé (ne se sait qu'à l'oral).
 Les colonnes « (Statut) », « Jalon en cours », « Next jalon » sont relevées
 au rapport. *Remplace* : Q19 (« Jalon en cours ») et les jalons datés de
 `SP_total`. Cibles toujours ancrées sur la config, jamais un id en dur.
@@ -123,8 +125,9 @@ entiers, matricules ignorés). `projets` : reconnu par Id + Nom + Type +
 État du processus (les deux formes) ; type par liste blanche des quatre
 (suffixe retiré), inconnu gardé et questionné ; sous-domaine résolu
 seulement dans A&D et CORPORATE, replié ailleurs et compté.
-`projets_jalons` : VRAI / oui / x / 1 / date = franchi (date future
-signalée), FAUX / non / 0 / vide = non ; valeurs brutes relevées (Q21).
+`projets_jalons` : dates RDO / RDLI / RDR ≤ jour de l'audit = franchi ; à
+défaut, « franchi » : VRAI / oui / o / x / 1 / date = franchi (date future
+signalée), FAUX / non / n / 0 / vide = non ; valeurs brutes relevées (Q21).
 `sp` : Nom + trois coûts requis, Id optionnel (jointure Id > nom > code
 PE) ; **montants en euros convertis en k€** et signalés, k€ ou sans unité
 pris tels quels. Q22/Q23 : statu quo, dit dans la ligne « coûts 2026 (SP) »
@@ -750,7 +753,7 @@ office de vérification sur site.
 | Q27 | Domaines Orga vus dans PARAM / Ress.Profils hors vocabulaire du tableau : « CONTROLE DE GESTION », « ING & PLM » — à ajouter, ou à rattacher à un domaine existant ? | PMO |
 | Q28 | `Projets` d'août : « Responsable » vide sur toutes les lignes — l'export peut-il porter le chef de projet ? | PMO |
 | Q29 | `SP_2026` d'août : « Engagé Achats » et « * Budget validé RDLI » — **tranchée** : les cellules portent l'unité « ke » (« 400 ke »), lue comme k€ depuis le 2026-09-08 | — |
-| Q21 | `ProjetsJalons` « franchi » — **tranchée par l'export d'août** : « o » / « n » (535 / 186) et vide ; lus comme oui / non | — |
+| Q21 | `ProjetsJalons` — **tranchée par l'auteur (2026-09-08)** : la position vient des **dates** des colonnes RDO / RDLI / RDR, passées ou non au jour de l'audit ; les cellules « franchi » (« o » / « n » dans l'export d'août) ne servent qu'en repli quand la date manque, et un désaccord date / franchi est signalé | — |
 | Q25 | `Ress.Profils` « Int/Ext » : valeurs exactes (Interne/Externe ? O/N ?) | PMO |
 | Q26 | Matricule joint au plan de charge : « Id » ou « pk Contact » ? (les deux sont acceptés, l'un des deux doit correspondre) | PMO |
 

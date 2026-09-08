@@ -662,7 +662,10 @@ de son ADR.
   formats de plus lus : « o » / « n » dans les cellules « franchi » des
   jalons (535 jalons attendaient), l'unité « ke » des montants SP, et un
   export Projets complet déposé en second qui prête ses Responsable au
-  chef de projet.
+  chef de projet. Règle des jalons revue sur décision de l'auteur : la
+  position vient des **dates** RDO / RDLI / RDR (passées ou non au jour de
+  l'audit), les cellules « franchi » ne décident qu'à défaut de date et un
+  désaccord est signalé.
 
 ### 2026-09-08 — Import depuis l'outil (ADR 027, sprint S4)
 

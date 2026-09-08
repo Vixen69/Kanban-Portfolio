@@ -1,9 +1,11 @@
-// Reader for the ProjetsJalons sheet — the initial position (R7): the
-// « RDO / RDLI / RDR franchi » cells give the last milestone passed,
-// mapped onto the config's stage anchors: RDR -> Exploitation, else
-// RDLI -> Actifs, else RDO -> Études, else the entry column. « Prêts »
-// is never derived. The raw « franchi » values are surveyed (Q21) so the
-// first real pass locks their format.
+// Reader for the ProjetsJalons sheet — the initial position (R7): a
+// milestone is passed when its date column (« RDO », « RDLI », « RDR ») is
+// at or before the audit day (author's rule, 2026-09-08); the « … franchi »
+// cell (o/n, VRAI/FAUX, a date) only decides when the date is missing, and
+// a disagreement between the two is signaled. The last milestone passed
+// maps onto the config's stage anchors: RDR -> Exploitation, else RDLI ->
+// Actifs, else RDO -> Études, else the entry column. « Prêts » is never
+// derived. The raw « franchi » values are surveyed (Q21).
 
 import type { BoardConfig } from "../../core/types.ts";
 import { resolveFlowAnchors } from "../../core/flow.ts";
@@ -127,9 +129,9 @@ function readRow(ctx: JalonsContext, row: CsvRow): void {
     doubt(ctx.report, ctx.fileName, `Id « ${id} » en double (lignes ${seen.ref.line} et ${row.line}) — première conservée`, { ref });
     return;
   }
-  const rdo = franchi(ctx, row, "RDO franchi");
-  const rdli = franchi(ctx, row, "RDLI franchi");
-  const rdr = franchi(ctx, row, "RDR franchi");
+  const rdo = passed(ctx, row, "RDO");
+  const rdli = passed(ctx, row, "RDLI");
+  const rdr = passed(ctx, row, "RDR");
   if (rdr && !rdli) tallyInto(ctx.tallies, "RDR franchi sans RDLI franchi — règle ordonnée appliquée", row.line);
   if (rdli && !rdo) tallyInto(ctx.tallies, "RDLI franchi sans RDO franchi — règle ordonnée appliquée", row.line);
   const stage: Stage = rdr ? "exploitation" : rdli ? "actifs" : rdo ? "etudes" : "entree";
@@ -142,13 +144,51 @@ function readRow(ctx: JalonsContext, row: CsvRow): void {
   if (name !== "" && !ctx.byName.has(entry.normalizedName)) ctx.byName.set(entry.normalizedName, entry);
 }
 
-// A « franchi » cell: booleans (VRAI/FAUX, oui/non, 1/0) as they are; a
-// date counts as passed (a future one is signaled); « x » counts as
-// passed; empty = not passed; anything else is unreadable = not passed.
-function franchi(ctx: JalonsContext, row: CsvRow, column: string): boolean {
-  const raw = cell(ctx, row, column);
+function surveyFranchi(ctx: JalonsContext, raw: string): void {
   const key = raw === "" ? "(vide)" : normalizeLabel(raw);
   ctx.franchiValues.set(key, (ctx.franchiValues.get(key) ?? 0) + 1);
+}
+
+// What a « franchi » cell says, without any signalement: true / false, or
+// null when empty or unreadable.
+function quietFlag(raw: string): boolean | null {
+  const bool = parseFrenchBoolean(raw);
+  if (bool !== "invalid") return bool;
+  const date = parseFrenchDate(raw);
+  if (date.kind === "date" || date.kind === "flag") return true;
+  return date.kind === "no" ? false : null;
+}
+
+// The milestone's date column decides (passed = at or before the audit
+// day); the « franchi » cell is the fallback when that date is missing or
+// unreadable, and a disagreement is signaled — the date wins.
+function passed(ctx: JalonsContext, row: CsvRow, milestone: "RDO" | "RDLI" | "RDR"): boolean {
+  const dated = parseFrenchDate(cell(ctx, row, milestone));
+  if (dated.kind !== "date") {
+    if (dated.kind === "invalid") {
+      tallyInto(ctx.tallies, `« ${milestone} » illisible — « ${milestone} franchi » fait foi`, row.line, dated.raw.slice(0, 40));
+    }
+    return franchi(ctx, row, `${milestone} franchi`);
+  }
+  const flagRaw = cell(ctx, row, `${milestone} franchi`);
+  surveyFranchi(ctx, flagRaw);
+  const byDate = dated.iso <= ctx.todayIso;
+  const flag = quietFlag(flagRaw);
+  if (flag !== null && flag !== byDate) {
+    tallyInto(ctx.tallies,
+      `« ${milestone} » ${byDate ? "passé" : "à venir"} mais « ${milestone} franchi » dit ${flag ? "oui" : "non"} — la date fait foi`,
+      row.line);
+  }
+  return byDate;
+}
+
+// A « franchi » cell (fallback path): booleans (VRAI/FAUX, oui/non, o/n,
+// 1/0) as they are; a date counts as passed (a future one is signaled);
+// « x » counts as passed; empty = not passed; anything else is unreadable
+// = not passed.
+function franchi(ctx: JalonsContext, row: CsvRow, column: string): boolean {
+  const raw = cell(ctx, row, column);
+  surveyFranchi(ctx, raw);
   const bool = parseFrenchBoolean(raw);
   if (bool === null) return false;
   if (bool !== "invalid") return bool;

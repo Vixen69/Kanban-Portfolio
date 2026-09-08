@@ -19,9 +19,10 @@ const CONFIG = JSON.parse(
 const NOW = new Date("2026-09-04T12:00:00.000Z");
 
 const HEADER = "Id;Nom du projet;Etat du processus;RDO franchi;RDO (Statut);RDLI franchi;RDLI (Statut);RDR franchi;RDR (Statut);Jalon en cours";
+const DATED_HEADER = "Id;Nom du projet;RDO;RDLI;RDR;RDO franchi;RDLI franchi;RDR franchi";
 
-function run(dataLines: string[]): { table: JalonsTable; report: ImportReport } {
-  const parsed = parseCsv([HEADER, ...dataLines].join("\n"));
+function run(dataLines: string[], header = HEADER): { table: JalonsTable; report: ImportReport } {
+  const parsed = parseCsv([header, ...dataLines].join("\n"));
   const identified = identifyHeader(parsed.rows[0]?.cells ?? []);
   if (identified.status !== "match" || identified.contract.id !== JALONS_CONTRACT.id) {
     throw new Error("test header must match projets_jalons");
@@ -87,4 +88,16 @@ test("« o » / « n » cells (August export) count as passed / not passed", () 
   ]);
   assert.deepEqual(table.entries.map((e) => e.stage), ["exploitation", "actifs", "etudes", "entree"]);
   assert.ok(!report.warnings.some((w) => /illisible/.test(w.message)));
+});
+
+test("the RDO / RDLI / RDR date columns decide (passed at the audit day); « franchi » is the fallback", () => {
+  const { table, report } = run([
+    "A;Un;01/01/2020;01/06/2021;01/03/2022;o;o;o",
+    "B;Deux;01/01/2020;01/06/2021;31/12/2099;o;o;o",
+    "C;Trois;01/01/2020;;;o;o;n",
+    "D;Quatre;n/a;;;n;;",
+  ], DATED_HEADER);
+  assert.deepEqual(table.entries.map((e) => e.stage), ["exploitation", "actifs", "actifs", "entree"]);
+  assert.ok(report.warnings.some((w) => /« RDR » à venir mais « RDR franchi » dit oui — la date fait foi : 1 cellule/.test(w.message)));
+  assert.ok(report.warnings.some((w) => /« RDO » illisible — « RDO franchi » fait foi : 1 cellule\(s\), ligne\(s\) 5 — ex. « n\/a »/.test(w.message)));
 });
