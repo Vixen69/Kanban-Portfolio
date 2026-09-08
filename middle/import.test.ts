@@ -1,6 +1,6 @@
-// Import from the tool (ADR 027): the shared secret, the body screening,
-// the audit and the load over the synthetic fixtures, and the HTTP routes
-// (403 without or with a wrong secret, the 40 MB cap confined to them).
+// Import from the tool (ADR 027): the body screening, the audit and the
+// load over the synthetic fixtures, and the HTTP routes (no authentication
+// until RP3; the 40 MB cap confined to them).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -14,7 +14,7 @@ import type { InputFile } from "../adapters/csv-import/index.ts";
 import { validateBoardConfig } from "../core/config.ts";
 import { createApp } from "./app.ts";
 import { createConfigStore } from "./config-store.ts";
-import { auditImport, checkSecret, Forbidden, loadImport, parseFiles } from "./import.ts";
+import { auditImport, loadImport, parseFiles } from "./import.ts";
 import { createJsonlStorage } from "./storage/jsonl.ts";
 
 const CONFIG: BoardConfig = validateBoardConfig(
@@ -40,15 +40,6 @@ async function withTempDir(work: (dir: string) => Promise<void>): Promise<void> 
     rmSync(dir, { recursive: true, force: true });
   }
 }
-
-test("checkSecret: disabled without configuration, refuses absent or wrong, accepts the right one", () => {
-  assert.throws(() => checkSecret(null, "x"), (e: unknown) => e instanceof Forbidden && /désactivé/.test(e.message));
-  assert.throws(() => checkSecret("s3cret", undefined), /requis/);
-  assert.throws(() => checkSecret("s3cret", ""), /requis/);
-  assert.throws(() => checkSecret("s3cret", "s3cre"), /invalide/);
-  assert.throws(() => checkSecret("s3cret", "S3CRET"), /invalide/);
-  assert.doesNotThrow(() => checkSecret("s3cret", "s3cret"));
-});
 
 test("parseFiles screens the body: list, count, names, content", () => {
   assert.throws(() => parseFiles({}), /Aucun fichier/);
@@ -91,13 +82,11 @@ test("loadImport writes the deck and the capacity; a second load updates; no per
   });
 });
 
-async function withImportServer(
-  importSecret: string | null, work: (base: string) => Promise<void>,
-): Promise<void> {
+async function withImportServer(work: (base: string) => Promise<void>): Promise<void> {
   await withTempDir(async (dir) => {
     const storage = createJsonlStorage(join(dir, "board.jsonl"));
     const configStore = createConfigStore(dir, CONFIG);
-    const app = createApp({ storage, configStore, importSecret });
+    const app = createApp({ storage, configStore });
     const server: Server = await new Promise((resolve) => {
       const s = app.listen(0, "127.0.0.1", () => resolve(s));
     });
@@ -111,39 +100,26 @@ async function withImportServer(
   });
 }
 
-function post(base: string, path: string, body: unknown, secret?: string): Promise<Response> {
-  const headers: Record<string, string> = { "content-type": "application/json" };
-  if (secret !== undefined) headers["x-import-secret"] = secret;
-  return fetch(`${base}${path}`, { method: "POST", headers, body: JSON.stringify(body) });
+function post(base: string, path: string, body: unknown): Promise<Response> {
+  return fetch(`${base}${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
 }
 
-test("the import routes answer 403 when disabled, without secret, or with a wrong one", async () => {
-  await withImportServer(null, async (base) => {
-    const res = await post(base, "/api/import/audit", payload(fixtureFiles(["PARAM.csv"])), "x");
-    assert.equal(res.status, 403);
-    assert.match(((await res.json()) as { error: string }).error, /désactivé/);
-  });
-  await withImportServer("s3cret", async (base) => {
-    assert.equal((await post(base, "/api/import/audit", payload(fixtureFiles(["PARAM.csv"])))).status, 403);
-    assert.equal((await post(base, "/api/import/load", payload(fixtureFiles(["PARAM.csv"])), "wrong")).status, 403);
-  });
-});
-
-test("with the secret, audit answers the report and load writes the deck; the 40 MB cap is theirs alone", async () => {
-  await withImportServer("s3cret", async (base) => {
-    const audit = await post(base, "/api/import/audit", payload(fixtureFiles()), "s3cret");
+test("audit answers the report and load writes the deck; the 40 MB cap is theirs alone", async () => {
+  await withImportServer(async (base) => {
+    const audit = await post(base, "/api/import/audit", payload(fixtureFiles()));
     assert.equal(audit.status, 200);
     const body = (await audit.json()) as { loadable: boolean; summary: { received: number } };
     assert.deepEqual([body.loadable, body.summary.received], [true, 6]);
-    const load = await post(base, "/api/import/load", payload(fixtureFiles()), "s3cret");
+    const load = await post(base, "/api/import/load", payload(fixtureFiles()));
     assert.equal(load.status, 200);
     assert.equal(((await load.json()) as { load: { created: number } }).load.created, 6);
     assert.equal((await (await fetch(`${base}/api/board`)).json() as { cards: unknown[] }).cards.length, 6);
     // A 100 KB file passes the import cap; the same body on /api/events is 413.
     const big = { files: [{ name: "gros.csv", base64: Buffer.alloc(100 * 1024, "a").toString("base64") }] };
-    assert.equal((await post(base, "/api/import/audit", big, "s3cret")).status, 200);
+    assert.equal((await post(base, "/api/import/audit", big)).status, 200);
     assert.equal((await post(base, "/api/events", big)).status, 413);
-    const bad = await post(base, "/api/import/audit", { files: [] }, "s3cret");
+    const bad = await post(base, "/api/import/audit", { files: [] });
     assert.equal(bad.status, 400);
+    assert.match(((await bad.json()) as { error: string }).error, /Aucun fichier/);
   });
 });

@@ -1,10 +1,11 @@
 // Import from the tool (ADR 027): the audit and the load of a PMO export
-// set over HTTP, guarded by a shared secret (no accounts yet — RP3). The
-// files travel base64-encoded in JSON; the middle runs the same audit and
-// load as sync/import.ts (adapters/csv-import), so the report the PMO reads
-// in the tool is the report the CLI writes. Logs carry counts only.
+// set over HTTP. Unauthenticated like the rest of the write API until RP3
+// (author's decision, 2026-09-08: network access to the VM is the barrier;
+// a shared secret was too technical for the handover). The files travel
+// base64-encoded in JSON; the middle runs the same audit and load as
+// sync/import.ts (adapters/csv-import), so the report the PMO reads in the
+// tool is the report the CLI writes. Logs carry counts only.
 
-import { createHash, timingSafeEqual } from "node:crypto";
 import { basename } from "node:path";
 import type { BoardStorage } from "../core/ports.ts";
 import type { BoardConfig } from "../core/types.ts";
@@ -13,28 +14,9 @@ import { planLoad, renderReport, runImportAudit } from "../adapters/csv-import/i
 import type { AuditResult, InputFile } from "../adapters/csv-import/index.ts";
 import { BadRequest } from "./errors.ts";
 
-/** Thrown when the shared secret is absent or wrong; the transport maps it to 403. */
-export class Forbidden extends Error {}
-
 const MAX_FILES = 12;
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
 const MAX_NAME = 200;
-
-/**
- * Checks the shared import secret (constant-time, length-independent).
- * Inputs: the configured secret (null = import by the tool disabled), the
- * header value the client sent. Output: none.
- * Failure: Forbidden (French) when disabled, absent or wrong.
- */
-export function checkSecret(expected: string | null, provided: unknown): void {
-  if (expected === null) {
-    throw new Forbidden("Import par l’outil désactivé : définir KANBAN_IMPORT_SECRET sur le middle.");
-  }
-  if (typeof provided !== "string" || provided === "") throw new Forbidden("Secret d’import requis.");
-  const a = createHash("sha256").update(expected).digest();
-  const b = createHash("sha256").update(provided).digest();
-  if (!timingSafeEqual(a, b)) throw new Forbidden("Secret d’import invalide.");
-}
 
 // One file entry of the body: a safe name (no path) and decoded bytes.
 function parseFile(raw: unknown, index: number): InputFile {

@@ -18,7 +18,7 @@ import { BadRequest, getBoard,
 import { postCard } from "./cards.ts";
 import type { ConfigStore } from "./config-store.ts";
 import { logError, logRequest } from "./log.ts";
-import { auditImport, checkSecret, Forbidden, loadImport, parseFiles } from "./import.ts";
+import { auditImport, loadImport, parseFiles } from "./import.ts";
 
 const SECURITY_HEADERS: Record<string, string> = {
   "Content-Security-Policy":
@@ -39,8 +39,6 @@ const IMPORT_PATH = "/api/import/";
 export interface MiddleDeps {
   storage: BoardStorage;
   configStore: ConfigStore;
-  /** Shared secret of the import routes (ADR 027); absent/null = disabled. */
-  importSecret?: string | null;
 }
 
 // HTTP status carried by express.json's own errors (413 too large, 400 parse).
@@ -67,10 +65,6 @@ function errorHandler(err: unknown, req: Request, res: Response, _next: NextFunc
     res.status(400).json({ error: err.message });
     return;
   }
-  if (err instanceof Forbidden) {
-    res.status(403).json({ error: err.message });
-    return;
-  }
   const status = bodyErrorStatus(err);
   if (status === 413) {
     res.status(413).json({ error: "Corps de requête trop volumineux." });
@@ -84,16 +78,15 @@ function errorHandler(err: unknown, req: Request, res: Response, _next: NextFunc
   res.status(500).json({ error: "Erreur interne." });
 }
 
-// The import routes (ADR 027): the shared secret first, then the same audit
-// and load as the CLI. Their own JSON parser carries the larger cap.
+// The import routes (ADR 027): the same audit and load as the CLI, no
+// authentication until RP3 like the rest of the write API. Their own JSON
+// parser carries the larger cap.
 function mountImportRoutes(app: Express, deps: MiddleDeps): void {
   const body = express.json({ limit: IMPORT_MAX_BODY });
   app.post("/api/import/audit", body, (req: Request, res: Response) => {
-    checkSecret(deps.importSecret ?? null, req.header("x-import-secret"));
     res.status(200).json(auditImport(deps.configStore.getRuntime(), parseFiles(req.body), new Date()));
   });
   app.post("/api/import/load", body, async (req: Request, res: Response) => {
-    checkSecret(deps.importSecret ?? null, req.header("x-import-secret"));
     const result = await loadImport(deps.storage, deps.configStore.getRuntime(), parseFiles(req.body), new Date());
     res.status(200).json(result);
   });

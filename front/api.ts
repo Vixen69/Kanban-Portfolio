@@ -186,31 +186,22 @@ export interface DecisionInput {
   reviewDate: string | null;
 }
 
-function importInit(files: ImportFilePayload[], secret: string): RequestInit {
-  return {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-import-secret": secret },
-    body: JSON.stringify({ files }),
-  };
-}
-
 /**
  * POST /api/import/audit — audits a set of PPM export files (ADR 027);
- * nothing is written. Inputs: the files (base64), the shared secret.
- * Output: the report and its counts. Failure: throws ApiError (403 on a
- * missing/wrong secret, 400 on bad files).
+ * nothing is written. Input: the files (base64). Output: the report and
+ * its counts. Failure: throws ApiError (400 on bad files).
  */
-export function postImportAudit(files: ImportFilePayload[], secret: string): Promise<ImportAuditResult> {
-  return request<ImportAuditResult>("/api/import/audit", importInit(files, secret));
+export function postImportAudit(files: ImportFilePayload[]): Promise<ImportAuditResult> {
+  return request<ImportAuditResult>("/api/import/audit", jsonInit("POST", { files }));
 }
 
 /**
  * POST /api/import/load — audits then loads the files into the board.
- * Inputs: the files, the shared secret. Output: the report plus what the
- * load wrote. Failure: throws ApiError.
+ * Input: the files. Output: the report plus what the load wrote.
+ * Failure: throws ApiError.
  */
-export function postImportLoad(files: ImportFilePayload[], secret: string): Promise<ImportLoadResult> {
-  return request<ImportLoadResult>("/api/import/load", importInit(files, secret));
+export function postImportLoad(files: ImportFilePayload[]): Promise<ImportLoadResult> {
+  return request<ImportLoadResult>("/api/import/load", jsonInit("POST", { files }));
 }
 
 /** POST a decision intent. Inputs: card id, the DecisionInput. Output: the stored event. Failure: throws ApiError. */

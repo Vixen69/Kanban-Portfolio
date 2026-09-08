@@ -647,11 +647,12 @@ de son ADR.
   que la ligne de commande (`runImportAudit`, `renderReport`, `planLoad`) :
   le rapport lu dans l'outil est celui que le CLI écrit ; le chargement
   écrit cartes + évènements en un lot puis le snapshot de capacité.
-- **Secret partagé** (`X-Import-Secret` ↔ `KANBAN_IMPORT_SECRET`, comparé
-  en temps constant via SHA-256) : variable absente = routes désactivées
-  (403 explicite). Jamais journalisé, jamais persisté côté front.
-  `npm run serve:dev` pose un secret jetable pour le développement.
-- **Écran d'import** (bouton ⬆) : secret, dépôt des CSV, « Auditer » →
+- **Pas de secret** (révision auteur du même jour, à la mise en test sur la
+  VM) : les routes d'import sont sans authentification jusqu'à RP3, comme le
+  reste de l'API d'écriture — l'accès réseau à la VM fait barrière, et un
+  secret à poser dans l'environnement était trop technique pour la
+  transmission. Le secret partagé codé le matin a été retiré.
+- **Écran d'import** (bouton ⬆) : dépôt des CSV, « Auditer » →
   rapport et compte rendu ; « Charger » actif après un audit assemblé et la
   case « j'ai lu le rapport » ; le tableau se recharge après chargement.
 - **Code** : `core/import-types.ts` (formes partagées), `middle/import.ts`

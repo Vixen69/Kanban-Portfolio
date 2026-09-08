@@ -27,15 +27,6 @@
         "preview"
       ],
       "port": 4173
-    },
-    {
-      "name": "kanban-server-dev",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": [
-        "run",
-        "serve:dev"
-      ],
-      "port": 8787
     }
   ]
 }

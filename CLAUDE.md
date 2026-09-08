@@ -301,9 +301,10 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
   JS/XSS reach (chosen over a Bearer header + the front's react-secure-
   storage). Token lifetime/refresh set at RP3.
 - No self-registration. Admin creates accounts via a CLI (no settings UI).
-- Until RP3, the import routes (`/api/import/*`, ADR 027) are guarded by a
-  shared secret (`KANBAN_IMPORT_SECRET`, constant-time compare; absent =
-  disabled). Never logged, never persisted by the front.
+- Until RP3, the import routes (`/api/import/*`, ADR 027) are unauthenticated
+  like the rest of the write API — the VM's network access is the barrier
+  (author's call, 2026-09-08: a shared secret was too technical for the
+  handover).
 - Logs contain no card titles or financial values, only ids.
 - Network/VM access control is part of the posture; app-level auth is
   additive. Tamper-evident audit-log hashing was **declined** — handled by

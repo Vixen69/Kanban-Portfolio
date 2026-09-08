@@ -1,7 +1,6 @@
-// Middle runtime configuration (ADR 010/011). Host, port, storage driver and
-// file paths, read from the environment with safe local defaults. The one
-// secret (the import-by-the-tool shared secret, ADR 027) is read from the
-// environment too, kept in memory, never logged nor written (CLAUDE.md §6).
+// Middle runtime configuration (ADR 010/011). Non-secret settings only — host,
+// port, storage driver and file paths — read from the environment with safe
+// local defaults. Secrets never live here nor in committed env (CLAUDE.md §6).
 
 import { dirname } from "node:path";
 
@@ -14,8 +13,6 @@ export interface ServerConfig {
   /** Directory of dataPath — also holds the runtime board-config override. */
   dataDir: string;
   boardConfigPath: string;
-  /** Shared secret of the import routes (ADR 027); null = routes disabled. */
-  importSecret: string | null;
 }
 
 const DEFAULTS = {
@@ -39,8 +36,7 @@ function parsePort(raw: string | undefined, fallback: number): number {
 /**
  * Builds the middle configuration from environment variables.
  * Inputs: an environment map (process.env). Recognized keys: KANBAN_HOST,
- * KANBAN_PORT, KANBAN_STORAGE_DRIVER, KANBAN_DATA_PATH, KANBAN_CONFIG_PATH,
- * KANBAN_IMPORT_SECRET (absent or blank = import by the tool disabled).
+ * KANBAN_PORT, KANBAN_STORAGE_DRIVER, KANBAN_DATA_PATH, KANBAN_CONFIG_PATH.
  * Output: a complete ServerConfig; absent keys fall back to local defaults
  * (127.0.0.1, 8787, jsonl, data/board.jsonl, config/board.json). dataDir is
  * always derived as the directory of dataPath (ADR 013: the board-config
@@ -56,6 +52,5 @@ export function loadServerConfig(env: Record<string, string | undefined>): Serve
     dataPath,
     dataDir: dirname(dataPath),
     boardConfigPath: env["KANBAN_CONFIG_PATH"] ?? DEFAULTS.boardConfigPath,
-    importSecret: (env["KANBAN_IMPORT_SECRET"] ?? "").trim() || null,
   };
 }

@@ -90,16 +90,15 @@ part et d'autre (à garder en phase : `docker/nginx.default.conf.template` et
 - Journalisation : `card_id` / id d'évènement et message uniquement ; jamais
   un objet carte/évènement ni un corps de requête.
 
-## Import depuis l'outil (secret partagé, ADR 027)
+## Import depuis l'outil (ADR 027)
 
-En attendant les comptes (RP3), les deux routes d'import (`/api/import/audit`,
-`/api/import/load`) exigent l'en-tête `X-Import-Secret`, comparé en temps
-constant (hachage SHA-256 des deux côtés puis `timingSafeEqual`) à la
-variable `KANBAN_IMPORT_SECRET` du middle. Variable absente ou vide = routes
-désactivées (403 explicite). Le secret n'est jamais journalisé ni persisté ;
-le front le garde en mémoire de page seulement. Ces routes portent leur
-propre plafond de corps (40 Mo, 12 fichiers de 20 Mo max) ; le reste de
-l'API garde 64 Ko. Les journaux du middle ne portent que des comptes.
+Les deux routes d'import (`/api/import/audit`, `/api/import/load`) sont,
+comme tout le reste de l'API d'écriture, **sans authentification jusqu'à
+RP3** : l'accès réseau à la VM est la barrière (décision de l'auteur,
+2026-09-08 — un secret partagé a été écarté comme trop technique pour la
+transmission). Elles portent leur propre plafond de corps (40 Mo, 12
+fichiers de 20 Mo max) ; le reste de l'API garde 64 Ko. Les journaux du
+middle ne portent que des comptes, jamais d'intitulé ni de montant.
 
 ## Durcissement des conteneurs (implémenté)
 

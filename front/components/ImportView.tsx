@@ -1,8 +1,8 @@
 // Import from the tool (ADR 027): drop the PMO's CSV files, read the audit
-// report, load. The secret stays in the page's memory; the files are read
-// in the browser and sent base64 to the middle, which runs the same audit
-// and load as the CLI. Nothing is written before « Charger », and a load
-// never deletes a card (absentes are marked — ADR 026).
+// report, load. The files are read in the browser and sent base64 to the
+// middle, which runs the same audit and load as the CLI. Nothing is written
+// before « Charger », and a load never deletes a card (absentes are marked
+// — ADR 026). No authentication until RP3, like the rest of the write API.
 
 import { useState } from "react";
 import type { ImportAuditResult, ImportFilePayload, ImportLoadResult } from "../../core/import-types.ts";
@@ -47,7 +47,7 @@ function messageOf(cause: unknown): string {
 
 // The audit / load cycle: one request at a time, the last audit kept when
 // a load fails so the report stays on screen with the error.
-function useImport(files: Picked[], secret: string, onLoaded: () => void) {
+function useImport(files: Picked[], onLoaded: () => void) {
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const [error, setError] = useState<string | null>(null);
   const audited = phase.kind === "audited" ? phase.result : phase.kind === "busy" ? phase.previous : null;
@@ -57,9 +57,9 @@ function useImport(files: Picked[], secret: string, onLoaded: () => void) {
     setPhase({ kind: "busy", what, previous: audited });
     try {
       if (what === "audit") {
-        setPhase({ kind: "audited", result: await postImportAudit(payload, secret) });
+        setPhase({ kind: "audited", result: await postImportAudit(payload) });
       } else {
-        setPhase({ kind: "loaded", result: await postImportLoad(payload, secret) });
+        setPhase({ kind: "loaded", result: await postImportLoad(payload) });
         onLoaded();
       }
     } catch (cause) {
@@ -70,16 +70,11 @@ function useImport(files: Picked[], secret: string, onLoaded: () => void) {
   return { phase, error, audited, run, reset: () => setPhase({ kind: "idle" }) };
 }
 
-function ImportForm({ secret, setSecret, files, onPick, busy, onAudit }: {
-  secret: string; setSecret: (s: string) => void; files: Picked[];
-  onPick: (list: FileList) => void; busy: boolean; onAudit: () => void;
+function ImportForm({ files, onPick, busy, onAudit }: {
+  files: Picked[]; onPick: (list: FileList) => void; busy: boolean; onAudit: () => void;
 }) {
   return (
     <div className="import-form">
-      <label className="import-row">
-        <span className="field-label">Secret d’import</span>
-        <input className="inp" type="password" autoComplete="off" value={secret} onChange={(e) => setSecret(e.target.value)} placeholder="KANBAN_IMPORT_SECRET du middle" />
-      </label>
       <label className="import-row">
         <span className="field-label">Fichiers CSV du classeur</span>
         <input className="inp" type="file" multiple accept=".csv,text/csv" onChange={(e) => { if (e.target.files) onPick(e.target.files); }} />
@@ -90,7 +85,7 @@ function ImportForm({ secret, setSecret, files, onPick, busy, onAudit }: {
         </ul>
       )}
       <div className="import-actions">
-        <button className="btn" disabled={busy || secret === "" || files.length === 0} onClick={onAudit}>Auditer</button>
+        <button className="btn" disabled={busy || files.length === 0} onClick={onAudit}>Auditer</button>
         <span className="m2-note">L’audit ne modifie rien : il produit le rapport ci-dessous.</span>
       </div>
     </div>
@@ -160,14 +155,13 @@ function Outcome({ phase, error, shown, acknowledged, setAcknowledged, onLoad }:
 /**
  * The import overlay (header ⬆).
  * Inputs: the close callback, and onLoaded (the board refetches after a
- * load). Output: the modal DOM. Failure modes: none — API refusals (403
- * secret, 400 files, 500) show their French message and keep the form.
+ * load). Output: the modal DOM. Failure modes: none — API refusals (400
+ * files, 500) show their French message and keep the form.
  */
 export function ImportView({ onClose, onLoaded }: { onClose: () => void; onLoaded: () => void }) {
-  const [secret, setSecret] = useState("");
   const [files, setFiles] = useState<Picked[]>([]);
   const [acknowledged, setAcknowledged] = useState(false);
-  const { phase, error, audited, run, reset } = useImport(files, secret, onLoaded);
+  const { phase, error, audited, run, reset } = useImport(files, onLoaded);
   const shown = phase.kind === "loaded" ? phase.result : audited;
   return (
     <div className="overlay" onClick={onClose}>
@@ -182,7 +176,7 @@ export function ImportView({ onClose, onLoaded }: { onClose: () => void; onLoade
             Déposer les CSV du classeur (PARAM, Projets, ProjetsJalons, SP, Ressources_PdC, Ress.Profils — reconnus par
             leurs en-têtes, pas par leur nom). L’audit ne modifie rien ; le chargement n’efface jamais une carte.
           </div>
-          <ImportForm secret={secret} setSecret={setSecret} files={files} busy={phase.kind === "busy"}
+          <ImportForm files={files} busy={phase.kind === "busy"}
             onPick={(list) => { void readFiles(list).then((picked) => { setFiles(picked); reset(); }); }}
             onAudit={() => { setAcknowledged(false); void run("audit"); }} />
           <Outcome phase={phase} error={error} shown={shown} acknowledged={acknowledged}

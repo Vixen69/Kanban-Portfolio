@@ -18,11 +18,10 @@ const defaults = validateBoardConfig(raw);
 mkdirSync(cfg.dataDir, { recursive: true });
 const storage = await createStorage(cfg.storageDriver, cfg.dataPath);
 const configStore = createConfigStore(cfg.dataDir, defaults);
-const app = createApp({ storage, configStore, importSecret: cfg.importSecret });
+const app = createApp({ storage, configStore });
 
 const server = app.listen(cfg.port, cfg.host, () => {
-  console.log(`${new Date().toISOString()} kanban middle: http://${cfg.host}:${cfg.port} (${cfg.storageDriver})` +
-    ` — import par l'outil ${cfg.importSecret === null ? "désactivé (KANBAN_IMPORT_SECRET absent)" : "activé"}`);
+  console.log(`${new Date().toISOString()} kanban middle: http://${cfg.host}:${cfg.port} (${cfg.storageDriver}) — import par l'outil actif`);
 });
 // Explicit timeouts (anti slow-loris), carried over from the node:http server.
 server.requestTimeout = 15000;
