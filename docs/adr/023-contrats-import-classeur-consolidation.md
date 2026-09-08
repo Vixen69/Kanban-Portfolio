@@ -15,6 +15,16 @@
   l'auteur (squelettes synthétiques), mode audit d'abord, rien d'ignoré en
   silence, aucune dépendance.
 
+## Révision 2026-09-08 — contrat `ProjetsCdP`
+
+L'export Projets d'août ne porte plus les Responsable ; le PMO livre un
+fichier séparé (Id, Nom, Responsable 1→3) issu de la même liste. Nouveau
+contrat `projets_cdp` (requis Id + Responsable 1), placé **après**
+`projets` dans le registre : Projets.csv, qui porte aussi ces colonnes,
+reste élu périmètre. Le chef de projet suit la règle R6 (premier Responsable
+hors responsables de domaine de PARAM) et ne remplit que les cartes qui n'en
+ont pas.
+
 ## Décision
 
 - **Registre des contrats**, du plus spécifique au plus générique :

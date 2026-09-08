@@ -56,7 +56,7 @@ test("parseFiles screens the body: list, count, names, content", () => {
 
 test("auditImport over the synthetic fixtures renders the CLI's report and its counts", () => {
   const result = auditImport(CONFIG, fixtureFiles(), NOW);
-  assert.deepEqual([result.summary.received, result.summary.recognized, result.summary.missing, result.loadable], [6, 6, [], true]);
+  assert.deepEqual([result.summary.received, result.summary.recognized, result.summary.missing, result.loadable], [7, 7, [], true]);
   assert.equal(result.summary.taken, 6);
   assert.match(result.report, /capacité : 5 personne\(s\)/);
   const partial = auditImport(CONFIG, fixtureFiles(["PARAM.csv"]), NOW);
@@ -109,7 +109,7 @@ test("audit answers the report and load writes the deck; the 40 MB cap is theirs
     const audit = await post(base, "/api/import/audit", payload(fixtureFiles()));
     assert.equal(audit.status, 200);
     const body = (await audit.json()) as { loadable: boolean; summary: { received: number } };
-    assert.deepEqual([body.loadable, body.summary.received], [true, 6]);
+    assert.deepEqual([body.loadable, body.summary.received], [true, 7]);
     const load = await post(base, "/api/import/load", payload(fixtureFiles()));
     assert.equal(load.status, 200);
     assert.equal(((await load.json()) as { load: { created: number } }).load.created, 6);

@@ -11,6 +11,8 @@ import type { CardAssembly } from "./enrich.ts";
 import { cardDistribution } from "./enrich.ts";
 import type { PdcTable } from "./pdc.ts";
 import type { ProfilsTable } from "./profils.ts";
+import type { CdpTable } from "./cdp.ts";
+import type { OwnerStats } from "./owners.ts";
 import type { CapacityBuild } from "./capacity.ts";
 import { formatJh } from "./charges.ts";
 import type { ChargeStats } from "./charges.ts";
@@ -24,6 +26,7 @@ export interface Presence {
   sp: boolean;
   pdc: boolean;
   profils: boolean;
+  cdp: boolean;
 }
 
 /**
@@ -39,6 +42,7 @@ export function emitMissing(report: ImportReport, present: Presence, year: numbe
     ["sp", "SP (exercice ou total)", `coûts ${year} : meilleur estimé, réel, engagé`],
     ["pdc", "Ressources_PdC", "plan de charge de l'exercice par profil et par personne (+ consolidation nominative)"],
     ["profils", "Ress.Profils", "personnes de la DSI (domaine, métier, capacité) — sans lui, la vue capacité ne connaît que la demande"],
+    ["cdp", "ProjetsCdP", "chefs de projet (Responsable 1→3, responsables de domaine exclus) quand `projets` ne les porte pas — facultatif"],
   ];
   for (const [key, name, note] of expected) {
     if (!present[key]) report.missingExpected.push({ name, note });
@@ -53,7 +57,9 @@ export interface AssemblyData {
   sp: SpTable | null;
   pdc: PdcTable | null;
   profils: ProfilsTable | null;
+  cdp: CdpTable | null;
   cards: CardAssembly | null;
+  ownerStats: OwnerStats | null;
   chargeStats: ChargeStats | null;
   capacity: CapacityBuild | null;
 }
@@ -133,9 +139,18 @@ function emitDeck(
       status: `${s.withDomain}/${s.total} (direct ${c.domainDirect} · via PARAM ${c.domainViaParam} · manquant ${c.domainMissing})` +
         ` · sous-domaine : ${s.withSubDomain} détaillé(s), ${c.subFolded} replié(s) dans leur domaine`,
     },
-    { subject: "chef de projet", status: `${s.withOwner}/${s.total} · responsables de domaine exclus : ${c.leadsExcluded}` },
+    { subject: "chef de projet", status: ownerStatus(deck, projets, data) },
     { subject: `coûts ${config.exercise.year} (SP)`, status: spStatus(data.sp, deck, config.exercise.year) },
   );
+}
+
+// Chefs de projet: from Projets, completed by ProjetsCdP when present; the
+// domain leads excluded by both readers are summed.
+function ownerStatus(deck: CardAssembly, projets: ProjetsTable, data: AssemblyData): string {
+  const via = data.ownerStats === null ? ""
+    : ` (dont ${data.ownerStats.filled} via ProjetsCdP · ${data.ownerStats.cdpOutside} ligne(s) ProjetsCdP hors périmètre)`;
+  const excluded = projets.counts.leadsExcluded + (data.cdp?.counts.leadsExcluded ?? 0);
+  return `${deck.stats.withOwner}/${deck.stats.total}${via} · responsables de domaine exclus : ${excluded}`;
 }
 
 function positionStatus(data: AssemblyData, deck: CardAssembly): string {

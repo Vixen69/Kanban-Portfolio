@@ -25,7 +25,7 @@ function fixture(name: string): InputFile {
   return { name, bytes: readFileSync(new URL(`../../fixtures/import/${name}`, import.meta.url)) };
 }
 
-const ALL = ["PARAM.csv", "Projets.csv", "ProjetsJalons.csv", "SP_2026.csv", "Ressources_PdC.csv", "Ress.Profils.csv"];
+const ALL = ["PARAM.csv", "Projets.csv", "ProjetsJalons.csv", "SP_2026.csv", "Ressources_PdC.csv", "Ress.Profils.csv", "ProjetsCdP.csv"];
 
 function audit(files: InputFile[]) {
   return runImportAudit(files, CONFIG, NOW);
@@ -37,13 +37,13 @@ test("a July RDOM file is inventoried as a retired contract, never parsed", () =
   assert.equal(report.inventory[0]?.contractId, "rdom");
   assert.equal(param, null);
   assert.deepEqual(report.missingExpected.map((m) => m.name),
-    ["Projets", "PARAM", "ProjetsJalons", "SP (exercice ou total)", "Ressources_PdC", "Ress.Profils"]);
+    ["Projets", "PARAM", "ProjetsJalons", "SP (exercice ou total)", "Ressources_PdC", "Ress.Profils", "ProjetsCdP"]);
 });
 
 test("the five fixture files assemble the full deck", () => {
   const { report, cards, projets, jalons, sp, chargeStats, capacity } = audit(ALL.map(fixture));
   assert.deepEqual(report.inventory.map((f) => [f.name, f.status]), [
-    ["PARAM.csv", "recognized-with-deviations"], ["Projets.csv", "recognized"],
+    ["PARAM.csv", "recognized-with-deviations"], ["Projets.csv", "recognized"], ["ProjetsCdP.csv", "recognized"],
     ["ProjetsJalons.csv", "recognized"], ["Ress.Profils.csv", "recognized"], ["Ressources_PdC.csv", "recognized-with-deviations"], ["SP_2026.csv", "recognized"],
   ]);
   assert.deepEqual(report.missingExpected, []);
@@ -60,7 +60,10 @@ test("the five fixture files assemble the full deck", () => {
   assert.equal(byLabel.get("position"),
     "jalons 5/6 (Exploitation 2 · Actifs 1 · Études 1 · entrée 1) · sans jalon : 1 → colonne d'entrée · lignes jalons hors périmètre : 1");
   assert.equal(byLabel.get("domaine"), "6/6 (direct 6 · via PARAM 0 · manquant 0) · sous-domaine : 3 détaillé(s), 2 replié(s) dans leur domaine");
-  assert.equal(byLabel.get("chef de projet"), "5/6 · responsables de domaine exclus : 2");
+  assert.equal(byLabel.get("chef de projet"),
+    "6/6 (dont 1 via ProjetsCdP · 1 ligne(s) ProjetsCdP hors périmètre) · responsables de domaine exclus : 4");
+  const carto = cards?.cards.find((c) => c.codename === "PE10008");
+  assert.equal(carto?.owner, "Farid KOVAC", "BARBIER Anne is a PARAM domain lead, excluded");
   assert.match(byLabel.get("coûts 2026 (SP)") ?? "", /^4\/6 jointes \(Id 3 · nom 1 · code 0\) · sans correspondance : 2 · sujets SP hors périmètre : 1 · RDLI/);
   assert.match(byLabel.get("plan de charge") ?? "", /^3\/6 cartes couvertes .* projets PdC hors périmètre : 1 · cartes sans charge : 3$/);
   assert.equal(chargeStats?.covered, 3);
@@ -91,7 +94,7 @@ test("each card carries the right position, vocabulary and costs", () => {
   assert.equal(connectivite?.budgetEstimated, 30, "SP joined by name (no Id in that SP row)");
   const carto = byCode.get("PE10008");
   assert.deepEqual([carto?.columnId, carto?.typeId, carto?.subDomainId, carto?.owner, carto?.budgetEstimated],
-    ["demandes", null, null, null, null]);
+    ["demandes", null, null, "Farid KOVAC", null]);
   assert.equal(byCode.get("PE10007")?.columnId, "exploitation", "RDR dated 01/06/2026, past");
 });
 

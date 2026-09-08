@@ -97,6 +97,20 @@ export const PROJETS_CONTRACT: FileContract = {
   ],
 };
 
+/** The ProjetsCdP sheet (2026-09-08): the perimeter's rows with their
+ * Responsable 1→3, exported separately because the August Projets onglet
+ * carries none. Same rule as Projets (R6): the chef de projet is the first
+ * Responsable that is not a PARAM domain lead. Keep this file to Id, Nom and
+ * the Responsable columns: with Type + État du processus it would pass for
+ * a second Projets perimeter (registry order elects Projets first). */
+export const CDP_CONTRACT: FileContract = {
+  id: "projets_cdp",
+  displayName: "ProjetsCdP",
+  columns: ["Id", "Responsable 1"],
+  optional: ["Nom", "Responsable 2", "Responsable 3"],
+  ignored: [],
+};
+
 /** The Ress.Profils onglet — the DSI's people (ADR 024): identity, Orga
  * domain, métier, Int/Ext and the exercise year's capacity. Email and
  * Coût are declared ignored: never read, never stored. */
@@ -152,7 +166,7 @@ export const RDOM_CONTRACT: FileContract = {
  * Input: the exercise year. Output: the ordered registry. Failure: none. */
 export function contractsFor(year: number): readonly FileContract[] {
   return [
-    PARAM_CONTRACT, SP_CONTRACT, JALONS_CONTRACT, PROJETS_CONTRACT, PROFILS_CONTRACT,
+    PARAM_CONTRACT, SP_CONTRACT, JALONS_CONTRACT, PROJETS_CONTRACT, CDP_CONTRACT, PROFILS_CONTRACT,
     pdcContract(year), RDOM_CONTRACT,
   ];
 }

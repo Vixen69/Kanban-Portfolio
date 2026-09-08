@@ -7,7 +7,8 @@
 
 import type { BoardConfig } from "../../core/types.ts";
 import {
-  JALONS_CONTRACT, PARAM_CONTRACT, PDC_CONTRACT, PROFILS_CONTRACT, PROJETS_CONTRACT, SP_CONTRACT, contractsFor,
+  CDP_CONTRACT, JALONS_CONTRACT, PARAM_CONTRACT, PDC_CONTRACT, PROFILS_CONTRACT, PROJETS_CONTRACT, SP_CONTRACT,
+  contractsFor,
 } from "./contract.ts";
 import type { FileContract, HeaderMatch } from "./contract.ts";
 import type { CsvRow } from "./csv.ts";
@@ -29,6 +30,10 @@ import { parsePdc } from "./pdc.ts";
 import type { PdcTable } from "./pdc.ts";
 import { attachCharges } from "./charges.ts";
 import type { ChargeStats } from "./charges.ts";
+import { parseCdp } from "./cdp.ts";
+import type { CdpTable } from "./cdp.ts";
+import { attachOwners } from "./owners.ts";
+import type { OwnerStats } from "./owners.ts";
 import { parseProfils } from "./profils.ts";
 import type { ProfilsTable } from "./profils.ts";
 import { buildCapacity } from "./capacity.ts";
@@ -46,7 +51,9 @@ export interface AuditResult {
   sp: SpTable | null;
   pdc: PdcTable | null;
   profils: ProfilsTable | null;
+  cdp: CdpTable | null;
   cards: CardAssembly | null;
+  ownerStats: OwnerStats | null;
   chargeStats: ChargeStats | null;
   capacity: CapacityBuild | null;
 }
@@ -93,14 +100,19 @@ export function runImportAudit(files: InputFile[], config: BoardConfig, now: Dat
   const profilsBest = pick(PROFILS_CONTRACT.id);
   const profils = profilsBest === null ? null
     : parseProfils(profilsBest.dataRows, profilsBest.match, config, report, profilsBest.file.name);
+  const cdpBest = pick(CDP_CONTRACT.id);
+  const cdp = cdpBest === null ? null : parseCdp(cdpBest.dataRows, cdpBest.match, param, report, cdpBest.file.name);
   const cards = assembleCards(projets, jalons, sp, config, report);
+  const ownerStats = attachOwners(cards, cdp, report);
   const chargeStats = attachCharges(cards?.cards ?? [], pdc, report, config.exercise.year);
   const capacity = buildCapacity(profils, pdc, cards?.cards ?? [], config, report);
   emitMissing(report, {
     param: param !== null, projets: projets !== null, jalons: jalons !== null,
-    sp: sp !== null, pdc: pdc !== null, profils: profils !== null,
+    sp: sp !== null, pdc: pdc !== null, profils: profils !== null, cdp: cdp !== null,
   }, config.exercise.year);
-  const result: AuditResult = { report, param, projets, jalons, sp, pdc, profils, cards, chargeStats, capacity };
+  const result: AuditResult = {
+    report, param, projets, jalons, sp, pdc, profils, cdp, cards, ownerStats, chargeStats, capacity,
+  };
   emitAssembly(report, result, config);
   return result;
 }

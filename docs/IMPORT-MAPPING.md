@@ -343,6 +343,20 @@ la machine d'exécution.
 conserve ses lignes nominatives (matricule → jh/réel) pour les
 affectations de la table capacité (section suivante).
 
+## `ProjetsCdP` — chefs de projet (révision 2026-09-08)
+
+L'export Projets d'août porte les colonnes Responsable vides sur toutes les
+lignes. Le PMO produit un fichier séparé à partir de la même liste (le
+périmètre fait foi) : **Id ; Nom ; Responsable 1 ; Responsable 2 ;
+Responsable 3** — et rien d'autre (avec Type et État du processus, il
+passerait pour un second périmètre). Contrat `projets_cdp` : requis Id,
+Responsable 1 ; optionnels Nom, Responsable 2, Responsable 3. Même règle
+que Projets (R6) : le chef de projet est le premier Responsable qui n'est
+pas un responsable de domaine de PARAM. Jointure par Id (le code de la
+carte), puis par nom ; seules les cartes **sans** chef de projet en
+prennent un ; les lignes hors périmètre sont comptées. La ligne « chef de
+projet » de l'état d'assemblage dit « dont N via ProjetsCdP ».
+
 ## `Ress.Profils` — structure et mapping (ADR 024, 2026-09-07)
 
 Une ligne = une personne de la DSI (interne ou externe). Onglet du classeur

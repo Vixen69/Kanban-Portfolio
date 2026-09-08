@@ -653,8 +653,12 @@ de son ADR.
   rapport montre jusqu'à trois valeurs brutes ; **(5)** la recherche
   d'en-têtes passe de 20 à 60 lignes non vides (préambules longs).
 - Restent des questions de vocabulaire pour le PMO (Q27–Q29 dans
-  IMPORT-MAPPING) et le fichier de jalons, dont l'en-tête vu ne porte ni
-  « Id » ni « Nom du projet ».
+  IMPORT-MAPPING). Le fichier de jalons reçu était un tableau croisé
+  exporté par erreur ; le vrai ProjetsJalons (Id, Nom du projet, jalons
+  « franchi ») correspond au contrat. Les Responsable de Projets étant
+  vides, un contrat **`ProjetsCdP`** (Id, Nom, Responsable 1→3, même règle
+  d'exclusion des responsables de domaine de PARAM) complète les chefs de
+  projet manquants (`cdp.ts`, `owners.ts`).
 
 ### 2026-09-08 — Import depuis l'outil (ADR 027, sprint S4)
 
