@@ -134,8 +134,9 @@ function readPdcRow(ctx: PdcContext, match: HeaderMatch, row: CsvRow): void {
   ctx.totals.done = roundJh(ctx.totals.done + done);
 }
 
-// Métier -> profile: direct tolerant match, else with the first
-// dot-prefix stripped (« Externe. », company names) — prefixes surveyed.
+// Métier -> profile: direct tolerant match, else with successive dotted
+// prefixes stripped until a profile matches (« Externe. », company names,
+// « NEXTER.ZZ_A NE PAS UTILISER. » seen in August) — prefixes surveyed.
 function resolveMetier(ctx: PdcContext, match: HeaderMatch, row: CsvRow): string | null {
   const raw = (row.cells[match.columnIndex.get("Métier") ?? -1] ?? "").trim();
   if (raw === "") {
@@ -144,10 +145,8 @@ function resolveMetier(ctx: PdcContext, match: HeaderMatch, row: CsvRow): string
   }
   const direct = ctx.profileLookup(raw);
   if (direct !== null) return direct.id;
-  const dot = raw.indexOf(".");
-  if (dot > 0) {
-    const stripped = raw.slice(dot + 1).trim();
-    const hit = ctx.profileLookup(stripped);
+  for (let dot = raw.indexOf("."); dot > 0; dot = raw.indexOf(".", dot + 1)) {
+    const hit = ctx.profileLookup(raw.slice(dot + 1).trim());
     if (hit !== null) {
       const prefix = raw.slice(0, dot).trim();
       ctx.prefixes.set(prefix, (ctx.prefixes.get(prefix) ?? 0) + 1);

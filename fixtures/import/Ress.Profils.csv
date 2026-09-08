@@ -4,4 +4,4 @@ C001;M001;Interne;ROCA;Jean;INFRA;INFRA BUILD;PMO;PMO;jean.roca@example.invalid;
 C002;M002;Interne;LANE;Zoé;A&D;DEVELOPPEMENTS RAPIDES;Concept.Dév.;Concept.Dév.;zoe.lane@example.invalid;Actif;600;180
 C003;M003;Externe;BER;Luc;A&D;ARCHITECTURE APPLICATIVE;Externe.Architecte A&D;Architecte A&D;luc.ber@example.invalid;Actif;900;1
 C004;M004;Interne;DUPRÉ;Nina;CORPORATE;ACHATS;CdP CORPORATE;CdP CORPORATE;nina.dupre@example.invalid;Actif;650;200
-C005;;Interne;VOLK;Ilan;INFRA;;Métier inconnu XYZ;;ilan.volk@example.invalid;Actif;650;
+C005;;Interne;VOLK;Ilan;INFRA;;Métier inconnu XYZ;;ilan.volk@example.invalid;Actif;650;0

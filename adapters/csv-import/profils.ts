@@ -145,8 +145,9 @@ function deriveMetier(ctx: ProfilsContext, row: CsvRow): Pick<ProfilEntry, "prof
   return { profileId: hit?.id ?? null, metier };
 }
 
-// « Disponibilité »: a value up to 5 is read as ETP and scaled by 200 j.h
-// (said in the report); anything above is taken as j.h for the year.
+// « Disponibilité »: 0 means no declared capacity (August export: 56 such
+// persons — not counted, said in the report); a value up to 5 is read as
+// ETP and scaled by 200 j.h; anything above is taken as j.h for the year.
 function deriveCapacity(ctx: ProfilsContext, row: CsvRow): number | null {
   const raw = cell(ctx, row, "Disponibilité");
   const parsed = parseFrenchAmount(raw);
@@ -159,6 +160,10 @@ function deriveCapacity(ctx: ProfilsContext, row: CsvRow): number | null {
     return null;
   }
   ctx.capacities.set(raw, (ctx.capacities.get(raw) ?? 0) + 1);
+  if (parsed.value === 0) {
+    tallyInto(ctx.tallies, "« Disponibilité » à 0 — capacité non déclarée (non comptée)", row.line);
+    return null;
+  }
   if (parsed.value <= 5) {
     ctx.counts.readAsEtp++;
     return Math.round(parsed.value * ETP_JH * 100) / 100;

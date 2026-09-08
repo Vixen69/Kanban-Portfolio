@@ -109,7 +109,7 @@ function LoadSummary({ result }: { result: ImportLoadResult }) {
   return (
     <div className="import-summary ok">
       Chargé : {l.created} créée(s) · {l.updated} mise(s) à jour · {l.moved} déplacée(s) · {l.unlisted} absente(s) marquée(s) ·
-      {" "}{l.relisted} de retour · {l.divergences} divergence(s) conservée(s)
+      {" "}{l.relisted} de retour · {l.divergences} divergence(s) conservée(s) · {l.kept} position(s) conservée(s) (sans jalon)
       {l.capacity !== null && <> · capacité : {l.capacity.persons} personne(s), {l.capacity.assignments} affectation(s)</>}
     </div>
   );

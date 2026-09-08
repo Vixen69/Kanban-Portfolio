@@ -60,8 +60,9 @@ export function createTypeLookup(config: BoardConfig): Lookup {
 }
 
 /**
- * Builds a tolerant profile lookup (id or name), retrying with the first
- * dot-prefix stripped (« Externe.Développeur » — prefixes surveyed, Q9).
+ * Builds a tolerant profile lookup (id or name), retrying with successive
+ * dotted prefixes stripped (« Externe.Développeur », « NEXTER.ZZ_A NE PAS
+ * UTILISER.CdP INFRA SSI » — prefixes surveyed in the PdC reader, Q9).
  * Inputs: the board config. Outputs: cell -> hit or null. Failure: none.
  */
 export function createProfileLookup(config: BoardConfig): Lookup {
@@ -71,8 +72,11 @@ export function createProfileLookup(config: BoardConfig): Lookup {
   return (cell) => {
     const direct = lookup(cell);
     if (direct !== null) return direct;
-    const dot = cell.indexOf(".");
-    return dot > 0 ? lookup(cell.slice(dot + 1).trim()) : null;
+    for (let dot = cell.indexOf("."); dot > 0; dot = cell.indexOf(".", dot + 1)) {
+      const hit = lookup(cell.slice(dot + 1).trim());
+      if (hit !== null) return hit;
+    }
+    return null;
   };
 }
 

@@ -103,7 +103,7 @@ export async function loadImport(
     load: {
       created: plan.created, updated: plan.updated, moved: plan.moved,
       unlisted: plan.unlisted, relisted: plan.relisted,
-      divergences: plan.divergences.length, chargesWithoutProfile: plan.chargesWithoutProfile,
+      divergences: plan.divergences.length, kept: plan.kept, chargesWithoutProfile: plan.chargesWithoutProfile,
       capacity: audit.capacity === null ? null
         : { persons: audit.capacity.snapshot.persons.length, assignments: audit.capacity.snapshot.assignments.length },
     },

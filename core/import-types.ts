@@ -38,6 +38,8 @@ export interface ImportLoadResult extends ImportAuditResult {
     relisted: number;
     /** Hand-placed cards the export would have moved (left in place). */
     divergences: number;
+    /** Existing cards the export carried no position for (left in place). */
+    kept: number;
     chargesWithoutProfile: number;
     /** The capacity snapshot stored with the load, when the files carried one. */
     capacity: { persons: number; assignments: number } | null;

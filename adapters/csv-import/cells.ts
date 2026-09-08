@@ -17,7 +17,7 @@ export function amountCell(
   const parsed = parseFrenchAmount(raw);
   if (parsed.kind === "empty") return null;
   if (parsed.kind === "invalid") {
-    tallyInto(tallies, `« ${column} » illisible`, line);
+    tallyInto(tallies, `« ${column} » illisible`, line, raw.trim().slice(0, 40));
     return null;
   }
   if (parsed.unit !== undefined) tallyInto(tallies, `« ${column} » : unité écrite dans la cellule`, line);
@@ -39,7 +39,7 @@ export function dateCell(
     if (parsed.via === "serial") tallyInto(tallies, `« ${column} » lu comme numéro de série Excel`, line);
     return parsed.iso;
   }
-  if (parsed.kind !== "empty") tallyInto(tallies, `« ${column} » illisible`, line);
+  if (parsed.kind !== "empty") tallyInto(tallies, `« ${column} » illisible`, line, raw.trim().slice(0, 40));
   return null;
 }
 
@@ -56,7 +56,7 @@ export function moneyCell(
   const parsed = parseFrenchAmount(raw);
   if (parsed.kind === "empty") return null;
   if (parsed.kind === "invalid") {
-    tallyInto(tallies, `« ${column} » illisible`, line);
+    tallyInto(tallies, `« ${column} » illisible`, line, raw.trim().slice(0, 40));
     return null;
   }
   let value = parsed.value;

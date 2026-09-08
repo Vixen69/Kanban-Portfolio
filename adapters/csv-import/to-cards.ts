@@ -30,6 +30,9 @@ export interface LoadPlan {
   unlisted: number;
   /** Cards marked absent earlier that the export lists again. */
   relisted: number;
+  /** Existing cards left where they are because the export carried no
+   * position for them (no jalons file, or no jalon row): the board stands. */
+  kept: number;
   /** Cards the export would move but a human already placed by hand. */
   divergences: Array<{ title: string; fromColumn: string; toColumn: string }>;
   /** Charges dropped because their métier stayed unresolved. */
@@ -57,14 +60,14 @@ export function planLoad(
     const existing = current.get(id);
     plan.cards.push(toCard(id, card, config, plan, existing?.createdAt));
     if (existing === undefined) {
-      plan.created++;
-      plan.events.push({
-        ...lifecycleEvent("imported", id, IMPORT_ACTOR, entryTs(card, now), { laneId: card.laneId }),
-        toColumn: card.columnId,
-      });
+      pushCreated(plan, id, card, now);
       continue;
     }
     plan.updated++;
+    if (!card.positioned) {
+      plan.kept++; // no position in the export: the board's own stands (ADR 026)
+      continue;
+    }
     if (existing.columnId === card.columnId && existing.laneId === card.laneId) continue;
     if (movedByHand.has(id)) {
       plan.divergences.push({
@@ -103,9 +106,18 @@ function markAbsences(plan: LoadPlan, current: Map<string, CardState>, deckIds: 
   }
 }
 
+// A new card: its snapshot plus the "imported" event dated at its entry.
+function pushCreated(plan: LoadPlan, id: string, card: EnrichedCard, now: Date): void {
+  plan.created++;
+  plan.events.push({
+    ...lifecycleEvent("imported", id, IMPORT_ACTOR, entryTs(card, now), { laneId: card.laneId }),
+    toColumn: card.columnId,
+  });
+}
+
 function emptyPlan(): LoadPlan {
   return {
-    cards: [], events: [], created: 0, updated: 0, moved: 0, unlisted: 0, relisted: 0,
+    cards: [], events: [], created: 0, updated: 0, moved: 0, unlisted: 0, relisted: 0, kept: 0,
     divergences: [], chargesWithoutProfile: 0,
   };
 }

@@ -127,3 +127,10 @@ test("re-import: a stored csv card missing from the export is marked absent, nev
   assert.deepEqual([back.relisted, back.unlisted], [1, 0]);
   assert.equal(back.events.find((e) => e.type === "relisted")?.cardId, "PE10002");
 });
+
+test("an export without position (no jalons) never moves an existing card: the board's position stands", () => {
+  const before = stored("actifs");
+  const plan = planLoad([card({ columnId: "demandes", positioned: false })], CONFIG, before.cards, before.events, NOW);
+  assert.deepEqual([plan.updated, plan.moved, plan.kept, plan.events.length], [1, 0, 1, 0]);
+  assert.equal(plan.cards[0]?.columnId, "demandes", "the snapshot still says what the export said");
+});

@@ -28,7 +28,7 @@ export interface ParsedCsvFile {
 }
 
 /** How many leading non-empty rows are tried as header candidates. */
-const HEADER_SEARCH_ROWS = 20;
+const HEADER_SEARCH_ROWS = 60;
 
 /**
  * Classifies one received file and feeds the inventory.

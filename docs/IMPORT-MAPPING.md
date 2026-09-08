@@ -357,7 +357,7 @@ de consolidation, converti en CSV comme les autres ; en-têtes en ligne 2
 | Domaine (Orga), Sous-domaine (Orga) | Domaine / sous-domaine de la personne (mêmes règles que `projets`, ADR 022) ; inconnu → douteux, personne sans domaine |
 | Métier | → profil DSI (liste blanche tolérante, préfixe pointé décollé) ; inconnu → douteux |
 | Profil, Statut | Optionnels, non lus pour l'instant (Statut : candidat filtre « actif ») |
-| Disponibilité | Capacité de l'exercice : ≤ 5 → ETP × 200 j.h (signalé) ; au-delà, j.h ; vide ou illisible → capacité inconnue (Q24) |
+| Disponibilité | Capacité de l'exercice, **en jours** (export d'août : 200 pour la plupart, 218 pour quelques-uns) ; **0 = capacité non déclarée** (56 personnes en août — non comptées, signalées) ; entre 0 et 5 → ETP × 200 j.h (signalé) ; vide ou illisible → inconnue (Q24 : reste la fenêtre, annuelle ou résiduelle) |
 | Email, Coût | **Déclarés ignorés — jamais lus, jamais stockés** |
 
 **Assemblage** (`adapters/csv-import/capacity.ts`) : personnes = fiches
@@ -731,7 +731,10 @@ office de vérification sur site.
 | Q14 | Projet de `SP_total` sans ligne dans `projet` (domaine/chef inconnus) : carte créée avec placeholders ou écartée ? (portée réduite depuis que le consolidé est la source unique) | Auteur |
 | Q20 | **Chef de projet** : absent du consolidé — source à définir (réintroduire l'export `projet`, ajouter une colonne au consolidé, ou saisie dans l'outil ?) | Auteur |
 | Q15 | Sémantique du jalon RDLI : la date peut-elle être future (prévue, pas passée) ? Règle : ≤ aujourd'hui pour valoir Actifs ? | PMO |
-| Q24 | `Ress.Profils` « Disponibilité » : unité (ETP ou j.h ?) et fenêtre (capacité annuelle ou résiduelle ?) — le parseur lit ≤ 5 en ETP × 200 et le signale | PMO |
+| Q24 | `Ress.Profils` « Disponibilité » : unité **tranchée par l'export d'août (jours ; 0 = non déclarée)** ; reste la fenêtre (capacité annuelle ou résiduelle ?) | PMO |
+| Q27 | Domaines Orga vus dans PARAM / Ress.Profils hors vocabulaire du tableau : « CONTROLE DE GESTION », « ING & PLM » — à ajouter, ou à rattacher à un domaine existant ? | PMO |
+| Q28 | `Projets` d'août : « Responsable » vide sur toutes les lignes — l'export peut-il porter le chef de projet ? | PMO |
+| Q29 | `SP_2026` d'août : « Engagé Achats » et « * Budget validé RDLI » illisibles sur la plupart des lignes — le rapport montre désormais des exemples de valeurs brutes pour trancher le format | PMO / auteur |
 | Q25 | `Ress.Profils` « Int/Ext » : valeurs exactes (Interne/Externe ? O/N ?) | PMO |
 | Q26 | Matricule joint au plan de charge : « Id » ou « pk Contact » ? (les deux sont acceptés, l'un des deux doit correspondre) | PMO |
 

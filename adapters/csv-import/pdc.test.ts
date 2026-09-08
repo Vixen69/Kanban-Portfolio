@@ -112,3 +112,15 @@ test("empty names and total rows are gated", () => {
     "ligne de total/sous-total — exclue (risque de double compte)",
   ]);
 });
+
+test("successive dotted prefixes are stripped until a profile matches (August export)", () => {
+  const { table, report } = run([
+    row("M1", "Jean", "NEXTER.ZZ_A NE PAS UTILISER.PMO", "", "Alpha", "10", "0"),
+    row("M2", "Lise", "NEXTER", "", "Alpha", "5", "0"),
+  ]);
+  const alpha = table.projects.get("alpha");
+  assert.deepEqual(alpha?.charges.get("pmo"), { jh: 10, done: 0 });
+  assert.deepEqual(alpha?.charges.get(""), { jh: 5, done: 0 }, "a bare company name stays unassigned");
+  const survey = report.warnings.find((w) => /préfixes métier décollés/.test(w.message));
+  assert.match(survey?.message ?? "", /« NEXTER.ZZ_A NE PAS UTILISER » \(1\)/);
+});

@@ -637,6 +637,25 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-08 — Premier audit réel d'août : corrections du parseur
+
+- Le rapport d'audit lancé sur la VM (fichiers d'août, aucune donnée ici)
+  a livré cinq faits de structure, corrigés le jour même :
+  **(1)** sans fichier de jalons reconnu, le chargeur aurait ramené en
+  colonne d'entrée toutes les cartes non déplacées à la main — désormais
+  un export sans position ne déplace jamais une carte existante
+  (`kept`, « position(s) conservée(s) ») ; **(2)** les métiers à double
+  préfixe (« NEXTER.ZZ_A NE PAS UTILISER.CdP INFRA SSI », 277 lignes)
+  restaient non attribués — les préfixes pointés sont décollés un à un ;
+  **(3)** « Disponibilité » est en jours, 0 pour 56 personnes — 0 vaut
+  « non déclarée », plus jamais lu en ETP ; **(4)** les cellules illisibles
+  (« Engagé Achats », « Budget validé RDLI ») n'étaient pas expliquées — le
+  rapport montre jusqu'à trois valeurs brutes ; **(5)** la recherche
+  d'en-têtes passe de 20 à 60 lignes non vides (préambules longs).
+- Restent des questions de vocabulaire pour le PMO (Q27–Q29 dans
+  IMPORT-MAPPING) et le fichier de jalons, dont l'en-tête vu ne porte ni
+  « Id » ni « Nom du projet ».
+
 ### 2026-09-08 — Import depuis l'outil (ADR 027, sprint S4)
 
 - **Mode autonome** (« go S3 S4 ») : choix de Claude, consignés dans
