@@ -89,7 +89,7 @@ test("réel > prévisionnel is kept and signaled; persons are consolidated", () 
     row("", "Générique", "PMO", "", "Beta", "99", "0"),
   ]);
   assert.ok(report.warnings.some((w) => /réel 2026 > prévisionnel 2026/.test(w.message)));
-  assert.deepEqual(table.persons, [{ name: "Jean ROCA", jh: 45, done: 28 }]);
+  assert.deepEqual(table.persons, [{ matricule: "M1", name: "Jean ROCA", jh: 45, done: 28 }]);
 });
 
 test("a missing sub-header row keeps positional pairing and says so", () => {

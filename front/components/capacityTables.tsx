@@ -1,8 +1,11 @@
-// The two arbitration tables of the capacity view (ADR 024/025): the
-// transverse matrix (which domains consume the shared people) and the cards
-// weighing most on each transverse domain — the levers an arbitration can
-// pull (pause, requalify, stop). Pure presentation over core/capacity-view.
+// The two arbitration tables of the capacity view (ADR 024/025/028): the
+// transverse matrix (each transverse domain's capacity, whole-plan
+// engagement, what the board takes of it and what lies outside, the
+// internal / external split, and which domains consume its board demand)
+// and the cards weighing most on each transverse domain — the levers an
+// arbitration can pull (pause, requalify, stop). Pure presentation.
 
+import type { LoadSplit } from "../../core/capacity.ts";
 import type { Consumer, TransverseRow, WeighingRow } from "../../core/capacity-view.ts";
 import { fmtUnit } from "../format.ts";
 import { Panel, pct } from "./capacityPanels.tsx";
@@ -13,6 +16,9 @@ interface Column {
   color: string;
   total: number;
 }
+
+/** Fixed columns before the consumer domains. */
+const FIXED = 5;
 
 // The consumer columns: every consumer domain seen, heaviest total first.
 function columnsOf(rows: TransverseRow[]): Column[] {
@@ -32,35 +38,49 @@ function cellOf(row: TransverseRow, column: Column): Consumer | undefined {
   return row.consumers.find((consumer) => (consumer.domainId ?? "?") === column.key);
 }
 
+function splitText(label: string, split: LoadSplit): string {
+  if (split.persons === 0) return `${label} : aucun`;
+  return `${label} (${split.persons}) : capacité ${fmtUnit(split.capacityJh)} · projeté ${fmtUnit(split.plannedJh)} j.h · ${pct(split.engagement)}`;
+}
+
 function MatrixRow({ row, columns }: { row: TransverseRow; columns: Column[] }) {
-  const over = row.ratio !== null && row.ratio > 1;
+  const planned = row.engagement !== null;
+  const over = (row.engagement ?? row.ratio ?? 0) > 1;
   return (
-    <tr>
-      <th><i className="lg-sw" style={{ background: row.color }} />{row.name}</th>
-      <td>{fmtUnit(row.capacityJh)}</td>
-      <td className={over ? "cap-over" : ""}>{fmtUnit(row.demandJh)}<small>{pct(row.ratio)}</small></td>
-      {columns.map((column) => {
-        const cell = cellOf(row, column);
-        return cell === undefined
-          ? <td key={column.key} className="cap-empty-cell">·</td>
-          : <td key={column.key}>{fmtUnit(cell.jh)}<small>{pct(cell.share)}</small></td>;
-      })}
-    </tr>
+    <>
+      <tr>
+        <th><i className="lg-sw" style={{ background: row.color }} />{row.name}</th>
+        <td>{fmtUnit(row.capacityJh)}</td>
+        <td className={over ? "cap-over" : ""}>{planned ? fmtUnit(row.plannedJh) : "—"}<small>{planned ? pct(row.engagement) : "hors plan de charge"}</small></td>
+        <td>{fmtUnit(row.demandJh)}<small>{pct(row.ratio)} de la capacité</small></td>
+        <td>{planned ? fmtUnit(row.outsideJh) : "—"}<small>{planned ? "run, autres portefeuilles" : ""}</small></td>
+        {columns.map((column) => {
+          const cell = cellOf(row, column);
+          return cell === undefined
+            ? <td key={column.key} className="cap-empty-cell">·</td>
+            : <td key={column.key}>{fmtUnit(cell.jh)}<small>{pct(cell.share)}</small></td>;
+        })}
+      </tr>
+      <tr className="cap-split">
+        <td colSpan={FIXED + columns.length}>{splitText("internes", row.internal)} — {splitText("externes", row.external)}</td>
+      </tr>
+    </>
   );
 }
 
 /**
- * Demande sur les domaines transverses: one row per transverse domain, one
- * column per consumer domain; cells carry the j.h and the share of the
- * transverse domain's capacity.
+ * Demande sur les domaines transverses: one row per transverse domain —
+ * capacity, whole-plan engagement, the board's share and what lies
+ * outside, then one column per consumer domain of the board demand; a
+ * second line splits internal and external people.
  * Inputs: the transverse rows. Output: the (wide) panel. Failure: none — no
  * transverse domain in the config says so.
  */
 export function TransversePanel({ rows }: { rows: TransverseRow[] }) {
   const columns = columnsOf(rows);
   return (
-    <Panel title="Demande sur les domaines transverses" wide
-      hint="qui consomme la capacité partagée · j.h prévisionnels de l’exercice et part de la capacité du domaine">
+    <Panel title="Les domaines transverses : engagement réel et part du tableau" wide
+      hint="projeté = tout le plan de charge · dont tableau = les cartes du tableau, réparties par domaine demandeur (j.h et part de la capacité)">
       {rows.length === 0 && <div className="mp-empty">Aucun domaine transverse dans la configuration.</div>}
       {rows.length > 0 && (
         <div className="cap-scroll">
@@ -69,7 +89,9 @@ export function TransversePanel({ rows }: { rows: TransverseRow[] }) {
               <tr>
                 <th>Domaine transverse</th>
                 <th>Capacité j.h</th>
-                <th>Demande j.h</th>
+                <th>Projeté j.h · engagement</th>
+                <th>dont tableau</th>
+                <th>dont hors tableau</th>
                 {columns.map((column) => (
                   <th key={column.key}><i className="lg-sw" style={{ background: column.color }} />{column.name}</th>
                 ))}

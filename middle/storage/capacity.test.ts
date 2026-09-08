@@ -37,7 +37,7 @@ for (const driver of DRIVERS) {
         assert.equal(await first.getCapacity(), null);
         const snapshot = {
           exerciseYear: 2026,
-          persons: [{ id: "p-1", name: "Un", domain: "alpha", subDomain: null, profileId: "pA", metier: "A", external: false, capacityJh: 200, source: "profils" as const }],
+          persons: [{ id: "p-1", name: "Un", domain: "alpha", subDomain: null, profileId: "pA", metier: "A", external: false, capacityJh: 200, plannedJh: 260, doneJh: 90, source: "profils" as const }],
           assignments: [{ personId: "p-1", cardId: "S001", jh: 40, done: 10 }],
         };
         await first.importCapacity(snapshot);

@@ -637,6 +637,28 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-08 — La vraie surcharge : projeté et réalisé sur tout le plan de charge (ADR 028)
+
+- **Constat de l'auteur sur données réelles** : la vue capacité comparait
+  la capacité entière des 184 personnes à la demande des seules 142 cartes
+  (4 951 j.h) — 17 % affichés là où le plan de charge complet dit
+  25 011 j.h pour 25 472 de capacité, une DSI pleine dont le tableau ne
+  voit qu'un cinquième.
+- **Modèle** : la personne porte `plannedJh` et `doneJh` (projeté et
+  réalisé 2026 sur tout le plan de charge, null si absente du PdC) ; les
+  affectations restent la demande du tableau. Le cœur distingue `ratio`
+  (tableau / capacité) et `engagement` (projeté / capacité), calcule le
+  hors tableau, et coupe chaque groupe en internes / externes.
+- **Vue** : chiffres de tête refaits (capacité, projeté, engagement,
+  avancement contre part de l'année écoulée, part du tableau, surcharges) ;
+  matrice transverse avec projeté, dont tableau, dont hors tableau, ligne
+  internes / externes ; barres à deux niveaux (clair = projeté, plein =
+  tableau) ; surcharges classées sur l'engagement. L'avancement est un
+  constat, pas une prévision (référentiel 8.3).
+- **Rapport et fixtures** : la ligne « capacité » porte projeté et réalisé
+  sur tout le plan de charge ; les fixtures donnent aux personnes un
+  projeté au-delà du tableau.
+
 ### 2026-09-08 — Premier audit réel d'août : corrections du parseur
 
 - Le rapport d'audit lancé sur la VM (fichiers d'août, aucune donnée ici)

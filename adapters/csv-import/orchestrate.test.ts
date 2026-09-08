@@ -73,7 +73,9 @@ test("the five fixture files assemble the full deck", () => {
   assert.ok(snapshot.assignments.every((a) => /^p-[0-9a-f]{16}$/.test(a.personId)));
   assert.ok(snapshot.assignments.every((a) => snapshot.persons.some((p) => p.id === a.personId)));
   assert.deepEqual(snapshot.persons.map((p) => p.source), ["profils", "profils", "profils", "profils", "profils"]);
-  assert.equal(byLabel.get("capacité"), "5 personne(s) dont 1 externe(s) · capacité 780 j.h · 0 sans fiche · affectations : 3 sur 3 carte(s) · demande 85 j.h");
+  assert.match(byLabel.get("capacité") ?? "", /^5 personne\(s\) dont 1 externe\(s\) · capacité 780 j\.h · 0 sans fiche · affectations : 3 sur 3 carte\(s\) · demande du tableau 85 j\.h · projeté \(tout le plan de charge\) [\d,]+ j\.h · réalisé [\d,]+ j\.h · 2 hors plan de charge$/);
+  const alice = snapshot.persons.find((p) => p.name === "Jean ROCA");
+  assert.ok(alice && alice.plannedJh !== null && alice.plannedJh > 0, "whole-plan totals reach the person");
 });
 
 test("each card carries the right position, vocabulary and costs", () => {

@@ -105,3 +105,5 @@
 .cap-meta .lg-sw { margin-left: 0; }
 .cap-fig { font-size: 10px; color: var(--tx-2); flex: 0 0 auto; font-variant-numeric: tabular-nums; }
 .cap-lines { display: flex; flex-direction: column; gap: 5px; font-size: 10px; color: var(--tx-2); line-height: 1.4; }
+.cap-fill-board { position: relative; }
+.cap-split td { font-size: 9px; color: var(--tx-3); text-align: left; padding-top: 2px; padding-bottom: 7px; white-space: normal; }

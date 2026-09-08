@@ -1,25 +1,27 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { CapacitySnapshot, CardState } from "./types.ts";
-import { computeCapacityReadout } from "./capacity-view.ts";
+import { computeCapacityReadout, yearElapsed } from "./capacity-view.ts";
 import { testCard, testConfig, testPerson } from "./test-helpers.ts";
 
 const CONFIG = testConfig(); // alpha; beta is transverse (ADR 024)
+const NOW = new Date("2026-09-08T10:00:00.000Z");
 
 function state(overrides: Partial<CardState>): CardState {
-  return { ...testCard(overrides), archived: false, ...overrides } as CardState;
+  return { ...testCard(overrides), archived: false, decisions: [], absentFromLastImport: null, ...overrides } as CardState;
 }
 
-// p1/p2 belong to the transverse beta domain, p3 to alpha (capacity
-// unknown), p4 is a PdC stub without domain or profile; S999 is outside
-// the fold (archived or deleted).
+// p1/p2 belong to the transverse beta domain (p2 external), p3 to alpha
+// (capacity unknown, absent from the plan de charge), p4 is a PdC stub
+// without domain or profile; S999 is outside the fold (archived or deleted).
+// Planned loads (whole plan de charge) exceed the board's demand for p1.
 const SNAPSHOT: CapacitySnapshot = {
   exerciseYear: 2026,
   persons: [
-    testPerson({ id: "p1", name: "Alice MERLE", domain: "beta", profileId: "pA", capacityJh: 200 }),
-    testPerson({ id: "p2", name: "Bruno DUBOIS", domain: "beta", profileId: "pB", capacityJh: 40, external: true }),
+    testPerson({ id: "p1", name: "Alice MERLE", domain: "beta", profileId: "pA", capacityJh: 200, plannedJh: 300, doneJh: 100 }),
+    testPerson({ id: "p2", name: "Bruno DUBOIS", domain: "beta", profileId: "pB", capacityJh: 40, external: true, plannedJh: 60, doneJh: 20 }),
     testPerson({ id: "p3", name: "Chloé NGUYEN", domain: "alpha", profileId: "pA", capacityJh: null }),
-    testPerson({ id: "p4", name: "Stub PDC", domain: null, profileId: null, metier: "", capacityJh: null, source: "pdc" }),
+    testPerson({ id: "p4", name: "Stub PDC", domain: null, profileId: null, metier: "", capacityJh: null, source: "pdc", plannedJh: 10, doneJh: 0 }),
   ],
   assignments: [
     { personId: "p1", cardId: "S001", jh: 120, done: 40 },
@@ -36,23 +38,33 @@ const CARDS: CardState[] = [
   state({ id: "S003", title: "Sans charge", domain: "alpha", chargeByProfile: [] }),
 ];
 
-const READOUT = computeCapacityReadout(SNAPSHOT, CARDS, CONFIG);
+const READOUT = computeCapacityReadout(SNAPSHOT, CARDS, CONFIG, NOW);
 
-test("kpis: capacity, demand, global ratio, overloads and uncovered cards", () => {
+test("kpis: capacity, board demand, whole-plan engagement, board share, progress, elapsed year", () => {
   assert.deepEqual(READOUT.kpis, {
-    persons: 4, external: 1, capacityJh: 240, demandJh: 250, doneJh: 50,
-    ratio: 1.04, overloaded: 1, cardsWithoutAssignment: 1,
+    persons: 4, external: 1, capacityJh: 240, demandJh: 250, doneJh: 50, plannedJh: 370, doneAllJh: 120,
+    ratio: 1.04, engagement: 1.54, perimeterShare: 0.68, progress: 0.32, yearElapsed: 0.69,
+    overloaded: 2, cardsWithoutAssignment: 1, withoutPlan: 1,
   });
   assert.equal(READOUT.exerciseYear, 2026);
 });
 
-test("the transverse matrix names who consumes beta's people, heaviest first", () => {
+test("yearElapsed clamps to the exercise year", () => {
+  assert.equal(yearElapsed(new Date("2026-01-01T00:00:00.000Z"), 2026), 0);
+  assert.equal(yearElapsed(new Date("2026-07-02T12:00:00.000Z"), 2026), 0.5);
+  assert.equal(yearElapsed(new Date("2027-03-01T00:00:00.000Z"), 2026), 1);
+  assert.equal(yearElapsed(new Date("2025-03-01T00:00:00.000Z"), 2026), 0);
+});
+
+test("the transverse matrix names who consumes beta's people, with the whole-plan engagement and the split", () => {
   assert.equal(READOUT.transverse.length, 1);
   const beta = READOUT.transverse[0];
   assert.deepEqual(
-    [beta?.domainId, beta?.name, beta?.capacityJh, beta?.demandJh, beta?.ratio],
-    ["beta", "Beta", 240, 210, 0.88],
+    [beta?.domainId, beta?.name, beta?.capacityJh, beta?.demandJh, beta?.ratio, beta?.plannedJh, beta?.outsideJh, beta?.engagement],
+    ["beta", "Beta", 240, 210, 0.88, 360, 150, 1.5],
   );
+  assert.deepEqual(beta?.internal, { persons: 1, capacityJh: 200, plannedJh: 300, engagement: 1.5 });
+  assert.deepEqual(beta?.external, { persons: 1, capacityJh: 40, plannedJh: 60, engagement: 1.5 });
   assert.deepEqual(beta?.consumers.map((c) => [c.domainId, c.name, c.jh, c.share]), [
     ["alpha", "Alpha", 120, 0.5],
     ["beta", "Beta", 90, 0.38],
@@ -60,18 +72,18 @@ test("the transverse matrix names who consumes beta's people, heaviest first", (
 });
 
 test("domain rows follow the config order, then the persons without domain", () => {
-  assert.deepEqual(READOUT.domains.map((row) => [row.domainId, row.name, row.persons, row.withoutCapacity, row.capacityJh, row.demandJh, row.ratio, row.transverse, row.external]), [
-    ["alpha", "Alpha", 1, 1, 0, 30, null, false, 0],
-    ["beta", "Beta", 2, 0, 240, 210, 0.88, true, 1],
-    [null, "Sans domaine", 1, 1, 0, 10, null, false, 0],
+  assert.deepEqual(READOUT.domains.map((row) => [row.domainId, row.name, row.persons, row.withoutCapacity, row.withoutPlan, row.capacityJh, row.demandJh, row.plannedJh, row.ratio, row.engagement, row.transverse, row.external.persons]), [
+    ["alpha", "Alpha", 1, 1, 1, 0, 30, 0, null, null, false, 0],
+    ["beta", "Beta", 2, 0, 0, 240, 210, 360, 0.88, 1.5, true, 1],
+    [null, "Sans domaine", 1, 1, 0, 0, 10, 10, null, null, false, 0],
   ]);
 });
 
 test("profile rows follow the config order, then the persons without profile", () => {
-  assert.deepEqual(READOUT.profiles.map((row) => [row.profileId, row.name, row.persons, row.capacityJh, row.demandJh, row.ratio]), [
-    ["pA", "Profil A", 2, 200, 180, 0.9],
-    ["pB", "Profil B", 1, 40, 60, 1.5],
-    [null, "Sans profil", 1, 0, 10, null],
+  assert.deepEqual(READOUT.profiles.map((row) => [row.profileId, row.name, row.persons, row.capacityJh, row.demandJh, row.plannedJh, row.ratio, row.engagement]), [
+    ["pA", "Profil A", 2, 200, 180, 300, 0.9, 1.5],
+    ["pB", "Profil B", 1, 40, 60, 60, 1.5, 1.5],
+    [null, "Sans profil", 1, 0, 10, 10, null, null],
   ]);
 });
 
@@ -79,28 +91,31 @@ test("the cards weighing on a transverse domain, with their share of its capacit
   assert.deepEqual(READOUT.weighing.map((row) => [row.domainId, row.cards.map((c) => [c.cardId, c.title, c.domainName, c.jh, c.share])]), [
     ["beta", [["S001", "Atelier", "Alpha", 120, 0.5], ["S002", "Portail", "Beta", 90, 0.38]]],
   ]);
-  const top1 = computeCapacityReadout(SNAPSHOT, CARDS, CONFIG, 1);
+  const top1 = computeCapacityReadout(SNAPSHOT, CARDS, CONFIG, NOW, 1);
   assert.equal(top1.weighing[0]?.cards.length, 1);
 });
 
-test("overloads list the persons above 100 % with resolved names", () => {
-  assert.deepEqual(READOUT.overloads.map((o) => [o.load.person.id, o.load.ratio, o.domainName, o.profileName, o.load.cards.length]), [
-    ["p2", 1.5, "Beta", "Profil B", 1],
+test("overloads rank on the whole-plan engagement, most loaded first, names resolved", () => {
+  assert.deepEqual(READOUT.overloads.map((o) => [o.load.person.id, o.load.engagement, o.load.ratio, o.domainName, o.profileName, o.load.cards.length]), [
+    ["p1", 1.5, 0.75, "Beta", "Profil A", 2],
+    ["p2", 1.5, 1.5, "Beta", "Profil B", 1],
   ]);
 });
 
-test("coverage counts stubs, unknown capacities, uncovered cards, generic and outside j.h", () => {
+test("coverage counts stubs, unknown capacities and plans, uncovered cards, generic and outside j.h", () => {
   assert.deepEqual(READOUT.coverage, {
-    stubs: 1, unknownCapacity: 2, assignedCards: 2, cardsWithoutAssignment: 1,
+    stubs: 1, unknownCapacity: 2, withoutPlan: 1, assignedCards: 2, cardsWithoutAssignment: 1,
     genericJh: 20, outsideJh: 10,
   });
 });
 
 test("an empty snapshot reads as zeros, not NaN", () => {
-  const empty = computeCapacityReadout({ exerciseYear: 2027, persons: [], assignments: [] }, [], CONFIG);
+  const empty = computeCapacityReadout({ exerciseYear: 2027, persons: [], assignments: [] }, [], CONFIG, NOW);
   assert.deepEqual(empty.kpis, {
-    persons: 0, external: 0, capacityJh: 0, demandJh: 0, doneJh: 0, ratio: null, overloaded: 0, cardsWithoutAssignment: 0,
+    persons: 0, external: 0, capacityJh: 0, demandJh: 0, doneJh: 0, plannedJh: 0, doneAllJh: 0,
+    ratio: null, engagement: null, perimeterShare: null, progress: null, yearElapsed: 0,
+    overloaded: 0, cardsWithoutAssignment: 0, withoutPlan: 0,
   });
-  assert.deepEqual(empty.transverse.map((row) => [row.name, row.consumers]), [["Beta", []]]);
+  assert.deepEqual(empty.transverse.map((row) => [row.name, row.consumers, row.engagement]), [["Beta", [], null]]);
   assert.deepEqual(empty.weighing, [{ domainId: "beta", name: "Beta", cards: [] }]);
 });

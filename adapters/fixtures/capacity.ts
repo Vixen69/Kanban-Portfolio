@@ -1,10 +1,11 @@
-// Synthetic people and assignments for the fixtures adapter (ADR 024): a
-// deterministic DSI of invented persons, sized on the cards' demand per
-// profile (about one person per 200 j.h of charge, two at least), spread
+// Synthetic people and assignments for the fixtures adapter (ADR 024/028):
+// a deterministic DSI of invented persons, sized on the cards' demand per
+// profile (about one person per 170 j.h of charge, two at least), spread
 // over the config's domains, and assigned to the cards' per-profile charges
 // (chargeByProfile) so the capacity read-outs have something to say — an
-// overall load around 1.0 with overloaded people, idle profiles and a few
-// unknown capacities. Every name is invented.
+// overall load around 1.0 with overloaded people, idle profiles, a few
+// unknown capacities, and a planned load beyond the board (run, other
+// portfolios) so engagement exceeds the board's demand. Every name is invented.
 
 import type { Assignment, BoardConfig, Card, CapacitySnapshot, Person } from "../../core/types.ts";
 import { ETP_JH } from "../../core/capacity.ts";
@@ -28,6 +29,8 @@ const DEMAND_PER_PERSON_JH = ETP_JH * 0.85;
 const CAPACITY_BANDS: Array<[number | null, number]> = [[200, 70], [160, 12], [100, 10], [null, 8]];
 const EXTERNAL_SHARE = 0.25;
 const SHARED_CHARGE_SHARE = 0.4;
+/** Share of persons absent from the plan de charge (planned load unknown). */
+const NO_PLAN_SHARE = 0.05;
 
 /** What the generator needs from a card: its id and per-profile charges. */
 export type ChargedCard = Pick<Card, "id" | "chargeByProfile">;
@@ -37,7 +40,8 @@ export type ChargedCard = Pick<Card, "id" | "chargeByProfile">;
  * Inputs: the board config (profiles, domains, exercise year), the cards
  * (their chargeByProfile sizes the people of each profile and is split
  * among them), the seed. Output: a CapacitySnapshot whose assignments sum
- * back, per card and profile, to the card's charge (two decimals).
+ * back, per card and profile, to the card's charge (two decimals), and
+ * whose persons carry a planned load at least equal to their board demand.
  * Deterministic for one seed. Failure modes: none.
  */
 export function generateCapacity(config: BoardConfig, cards: readonly ChargedCard[], seed: number): CapacitySnapshot {
@@ -55,6 +59,7 @@ export function generateCapacity(config: BoardConfig, cards: readonly ChargedCar
       if (pool.length > 0) assignments.push(...split(card.id, charge, pool, random));
     }
   }
+  assignPlans(persons, assignments, random);
   return { exerciseYear: config.exercise.year, persons, assignments };
 }
 
@@ -85,6 +90,8 @@ function generatePersons(config: BoardConfig, demand: Map<string, number>, rando
         metier: profile.name,
         external: random.next() < EXTERNAL_SHARE,
         capacityJh: pickCapacity(random),
+        plannedJh: null,
+        doneJh: null,
         source: "profils",
       });
     }
@@ -133,4 +140,21 @@ function split(
     { personId: first.id, cardId, jh, done },
     { personId: second.id, cardId, jh: round2(charge.jh - jh), done: round2(charge.done - done) },
   ];
+}
+
+// The whole-plan load: the board's demand plus some run / other-portfolio
+// work (0–90 % on top), a few persons unknown to the plan de charge.
+function assignPlans(persons: Person[], assignments: readonly Assignment[], random: SeededRandom): void {
+  const demand = new Map<string, { jh: number; done: number }>();
+  for (const a of assignments) {
+    const sum = demand.get(a.personId) ?? { jh: 0, done: 0 };
+    demand.set(a.personId, { jh: round2(sum.jh + a.jh), done: round2(sum.done + a.done) });
+  }
+  for (const person of persons) {
+    if (random.next() < NO_PLAN_SHARE) continue;
+    const board = demand.get(person.id) ?? { jh: 0, done: 0 };
+    const outside = board.jh > 0 ? board.jh * random.next() * 0.9 : (person.capacityJh ?? ETP_JH) * (0.2 + random.next() * 0.8);
+    person.plannedJh = round2(board.jh + outside);
+    person.doneJh = round2(board.done + outside * (0.25 + random.next() * 0.5));
+  }
 }

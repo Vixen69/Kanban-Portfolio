@@ -250,6 +250,11 @@ export interface Person {
   external: boolean;
   /** Capacity for the exercise year, jours-homme (200 ≈ 1 ETP); null when unknown. */
   capacityJh: number | null;
+  /** Planned load over the WHOLE plan de charge (every project, on the board
+   * or not), j.h — the real engagement (ADR 028); null when absent from it. */
+  plannedJh: number | null;
+  /** Done over the whole plan de charge, j.h; null when absent from it. */
+  doneJh: number | null;
   /** "profils" = from Ress.Profils; "pdc" = stub built from an assignment without a profils row. */
   source: "profils" | "pdc";
 }

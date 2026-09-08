@@ -33,8 +33,8 @@ export interface PdcProject {
 /** The parsed plan de charge. */
 export interface PdcTable {
   projects: Map<string, PdcProject>;
-  /** Per-person 2026 totals, matricule-keyed rows only, jh descending. */
-  persons: Array<{ name: string; jh: number; done: number }>;
+  /** Per-person totals over EVERY project (matricule-keyed rows only), jh descending. */
+  persons: Array<{ matricule: string; name: string; jh: number; done: number }>;
   totals: { jh: number; done: number };
 }
 
@@ -48,7 +48,7 @@ interface PdcContext {
   nameIdx: number;
   profileLookup: (cell: string) => TolerantHit | null;
   projects: Map<string, PdcProject>;
-  persons: Map<string, { name: string; jh: number; done: number }>;
+  persons: Map<string, { matricule: string; name: string; jh: number; done: number }>;
   totals: { jh: number; done: number };
   unknownMetiers: Map<string, Tally>;
   prefixes: Map<string, number>;
@@ -206,7 +206,7 @@ function addToPerson(ctx: PdcContext, match: HeaderMatch, row: CsvRow, jh: numbe
   const matricule = (row.cells[match.columnIndex.get("Matricule") ?? -1] ?? "").trim();
   if (matricule === "") return;
   const name = (row.cells[match.columnIndex.get("Ressource") ?? -1] ?? "").trim() || matricule;
-  const person = ctx.persons.get(matricule) ?? { name, jh: 0, done: 0 };
+  const person = ctx.persons.get(matricule) ?? { matricule, name, jh: 0, done: 0 };
   person.jh = roundJh(person.jh + jh);
   person.done = roundJh(person.done + done);
   ctx.persons.set(matricule, person);

@@ -60,13 +60,15 @@ vivant) et `docs/adr/` (décisions). Le contrat de travail est `CLAUDE.md`.
   repliés : estimé k€ + charge RAF j.h ; dépliés : enveloppe RDLI, meilleur
   estimé, engagé, réalisé, plan de charge et ventilation par profil. Deux
   bascules Σ dans le coin du tableau, mémorisées par navigateur.
-- **Capacité** (☷, ADR 024/025) : la lecture d'arbitrage entre responsables
-  de domaines, calculée depuis le snapshot de capacité importé (personnes,
-  affectations de l'exercice) et les cartes — six chiffres de tête, puis la
-  demande sur les domaines transverses (qui consomme A&D et INFRA), la charge
-  par domaine et par profil, les cartes qui pèsent sur chaque transverse,
-  les personnes au-delà de 100 % et la couverture des chiffres. Lecture
-  annuelle : prévisionnel de l'exercice contre capacité déclarée.
+- **Capacité** (☷, ADR 024/025/028) : la lecture d'arbitrage entre
+  responsables de domaines, calculée depuis le snapshot importé (personnes
+  avec capacité, projeté et réalisé sur tout le plan de charge, affectations
+  aux cartes) — six chiffres de tête (capacité, projeté, engagement,
+  avancement contre part de l'année, part du tableau, surcharges), la
+  matrice des transverses (engagement réel, dont tableau, dont hors tableau,
+  internes / externes, domaines demandeurs), la charge par domaine et par
+  profil, les cartes qui pèsent, les personnes au-delà de 100 % et la
+  couverture des chiffres. Lecture annuelle : projeté contre capacité.
 - **Décision tracée** (ADR 026) : dans la fiche, une décision D1–D6 du
   référentiel (faire entrer, continuer, réduire, mettre en pause,
   requalifier, stopper) se trace avec sa raison dans les termes de la

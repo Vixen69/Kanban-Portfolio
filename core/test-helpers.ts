@@ -99,7 +99,7 @@ export function testConfig(): BoardConfig {
 export function testPerson(overrides: Partial<Person> = {}): Person {
   return {
     id: "p-0001", name: "Alice MERLE", domain: "alpha", subDomain: null,
-    profileId: "pA", metier: "Profil A", external: false, capacityJh: 200, source: "profils",
+    profileId: "pA", metier: "Profil A", external: false, capacityJh: 200, plannedJh: null, doneJh: null, source: "profils",
     ...overrides,
   };
 }

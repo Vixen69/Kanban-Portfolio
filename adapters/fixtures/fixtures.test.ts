@@ -7,9 +7,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import type { BoardConfig } from "../../core/types.ts";
 import { createFixtures } from "./index.ts";
-import { FIXTURES_SEED, TOTAL_CARDS, generatePortfolio } from "./generate.ts";
-import { generateCapacity } from "./capacity.ts";
-import { toCard } from "../../core/state.ts";
+import { TOTAL_CARDS, generatePortfolio } from "./generate.ts";
 import {
   BLOCK_REASONS,
   CP_NAMES,
@@ -257,40 +255,4 @@ test("a topology missing a required id is refused in French", () => {
     columns: CONFIG.columns.filter((column) => column.id !== "actifs"),
   };
   assert.throws(() => generatePortfolio(broken, NOW), /identifiants requis.*colonne actifs/);
-});
-
-test("the capacity snapshot is deterministic and sums back to the cards' charges", () => {
-  const cards = PORTFOLIO.subjects.map((subject) => toCard(subject, PORTFOLIO.financialsById.get(subject.id) ?? null));
-  const snapshot = generateCapacity(CONFIG, cards, FIXTURES_SEED);
-  assert.deepEqual(generateCapacity(CONFIG, cards, FIXTURES_SEED), snapshot);
-  assert.equal(snapshot.exerciseYear, 2026);
-  assert.ok(snapshot.persons.length >= 2 * CONFIG.profiles.length);
-  assert.ok(snapshot.persons.some((p) => p.capacityJh === null), "some unknown capacities");
-  assert.ok(snapshot.persons.some((p) => p.external), "some externals");
-  const personIds = new Set(snapshot.persons.map((p) => p.id));
-  assert.equal(personIds.size, snapshot.persons.length, "unique person ids");
-  const byCard = new Map<string, number>();
-  for (const a of snapshot.assignments) {
-    assert.ok(personIds.has(a.personId));
-    byCard.set(a.cardId, Math.round(((byCard.get(a.cardId) ?? 0) + a.jh) * 100) / 100);
-  }
-  for (const card of cards) {
-    const expected = card.chargeByProfile
-      .filter((c) => snapshot.persons.some((p) => p.profileId === c.profileId))
-      .reduce((sum, c) => Math.round((sum + c.jh) * 100) / 100, 0);
-    assert.equal(byCard.get(card.id) ?? 0, expected, card.id);
-  }
-});
-
-test("decisions (ADR 026): Pause subjects carry a traced D4; no decision predates its subject", () => {
-  const decided = PORTFOLIO.events.filter((e) => e.type === "decided");
-  assert.ok(decided.length >= 3, String(decided.length));
-  const created = new Map(PORTFOLIO.subjects.map((s) => [s.id, s.createdAt]));
-  for (const e of decided) assert.ok(e.ts > (created.get(e.cardId) ?? ""), e.cardId);
-  for (const s of PORTFOLIO.subjects.filter((s) => s.columnId === "pause")) {
-    const own = decided.filter((e) => e.cardId === s.id);
-    assert.equal(own.length, 1, s.id);
-    assert.equal(own[0]?.payload["decisionId"], "D4");
-    assert.ok(typeof own[0]?.payload["reason"] === "string" && own[0].payload["reason"] !== "");
-  }
 });

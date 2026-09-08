@@ -382,9 +382,14 @@ de consolidation, converti en CSV comme les autres ; en-têtes en ligne 2
 Profils ; affectations = lignes nominatives du PdC des projets joints aux
 cartes (une par personne × carte, prévisionnel / réel de l'exercice) ;
 personne du PdC sans fiche → **stub** (nom, capacité inconnue), signalé.
-Ligne « capacité » de l'état d'assemblage : personnes, externes, capacité,
-sans fiche, affectations, demande. Enregistré par `--charger` (table
-`capacity`, remplacée entière — ADR 024), servi par `GET /api/capacity`.
+Chaque personne porte aussi son **projeté** et son **réalisé** sur tout le
+plan de charge (toutes lignes à son matricule, périmètre ou non — ADR 028) ;
+toute personne du PdC sans fiche devient un stub, pour que les totaux
+soient ceux de la DSI entière. Ligne « capacité » de l'état d'assemblage :
+personnes, externes, capacité, sans fiche, affectations, demande du
+tableau, projeté et réalisé sur tout le plan de charge, hors plan de
+charge. Enregistré par `--charger` (table `capacity`, remplacée entière —
+ADR 024), servi par `GET /api/capacity`.
 
 ## Règles de dérivation
 

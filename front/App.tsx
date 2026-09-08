@@ -164,7 +164,7 @@ function ShellModals({ ctx }: { ctx: Ctx }) {
           onClose={() => ui.setAdmin(false)} />
       )}
       {ui.metrics && (
-        <CapacityView cards={ctx.cards} config={config} onClose={() => ui.setMetrics(false)} />
+        <CapacityView cards={ctx.cards} config={config} now={ctx.nowMs} onClose={() => ui.setMetrics(false)} />
       )}
       {ui.importing && (
         <ImportView onClose={() => ui.setImporting(false)} onLoaded={() => void store.reload()} />

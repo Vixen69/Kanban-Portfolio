@@ -5,6 +5,7 @@
 
 import type { BoardConfig, CapacitySnapshot, CardState } from "./types.ts";
 import type { PersonLoad } from "./capacity.ts";
+import { loadLevel } from "./capacity.ts";
 
 const NEUTRAL = "#94a3b8";
 
@@ -47,6 +48,8 @@ export interface Coverage {
   /** Persons known only from the plan de charge (no Ress.Profils row). */
   stubs: number;
   unknownCapacity: number;
+  /** Persons absent from the plan de charge (planned load unknown). */
+  withoutPlan: number;
   assignedCards: number;
   cardsWithoutAssignment: number;
   /** j.h of the cards' charges carried by nobody (generic PdC rows). */
@@ -93,7 +96,8 @@ export function weighingFor(
 }
 
 /**
- * The persons above 100 %, most loaded first, with display names resolved.
+ * The persons above 100 % (whole-plan engagement, else board ratio), most
+ * loaded first, with display names resolved.
  * Inputs: the person loads (personLoads), the config. Output: the overloads.
  * Failure: none.
  */
@@ -101,7 +105,10 @@ export function overloadRows(loads: PersonLoad[], config: BoardConfig): Overload
   const domains = new Map(config.domains.map((domain) => [domain.id, domain.name]));
   const profiles = new Map(config.profiles.map((profile) => [profile.id, profile.name]));
   return loads
-    .filter((load) => load.ratio !== null && load.ratio > 1)
+    .filter((load) => {
+      const level = loadLevel(load);
+      return level !== null && level > 1;
+    })
     .map((load): Overload => {
       const { domain, profileId, metier } = load.person;
       return {
@@ -133,6 +140,7 @@ export function coverageOf(snapshot: CapacitySnapshot, cards: readonly CardState
   return {
     stubs: snapshot.persons.filter((person) => person.source === "pdc").length,
     unknownCapacity: snapshot.persons.filter((person) => person.capacityJh === null).length,
+    withoutPlan: snapshot.persons.filter((person) => person.plannedJh === null).length,
     assignedCards: assignedCards.size,
     cardsWithoutAssignment: cards.length - assignedCards.size,
     genericJh: Math.max(0, round2(chargesJh - inFold)),

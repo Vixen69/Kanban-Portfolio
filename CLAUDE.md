@@ -193,8 +193,9 @@ fields, append-only enforced by table grants/triggers):
   never count as stage entries, ADR 019).
 - `users`: id, login, scrypt_hash, role (viewer/editor/admin), created_at,
   disabled.
-- `capacity` (ADR 024): one row, the last imported `CapacitySnapshot`
-  (exerciseYear, persons with opaque ids, assignments person × card),
+- `capacity` (ADR 024/028): one row, the last imported `CapacitySnapshot`
+  (exerciseYear, persons with opaque ids + capacity + planned/done over the
+  WHOLE plan de charge, assignments person × card = the board's demand),
   replaced whole at each import — a fact table beside the log, not an
   event stream. Names never enter `card_events`.
 

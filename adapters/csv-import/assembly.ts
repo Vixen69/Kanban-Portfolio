@@ -90,7 +90,8 @@ function capacityStatus(data: AssemblyData): string {
     ? "sans `Ress.Profils` — personnes connues par le plan de charge seul, capacité inconnue"
     : `${s.persons} personne(s) dont ${s.external} externe(s) · capacité ${formatJh(s.capacityJh)} j.h`;
   return `${people} · ${s.stubs} sans fiche · affectations : ${s.assignments} sur ${s.cardsCovered} carte(s)` +
-    ` · demande ${formatJh(s.demandJh)} j.h`;
+    ` · demande du tableau ${formatJh(s.demandJh)} j.h · projeté (tout le plan de charge) ${formatJh(s.plannedJh)} j.h` +
+    ` · réalisé ${formatJh(s.doneAllJh)} j.h · ${s.withoutPlan} hors plan de charge`;
 }
 
 function paramStatus(param: ParamTable | null): string {
