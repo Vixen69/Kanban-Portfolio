@@ -1,5 +1,5 @@
 // The audit pass the CLI calls: classify every received file (identify.ts),
-// elect the cleanest candidate per contract, run the contract readers in
+// elect one candidate per contract (election.ts), run the contract readers in
 // dependency order (PARAM before Projets), assemble the cards (enrich.ts
 // — the `projets` sheet is the perimeter), attach the charges, then
 // describe what is missing and the assembly state (assembly.ts). Pure and
@@ -10,11 +10,12 @@ import {
   CDP_CONTRACT, JALONS_CONTRACT, PARAM_CONTRACT, PDC_CONTRACT, PROFILS_CONTRACT, PROJETS_CONTRACT, SP_CONTRACT,
   contractsFor,
 } from "./contract.ts";
-import type { FileContract, HeaderMatch } from "./contract.ts";
-import type { CsvRow } from "./csv.ts";
+import type { FileContract } from "./contract.ts";
 import { processFile } from "./identify.ts";
 import type { InputFile } from "./identify.ts";
-import { createReport, doubt, warn } from "./report.ts";
+import { elect, electPerimeter, secondProjets } from "./election.ts";
+import type { Candidate } from "./election.ts";
+import { createReport } from "./report.ts";
 import type { ImportReport } from "./report.ts";
 import { parseParam } from "./param.ts";
 import type { ParamTable } from "./param.ts";
@@ -58,13 +59,6 @@ export interface AuditResult {
   capacity: CapacityBuild | null;
 }
 
-interface Candidate {
-  file: InputFile;
-  match: HeaderMatch;
-  headerCells: string[];
-  dataRows: CsvRow[];
-}
-
 /**
  * Runs the full audit pass over the received files.
  * Inputs: the files (any set — recognition is by header contract, never by
@@ -72,7 +66,8 @@ interface Candidate {
  * `now` (injected for determinism; dates a « franchi » milestone against
  * the run day). When several files match one contract, the cleanest
  * header wins (fewest deviations, then first name); the others are flagged
- * douteux.
+ * douteux. The perimeter has its own rule (election.ts): among the
+ * Projets-shaped files, the one without Responsable columns.
  * Outputs: the report, the parsed tables and the assembled cards (non-null
  * when the `projets` perimeter is present). Deterministic for identical
  * inputs and `now`.
@@ -86,7 +81,7 @@ export function runImportAudit(files: InputFile[], config: BoardConfig, now: Dat
   const paramBest = pick(PARAM_CONTRACT.id);
   const param = paramBest === null ? null
     : parseParam(paramBest.dataRows, paramBest.match, paramBest.headerCells, config, report, paramBest.file.name);
-  const projetsBest = pick(PROJETS_CONTRACT.id);
+  const projetsBest = electPerimeter(byContract.get(PROJETS_CONTRACT.id) ?? [], report);
   const projets = projetsBest === null ? null
     : parseProjets(projetsBest.dataRows, projetsBest.match, config, param, report, projetsBest.file.name);
   const jalonsBest = pick(JALONS_CONTRACT.id);
@@ -132,36 +127,4 @@ function classifyFiles(
     byContract.set(parsed.match.contract.id, list);
   }
   return byContract;
-}
-
-// A second file matching Projets (a full export carrying the Responsable
-// columns, as the August ProjetsCdP was) feeds the chefs de projet when no
-// dedicated ProjetsCdP file came: the elected perimeter stays, the other
-// one only lends its owners.
-function secondProjets(candidates: Candidate[], elected: Candidate | null, report: ImportReport): Candidate | null {
-  const other = candidates.find((c) => c !== elected && c.match.columnIndex.has("Responsable 1"));
-  if (other === undefined) return null;
-  warn(report, "second fichier Projets — lu comme ProjetsCdP (chefs de projet), non retenu comme périmètre", other.file.name);
-  return other;
-}
-
-// Several files can carry a contract's required columns. The cleanest
-// header wins: fewest deviations, then first name; the others are flagged
-// douteux, never silently parsed.
-function elect(candidates: Candidate[], report: ImportReport): Candidate | null {
-  const best = candidates.reduce<Candidate | null>(
-    (acc, c) => (acc === null || c.match.deviations.length < acc.match.deviations.length ? c : acc),
-    null,
-  );
-  if (best === null) return null;
-  for (const c of candidates) {
-    if (c === best) continue;
-    doubt(
-      report, c.file.name,
-      `correspond aussi au contrat ${best.match.contract.displayName} ` +
-        `(${c.match.deviations.length} écart(s) d'en-têtes, contre ` +
-        `${best.match.deviations.length} pour « ${best.file.name} ») — non retenu`,
-    );
-  }
-  return best;
 }

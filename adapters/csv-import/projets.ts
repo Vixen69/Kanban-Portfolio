@@ -48,6 +48,8 @@ export interface ProjetEntry {
 
 /** The parsed perimeter. */
 export interface ProjetsTable {
+  /** The elected file's name — the assembly line names the perimeter's source. */
+  fileName: string;
   entries: ProjetEntry[];
   byId: ReadonlyMap<string, ProjetEntry>;
   byName: ReadonlyMap<string, ProjetEntry>;
@@ -117,7 +119,7 @@ export function parseProjets(
   for (const row of rows) readRow(ctx, row);
   finalize(ctx);
   return {
-    entries: ctx.entries, byId: ctx.byId, byName: ctx.byName, shape: ctx.shape,
+    fileName, entries: ctx.entries, byId: ctx.byId, byName: ctx.byName, shape: ctx.shape,
     typeCounts: ctx.typeCounts, counts: ctx.counts,
   };
 }

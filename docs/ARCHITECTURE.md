@@ -637,6 +637,23 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-09 — Élection du périmètre : le fichier Projets sans colonnes Responsable
+
+- **Constat sur les exports de septembre** : l'audit a retenu 1 357 sujets
+  pour un périmètre de 138. Deux fichiers avaient la forme Projets (Id, Nom,
+  Type, État du processus) : l'onglet du PMO et l'export complet qui porte
+  les chefs de projet ; la règle « en-tête le plus propre » a élu l'export.
+- **Règle (auteur)** : l'onglet Projets du PMO ne porte jamais les
+  colonnes Responsable, l'export ProjetsCdP les porte toujours. Le
+  périmètre est donc le candidat **sans** « Responsable 1 » ; à égalité,
+  celui qui porte « Domaine (Orga) », puis le moins d'écarts, puis le nom.
+  L'autre fichier est lu comme ProjetsCdP et signalé douteux avec la
+  raison. La reconnaissance reste par en-têtes, jamais par nom.
+- **Code** : `adapters/csv-import/election.ts` (élection générique,
+  élection du périmètre, second Projets) sorti de l'orchestrateur ;
+  `ProjetsTable.fileName` ; la ligne « périmètre » du rapport nomme le
+  fichier élu. Tests `election.test.ts`.
+
 ### 2026-09-08 — La vraie surcharge : projeté et réalisé sur tout le plan de charge (ADR 028)
 
 - **Constat de l'auteur sur données réelles** : la vue capacité comparait

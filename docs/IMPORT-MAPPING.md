@@ -38,6 +38,16 @@ Plus aucune exclusion par « Domaine (Ptf) » ni par `isProjetSIS`. Le
 parseur contrôle malgré tout le type (R3) et signale tout écart — jamais
 d'exclusion silencieuse.
 
+**Élection du périmètre (2026-09-09).** Quand plusieurs fichiers ont la
+forme Projets (Id, Nom, Type, État du processus), le périmètre est celui
+**sans** colonne « Responsable 1 » : l'onglet Projets du PMO n'en porte
+jamais, l'export complet qui en porte est la source ProjetsCdP (en
+septembre, 1 357 lignes contre 138 — l'ancienne règle « en-tête le plus
+propre » l'avait élu). À égalité : le fichier qui porte « Domaine (Orga) »,
+puis le moins d'écarts d'en-têtes, puis le nom. Les autres candidats sont
+signalés douteux avec la raison ; la ligne « périmètre » de l'état
+d'assemblage nomme le fichier élu.
+
 **R3 — Types.** Clé = colonne **« Type »** de `projets` (pas « Type Gpe »,
 pas SP_2026). Le suffixe parenthésé est retiré avant comparaison —
 « (Projet) », « (Opportunité) », « (Run) » ne distinguent rien. Quatre
@@ -352,8 +362,9 @@ L'export Projets d'août porte les colonnes Responsable vides sur toutes les
 lignes. Le PMO produit un fichier séparé à partir de la même liste (le
 périmètre fait foi) : **Id ; Nom ; Responsable 1 ; Responsable 2 ;
 Responsable 3**. Un export Projets complet portant les Responsable convient
-aussi : déposé en second, il est lu comme ProjetsCdP (le premier fichier
-Projets, par ordre de nom, reste le périmètre — signalé). Contrat `projets_cdp` : requis Id,
+aussi, quel que soit son nom : il est lu comme ProjetsCdP, et le périmètre
+reste le fichier **sans** colonnes Responsable (R2, 2026-09-09 — signalé
+dans les douteux). Contrat `projets_cdp` : requis Id,
 Responsable 1 ; optionnels Nom, Responsable 2, Responsable 3. Même règle
 que Projets (R6) : le chef de projet est le premier Responsable qui n'est
 pas un responsable de domaine de PARAM. Jointure par Id (le code de la

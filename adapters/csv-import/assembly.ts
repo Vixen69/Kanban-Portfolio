@@ -107,7 +107,7 @@ function perimeterStatus(projets: ProjetsTable, config: BoardConfig): string {
     .map(([id, count]) => `${id === "?" ? "hors des quatre retenus" : (names.get(id) ?? id)} ${count}`);
   const shape = projets.shape === "orga" ? "colonnes Orga (direct)"
     : projets.shape === "path" ? "chemin d'organisation (via PARAM)" : "aucune colonne de domaine";
-  return `${projets.entries.length} carte(s) — la liste fait foi · types : ${parts.join(" · ")} · domaine : ${shape}`;
+  return `${projets.entries.length} carte(s) — la liste fait foi (« ${projets.fileName} ») · types : ${parts.join(" · ")} · domaine : ${shape}`;
 }
 
 function chargeStatus(data: AssemblyData, year: number): string {

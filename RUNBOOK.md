@@ -6,7 +6,7 @@ jusqu'aux cartes affichées sur le tableau.
 | | |
 |---|---|
 | VM | `DVPZ-KANBAN-VD1` |
-| Dossier | `~/Kanban-Portfolio-main` |
+| Dossier | `/app/Kanban-Portfolio-main` |
 | Tableau | `http://localhost:8080` |
 
 ---
@@ -16,7 +16,7 @@ jusqu'aux cartes affichées sur le tableau.
 **1. Se placer dans le dépôt**
 
 ```bash
-cd ~/Kanban-Portfolio-main
+cd /app/Kanban-Portfolio-main
 ```
 
 **2. Démarrer les conteneurs** (base, middle, front)
@@ -53,11 +53,13 @@ ne peuvent pas porter le même nom.
 
 | Fichier | Ce qu'il apporte |
 |---|---|
-| `Projets.csv` **(requis)** | Le périmètre : chaque ligne est une carte (Id, nom, type, domaine et sous-domaine, chef de projet, dates). L'onglet consolidé (colonnes « Domaine (Orga) ») ou l'export brut (chemin d'organisation, traduit par PARAM). |
+| `Projets.csv` **(requis)** | Le périmètre : chaque ligne est une carte (Id, nom, type, domaine et sous-domaine, dates). L'onglet consolidé (colonnes « Domaine (Orga) ») ou l'export brut (chemin d'organisation, traduit par PARAM). **Sans colonnes Responsable** : si deux fichiers ont la forme Projets, c'est celui-là qui fait foi. |
+| `ProjetsCdP.csv` | Les chefs de projet : l'export complet des projets avec Responsable 1→3 (responsables de domaine de PARAM exclus). Jamais le périmètre, quel que soit son nom. |
 | `PARAM.csv` | La table de correspondance du PMO : responsables de domaine (exclus du chef de projet) et chemins d'organisation → domaine / sous-domaine. |
 | `ProjetsJalons.csv` | La position initiale : RDO / RDLI / RDR « franchi » → Études / Actifs / Exploitation, sinon Demandes. |
 | `SP_2026.csv` | Les coûts 2026 : meilleur estimé, réel, engagé (l'export `SP_total` est accepté aussi, jointure par nom). |
 | `Ressources_PdC.csv` | Plan de charge 2026 par profil, plus la consolidation nominative (taux ETP). |
+| `Ress.Profils.csv` | Les personnes de la DSI : domaine Orga, métier, Int/Ext, disponibilité de l'exercice — la capacité de la vue ☷. |
 
 Un `RDOM.csv` de juillet est inventorié « contrat retiré » et n'est pas lu.
 
@@ -113,10 +115,10 @@ node sync/import.ts imports --charger
 docker exec portfolio-kanban-db-1 psql -U kanban -d kanban -c "SELECT count(*) FROM cards;"
 ```
 
-**Vider les cartes** — garde le schéma et la topologie
+**Vider les données** (cartes, journal, capacité) — garde le schéma, la topologie et la surcharge de configuration ; après un import raté par exemple
 
 ```bash
-docker exec portfolio-kanban-db-1 psql -U kanban -d kanban -c "TRUNCATE cards, card_events RESTART IDENTITY;"
+docker exec portfolio-kanban-db-1 psql -U kanban -d kanban -c "TRUNCATE cards, card_events, capacity RESTART IDENTITY;"
 ```
 
 **Mettre à jour le code** — après un transfert de ZIP

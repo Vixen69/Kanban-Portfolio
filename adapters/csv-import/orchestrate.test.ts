@@ -55,7 +55,7 @@ test("the five fixture files assemble the full deck", () => {
   assert.equal(report.taken.length, 6, "the pris lines are the cards");
   const byLabel = new Map(report.assembly.map((a) => [a.subject, a.status]));
   assert.equal(byLabel.get("table PARAM"), "prête (5 responsable(s) de domaine · 7 ligne(s) organisation, 7 avec chemin)");
-  assert.match(byLabel.get("périmètre `projets`") ?? "", /^6 carte\(s\) — la liste fait foi · types : .*Étude 2.*hors des quatre retenus 1 · domaine : colonnes Orga \(direct\)$/);
+  assert.match(byLabel.get("périmètre `projets`") ?? "", /^6 carte\(s\) — la liste fait foi \(« Projets\.csv »\) · types : .*Étude 2.*hors des quatre retenus 1 · domaine : colonnes Orga \(direct\)$/);
   assert.equal(byLabel.get("cartes"), "6 — répartition : Demandes 2 · Études 1 · Actifs 1 · Exploitation 2");
   assert.equal(byLabel.get("position"),
     "jalons 5/6 (Exploitation 2 · Actifs 1 · Études 1 · entrée 1) · sans jalon : 1 → colonne d'entrée · lignes jalons hors périmètre : 1");
