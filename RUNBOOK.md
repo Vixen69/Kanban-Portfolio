@@ -6,7 +6,7 @@ jusqu'aux cartes affichées sur le tableau.
 | | |
 |---|---|
 | VM | `DVPZ-KANBAN-VD1` |
-| Dossier | `/app/Kanban-Portfolio-main` |
+| Dossier | `~/Kanban-Portfolio-main` |
 | Tableau | `http://localhost:8080` |
 
 ---
@@ -16,7 +16,7 @@ jusqu'aux cartes affichées sur le tableau.
 **1. Se placer dans le dépôt**
 
 ```bash
-cd /app/Kanban-Portfolio-main
+cd ~/Kanban-Portfolio-main
 ```
 
 **2. Démarrer les conteneurs** (base, middle, front)
