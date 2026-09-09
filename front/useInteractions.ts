@@ -11,7 +11,7 @@ import type { BoardStore } from "./useBoardStore.ts";
 /**
  * The app shell's view state: sidebar, focused column, collapsed lanes and
  * columns (Pause starts collapsed, per the design), the open modal flags,
- * the codes-projet toggle and the drag-over cell.
+ * the codes-projet and types toggles and the drag-over cell.
  * Output: state values + setters, one object per render. Failure: none.
  */
 export function useUiState() {
@@ -27,6 +27,7 @@ export function useUiState() {
   const [metrics, setMetrics] = useState(false);
   const [importing, setImporting] = useState(false);
   const [showCodes, setShowCodes] = useState(false);
+  const [showTypes, setShowTypes] = useState(true);
   const [dragOver, setDragOver] = useState<MoveTarget | null>(null);
   const [dropCardId, setDropCardId] = useState<string | null>(null);
   return {
@@ -34,7 +35,7 @@ export function useUiState() {
     collapsedLanes, setCollapsedLanes, collapsedCols, setCollapsedCols,
     detailId, setDetailId, editing, setEditing, adding, setAdding,
     archive, setArchive, admin, setAdmin, metrics, setMetrics, importing, setImporting,
-    showCodes, setShowCodes, dragOver, setDragOver,
+    showCodes, setShowCodes, showTypes, setShowTypes, dragOver, setDragOver,
     dropCardId, setDropCardId,
   };
 }

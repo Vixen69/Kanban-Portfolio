@@ -48,6 +48,14 @@ puis le moins d'écarts d'en-têtes, puis le nom. Les autres candidats sont
 signalés douteux avec la raison ; la ligne « périmètre » de l'état
 d'assemblage nomme le fichier élu.
 
+**Titre de la carte (2026-09-09).** Le « Nom » Sciforma répète souvent
+l'Id en tête (« PX4520155 - Modernisation atelier ») : le titre de la
+carte est le nom **sans** ce code de tête (crochets et séparateurs
+tolérés ; un nom réduit au code est gardé tel quel), pour que
+l'interrupteur « Codes projet » du panneau latéral montre ou cache
+vraiment le code. Le nom brut reste la clé des jointures par nom (SP,
+PdC).
+
 **R3 — Types.** Clé = colonne **« Type »** de `projets` (pas « Type Gpe »,
 pas SP_2026). Le suffixe parenthésé est retiré avant comparaison —
 « (Projet) », « (Opportunité) », « (Run) » ne distinguent rien. Quatre

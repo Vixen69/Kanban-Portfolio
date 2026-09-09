@@ -129,6 +129,7 @@ export interface BoardGridProps {
   /** Epoch milliseconds of the shared "now" tick. */
   now: number;
   showCodes: boolean;
+  showTypes: boolean;
   /** The cell a dragged card is currently over, or null. */
   dragOver: { laneId: string; columnId: string } | null;
   onFocusColumn: (id: string) => void;
@@ -160,6 +161,7 @@ function BoardCell({ lane, col, cards, props }: { lane: Lane; col: Column; cards
       config={props.config}
       now={props.now}
       showCodes={props.showCodes}
+      showTypes={props.showTypes}
       dragOver={over !== null && over.laneId === lane.id && over.columnId === col.id}
       gateDef={gateDefOf(props.config, col)}
       onOpen={props.onOpen}

@@ -34,6 +34,8 @@ export interface SidebarProps {
   searchRef: Ref<HTMLInputElement>;
   showCodes: boolean;
   setShowCodes: (value: boolean) => void;
+  showTypes: boolean;
+  setShowTypes: (value: boolean) => void;
 }
 
 // One stat row. When filtering, the visible count leads; total trails muted.
@@ -80,18 +82,30 @@ function ResultRow(props: SidebarProps) {
   );
 }
 
-function CodesSection(props: SidebarProps) {
+// One display switch of the sidebar: label, the switch, a one-line hint.
+function DisplayToggle({ label, on, hint, onToggle }: { label: string; on: boolean; hint: string; onToggle: () => void }) {
   return (
-    <div className="sb-section">
+    <>
       <label className="code-toggle">
-        <span className="sb-label" style={{ marginBottom: 0 }}>Codes projet</span>
-        <span className={"switch" + (props.showCodes ? " on" : "")} onClick={() => props.setShowCodes(!props.showCodes)}>
+        <span className="sb-label" style={{ marginBottom: 0 }}>{label}</span>
+        <span className={"switch" + (on ? " on" : "")} onClick={onToggle}>
           <span className="knob" />
         </span>
       </label>
-      <div className="code-hint">
-        {props.showCodes ? "Affichés sur les cartes (ex. PX4520155)" : "Masqués — recherchables dans la barre ci-dessus"}
-      </div>
+      <div className="code-hint">{hint}</div>
+    </>
+  );
+}
+
+// What the tickets wear besides the name (author's asks): the code projet,
+// off by default since it stays searchable; the type tag, on by default.
+function CodesSection(props: SidebarProps) {
+  return (
+    <div className="sb-section">
+      <DisplayToggle label="Codes projet" on={props.showCodes} onToggle={() => props.setShowCodes(!props.showCodes)}
+        hint={props.showCodes ? "Affichés sur les cartes (ex. PX4520155)" : "Masqués — recherchables dans la barre ci-dessus"} />
+      <DisplayToggle label="Types de projet" on={props.showTypes} onToggle={() => props.setShowTypes(!props.showTypes)}
+        hint={props.showTypes ? "Affichés devant le nom (ETU, OBS, MEP, IA)" : "Masqués — le nom seul"} />
     </div>
   );
 }
@@ -202,7 +216,7 @@ function Shortcuts() {
 /**
  * The sidebar. Hidden (zero width) when closed; S or the ≡ button toggles
  * it, "/" opens it and focuses the search box. Sections in design-v11
- * order: search, live result row, codes-projet switch, Contrainte, Blocage,
+ * order: search, live result row, codes-projet and types switches, Contrainte, Blocage,
  * Type de projet, Criticité, Domaine (with unfoldable sub-domains), the
  * stats block, keyboard shortcuts.
  * Inputs: SidebarProps (open flag, config, filter state + callbacks,

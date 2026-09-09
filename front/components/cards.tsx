@@ -20,6 +20,8 @@ export interface CardItemProps {
   config: BoardConfig;
   /** Show the code projet on the card (sidebar toggle). */
   showCodes: boolean;
+  /** Show the type tag before the name (sidebar toggle, on by default). */
+  showTypes: boolean;
   /** One click opens the card detail (design v11). */
   onOpen: (card: CardState) => void;
   onDragStart: (e: DragEvent, card: CardState) => void;
@@ -63,7 +65,7 @@ function domPillStyle(color: string): CSSProperties {
  * the whole portfolio visible at once.
  * Inputs: CardItemProps.
  * Output: the bar (domain accent, pulse dot when blocked, criticality
- * mark, type tag, optional code, name, age pill) with the design tooltip.
+ * mark, optional type tag and code, name, age pill) with the design tooltip.
  * Failure modes: unknown domain/type ids degrade to a neutral accent and
  * no tag — the display never crashes after an admin topology edit.
  */
@@ -90,7 +92,7 @@ export function MiniCard(props: CardItemProps) {
           Type first, then the name (aligned across tickets), the criticality
           picto AFTER the name. */}
       <span className="mini-accent" style={acc.accent} />
-      <TypeTag type={type} />
+      {props.showTypes && <TypeTag type={type} />}
       {props.showCodes && card.codename !== null && <span className="mini-code">{card.codename}</span>}
       <span className="mini-name">{card.title}</span>
       <CritMark c={card.criticality} />
@@ -135,7 +137,7 @@ export function FocusCard(props: CardItemProps) {
           <span className="card-fill" />
           <AgeText days={days} age={config.age} />
         </div>
-        <FocusMeta card={card} config={config} showCodes={props.showCodes} />
+        <FocusMeta card={card} config={config} showCodes={props.showCodes} showTypes={props.showTypes} />
         {card.blocked && <div className="focus-block">{card.blockedReason}</div>}
         <EstimeBar card={card} />
       </div>
@@ -149,17 +151,19 @@ function FocusMeta({
   card,
   config,
   showCodes,
+  showTypes,
 }: {
   card: CardState;
   config: BoardConfig;
   showCodes: boolean;
+  showTypes: boolean;
 }) {
   const domain = domainById(config)[card.domain];
   const type = typeById(config)[card.typeId ?? ""] ?? null;
   const badge = config.criticalities[card.criticality].badge;
   return (
     <div className="focus-line2">
-      <TypeTag type={type} big />
+      {showTypes && <TypeTag type={type} big />}
       {domain !== undefined && (
         <span className="dom-pill" style={domPillStyle(domain.color)}>{domain.short}</span>
       )}

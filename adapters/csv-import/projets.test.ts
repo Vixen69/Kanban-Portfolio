@@ -141,3 +141,15 @@ test("structural gates: empty, nameless and total rows are discarded; duplicate 
   ]);
   assert.ok(report.doubtful.some((d) => /Id « PE3» porté par/.test(d.question)));
 });
+
+test("the card title drops the leading project code the name repeats (author, 2026-09-09)", () => {
+  const { table } = run(ORGA_HEADER, [
+    "PX4520155;PX4520155 - Modernisation atelier;INFRA;;Etude;Nouveau;;;;;;;;;",
+    "PX4520156;[PX4520156] Étude connectivité;INFRA;;Etude;Nouveau;;;;;;;;;",
+    "PX4520157;Portail fournisseurs;INFRA;;Etude;Nouveau;;;;;;;;;",
+    "PX4520158;PX4520158;INFRA;;Etude;Nouveau;;;;;;;;;",
+  ], null);
+  assert.deepEqual(table.entries.map((e) => e.title),
+    ["Modernisation atelier", "Étude connectivité", "Portail fournisseurs", "PX4520158"]);
+  assert.equal(table.entries[0]?.name, "PX4520155 - Modernisation atelier", "the raw name stays for the joins by name");
+});

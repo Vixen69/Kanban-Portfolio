@@ -22,6 +22,7 @@ export interface CellProps {
   /** Epoch milliseconds of the shared "now" tick. */
   now: number;
   showCodes: boolean;
+  showTypes: boolean;
   /** True when a dragged card is currently over this cell. */
   dragOver: boolean;
   /** The gate definition of the column, or null when ungated. */
@@ -66,6 +67,7 @@ function CellCardList({ props, listRef }: { props: CellProps; listRef: React.Ref
     now: props.now,
     config: props.config,
     showCodes: props.showCodes,
+    showTypes: props.showTypes,
     onOpen: props.onOpen,
     onDragStart: props.onDragStart,
     onDragEnd: props.onDragEnd,

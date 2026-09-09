@@ -137,7 +137,7 @@ function buildCard(ctx: JoinContext, entry: ProjetEntry): EnrichedCard {
   if (entry.owner !== null) s.withOwner++;
   if (entry.typeId !== null) s.withType++;
   const card: EnrichedCard = {
-    title: entry.name, normalizedName: entry.normalizedName, codename: entry.codename,
+    title: entry.title, normalizedName: entry.normalizedName, codename: entry.codename,
     laneId: ctx.laneId,
     domainId: entry.domainId, subDomainId: entry.subDomainId, domainSource: entry.domainSource,
     owner: entry.owner, typeId: entry.typeId,

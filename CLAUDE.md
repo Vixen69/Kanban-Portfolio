@@ -255,7 +255,7 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
   visible with zero scrolling; never any horizontal scroll. Measured in the
   COMPACT default state (v12): unfolded totals and the 176px canal gutter
   are a deliberate zoom that may scroll.
-- Sidebar: search (title + codename), codes-projet toggle, « Contrainte »
+- Sidebar: search (title + codename), codes-projet and types toggles, « Contrainte »
   pills (config-driven + a synthetic « Aucune »; OR-shaped — a card stays
   lit while ANY of its constraints is on), « Bloqués uniquement » toggle,
   filters by type / criticality / domain with tout·rien; live shown/total

@@ -29,8 +29,9 @@ vivant) et `docs/adr/` (décisions). Le contrat de travail est `CLAUDE.md`.
   pulsant ne subsiste que dans le bandeau BLOCAGE de la fiche ; badge de
   comptage des bloqués par cellule. WIP : n/limite, avertit à ≥ 80 %, rougit
   au-delà de 100 % — signale, ne bloque jamais.
-- Panneau latéral (`S`) : recherche titre + code projet (`/`), interrupteur
-  codes projet, filtre **« Contrainte »** (contraintes de la config +
+- Panneau latéral (`S`) : recherche titre + code projet (`/`), interrupteurs
+  codes projet et types de projet sur les cartes (le titre importé ne répète
+  plus le code), filtre **« Contrainte »** (contraintes de la config +
   « Aucune » ; une carte reste allumée tant qu'**une** de ses contraintes est
   active, ADR 020), interrupteur **« Bloqués uniquement »**, filtres type /
   criticité / domaine avec tout·rien (pas de filtre nature — la nature est le

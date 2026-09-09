@@ -185,7 +185,7 @@ function BoardArea({ ctx }: { ctx: Ctx }) {
     <div className="board-area">
       <BoardGrid config={config} cards={ctx.cards} dimmedIds={derived.dimmed}
         focusedColumn={ui.focusCol} collapsedLanes={ui.collapsedLanes}
-        collapsedCols={ui.collapsedCols} now={ctx.nowMs} showCodes={ui.showCodes}
+        collapsedCols={ui.collapsedCols} now={ctx.nowMs} showCodes={ui.showCodes} showTypes={ui.showTypes}
         dragOver={ui.dragOver}
         onFocusColumn={handlers.onFocusColumn} onToggleLane={handlers.onToggleLane}
         onToggleColumnCollapse={handlers.onToggleColumnCollapse}
@@ -219,7 +219,8 @@ function Screen({ ctx }: { ctx: Ctx }) {
         onToggleNoConstraint={filters.toggleNoConstraint}
         onSetGroup={filters.setGroup} stats={derived.all} view={derived.view}
         filtersActive={filters.active} onReset={filters.reset} searchRef={ctx.searchRef}
-        showCodes={ui.showCodes} setShowCodes={ui.setShowCodes} />
+        showCodes={ui.showCodes} setShowCodes={ui.setShowCodes}
+        showTypes={ui.showTypes} setShowTypes={ui.setShowTypes} />
       <BoardArea ctx={ctx} />
       <CardModals ctx={ctx} />
       <ShellModals ctx={ctx} />

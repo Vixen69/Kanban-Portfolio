@@ -637,6 +637,19 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-09 — Tickets : le code sort du titre, interrupteur « Types de projet »
+
+- **Constat de l'auteur** : le nom Sciforma répète l'Id en tête, donc
+  l'interrupteur « Codes projet » affichait le code deux fois ou jamais
+  moins d'une fois. À l'import, le titre de la carte est désormais le nom
+  sans son code de tête (`adapters/csv-import/code-prefix.ts`) ; le nom
+  brut reste la clé des jointures. Un ré-import corrige les titres déjà
+  chargés (le titre est un fait de l'instantané).
+- **Interrupteur « Types de projet »** dans le panneau latéral, à côté de
+  « Codes projet » : masque l'étiquette de type devant le nom sur les
+  tickets et les cartes focalisées (demande de l'auteur, non faite jusque
+  là). État de session, non persisté, comme les codes.
+
 ### 2026-09-09 — Élection du périmètre : le fichier Projets sans colonnes Responsable
 
 - **Constat sur les exports de septembre** : l'audit a retenu 1 357 sujets

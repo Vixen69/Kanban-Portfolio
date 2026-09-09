@@ -9,6 +9,7 @@
 import type { BoardConfig } from "../../core/types.ts";
 import { normalizeLabel } from "./normalize.ts";
 import { splitSubjectName } from "./subject-name.ts";
+import { stripCodePrefix } from "./code-prefix.ts";
 import { createDomainLookup, createSubDomainLookups, createTypeLookup, isDomainLead } from "./domains.ts";
 import type { Lookup } from "./domains.ts";
 import { amountCell, dateCell, moneyCell } from "./cells.ts";
@@ -29,6 +30,8 @@ export interface ProjetEntry {
   /** « Id » as written (the stable identity); "" when the cell is empty. */
   id: string;
   name: string;
+  /** The name without its leading code — the card's title (author, 2026-09-09). */
+  title: string;
   normalizedName: string;
   normalizedTitle: string;
   /** The Id, else a PE code embedded in the name, else null. */
@@ -183,7 +186,8 @@ function buildEntry(
   const state = cell(ctx, row, "État du processus");
   if (state !== "") ctx.states.set(state, (ctx.states.get(state) ?? 0) + 1);
   return {
-    id, name: nom, normalizedName, normalizedTitle: normalizeLabel(split.title),
+    id, name: nom, title: id !== "" ? stripCodePrefix(nom, id) : split.title,
+    normalizedName, normalizedTitle: normalizeLabel(split.title),
     codename: id !== "" ? id : split.codename,
     typeId: deriveType(ctx, row),
     createdAt: dateCell(cell(ctx, row, "Début"), "Début", row.line, ctx.tallies),
