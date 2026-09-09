@@ -3,7 +3,7 @@
 // project constraints). Split from config.ts to respect the 300-line file
 // cap; config.ts composes them into validateBoardConfig.
 
-import type { Domain, RoleFamily, SubDomain } from "./types.ts";
+import type { Domain, ProjectType, RoleFamily, SubDomain } from "./types.ts";
 import { fail, requireRecord, requireText, uniqueIds } from "./config-parse.ts";
 
 /**
@@ -20,6 +20,23 @@ export function parseColored(value: unknown, kind: string, index: number): Domai
     short: requireText(record.short, `${kind}[${index}].short`),
     color: requireText(record.color, `${kind}[${index}].color`),
   };
+}
+
+/**
+ * Parses one project type: the colored entry plus the optional `aliases`,
+ * the export labels the import reads the type from when they differ from
+ * its name (author, 2026-09-09: « Obsolescence » shown, « Projet de gestion
+ * d’obsolescence » imported).
+ * Inputs: the raw value, its index. Output: the type (aliases only when
+ * present). Failure: ConfigError naming the first bad field.
+ */
+export function parseProjectType(value: unknown, index: number): ProjectType {
+  const base = parseColored(value, "types", index);
+  const record = requireRecord(value, `types[${index}]`);
+  if (record.aliases === undefined) return base;
+  if (!Array.isArray(record.aliases)) fail(`types[${index}].aliases doit être une liste de libellés`);
+  const aliases = record.aliases.map((alias, j) => requireText(alias, `types[${index}].aliases[${j}]`));
+  return { ...base, aliases };
 }
 
 /**

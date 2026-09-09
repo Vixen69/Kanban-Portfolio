@@ -210,7 +210,8 @@ INSERT/SELECT. Courtesy heads-up to the tech lead: the schema is append-only
 Config (`config/board.json`, versioned in git — the NMO default model):
 lanes (name, nature subtitle, `natureKey` — the nature the canal confers to
 its cards, ADR 018 — detail), columns (name, `wip`, `gate` DoR/DoD, note),
-domains and types (name, short, color; a domain may be `transverse` — its
+domains and types (name, short, color; a type may carry `aliases`, the
+export labels it is read from; a domain may be `transverse` — its
 people serve the whole portfolio, ADR 024), nature/criticality labels,
 custom field definitions, `age` thresholds (fresh/recent/aging/stale),
 `andonThresholdDays`, and `exercise.year` (the year the import reads and

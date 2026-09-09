@@ -649,6 +649,10 @@ de son ADR.
   « Codes projet » : masque l'étiquette de type devant le nom sur les
   tickets et les cartes focalisées (demande de l'auteur, non faite jusque
   là). État de session, non persisté, comme les codes.
+- **Type « Obsolescence »** : nom affiché raccourci pour égaliser les cases
+  du panneau latéral (demande de l'auteur) ; le libellé Sciforma « Projet de
+  gestion d’obsolescence » reste reconnu à l'import par le nouveau champ
+  optionnel `aliases` des types (config validée, lookup d'import).
 
 ### 2026-09-09 — Élection du périmètre : le fichier Projets sans colonnes Responsable
 

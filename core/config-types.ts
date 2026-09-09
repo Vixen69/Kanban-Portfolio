@@ -68,6 +68,9 @@ export interface ProjectType {
   name: string;
   short: string;
   color: string;
+  /** Export labels the import reads this type from when they differ from the
+   * name (« Projet de gestion d’obsolescence » shown as « Obsolescence »). */
+  aliases?: string[];
 }
 
 /** Display style of one nature (label is renamable in config, key is not). */

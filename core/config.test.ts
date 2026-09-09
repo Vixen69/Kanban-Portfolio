@@ -22,6 +22,8 @@ test("the repository's config/board.json is valid", () => {
   assert.equal(config.columns.length, 8);
   assert.equal(config.domains.length, 10);
   assert.equal(config.types.length, 4);
+  assert.equal(config.types.find((t) => t.id === "obsolescence")?.name, "Obsolescence");
+  assert.deepEqual(config.types.find((t) => t.id === "obsolescence")?.aliases, ["Projet de gestion d’obsolescence"]);
   // ADR 022: only A&D and CORPORATE are detailed into sub-domains.
   const detailed = config.domains.filter((d) => d.subDomains !== undefined).map((d) => [d.id, d.subDomains?.length]);
   assert.deepEqual(detailed, [["ad", 4], ["corporate", 9]]);
@@ -279,4 +281,16 @@ test("decisions and grid terms default to the referential when absent, validate 
   assert.deepEqual(explicit.decisions.map((d) => d.id), ["X"]);
   assert.throws(() => validateBoardConfig({ ...rawConfig(), decisions: [{ id: "X", name: "X", short: "X", color: "#000" }] }), ConfigError);
   assert.throws(() => validateBoardConfig({ ...rawConfig(), decisionGrounds: [{ id: "g", name: "G", family: "autre" }] }), ConfigError);
+});
+
+test("types: aliases are kept when present, absent otherwise; a non-list or empty alias fails", () => {
+  const raw = rawConfig();
+  raw.types[0].aliases = ["Projet de gestion d’obsolescence", "Gestion obsolescence"];
+  const config = validateBoardConfig(raw);
+  assert.deepEqual(config.types[0]?.aliases, ["Projet de gestion d’obsolescence", "Gestion obsolescence"]);
+  assert.equal("aliases" in (config.types[1] ?? {}), false);
+  raw.types[0].aliases = "Projet";
+  assert.throws(() => validateBoardConfig(raw), ConfigError);
+  raw.types[0].aliases = [""];
+  assert.throws(() => validateBoardConfig(raw), ConfigError);
 });

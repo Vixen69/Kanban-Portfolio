@@ -12,7 +12,7 @@ import {
   fail, isRecord, optionalText, parseKeyed, parseNonEmptyArray,
   requireExactKeys, requireRecord, requireText, uniqueIds,
 } from "./config-parse.ts";
-import { parseColored, parseDomain, parseIdNameColor } from "./config-vocab.ts";
+import { parseColored, parseDomain, parseIdNameColor, parseProjectType } from "./config-vocab.ts";
 import { parseDecisionGrounds, parseDecisions } from "./config-decisions.ts";
 
 export { ConfigError } from "./config-parse.ts";
@@ -253,7 +253,7 @@ export function validateBoardConfig(raw: unknown): BoardConfig {
   const lanes = parseNonEmptyArray(raw.lanes, "lanes", parseLane);
   const columns = parseNonEmptyArray(raw.columns, "columns", parseColumn);
   const domains = parseNonEmptyArray(raw.domains, "domains", parseDomain);
-  const types = parseNonEmptyArray(raw.types, "types", (v, i) => parseColored(v, "types", i));
+  const types = parseNonEmptyArray(raw.types, "types", parseProjectType);
   uniqueIds(lanes, "lanes");
   uniqueIds(columns, "columns");
   uniqueIds(domains, "domains");

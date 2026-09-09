@@ -49,12 +49,15 @@ export function typeBaseLabel(raw: string): string {
 }
 
 /**
- * Builds a tolerant type lookup (id, name or short) over the base label.
+ * Builds a tolerant type lookup (id, name, short or alias) over the base label.
  * Inputs: the board config. Outputs: cell -> hit or null. Failure: none.
  */
 export function createTypeLookup(config: BoardConfig): Lookup {
   const lookup = createTolerantLookup(
-    config.types.flatMap((t): Array<[string, string]> => [[t.id, t.id], [t.name, t.id], [t.short, t.id]]),
+    config.types.flatMap((t): Array<[string, string]> => [
+      [t.id, t.id], [t.name, t.id], [t.short, t.id],
+      ...(t.aliases ?? []).map((alias): [string, string] => [alias, t.id]),
+    ]),
   );
   return (cell) => lookup(typeBaseLabel(cell));
 }
