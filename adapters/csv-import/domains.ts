@@ -48,8 +48,22 @@ export function typeBaseLabel(raw: string): string {
   return raw.replace(/\s*\([^()]*\)\s*$/, "").trim();
 }
 
+// A normalized alias as a whole-word pattern inside a normalized label
+// (« obsolescence » inside « projet de gestion de l'obsolescence »): the
+// alias's words, any separator run between them, a non-alphanumeric or an
+// edge on both sides. Built without escapes — only [a-z0-9] words survive.
+function keywordPattern(alias: string): RegExp {
+  const core = normalizeLabel(alias).split(/[^a-z0-9]+/).filter((w) => w !== "").join("[^a-z0-9]+");
+  return new RegExp("(?:^|[^a-z0-9])" + core + "(?:[^a-z0-9]|$)");
+}
+
 /**
- * Builds a tolerant type lookup (id, name, short or alias) over the base label.
+ * Builds a tolerant type lookup over the base label: id, name, short or
+ * alias (exact, then accent-damage tolerant), then — for the aliases only —
+ * the alias searched INSIDE the label as a whole word (author, 2026-09-10:
+ * the September « obsolescence » labels matched none of the spellings
+ * dictated so far; a keyword survives every variant). A keyword hitting
+ * several types is ambiguous and yields null, never a guess.
  * Inputs: the board config. Outputs: cell -> hit or null. Failure: none.
  */
 export function createTypeLookup(config: BoardConfig): Lookup {
@@ -59,7 +73,16 @@ export function createTypeLookup(config: BoardConfig): Lookup {
       ...(t.aliases ?? []).map((alias): [string, string] => [alias, t.id]),
     ]),
   );
-  return (cell) => lookup(typeBaseLabel(cell));
+  const keywords = config.types.flatMap((t) => (t.aliases ?? []).map((alias) => ({ re: keywordPattern(alias), id: t.id })));
+  return (cell) => {
+    const base = typeBaseLabel(cell);
+    const direct = lookup(base);
+    if (direct !== null) return direct;
+    const key = normalizeLabel(base);
+    const ids = [...new Set(keywords.filter((k) => k.re.test(key)).map((k) => k.id))];
+    const id = ids[0];
+    return ids.length === 1 && id !== undefined ? { id, repaired: true } : null;
+  };
 }
 
 /**

@@ -14,8 +14,6 @@ export type ParsedAmount =
   | { kind: "invalid"; raw: string };
 
 const FORMULA_ERRORS = ["#ref!", "#n/a", "#div/0!", "#valeur!", "#nom?", "#value!", "#name?"];
-const NBSP = String.fromCharCode(0xa0);
-const NNBSP = String.fromCharCode(0x202f);
 
 /**
  * Parses a French-formatted amount cell.
@@ -35,7 +33,10 @@ export function parseFrenchAmount(raw: string): ParsedAmount {
   if (["-", "—", "n/a", "na", "?"].includes(lowered) || FORMULA_ERRORS.includes(lowered)) {
     return { kind: "invalid", raw: cell };
   }
-  const compact = cell.replaceAll(NBSP, "").replaceAll(NNBSP, "").replaceAll(" ", "");
+  // Every blank goes, visible or not: spaces, tabs, NBSP, narrow NBSP, the
+  // Unicode spaces, zero-width space, BOM (September SP cells still failed
+  // after « k » was accepted — something invisible sat in « 501 k »).
+  const compact = cell.replace(/[\s\u00A0\u00AD\u1680\u2000-\u200B\u202F\u205F\u3000\uFEFF]/g, "");
   // Units seen: € / k€, « eur », « ke » (the August SP export's k€) and a
   // bare « k » (the September SP export: « 501 k », « 1 736 k »).
   const unitMatch = compact.match(/(k?€|k?eur(?:os?)?|ke|k)$/i);

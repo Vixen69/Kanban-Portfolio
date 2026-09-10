@@ -153,3 +153,15 @@ test("the card title drops the leading project code the name repeats (author, 20
     ["Modernisation atelier", "Étude connectivité", "Portail fournisseurs", "PX4520158"]);
   assert.equal(table.entries[0]?.name, "PX4520155 - Modernisation atelier", "the raw name stays for the joins by name");
 });
+
+test("types: a keyword alias is found inside any spelling of the label, as a whole word (author, 2026-09-10)", () => {
+  const { table } = run(ORGA_HEADER, [
+    "PE1;Un;INFRA;;Projet de gestion de l'obsolescence (Projet);Nouveau;;;;;;;;;",
+    "PE2;Deux;INFRA;;Gestion obsolescence (Run);Nouveau;;;;;;;;;",
+    "PE3;Trois;INFRA;;Projet de gestion d'obscolescence (Projet);Nouveau;;;;;;;;;",
+    "PE4;Quatre;INFRA;;Projet IA (Projet);Nouveau;;;;;;;;;",
+    "PE5;Cinq;INFRA;;Obsolescences applicatives;Nouveau;;;;;;;;;",
+    "PE6;Six;INFRA;;Evolution - TMA (Run);Nouveau;;;;;;;;;",
+  ], null);
+  assert.deepEqual(table.entries.map((e) => e.typeId), ["obsolescence", "obsolescence", "obsolescence", "ia", null, null]);
+});

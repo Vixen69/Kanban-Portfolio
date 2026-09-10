@@ -637,6 +637,19 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-10 — Types par mot-clé ; blancs invisibles dans les montants
+
+- **Types** : l'audit de septembre donnait 0 Obsolescence et 34 « hors des
+  quatre retenus » malgré trois orthographes d'alias. Un alias court est
+  désormais cherché **dans** le libellé, mot entier (`createTypeLookup`) ;
+  config : `aliases: ["Projet de gestion d’obsolescence", "obsolescence",
+  "obscolescence"]`. Ambiguïté → inconnu, jamais de choix silencieux.
+- **Montants** : « Coût prév (ME) » et « Coût réel » restaient à 0/137
+  après l'unité « k » (engagé 57/137, RDLI 44/137 passaient : cellules
+  sans unité). Le lecteur retire désormais tout blanc, visible ou non
+  (tabulation, espaces Unicode, espace fine, trait d'union conditionnel,
+  espace sans chasse, BOM) avant de lire l'unité.
+
 ### 2026-09-10 — Carte étendue : l'estimé ne prend plus la charge pour des k€ ; échantillons révélateurs ; alias obsolescence
 
 - **Bug d'affichage** vu par l'auteur : « est. 31 k€ » à côté de « RAF

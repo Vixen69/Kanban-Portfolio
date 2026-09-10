@@ -68,7 +68,12 @@ s'ils apparaissent) : Achat, Evolution - TMA, TMA Corrective. Tout autre
 libellé → douteux. La config `types` ne porte plus que ces quatre. Le nom
 affiché est libre ; quand le libellé d'export en diffère, il vit dans
 `aliases` du type (« Obsolescence » affiché, « Projet de gestion
-d’obsolescence » lu à l'import — 2026-09-09).
+d’obsolescence » lu à l'import — 2026-09-09). Un alias **court** est
+cherché **dans** le libellé, mot entier (« obsolescence » reconnaît « Projet
+de gestion de l'obsolescence », « Gestion obsolescence », etc.) ; un
+mot-clé qui touche plusieurs types est ambigu → type inconnu, jamais de
+choix silencieux (2026-09-10 : 34 lignes « hors des quatre retenus »
+étaient des obsolescences sous un libellé non prévu).
 
 **R4 — Domaine et sous-domaine : le vocabulaire Orga.** Le domaine de la
 carte = **« Domaine (Orga) »** (10 valeurs : A&D, CORPORATE, ERP,

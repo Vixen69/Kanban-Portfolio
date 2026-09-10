@@ -91,3 +91,11 @@ test("September export shape: a bare « k » is the k€ unit (264 cells were un
   assert.deepEqual(parseFrenchAmount("0 K"), { kind: "value", value: 0, unit: "K" });
   assert.equal(parseFrenchAmount("ok").kind, "invalid");
 });
+
+test("amounts: every invisible blank is ignored — tab, thin space, soft hyphen, zero-width space", () => {
+  assert.deepEqual(parseFrenchAmount("501\tk"), { kind: "value", value: 501, unit: "k" });
+  assert.deepEqual(parseFrenchAmount("1\u2009736\u2009k"), { kind: "value", value: 1736, unit: "k" });
+  assert.deepEqual(parseFrenchAmount("501\u00ADk"), { kind: "value", value: 501, unit: "k" });
+  assert.deepEqual(parseFrenchAmount("\u200B501 k\u200B"), { kind: "value", value: 501, unit: "k" });
+  assert.deepEqual(parseFrenchAmount("1\u00A0736,5\u202Fk"), { kind: "value", value: 1736.5, unit: "k" });
+});
