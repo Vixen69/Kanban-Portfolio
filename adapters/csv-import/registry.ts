@@ -36,6 +36,8 @@ export const SP_CONTRACT: FileContract = {
     "Budget validé PDSI", "* CAT global projet", "ME Achats", "Réel Achats",
     "Lignes Arbitrages", "RAF Achats", "% Reste à engager", "% Engagé ou Réalisé",
     "Seuil Engagé ou Réalisé",
+    // September 2026 export: the domain (Projets/PARAM give it) and the PDSI flag.
+    "Domaine", "PDSI O-N",
   ],
 };
 

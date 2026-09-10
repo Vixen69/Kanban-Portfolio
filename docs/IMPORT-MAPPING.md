@@ -120,10 +120,22 @@ au rapport. *Remplace* : Q19 (« Jalon en cours ») et les jalons datés de
 **R8 — Budgets 2026 : `SP_2026`.** Jointure par **Id** (SP_2026 en a un,
 contrairement à SP_total ; nom en contrôle croisé). « Coût prév (ME) » →
 `budgetEstimated` ; « Coût réel » → `budgetConsumed` ; « Engagé Achats » →
-`budgetEngaged`. « Réel Achats » non retenu. Unités écrites dans les
-cellules : lues et signalées comme avant. *Remplace* : « Coût final ME
-(Res.+Trans) », « Coût réel ME (Res.+Trans) » et « Engagé 2026 (Trans) »
-du consolidé (2026-07-31), qui ne sont plus lus.
+`budgetEngaged` ; « * Budget validé RDLI » → `budgetRdli` (enveloppe RDLI,
+confirmé par l'auteur le 2026-09-10 — « Budget validé PDSI » reste ignoré).
+« Réel Achats » non retenu. Unités écrites dans les cellules : lues et
+signalées comme avant (« ke » en août, « k » nu en septembre). *Remplace* :
+« Coût final ME (Res.+Trans) », « Coût réel ME (Res.+Trans) » et « Engagé
+2026 (Trans) » du consolidé (2026-07-31), qui ne sont plus lus.
+
+*En-têtes SP_2026 de septembre 2026 (relevé auteur)* : Domaine ; Sous
+domaine ; Id ; Nom ; État du processus ; Type Gpe ; Score criblage ; Début ;
+Jalon RVSR ou Fin ; Jalon RDLI validé ; Jalon RDR validé (Réf.8) ; Jalon RDR
+prévisionnel ; Budget présenté PDSI ; Budget validé PDSI ; PDSI O-N ; * Budget
+validé RDLI ; * CAT global projet ; Coût prév (ME) ; Coût réel ; ME Achats ;
+Engagé Achats ; Réel Achats ; Lignes Arbitrages ; RAF Achats ; % Reste à
+engager ; % Engagé ou Réalisé ; Seuil Engagé ou Réalisé. « Id » porte le
+code projet, « Nom » le code suivi du nom. Toutes déclarées au contrat
+(« Domaine » et « PDSI O-N » ignorées depuis le 2026-09-10).
 
 **R9 — Registre des contrats (priorité, du plus spécifique au plus
 générique).** `param` → `projets` (consolidé) → `projets_jalons` →
