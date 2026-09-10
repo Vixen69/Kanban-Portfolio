@@ -6,7 +6,7 @@ jusqu'aux cartes affichées sur le tableau.
 | | |
 |---|---|
 | VM | `DVPZ-KANBAN-VD1` |
-| Dossier | `~/Kanban-Portfolio-main` |
+| Dossier | `/app/Kanban-Portfolio` (clone git) |
 | Tableau | `http://localhost:8080` |
 
 ---
@@ -16,7 +16,7 @@ jusqu'aux cartes affichées sur le tableau.
 **1. Se placer dans le dépôt**
 
 ```bash
-cd ~/Kanban-Portfolio-main
+cd /app/Kanban-Portfolio
 ```
 
 **2. Démarrer les conteneurs** (base, middle, front)
@@ -121,12 +121,17 @@ docker exec portfolio-kanban-db-1 psql -U kanban -d kanban -c "SELECT count(*) F
 docker exec portfolio-kanban-db-1 psql -U kanban -d kanban -c "TRUNCATE cards, card_events, capacity RESTART IDENTITY;"
 ```
 
-**Mettre à jour le code** — après un transfert de ZIP
+**Mettre à jour le code** — la VM tourne sur un clone git depuis le 2026-09-10
 
 ```bash
-chmod +x *.sh verify.sh
-docker compose -f docker/compose.yaml --profile app up -d --build
+cd /app/Kanban-Portfolio && git pull && docker compose -f docker/compose.yaml --profile app up -d --build
 ```
+
+> Le proxy authentifié est configuré dans `~/.gitconfig` (mot de passe = le
+> **token**, pas le mot de passe Windows). En repli, si git retombe en panne :
+> nouveau ZIP GitHub → `chmod +x *.sh` → même `up -d --build`. Ne jamais
+> construire depuis un ZIP partiel : le middle qui échoue sur
+> `adapters/csv-import/index.ts` (502 sur /api) = un dossier incomplet.
 
 **Arrêter** — les données restent dans le volume
 
