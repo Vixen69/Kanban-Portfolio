@@ -637,6 +637,19 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-10 — Les montants k€ viennent de SP seul (Q23 tranchée)
+
+- **Constat de l'auteur** : enveloppes RDLI « délirantes » et peu de
+  chiffres depuis le changement de périmètre. Cause : la carte prenait
+  d'abord « Budget RDLI Total Coût (Res+Trans) » de Projets, pluriannuelle,
+  SP n'était qu'un secours.
+- **Décision** : estimé, réel, engagé et enveloppe RDLI viennent de
+  SP_2026 seul (« * Budget validé RDLI » = annuelle) ; la colonne de
+  Projets n'alimente plus la carte, même en secours.
+- **Rapport** : la ligne « coûts (SP) » compte les montants renseignés
+  (estimé n/N · réel · engagé · RDLI) — le rapport dit lui-même si les
+  chiffres passent, sans requête en base.
+
 ### 2026-09-10 — Budget SP : l'unité « k » nue
 
 - **Constat (rapport d'audit de septembre)** : aucun budget sur les cartes.

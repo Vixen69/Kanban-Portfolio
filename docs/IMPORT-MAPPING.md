@@ -165,8 +165,13 @@ défaut, « franchi » : VRAI / oui / o / x / 1 / date = franchi (date future
 signalée), FAUX / non / n / 0 / vide = non ; valeurs brutes relevées (Q21).
 `sp` : Nom + trois coûts requis, Id optionnel (jointure Id > nom > code
 PE) ; **montants en euros convertis en k€** et signalés, k€ ou sans unité
-pris tels quels. Q22/Q23 : statu quo, dit dans la ligne « coûts 2026 (SP) »
-du rapport. Squelettes synthétiques dans `fixtures/import/` (PARAM,
+pris tels quels. **Q23 tranchée (2026-09-10)** : les quatre montants k€
+de la carte (estimé, réel, engagé, enveloppe RDLI) viennent de SP_2026
+seul ; « Budget RDLI Total Coût (Res+Trans) » de Projets, pluriannuelle,
+n'alimente plus la carte (elle donnait des enveloppes « délirantes »). La
+ligne « coûts 2026 (SP) » du rapport compte les montants renseignés
+(estimé n/N · réel · engagé · RDLI) : elle dit d'elle-même si les chiffres
+passent. Squelettes synthétiques dans `fixtures/import/` (PARAM,
 Projets, ProjetsJalons, SP_2026, Ressources_PdC).
 
 **Questions ouvertes nées de la révision** (ne pas inventer) :
@@ -175,7 +180,7 @@ Projets, ProjetsJalons, SP_2026, Ressources_PdC).
 |---|---|---|
 | Q21 | Sémantique des cellules « RDO/RDLI/RDR franchi » : date, oui/x, booléen ? Et « (Statut) » ? — à verrouiller par l'audit | PMO |
 | Q22 | Charge j.h de la carte (`effortEstimated` / `effortConsumed`) : « Charge finale/réelle ME (Res) (J) » du consolidé sont pluriannuelles comme les coûts ; source 2026 à désigner (« Réel 2026 (Res)(J) » existe, pas d'estimé 2026 en jours) | Auteur + PMO |
-| Q23 | Enveloppe RDLI (`budgetRdli`) : garder « Budget RDLI Total Coût (Res+Trans) » du consolidé ou passer à « * Budget validé RDLI » de SP_2026 ? | Auteur |
+| Q23 | Enveloppe RDLI (`budgetRdli`) — **tranchée 2026-09-10** : « * Budget validé RDLI » de SP_2026 (annuelle) ; la colonne pluriannuelle de Projets n'alimente plus la carte | — |
 
 ## Principes
 

@@ -143,7 +143,10 @@ function buildCard(ctx: JoinContext, entry: ProjetEntry): EnrichedCard {
     owner: entry.owner, typeId: entry.typeId,
     columnId: jalon?.columnId ?? ctx.entryColumnId, positioned: jalon !== null,
     createdAt: entry.createdAt, dateRdr: entry.dateRdr,
-    budgetRdli: entry.budgetRdli ?? spEntry?.budgetRdli ?? null,
+    // The four k€ figures come from SP alone (author, 2026-09-10): the
+    // Projets « Budget RDLI Total Coût » is plurianual and no longer feeds
+    // the card, even as a fallback (Q23 tranchée).
+    budgetRdli: spEntry?.budgetRdli ?? null,
     budgetEstimated: spEntry?.budgetEstimated ?? null,
     budgetConsumed: spEntry?.budgetConsumed ?? null,
     budgetEngaged: spEntry?.budgetEngaged ?? null,

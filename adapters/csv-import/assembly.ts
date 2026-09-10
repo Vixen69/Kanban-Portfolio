@@ -7,7 +7,7 @@ import type { ParamTable } from "./param.ts";
 import type { ProjetsTable } from "./projets.ts";
 import type { JalonsTable } from "./jalons.ts";
 import type { SpTable } from "./sp.ts";
-import type { CardAssembly } from "./enrich.ts";
+import type { CardAssembly, EnrichedCard } from "./enrich.ts";
 import { cardDistribution } from "./enrich.ts";
 import type { PdcTable } from "./pdc.ts";
 import type { ProfilsTable } from "./profils.ts";
@@ -167,12 +167,16 @@ function positionStatus(data: AssemblyData, deck: CardAssembly): string {
 
 function spStatus(sp: SpTable | null, deck: CardAssembly, year: number): string {
   const s = deck.stats;
-  const q = " · RDLI et charges j.h lus dans `projets` (pluriannuels — Q22/Q23 en suspens)";
+  const q = " · RDLI depuis SP (« * Budget validé RDLI », annuelle — Q23 tranchée 2026-09-10)";
   if (sp === null) return `en attente de SP — coûts ${year} inconnus${q}`;
   const joined = s.spById + s.spByName + s.spByCode;
+  const filled = (pick: (c: EnrichedCard) => number | null): string =>
+    `${deck.cards.filter((c) => pick(c) !== null).length}/${s.total}`;
   return `${joined}/${s.total} jointes (Id ${s.spById} · nom ${s.spByName} · code ${s.spByCode})` +
     ` · sans correspondance : ${s.withoutSp} · sujets SP hors périmètre : ${s.spOutside}` +
-    `${sp.hasIds ? "" : " · fichier sans colonne Id (forme SP_total)"}${q}`;
+    `${sp.hasIds ? "" : " · fichier sans colonne Id (forme SP_total)"}${q}` +
+    ` · montants renseignés : estimé ${filled((c) => c.budgetEstimated)} · réel ${filled((c) => c.budgetConsumed)}` +
+    ` · engagé ${filled((c) => c.budgetEngaged)} · RDLI ${filled((c) => c.budgetRdli)}`;
 }
 
 // No deck yet: say what each present table waits for.
