@@ -637,6 +637,21 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-10 — Le « € » de Windows-1252 : décodage fait main (budget SP enfin lu)
+
+- **Cause racine du budget à 0/137** (capture Excel de l'auteur) : les
+  colonnes « Coût prév (ME) » et « Coût réel » sont écrites « 501 k€ » avec
+  le vrai signe euro, celles qui passaient (« Engagé Achats », « * Budget
+  validé RDLI ») sont écrites « 193 ke ». En Windows-1252 le « € » est
+  l'octet 0x80 ; un Node sans ICU complet (image alpine) décode ce label en
+  ISO-8859-1 et rend U+0080, un contrôle invisible que ni l'échantillon du
+  rapport ni les filtres de blancs ne montraient. Sur le poste de l'auteur
+  (ICU complet) tout passait — d'où trois correctifs à côté.
+- **Correctif** : `decodeWindows1252` mappe les octets 0x80–0x9F par
+  table, sans décodeur de plateforme ; l'échantillon des cellules illisibles
+  épelle aussi les contrôles C1 (⟨U+0080⟩). Leçon : un comportement qui
+  dépend de la build Node se teste sur l'image cible, pas sur le poste.
+
 ### 2026-09-10 — Types par mot-clé ; blancs invisibles dans les montants
 
 - **Types** : l'audit de septembre donnait 0 Obsolescence et 34 « hors des

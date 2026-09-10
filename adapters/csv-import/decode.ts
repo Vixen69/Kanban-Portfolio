@@ -47,23 +47,43 @@ function hasUtf16Bom(bytes: Uint8Array): boolean {
     && ((bytes[0] === 0xff && bytes[1] === 0xfe) || (bytes[0] === 0xfe && bytes[1] === 0xff));
 }
 
-// Invalid UTF-8: decode as Windows-1252 (every byte maps, never throws) and
-// flag it. The constructor guard covers no-ICU Node builds, where the label
-// is unknown — degrade to lossy UTF-8 rather than crash the audit.
+// Invalid UTF-8: decode as Windows-1252 and flag it. The mapping is done
+// here, byte by byte, never through TextDecoder("windows-1252"): a Node
+// built without full ICU (the alpine images the middle runs on) serves
+// ISO-8859-1 under that label, which turns the euro byte 0x80 into the
+// invisible control U+0080 — the September SP amounts « 501 k€ » then read
+// as « 501 k » plus junk and every k€ column came out empty (2026-09-10).
 function decodeFallback(body: Uint8Array): DecodedCsv {
-  try {
-    const text = new TextDecoder("windows-1252").decode(body);
-    return {
-      text,
-      encoding: "windows-1252",
-      warnings: ["encodage Windows-1252 détecté (UTF-8 attendu) — accents décodés, export à corriger"],
-    };
-  } catch {
-    const text = new TextDecoder("utf-8").decode(body);
-    return {
-      text,
-      encoding: "unknown",
-      warnings: ["encodage indéterminé — décodage UTF-8 de secours, des caractères ont pu être perdus"],
-    };
+  return {
+    text: decodeWindows1252(body),
+    encoding: "windows-1252",
+    warnings: ["encodage Windows-1252 détecté (UTF-8 attendu) — accents décodés, export à corriger"],
+  };
+}
+
+/** Code points of the Windows-1252 bytes 0x80–0x9F (the ones ISO-8859-1 lacks). */
+const CP1252_HIGH: readonly number[] = [
+  0x20ac, 0x0081, 0x201a, 0x0192, 0x201e, 0x2026, 0x2020, 0x2021, 0x02c6, 0x2030, 0x0160, 0x2039, 0x0152, 0x008d, 0x017d, 0x008f,
+  0x0090, 0x2018, 0x2019, 0x201c, 0x201d, 0x2022, 0x2013, 0x2014, 0x02dc, 0x2122, 0x0161, 0x203a, 0x0153, 0x009d, 0x017e, 0x0178,
+];
+
+/**
+ * Decodes Windows-1252 bytes to text without any platform decoder: bytes
+ * below 0x80 and from 0xA0 are their own code points, 0x80–0x9F go through
+ * the table (€, ’, “ ”, …, œ, Œ, –, —).
+ * Inputs: the bytes. Output: the text. Failure modes: none — every byte maps.
+ */
+export function decodeWindows1252(bytes: Uint8Array): string {
+  const CHUNK = 8192;
+  const parts: string[] = [];
+  for (let start = 0; start < bytes.length; start += CHUNK) {
+    const end = Math.min(start + CHUNK, bytes.length);
+    const codes: number[] = new Array<number>(end - start);
+    for (let i = start; i < end; i++) {
+      const b = bytes[i] ?? 0;
+      codes[i - start] = b >= 0x80 && b <= 0x9f ? (CP1252_HIGH[b - 0x80] ?? b) : b;
+    }
+    parts.push(String.fromCharCode(...codes));
   }
+  return parts.join("");
 }

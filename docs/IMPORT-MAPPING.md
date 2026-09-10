@@ -609,6 +609,15 @@ en silence). Attention au « CSV » d'Excel français : séparateur `;` et
 virgule décimale — le lecteur les attend, et signale tout fichier qui
 dévie.
 
+**Décodage Windows-1252 fait main (2026-09-10).** Le lecteur ne passe plus
+par `TextDecoder("windows-1252")` : un Node sans ICU complet (les images
+alpine du middle) sert de l'ISO-8859-1 sous ce nom, et l'octet 0x80 du
+« € » devient le contrôle invisible U+0080. Symptôme vu sur l'export SP de
+septembre : « Coût prév (ME) » et « Coût réel » écrites « 501 k€ » lues
+comme « 501 k » + un caractère invisible → 0/137 renseignées, alors que
+« Engagé Achats » et « * Budget validé RDLI », écrites « 193 ke », passaient.
+Les 32 octets 0x80–0x9F sont désormais mappés par table (€, ’, “ ”, …, œ).
+
 ## Module nominatif : construit comme table de capacité (ADR 024, 2026-09-07)
 
 Direction de 2026-07-29, **réalisée autrement** : les personnes ne vont

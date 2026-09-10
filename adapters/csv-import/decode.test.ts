@@ -4,7 +4,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { decodeCsvBytes } from "./decode.ts";
+import { decodeCsvBytes, decodeWindows1252 } from "./decode.ts";
 
 const EURO = String.fromCharCode(0x20ac);
 const OE = String.fromCharCode(0x153);
@@ -58,4 +58,15 @@ test("empty bytes decode to empty text", () => {
   assert.equal(out.text, "");
   assert.equal(out.encoding, "utf-8");
   assert.deepEqual(out.warnings, []);
+});
+
+test("Windows-1252 is mapped by hand: the euro byte and the typographic quotes survive without ICU (2026-09-10)", () => {
+  const bytes = Buffer.from([0x35, 0x30, 0x31, 0x20, 0x6b, 0x80, 0x3b, 0xe9, 0x3b, 0x64, 0x92, 0x6f, 0x3b, 0x9c]);
+  const out = decodeCsvBytes(bytes);
+  assert.equal(out.encoding, "windows-1252");
+  assert.equal(out.text, "501 k" + EURO + ";é;d" + String.fromCharCode(0x2019) + "o;" + OE);
+  assert.equal(decodeWindows1252(Uint8Array.from([0x80, 0x85, 0x93, 0x94, 0x96, 0x97, 0x8c])),
+    EURO + "\u2026\u201c\u201d\u2013\u2014\u0152");
+  assert.equal(decodeWindows1252(Uint8Array.from([0x41, 0xa0, 0xe9, 0xff])), "A\u00a0\u00e9\u00ff", "ISO-8859-1 range untouched");
+  assert.equal(decodeWindows1252(new Uint8Array(20000)).length, 20000, "chunking keeps every byte");
 });

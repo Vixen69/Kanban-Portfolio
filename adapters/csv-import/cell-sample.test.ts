@@ -15,3 +15,7 @@ test("sampleOf reveals inner invisible spaces and control characters, keeps acce
   assert.equal(sampleOf("Coût prév"), "Coût prév", "accents untouched");
   assert.equal(sampleOf("x".repeat(60)).length, 40);
 });
+
+test("sampleOf reveals the C1 controls a Latin-1 decode leaves behind (the euro byte 0x80)", () => {
+  assert.equal(sampleOf("501 k\u0080"), "501 k⟨U+0080⟩");
+});

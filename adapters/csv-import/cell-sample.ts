@@ -6,7 +6,7 @@
 // client machine. Accented letters stay as they are.
 
 /** Control characters and invisible spaces worth spelling out (accents excluded). */
-const HIDDEN = /[\x00-\x1F\x7F\u00A0\u00AD\u1680\u2000-\u200B\u202F\u205F\u3000\uFEFF]/g;
+const HIDDEN = /[\x00-\x1F\x7F-\x9F\u00A0\u00AD\u1680\u2000-\u200B\u202F\u205F\u3000\uFEFF]/g;
 
 /**
  * Trims a raw cell, keeps its first 40 characters and spells every hidden
