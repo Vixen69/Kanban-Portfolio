@@ -23,8 +23,9 @@
 /* Type-of-project tag — deliberately more prominent than the domain bar. */
 .type-tag { font-size: 8px; font-weight: 700; color: #fff; padding: 0 4px; border-radius: 3px; line-height: 1.55; letter-spacing: .03em; flex: 0 0 auto; white-space: nowrap; }
 .type-tag.big { font-size: 9px; padding: 1px 7px; border-radius: 4px; line-height: 1.5; }
-.mini-code { font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace; font-size: 8px; color: var(--tx-4); flex: 0 0 auto; }
-.focus-code { font-family: ui-monospace, Menlo, monospace; font-size: 9px; color: var(--tx-4); }
+/* Code projet : même police, même taille, même couleur que le nom qu'il précède (lisibilité, auteur 2026-09-10). */
+.mini-code { font-size: 9px; color: var(--tx-1); font-weight: 500; flex: 0 0 auto; }
+.focus-code { font-size: 11px; color: var(--tx-1); font-weight: 600; }
 
 .focus-card { position: relative; display: flex; gap: 8px; padding: 7px 9px 7px 13px; border-radius: 4px; background: var(--bg-card); min-height: 58px; cursor: grab; overflow: hidden; flex: 0 0 auto; box-shadow: 0 1px 2px rgba(15,23,42,.08); }
 .focus-card:hover { box-shadow: 0 2px 7px rgba(15,23,42,.14); }
