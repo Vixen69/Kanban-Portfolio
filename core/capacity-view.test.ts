@@ -41,11 +41,18 @@ const CARDS: CardState[] = [
 const READOUT = computeCapacityReadout(SNAPSHOT, CARDS, CONFIG, NOW);
 
 test("kpis: capacity, board demand, whole-plan engagement, board share, progress, elapsed year", () => {
-  assert.deepEqual(READOUT.kpis, {
+  const { freeJh, overJh, ...kpis } = READOUT.kpis;
+  assert.deepEqual(kpis, {
     persons: 4, external: 1, capacityJh: 240, demandJh: 250, doneJh: 50, plannedJh: 370, doneAllJh: 120,
     ratio: 1.04, engagement: 1.54, perimeterShare: 0.68, progress: 0.32, yearElapsed: 0.69,
     overloaded: 2, cardsWithoutAssignment: 1, withoutPlan: 1,
   });
+  // ADR 029: free and over are the two sides of planned − capacity, summed per known person.
+  const net = SNAPSHOT.persons
+    .filter((p) => p.capacityJh !== null && p.plannedJh !== null)
+    .reduce((sum, p) => sum + (p.plannedJh ?? 0) - (p.capacityJh ?? 0), 0);
+  assert.ok(freeJh >= 0 && overJh >= 0);
+  assert.equal(Math.round((overJh - freeJh) * 100) / 100, Math.round(net * 100) / 100);
   assert.equal(READOUT.exerciseYear, 2026);
 });
 
@@ -112,7 +119,7 @@ test("coverage counts stubs, unknown capacities and plans, uncovered cards, gene
 test("an empty snapshot reads as zeros, not NaN", () => {
   const empty = computeCapacityReadout({ exerciseYear: 2027, persons: [], assignments: [] }, [], CONFIG, NOW);
   assert.deepEqual(empty.kpis, {
-    persons: 0, external: 0, capacityJh: 0, demandJh: 0, doneJh: 0, plannedJh: 0, doneAllJh: 0,
+    persons: 0, external: 0, capacityJh: 0, demandJh: 0, doneJh: 0, plannedJh: 0, doneAllJh: 0, freeJh: 0, overJh: 0,
     ratio: null, engagement: null, perimeterShare: null, progress: null, yearElapsed: 0,
     overloaded: 0, cardsWithoutAssignment: 0, withoutPlan: 0,
   });

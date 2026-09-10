@@ -34,6 +34,10 @@ export interface CapacityKpis {
   plannedJh: number;
   /** Done over the whole plan de charge, j.h. */
   doneAllJh: number;
+  /** Capacity left once every plan is placed, j.h (persons' free days summed, ADR 029). */
+  freeJh: number;
+  /** Planned beyond capacity, j.h (persons' overloads summed). */
+  overJh: number;
   /** demandJh / capacityJh, null when no capacity is known. */
   ratio: number | null;
   /** plannedJh / capacityJh — the real engagement; null when unknown. */
@@ -152,11 +156,13 @@ export function computeCapacityReadout(
 function kpisOf(
   snapshot: CapacitySnapshot, loads: PersonLoad[], cardsWithoutAssignment: number, overloaded: number, now: Date,
 ): CapacityKpis {
-  const sums = { capacityJh: 0, demandJh: 0, doneJh: 0, plannedJh: 0, doneAllJh: 0, withoutPlan: 0 };
+  const sums = { capacityJh: 0, demandJh: 0, doneJh: 0, plannedJh: 0, doneAllJh: 0, freeJh: 0, overJh: 0, withoutPlan: 0 };
   for (const load of loads) {
     sums.capacityJh = round2(sums.capacityJh + (load.person.capacityJh ?? 0));
     sums.demandJh = round2(sums.demandJh + load.jh);
     sums.doneJh = round2(sums.doneJh + load.done);
+    sums.freeJh = round2(sums.freeJh + load.freeJh);
+    sums.overJh = round2(sums.overJh + load.overJh);
     if (load.person.plannedJh === null) sums.withoutPlan++;
     else {
       sums.plannedJh = round2(sums.plannedJh + load.person.plannedJh);

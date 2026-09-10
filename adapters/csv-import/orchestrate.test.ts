@@ -65,7 +65,7 @@ test("the five fixture files assemble the full deck", () => {
   const carto = cards?.cards.find((c) => c.codename === "PE10008");
   assert.equal(carto?.owner, "Farid KOVAC", "BARBIER Anne is a PARAM domain lead, excluded");
   assert.match(byLabel.get("coûts 2026 (SP)") ?? "", /^4\/6 jointes \(Id 3 · nom 1 · code 0\) · sans correspondance : 2 · sujets SP hors périmètre : 1 · RDLI/);
-  assert.match(byLabel.get("plan de charge") ?? "", /^3\/6 cartes couvertes .* projets PdC hors périmètre : 1 · cartes sans charge : 3$/);
+  assert.match(byLabel.get("plan de charge") ?? "", /^3\/6 cartes couvertes .* projets PdC hors périmètre : 1 · cartes sans charge : 3 · non nominatives : 3 ligne\(s\) \(75 j\.h, gardées sur les projets\)$/);
   assert.equal(chargeStats?.covered, 3);
   const snapshot = capacity?.snapshot;
   assert.ok(snapshot);
@@ -73,7 +73,7 @@ test("the five fixture files assemble the full deck", () => {
   assert.ok(snapshot.assignments.every((a) => /^p-[0-9a-f]{16}$/.test(a.personId)));
   assert.ok(snapshot.assignments.every((a) => snapshot.persons.some((p) => p.id === a.personId)));
   assert.deepEqual(snapshot.persons.map((p) => p.source), ["profils", "profils", "profils", "profils", "profils"]);
-  assert.match(byLabel.get("capacité") ?? "", /^5 personne\(s\) dont 1 externe\(s\) · capacité 780 j\.h · 0 sans fiche · affectations : 3 sur 3 carte\(s\) · demande du tableau 85 j\.h · projeté \(tout le plan de charge\) [\d,]+ j\.h · réalisé [\d,]+ j\.h · 2 hors plan de charge$/);
+  assert.match(byLabel.get("capacité") ?? "", /^5 personne\(s\) dont 1 externe\(s\) · capacité 780 j\.h · 0 sans fiche · affectations : 3 sur 3 carte\(s\) · demande du tableau 85 j\.h · projeté \(tout le plan de charge\) [\d,]+ j\.h · réalisé [\d,]+ j\.h · 2 hors plan de charge · capacité lue dans le PdC pour 2 personne\(s\)$/);
   const alice = snapshot.persons.find((p) => p.name === "Jean ROCA");
   assert.ok(alice && alice.plannedJh !== null && alice.plannedJh > 0, "whole-plan totals reach the person");
 });

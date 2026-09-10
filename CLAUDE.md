@@ -280,7 +280,7 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
 - QuickAdd (« + Sujet », touche N): always enters the first column; the
   canal confers the nature.
 - Admin panel (⚙): topology/vocabulary only (ADR 013), incl. per-lane
-  natureKey. Capacity view (☷, ADR 024/025 — replaces the v12 Metrics
+  natureKey. Capacity view (☷, ADR 024/025/029 — replaces the v12 Metrics
   read-out, author's call 2026-09-07): the arbitration read-out computed
   from the imported capacity snapshot + the active cards by
   `core/capacity-view.ts` — 6 KPIs, then demande sur les domaines

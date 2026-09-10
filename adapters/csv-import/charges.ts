@@ -3,6 +3,7 @@
 // orphans are counted, and the nominative consolidation (taux ETP, base
 // 200 j.h/an) lands in the report — names stay on this machine.
 
+import { normalizeLabel } from "./normalize.ts";
 import { tallyInto, tallyLabel } from "./tallies.ts";
 import type { Tally } from "./tallies.ts";
 import type { EnrichedCard } from "./enrich.ts";
@@ -28,6 +29,29 @@ export interface ChargeStats {
   /** 2026 totals of the retained cards only (the board's own load). */
   cardsJh: number;
   cardsDone: number;
+  /** Non-nominative project rows set aside from the persons (ADR 029). */
+  genericRows: number;
+  genericJh: number;
+}
+
+/** The PdC projects indexed for the join: code, exact name, title (ADR 029). */
+interface ProjectIndex {
+  byCode: Map<string, string>;
+  byName: Map<string, string | "ambiguous">;
+  byTitle: Map<string, string | "ambiguous">;
+}
+
+// Every index maps to the project's key; a name or title borne by two
+// projects becomes "ambiguous" and joins nothing.
+function indexProjects(pdc: PdcTable): ProjectIndex {
+  const index: ProjectIndex = { byCode: new Map(), byName: new Map(), byTitle: new Map() };
+  for (const project of pdc.projects.values()) {
+    const code = project.codename === null ? null : normalizeLabel(project.codename);
+    if (code !== null && !index.byCode.has(code)) index.byCode.set(code, project.key);
+    index.byName.set(project.normalizedName, index.byName.has(project.normalizedName) ? "ambiguous" : project.key);
+    index.byTitle.set(project.normalizedTitle, index.byTitle.has(project.normalizedTitle) ? "ambiguous" : project.key);
+  }
+  return index;
 }
 
 /** Base of the taux-ETP reading: 200 j.h ≈ one full-time year. */
@@ -65,29 +89,22 @@ export function attachCharges(
     covered: 0, uncovered: 0, pdcOutside: 0,
     totalJh: pdc.totals.jh, totalDone: pdc.totals.done,
     cardsJh: 0, cardsDone: 0,
+    genericRows: pdc.excluded.generic + pdc.excluded.zz + pdc.excluded.roles, genericJh: pdc.excluded.jh,
   };
-  const byCode = new Map<string, string>();
-  const byTitle = new Map<string, string | "ambiguous">();
-  for (const project of pdc.projects.values()) {
-    if (project.codename !== null && !byCode.has(project.codename)) {
-      byCode.set(project.codename, project.normalizedName);
-    }
-    byTitle.set(project.normalizedTitle,
-      byTitle.has(project.normalizedTitle) ? "ambiguous" : project.normalizedName);
-  }
+  const index = indexProjects(pdc);
   const consumed = new Set<string>();
   const tallies = new Map<string, Tally>();
   for (const card of cards) {
-    const key = joinKey(pdc, byCode, byTitle, card);
+    const key = joinKey(index, card);
     const project = key === null ? undefined : pdc.projects.get(key);
     if (project === undefined) {
       stats.uncovered++;
       tallyInto(tallies, `carte sans plan de charge ${year}`, card.ref.line);
       continue;
     }
-    consumed.add(project.normalizedName);
+    consumed.add(project.key);
     card.charges = attach(project, stats);
-    card.pdcKey = project.normalizedName;
+    card.pdcKey = project.key;
     stats.covered++;
   }
   stats.pdcOutside = pdc.projects.size - consumed.size;
@@ -109,16 +126,16 @@ function attach(project: PdcProject, stats: ChargeStats): CardCharge[] {
   return charges;
 }
 
-function joinKey(
-  pdc: PdcTable, byCode: Map<string, string>,
-  byTitle: Map<string, string | "ambiguous">, card: EnrichedCard,
-): string | null {
-  if (pdc.projects.has(card.normalizedName)) return card.normalizedName;
+// Code first (names repeat across projects — ADR 029), then the exact
+// name, then the title without its code; an ambiguous name joins nothing.
+function joinKey(index: ProjectIndex, card: EnrichedCard): string | null {
   if (card.codename !== null) {
-    const viaCode = byCode.get(card.codename);
+    const viaCode = index.byCode.get(normalizeLabel(card.codename));
     if (viaCode !== undefined) return viaCode;
   }
-  const viaTitle = byTitle.get(card.normalizedName);
+  const viaName = index.byName.get(card.normalizedName);
+  if (viaName !== undefined && viaName !== "ambiguous") return viaName;
+  const viaTitle = index.byTitle.get(card.normalizedName);
   return viaTitle === undefined || viaTitle === "ambiguous" ? null : viaTitle;
 }
 
@@ -126,10 +143,13 @@ function joinKey(
 function emitPersons(report: ImportReport, pdc: PdcTable, year: number): void {
   const top = pdc.persons.slice(0, TOP_PERSONS);
   for (const person of top) {
-    const etp = (person.jh / ETP_BASE).toFixed(2).replace(".", ",");
+    const planned = person.plannedJh ?? person.jh;
+    const done = person.plannedDone ?? person.done;
+    const etp = (planned / ETP_BASE).toFixed(2).replace(".", ",");
+    const capacity = person.capacityJh === null ? "" : ` · disponible ${formatJh(person.capacityJh)}`;
     warn(report,
-      `mobilisation ${year} : « ${person.name} » ${etp} ETP (${formatJh(person.jh)} j.h prévisionnel` +
-        ` · ${formatJh(person.done)} réel)`,
+      `mobilisation ${year} : « ${person.name} » ${etp} ETP (${formatJh(planned)} j.h prévisionnel` +
+        ` · ${formatJh(done)} réel${capacity})`,
       "consolidation nominative");
   }
   if (pdc.persons.length > TOP_PERSONS) {

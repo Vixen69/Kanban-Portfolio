@@ -637,6 +637,27 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-10 — Plan de charge : trois natures de lignes, personnes nominatives, capacité lue dans le PdC (ADR 029)
+
+- **Constat de l'auteur, fichier ouvert** : export par ressource. Chaque
+  personne a une ligne par affectation projet, plus « Disponible ressource
+  (en jour) » (sa capacité) et « Planifiée projet (en jour) » (le total de
+  ses affectations), toutes dans la colonne « Id Projet ». « Ressource »
+  mêle personnes nommées, affectations génériques, codes « zz… », rôles
+  « PE22… ». Les noms de projet se répètent.
+- **Avant** : tout était additionné — projeté doublé, « Disponible » pris
+  pour un projet (490 « projets hors périmètre », 20 000 j.h projetés), et
+  des « personnes » qui n'en étaient pas.
+- **Décision** : classification des lignes ; projets agrégés par **code** ;
+  personnes = ressources nominatives seulement (le reste garde sa charge
+  sur le projet, compté) ; capacité = ligne « Disponible » du PdC (Ress.
+  Profils en repli) ; projeté = ligne « Planifiée » (somme en repli, écart
+  signalé). Cœur : `freeJh` / `overJh` par personne et par groupe ; vue ☷ :
+  « Reste disponible » et « Surcharge cumulée » en tête, marges dans les
+  barres. Rapport : lignes « plan de charge » et « capacité » étendues.
+- **Ouvert** : rattacher la demande sans personne nommée à son domaine
+  (« à pourvoir ») ; capacité d'un domaine = internes seuls ?
+
 ### 2026-09-10 — Le « € » de Windows-1252 : décodage fait main (budget SP enfin lu)
 
 - **Cause racine du budget à 0/137** (capture Excel de l'auteur) : les

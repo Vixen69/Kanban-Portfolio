@@ -255,6 +255,9 @@ export interface Person {
   plannedJh: number | null;
   /** Done over the whole plan de charge, j.h; null when absent from it. */
   doneJh: number | null;
+  /** Where the capacity was read: the plan de charge's own « Disponible
+   * ressource » line (ADR 029) or Ress.Profils; absent when unknown. */
+  capacitySource?: "pdc" | "profils";
   /** "profils" = from Ress.Profils; "pdc" = stub built from an assignment without a profils row. */
   source: "profils" | "pdc";
 }

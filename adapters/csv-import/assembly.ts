@@ -91,7 +91,8 @@ function capacityStatus(data: AssemblyData): string {
     : `${s.persons} personne(s) dont ${s.external} externe(s) · capacité ${formatJh(s.capacityJh)} j.h`;
   return `${people} · ${s.stubs} sans fiche · affectations : ${s.assignments} sur ${s.cardsCovered} carte(s)` +
     ` · demande du tableau ${formatJh(s.demandJh)} j.h · projeté (tout le plan de charge) ${formatJh(s.plannedJh)} j.h` +
-    ` · réalisé ${formatJh(s.doneAllJh)} j.h · ${s.withoutPlan} hors plan de charge`;
+    ` · réalisé ${formatJh(s.doneAllJh)} j.h · ${s.withoutPlan} hors plan de charge` +
+    ` · capacité lue dans le PdC pour ${s.capacityFromPdc} personne(s)`;
 }
 
 function paramStatus(param: ParamTable | null): string {
@@ -119,7 +120,8 @@ function chargeStatus(data: AssemblyData, year: number): string {
   return `${s.covered}/${data.cards.cards.length} cartes couvertes · charge ${year} des cartes : ` +
     `${formatJh(s.cardsJh)} j.h prév. · ${formatJh(s.cardsDone)} réel` +
     ` · total du fichier PdC (toute la DSI) : ${formatJh(s.totalJh)} / ${formatJh(s.totalDone)}` +
-    ` · projets PdC hors périmètre : ${s.pdcOutside} · cartes sans charge : ${s.uncovered}`;
+    ` · projets PdC hors périmètre : ${s.pdcOutside} · cartes sans charge : ${s.uncovered}` +
+    ` · non nominatives : ${s.genericRows} ligne(s) (${formatJh(s.genericJh)} j.h, gardées sur les projets)`;
 }
 
 // The assembled deck: distribution, position, domain, owner, costs.

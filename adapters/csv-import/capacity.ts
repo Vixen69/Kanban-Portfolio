@@ -34,6 +34,11 @@ export interface CapacityStats {
   doneAllJh: number;
   /** Persons of Ress.Profils absent from the plan de charge. */
   withoutPlan: number;
+  /** Persons whose capacity comes from their « Disponible ressource » line (ADR 029). */
+  capacityFromPdc: number;
+  /** Non-nominative project rows set aside from the persons, and their load. */
+  genericRows: number;
+  genericJh: number;
 }
 
 /** The built snapshot with its counters. */
@@ -115,15 +120,19 @@ export function buildCapacity(
   // Whole-plan totals first (they create the stubs), then the assignments.
   for (const entry of pdc?.persons ?? []) {
     const person = personFor(registry, entry.matricule, entry.name, 0);
-    person.plannedJh = entry.jh;
-    person.doneJh = entry.done;
+    person.plannedJh = entry.plannedJh ?? entry.jh;
+    person.doneJh = entry.plannedDone ?? entry.done;
+    if (entry.capacityJh !== null) {
+      person.capacityJh = entry.capacityJh;
+      person.capacitySource = "pdc";
+    } else if (person.capacityJh !== null) person.capacitySource = "profils";
   }
   const assignments = collectAssignments(pdc, cards, registry);
   for (const [message, t] of registry.tallies) warn(report, `${message} : ${tallyLabel(t)}`, "capacité");
   const snapshot: CapacitySnapshot = {
     exerciseYear: config.exercise.year, persons: [...registry.persons.values()], assignments,
   };
-  return { snapshot, stats: statsOf(snapshot, cards) };
+  return { snapshot, stats: statsOf(snapshot, cards, pdc) };
 }
 
 // One assignment per (PdC person, card): the PdC project a card joined
@@ -142,7 +151,7 @@ function collectAssignments(pdc: PdcTable | null, cards: readonly EnrichedCard[]
   return assignments;
 }
 
-function statsOf(snapshot: CapacitySnapshot, cards: readonly EnrichedCard[]): CapacityStats {
+function statsOf(snapshot: CapacitySnapshot, cards: readonly EnrichedCard[], pdc: PdcTable | null): CapacityStats {
   const round2 = (v: number): number => Math.round(v * 100) / 100;
   const covered = new Set(snapshot.assignments.map((a) => a.cardId));
   const sums = { capacityJh: 0, demandJh: 0, plannedJh: 0, doneAllJh: 0, withoutPlan: 0 };
@@ -161,6 +170,9 @@ function statsOf(snapshot: CapacitySnapshot, cards: readonly EnrichedCard[]): Ca
     external: snapshot.persons.filter((p) => p.external).length,
     assignments: snapshot.assignments.length,
     cardsCovered: cards.filter((card) => covered.has(cardId(card))).length,
+    capacityFromPdc: snapshot.persons.filter((p) => p.capacitySource === "pdc").length,
+    genericRows: pdc === null ? 0 : pdc.excluded.generic + pdc.excluded.zz + pdc.excluded.roles,
+    genericJh: pdc?.excluded.jh ?? 0,
     ...sums,
   };
 }

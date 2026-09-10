@@ -407,6 +407,36 @@ carte), puis par nom ; seules les cartes **sans** chef de projet en
 prennent un ; les lignes hors périmètre sont comptées. La ligne « chef de
 projet » de l'état d'assemblage dit « dont N via ProjetsCdP ».
 
+## `Ressources_PdC` — les trois natures de lignes (ADR 029, 2026-09-10)
+
+Le plan de charge est un export **par ressource** : pour chaque ressource,
+une ligne par affectation projet, plus deux lignes propres portées par la
+même colonne « Id Projet » — **« Disponible ressource (en jour) »**, la
+capacité de la personne, et **« Planifiée projet (en jour) »**, le total de
+ses affectations tel que l'outil le calcule. Chaque ligne porte un Prév. et
+un Réel de l'exercice. Règles :
+
+- **Lignes projet agrégées par code** (« Id Projet »), jamais par nom : les
+  noms se répètent d'un projet à l'autre. Une ligne sans code retombe sur le
+  nom. La jointure aux cartes se fait code d'abord, puis nom exact, puis
+  titre sans code ; un nom ambigu ne joint rien.
+- **Ressources nominatives seulement** pour les personnes : « Ressource »
+  qui contient « générique », commence par « zz » (codes à ne pas utiliser)
+  ou « PE22 » (rôles génériques), ou sans matricule → la charge reste sur le
+  projet (« demande sans personne nommée », comptée dans la ligne « plan de
+  charge » de l'assemblage), jamais une personne.
+- **Capacité de la personne** = sa ligne « Disponible ressource » (Prév.) ;
+  à défaut, « Disponibilité » de Ress.Profils. **Projeté** = sa ligne
+  « Planifiée projet » ; à défaut, la somme de ses lignes projet. Un écart
+  > 0,5 j.h entre la somme et la ligne est signalé, la ligne fait foi.
+- Les deux lignes propres **ne comptent jamais** comme charge projet. Avant
+  cette révision elles étaient additionnées : projeté doublé, « Disponible »
+  pris pour un projet — les 490 « projets PdC hors périmètre » et les
+  20 000 j.h projetés de l'audit de septembre.
+- Chiffres nouveaux : **reste disponible** (capacité − projeté par personne,
+  sommé) et **surcharge cumulée** (projeté − capacité), en tête de la vue ☷
+  et dans les barres par domaine / profil.
+
 ## `Ress.Profils` — structure et mapping (ADR 024, 2026-09-07)
 
 Une ligne = une personne de la DSI (interne ou externe). Onglet du classeur

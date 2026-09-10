@@ -90,6 +90,9 @@ function Kpis({ readout }: { readout: CapacityReadout }) {
         tone={progressTone(kpis)} />
       <Kpi num={pct(kpis.perimeterShare)} label="Part du tableau dans le projeté" />
       <Kpi num={kpis.overloaded} label="Personnes au-delà de 100 %" tone={kpis.overloaded > 0 ? "alert" : "ok"} />
+      <Kpi num={fmtUnit(kpis.freeJh)} unit="j.h" label="Reste disponible · capacité non planifiée" tone="ok" />
+      <Kpi num={fmtUnit(kpis.overJh)} unit="j.h" label="Surcharge cumulée · planifié au-delà des capacités"
+        tone={kpis.overJh > 0 ? "alert" : "ok"} />
     </div>
   );
 }

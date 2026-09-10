@@ -26,6 +26,10 @@ export interface PersonLoad {
   engagement: number | null;
   /** Planned load outside the board: plannedJh − jh (0 when the plan is unknown). */
   outsideJh: number;
+  /** Capacity left once the whole plan is placed: capacityJh − plannedJh when positive (ADR 029). */
+  freeJh: number;
+  /** Planned beyond the capacity: plannedJh − capacityJh when positive. */
+  overJh: number;
   cards: Array<{ cardId: string; jh: number; done: number }>;
 }
 
@@ -57,6 +61,10 @@ export interface GroupLoad {
   doneAllJh: number;
   /** Planned load outside the board, j.h (sum of the persons' outsideJh). */
   outsideJh: number;
+  /** Capacity left once every plan is placed, j.h (sum of the persons' freeJh, ADR 029). */
+  freeJh: number;
+  /** Planned beyond capacity, j.h (sum of the persons' overJh). */
+  overJh: number;
   /** demandJh / capacityJh, null when no capacity is known. */
   ratio: number | null;
   /** plannedJh / capacityJh, null when no plan or no capacity is known. */
@@ -91,7 +99,7 @@ function emptySplit(): LoadSplit {
 export function emptyGroupLoad(key: string): GroupLoad {
   return {
     key, persons: 0, withoutCapacity: 0, withoutPlan: 0, capacityJh: 0, demandJh: 0, doneJh: 0,
-    plannedJh: 0, doneAllJh: 0, outsideJh: 0, ratio: null, engagement: null,
+    plannedJh: 0, doneAllJh: 0, outsideJh: 0, freeJh: 0, overJh: 0, ratio: null, engagement: null,
     internal: emptySplit(), external: emptySplit(),
   };
 }
@@ -106,7 +114,7 @@ export function emptyGroupLoad(key: string): GroupLoad {
 export function personLoads(snapshot: CapacitySnapshot): PersonLoad[] {
   const byPerson = new Map<string, PersonLoad>();
   for (const person of snapshot.persons) {
-    byPerson.set(person.id, { person, jh: 0, done: 0, ratio: null, engagement: null, outsideJh: 0, cards: [] });
+    byPerson.set(person.id, { person, jh: 0, done: 0, ratio: null, engagement: null, outsideJh: 0, freeJh: 0, overJh: 0, cards: [] });
   }
   for (const assignment of snapshot.assignments) {
     const load = byPerson.get(assignment.personId);
@@ -121,6 +129,9 @@ export function personLoads(snapshot: CapacitySnapshot): PersonLoad[] {
     load.ratio = capacityJh === null ? null : ratioOf(load.jh, capacityJh);
     load.engagement = capacityJh === null || plannedJh === null ? null : ratioOf(plannedJh, capacityJh);
     load.outsideJh = plannedJh === null ? 0 : Math.max(0, round2(plannedJh - load.jh));
+    const known = capacityJh !== null && plannedJh !== null;
+    load.freeJh = known ? Math.max(0, round2(capacityJh - plannedJh)) : 0;
+    load.overJh = known ? Math.max(0, round2(plannedJh - capacityJh)) : 0;
     load.cards.sort((a, b) => b.jh - a.jh);
   }
   return loads.sort(compareLoads);
@@ -153,6 +164,8 @@ function addPerson(group: GroupLoad, load: PersonLoad): void {
   group.demandJh = round2(group.demandJh + load.jh);
   group.doneJh = round2(group.doneJh + load.done);
   group.outsideJh = round2(group.outsideJh + load.outsideJh);
+  group.freeJh = round2(group.freeJh + load.freeJh);
+  group.overJh = round2(group.overJh + load.overJh);
   const split = person.external ? group.external : group.internal;
   split.persons++;
   split.capacityJh = round2(split.capacityJh + (person.capacityJh ?? 0));

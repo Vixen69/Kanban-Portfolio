@@ -62,6 +62,8 @@ function metaOf(group: GroupLoad): string {
   if (group.external.persons > 0) parts.push(`dont ${group.external.persons} ext.`);
   if (group.withoutCapacity > 0) parts.push(`${group.withoutCapacity} capacité inconnue`);
   if (group.withoutPlan > 0) parts.push(`${group.withoutPlan} hors plan de charge`);
+  if (group.freeJh > 0) parts.push(`${fmtUnit(group.freeJh)} j.h libres`);
+  if (group.overJh > 0) parts.push(`${fmtUnit(group.overJh)} j.h de surcharge`);
   return parts.join(" · ");
 }
 

@@ -69,7 +69,10 @@ vivant) et `docs/adr/` (décisions). Le contrat de travail est `CLAUDE.md`.
   matrice des transverses (engagement réel, dont tableau, dont hors tableau,
   internes / externes, domaines demandeurs), la charge par domaine et par
   profil, les cartes qui pèsent, les personnes au-delà de 100 % et la
-  couverture des chiffres. Lecture annuelle : projeté contre capacité.
+  couverture des chiffres, et depuis l'ADR 029 le **reste disponible** et la
+  **surcharge cumulée** (capacité et projeté lus dans le plan de charge
+  lui-même, personnes nommées seulement). Lecture annuelle : projeté contre
+  capacité.
 - **Décision tracée** (ADR 026) : dans la fiche, une décision D1–D6 du
   référentiel (faire entrer, continuer, réduire, mettre en pause,
   requalifier, stopper) se trace avec sa raison dans les termes de la
