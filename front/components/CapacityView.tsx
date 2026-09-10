@@ -80,7 +80,7 @@ function Kpis({ readout }: { readout: CapacityReadout }) {
   const planKnown = kpis.engagement !== null;
   return (
     <div className="m2-kpis">
-      <Kpi num={fmtUnit(kpis.capacityJh)} unit="j.h" label="Capacité déclarée" />
+      <Kpi num={fmtUnit(kpis.capacityJh)} unit="j.h" label="Capacité · lignes « Disponible ressource »" />
       <Kpi num={fmtUnit(planKnown ? kpis.plannedJh : kpis.demandJh)} unit="j.h"
         label={planKnown ? "Projeté · tout le plan de charge" : "Demande du tableau"} tone="accent" />
       <Kpi num={pct(kpis.engagement ?? kpis.ratio)}
@@ -115,9 +115,9 @@ function Empty() {
     <div className="m2-panel wide">
       <div className="m2-title">Aucune capacité importée</div>
       <div className="m2-note">
-        Cette vue s’alimente à l’import : déposer les fichiers Ress.Profils et Ressources_PdC avec le
-        classeur, puis charger. Les personnes, leur projeté et leurs affectations de l’exercice
-        apparaissent alors ici, contre leur capacité déclarée.
+        Cette vue s’alimente à l’import : déposer le plan de charge (Ressources_PdC) avec PARAM et le
+        classeur, puis charger. Les personnes nommées, leur capacité, leur projeté et leurs affectations
+        de l’exercice apparaissent alors ici.
       </div>
     </div>
   );

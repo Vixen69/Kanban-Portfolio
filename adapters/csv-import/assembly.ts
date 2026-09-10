@@ -8,6 +8,7 @@ import type { ProjetsTable } from "./projets.ts";
 import type { JalonsTable } from "./jalons.ts";
 import type { SpTable } from "./sp.ts";
 import type { CardAssembly, EnrichedCard } from "./enrich.ts";
+import { emitCapacityByDomain } from "./assembly-capacity.ts";
 import { cardDistribution } from "./enrich.ts";
 import type { PdcTable } from "./pdc.ts";
 import type { ProfilsTable } from "./profils.ts";
@@ -41,7 +42,7 @@ export function emitMissing(report: ImportReport, present: Presence, year: numbe
     ["jalons", "ProjetsJalons", "position initiale (RDO / RDLI / RDR franchi) — sans lui, tout en colonne d'entrée"],
     ["sp", "SP (exercice ou total)", `coûts ${year} : meilleur estimé, réel, engagé`],
     ["pdc", "Ressources_PdC", "plan de charge de l'exercice par profil et par personne (+ consolidation nominative)"],
-    ["profils", "Ress.Profils", "personnes de la DSI (domaine, métier, capacité) — sans lui, la vue capacité ne connaît que la demande"],
+    ["profils", "Ress.Profils", "facultatif depuis l'ADR 029 — les personnes, capacités et métiers viennent du plan de charge ; sert de repli pour le domaine"],
     ["cdp", "ProjetsCdP", "chefs de projet (Responsable 1→3, responsables de domaine exclus) quand `projets` ne les porte pas — facultatif"],
   ];
   for (const [key, name, note] of expected) {
@@ -80,19 +81,20 @@ export function emitAssembly(report: ImportReport, data: AssemblyData, config: B
   else emitWaiting(report, data, config.exercise.year);
   report.assembly.push({ subject: "plan de charge", status: chargeStatus(data, config.exercise.year) });
   report.assembly.push({ subject: "capacité", status: capacityStatus(data) });
+  if (data.capacity !== null) emitCapacityByDomain(report, data.capacity, config);
 }
 
 // The capacity snapshot (ADR 024): who, how much capacity, how much demand.
 function capacityStatus(data: AssemblyData): string {
-  if (data.capacity === null) return "en attente de `Ress.Profils` (personnes) et de `Ressources_PdC` (affectations)";
+  if (data.capacity === null) return "en attente de `Ressources_PdC` (personnes, capacités et affectations — ADR 029)";
   const s = data.capacity.stats;
-  const people = data.profils === null
-    ? "sans `Ress.Profils` — personnes connues par le plan de charge seul, capacité inconnue"
-    : `${s.persons} personne(s) dont ${s.external} externe(s) · capacité ${formatJh(s.capacityJh)} j.h`;
-  return `${people} · ${s.stubs} sans fiche · affectations : ${s.assignments} sur ${s.cardsCovered} carte(s)` +
+  const viaProfils = s.domainViaProfils > 0 ? ` · Ress.Profils ${s.domainViaProfils}` : "";
+  return `${s.persons} personne(s) nominatives du plan de charge dont ${s.external} externe(s)` +
+    ` · capacité ${formatJh(s.capacityJh)} j.h (${s.withoutCapacity} sans ligne « Disponible »)` +
+    ` · domaine ${s.persons - s.domainUnknown}/${s.persons} (Organisation → PARAM ${s.domainViaPath}${viaProfils})` +
+    ` · affectations : ${s.assignments} sur ${s.cardsCovered} carte(s)` +
     ` · demande du tableau ${formatJh(s.demandJh)} j.h · projeté (tout le plan de charge) ${formatJh(s.plannedJh)} j.h` +
-    ` · réalisé ${formatJh(s.doneAllJh)} j.h · ${s.withoutPlan} hors plan de charge` +
-    ` · capacité lue dans le PdC pour ${s.capacityFromPdc} personne(s)`;
+    ` · réalisé ${formatJh(s.doneAllJh)} j.h`;
 }
 
 function paramStatus(param: ParamTable | null): string {

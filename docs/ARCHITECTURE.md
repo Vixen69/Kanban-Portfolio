@@ -637,6 +637,20 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-10 (soir) — Le plan de charge, seule source des personnes (ADR 029, complément)
+
+- **Constat** : après le premier ré-import, A&D affichait toujours 33
+  personnes — la liste venait de Ress.Profils, où figurent aussi ressources
+  génériques et rôles. Décision de l'auteur : « tire tout depuis PdC 2026 ».
+- **Modèle** : personnes = ressources nominatives du PdC ; capacité = ligne
+  « Disponible », projeté = ligne « Planifiée », profil = « Métier »
+  (« Externe. » = externe), domaine = « Organisation » via PARAM (repli :
+  segment du chemin, puis Ress.Profils par matricule, compté), nom sans
+  matricule. Ress.Profils facultatif. Rapport : ligne « capacité » refaite,
+  une ligne « capacité · <domaine> » par domaine (internes/externes,
+  capacité, projeté, demande, libre, surcharge). Vue ☷ : couverture et
+  libellés parlent la langue du plan de charge.
+
 ### 2026-09-10 — Plan de charge : trois natures de lignes, personnes nominatives, capacité lue dans le PdC (ADR 029)
 
 - **Constat de l'auteur, fichier ouvert** : export par ressource. Chaque

@@ -4,14 +4,27 @@
 // its « Planifiée projet (en jour) » line (the export's own total of its
 // assignments). « Ressource » names the resource: a person with a
 // matricule, else a generic assignment, a « zz… » code or a « PE22… »
-// generic role — counted, kept on the project, never a person.
+// generic role — counted, kept on the project, never a person. Since the
+// author's call of the same evening, the plan de charge is the ONLY source
+// of the persons: organisation, métier and internal/external come from
+// its rows too (Ress.Profils is a fallback for the domain at most).
 
 import { normalizeLabel } from "./normalize.ts";
+import { stripCode } from "./code-prefix.ts";
 
 /** One nominative resource of the plan de charge. */
 export interface PdcPerson {
   matricule: string;
+  /** Display name: the « Ressource » cell without its trailing matricule. */
   name: string;
+  /** « Organisation » path as exported (first seen), "" when absent. */
+  organisation: string;
+  /** « Métier » label as exported (first seen), "" when absent. */
+  metier: string;
+  /** DSI profile resolved from the métier, null when unknown. */
+  profileId: string | null;
+  /** True when the métier or the organisation says « Externe ». */
+  external: boolean;
   /** Sum of the project rows, j.h. */
   jh: number;
   done: number;
@@ -36,6 +49,13 @@ export interface PdcExcluded {
 export type ResourceKind = "nominative" | "generic" | "zz" | "role";
 export type LineKind = "project" | "capacity" | "planned";
 
+/** What a row says about its resource, beyond the matricule. */
+export interface ResourceFacts {
+  organisation: string;
+  metier: string;
+  profileId: string | null;
+}
+
 /**
  * Names the line from its « Id Projet » cell.
  * Input: the raw cell. Output: capacity, planned or project. Failure: none.
@@ -48,16 +68,25 @@ export function lineKind(idCell: string): LineKind {
 }
 
 /**
+ * Names a resource label alone: a generic assignment, a « zz… » code, a
+ * « PE22… » role — or null when the label could be a person's name.
+ * Input: the raw label. Output: the generic kind or null. Failure: none.
+ */
+export function genericKind(label: string): Exclude<ResourceKind, "nominative"> | null {
+  const key = normalizeLabel(label);
+  if (key.startsWith("zz")) return "zz";
+  if (/^pe22/.test(key)) return "role";
+  if (key.includes("generique")) return "generic";
+  return null;
+}
+
+/**
  * Names the resource from its « Ressource » cell and matricule.
  * Inputs: the raw resource label, the matricule (may be empty).
  * Output: nominative, generic, zz or role. Failure: none.
  */
 export function resourceKind(resource: string, matricule: string): ResourceKind {
-  const key = normalizeLabel(resource);
-  if (key.startsWith("zz")) return "zz";
-  if (/^pe22/.test(key)) return "role";
-  if (key.includes("generique") || matricule === "") return "generic";
-  return "nominative";
+  return genericKind(resource) ?? (matricule === "" ? "generic" : "nominative");
 }
 
 /** The French label of an excluded resource kind, for the report. */
@@ -67,16 +96,30 @@ export function excludedLabel(kind: ResourceKind): string {
   return "affectation générique (sans personne nommée)";
 }
 
+/** « Externe » in the métier prefix (« Externe.Concept.Dév. ») or the organisation. */
+function isExternal(facts: ResourceFacts): boolean {
+  return normalizeLabel(facts.metier).startsWith("externe") || normalizeLabel(facts.organisation).includes("externe");
+}
+
 /**
- * The person behind a matricule, created once.
- * Inputs: the registry, the matricule, the display name. Output: the
- * PdcPerson (mutable). Failure: none.
+ * The person behind a matricule, created once from the first row seen;
+ * later rows fill what was still empty (organisation, métier, profile).
+ * Inputs: the registry, the matricule, the raw « Ressource » cell, the
+ * row's facts. Output: the PdcPerson (mutable). Failure: none.
  */
-export function personFor(persons: Map<string, PdcPerson>, matricule: string, name: string): PdcPerson {
+export function personFor(persons: Map<string, PdcPerson>, matricule: string, resource: string, facts: ResourceFacts): PdcPerson {
   const existing = persons.get(matricule);
-  if (existing !== undefined) return existing;
+  if (existing !== undefined) {
+    if (existing.organisation === "") existing.organisation = facts.organisation;
+    if (existing.metier === "") existing.metier = facts.metier;
+    if (existing.profileId === null) existing.profileId = facts.profileId;
+    if (!existing.external) existing.external = isExternal(facts);
+    return existing;
+  }
   const person: PdcPerson = {
-    matricule, name, jh: 0, done: 0, plannedJh: null, plannedDone: null, capacityJh: null, capacityDone: null,
+    matricule, name: stripCode(resource, matricule),
+    organisation: facts.organisation, metier: facts.metier, profileId: facts.profileId, external: isExternal(facts),
+    jh: 0, done: 0, plannedJh: null, plannedDone: null, capacityJh: null, capacityDone: null,
   };
   persons.set(matricule, person);
   return person;
@@ -84,13 +127,10 @@ export function personFor(persons: Map<string, PdcPerson>, matricule: string, na
 
 /**
  * Records the resource's own line: its capacity or its planned total.
- * Inputs: the registry, the matricule and name, the line kind, the
- * exercise-year pair. Output: none (registry mutated). Failure: none.
+ * Inputs: the person, the line kind, the exercise-year pair.
+ * Output: none (person mutated). Failure: none.
  */
-export function setPersonLine(
-  persons: Map<string, PdcPerson>, matricule: string, name: string, line: LineKind, jh: number, done: number,
-): void {
-  const person = personFor(persons, matricule, name);
+export function setPersonLine(person: PdcPerson, line: LineKind, jh: number, done: number): void {
   if (line === "capacity") {
     person.capacityJh = jh;
     person.capacityDone = done;

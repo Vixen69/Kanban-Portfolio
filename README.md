@@ -70,9 +70,10 @@ vivant) et `docs/adr/` (décisions). Le contrat de travail est `CLAUDE.md`.
   internes / externes, domaines demandeurs), la charge par domaine et par
   profil, les cartes qui pèsent, les personnes au-delà de 100 % et la
   couverture des chiffres, et depuis l'ADR 029 le **reste disponible** et la
-  **surcharge cumulée** (capacité et projeté lus dans le plan de charge
-  lui-même, personnes nommées seulement). Lecture annuelle : projeté contre
-  capacité.
+  **surcharge cumulée**. Depuis le complément de l'ADR 029, le plan de
+  charge est la seule source des personnes : capacité, projeté, métier,
+  interne/externe et domaine (via PARAM) en viennent ; Ress.Profils est
+  facultatif. Lecture annuelle : projeté contre capacité.
 - **Décision tracée** (ADR 026) : dans la fiche, une décision D1–D6 du
   référentiel (faire entrer, continuer, réduire, mettre en pause,
   requalifier, stopper) se trace avec sa raison dans les termes de la

@@ -1,14 +1,14 @@
 Matricule;Ressource;Organisation;Métier;Id Projet;Nom Projet;Type projet;Portefeuille;2023;;2024;;2025;;2026;;2027;;2028;;2029;;2030;;Total Prév.;Total Réel;Etat du processus;Date de publication;Projet.Actif;Date export
 ;;;;;;;;Prév.;Réel;Prév.;Réel;Prév.;Réel;Prév.;Réel;Prév.;Réel;Prév.;Réel;Prév.;Réel;Prév.;Réel;;;;;;
-M001;Jean ROCA;DSI;PMO;PE10001;Modernisation atelier;Achat;PTF A;;;;;10;8;40;25;;;;;;;;;50;33;En cours;01/07/2026;VRAI;30/07/2026
-M001;Jean ROCA;DSI;PMO;PE10002;Refonte portail interne;Evolution;PTF A;;;;;;;30;10;;;;;;;;;30;10;En cours;;VRAI;
-;Concepteur générique;DSI;Externe.Concept.Dév.;PE10001;Modernisation atelier;Achat;PTF A;;;;;;;60;20;;;;;;;;;60;20;;;VRAI;
-M002;Zoé LANE;DSI;Métier inconnu XYZ;PE10003;Montée de version calcul;Etude;PTF B;;;;;;;15;18;;;;;;;;;15;18;;;VRAI;
-M003;Luc BER;DSI;PMO;;Projet fantôme hors périmètre;Etude;PTF B;;;;;;;25;5;;;;;;;;;25;5;;;VRAI;
-M001;Jean ROCA;DSI;PMO;Disponible ressource (en jour);;;;;;;;;;200;120;;;;;;;;;200;120;;;;
-M001;Jean ROCA;DSI;PMO;Planifiée projet (en jour);;;;;;;;;;70;35;;;;;;;;;70;35;;;;
-M002;Zoé LANE;DSI;Métier inconnu XYZ;Disponible ressource (en jour);;;;;;;;;;180;100;;;;;;;;;180;100;;;;
-M002;Zoé LANE;DSI;Métier inconnu XYZ;Planifiée projet (en jour);;;;;;;;;;15;18;;;;;;;;;15;18;;;;
-M003;Luc BER;DSI;PMO;Planifiée projet (en jour);;;;;;;;;;25;5;;;;;;;;;25;5;;;;
-ZZ01;ZZ_A NE PAS UTILISER;DSI;PMO;PE10001;Modernisation atelier;Achat;PTF A;;;;;;;5;0;;;;;;;;;5;0;;;VRAI;
-R001;PE22001 CdP INFRA;DSI;PMO;PE10001;Modernisation atelier;Achat;PTF A;;;;;;;10;0;;;;;;;;;10;0;;;VRAI;
+M001;Jean ROCA M001;DSI NEXTER.DOMAINE INFRASTRUCTURE;PMO;PE10001;Modernisation atelier;Achat;PTF A;;;;;10;8;40;25;;;;;;;;;50;33;En cours;01/07/2026;VRAI;30/07/2026
+M001;Jean ROCA M001;DSI NEXTER.DOMAINE INFRASTRUCTURE;PMO;PE10002;Refonte portail interne;Evolution;PTF A;;;;;;;30;10;;;;;;;;;30;10;En cours;;VRAI;
+M001;Jean ROCA M001;DSI NEXTER.DOMAINE INFRASTRUCTURE;PMO;Disponible ressource (en jour);;;;;;;;;;200;120;;;;;;;;;200;120;;;;
+M001;Jean ROCA M001;DSI NEXTER.DOMAINE INFRASTRUCTURE;PMO;Planifiée projet (en jour);;;;;;;;;;70;35;;;;;;;;;70;35;;;;
+;Concepteur générique;DSI NEXTER.ARCHITECTURE APPLICATIVE & DEVELOPPEMENT.GROUPE : Développements rapides;Externe.Concept.Dév.;PE10001;Modernisation atelier;Achat;PTF A;;;;;;;60;20;;;;;;;;;60;20;;;VRAI;
+M002;Zoé LANE M002;DSI NEXTER.ARCHITECTURE APPLICATIVE & DEVELOPPEMENT.GROUPE : Développements rapides;Métier inconnu XYZ;PE10003;Montée de version calcul;Etude;PTF B;;;;;;;15;18;;;;;;;;;15;18;;;VRAI;
+M002;Zoé LANE M002;DSI NEXTER.ARCHITECTURE APPLICATIVE & DEVELOPPEMENT.GROUPE : Développements rapides;Métier inconnu XYZ;Disponible ressource (en jour);;;;;;;;;;180;100;;;;;;;;;180;100;;;;
+M002;Zoé LANE M002;DSI NEXTER.ARCHITECTURE APPLICATIVE & DEVELOPPEMENT.GROUPE : Développements rapides;Métier inconnu XYZ;Planifiée projet (en jour);;;;;;;;;;15;18;;;;;;;;;15;18;;;;
+M003;Luc BER M003;DSI NEXTER.ARCHITECTURE APPLICATIVE & DEVELOPPEMENT.GROUPE : Architecture;Externe.PMO;;Projet fantôme hors périmètre;Etude;PTF B;;;;;;;25;5;;;;;;;;;25;5;;;VRAI;
+M003;Luc BER M003;DSI NEXTER.ARCHITECTURE APPLICATIVE & DEVELOPPEMENT.GROUPE : Architecture;Externe.PMO;Planifiée projet (en jour);;;;;;;;;;25;5;;;;;;;;;25;5;;;;
+ZZ01;ZZ_A NE PAS UTILISER;DSI NEXTER.DOMAINE INFRASTRUCTURE;PMO;PE10001;Modernisation atelier;Achat;PTF A;;;;;;;5;0;;;;;;;;;5;0;;;VRAI;
+R001;PE22001 CdP INFRA;DSI NEXTER.DOMAINE INFRASTRUCTURE;PMO;PE10001;Modernisation atelier;Achat;PTF A;;;;;;;10;0;;;;;;;;;10;0;;;VRAI;

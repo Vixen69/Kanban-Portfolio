@@ -90,7 +90,8 @@ test("réel > prévisionnel is kept and signaled; persons are consolidated", () 
   ]);
   assert.ok(report.warnings.some((w) => /réel 2026 > prévisionnel 2026/.test(w.message)));
   assert.deepEqual(table.persons, [{
-    matricule: "M1", name: "Jean ROCA", jh: 45, done: 28, plannedJh: null, plannedDone: null, capacityJh: null, capacityDone: null,
+    matricule: "M1", name: "Jean ROCA", organisation: "DSI", metier: "PMO", profileId: "pmo", external: false,
+    jh: 45, done: 28, plannedJh: null, plannedDone: null, capacityJh: null, capacityDone: null,
   }]);
 });
 
@@ -138,7 +139,8 @@ test("ADR 029: the resource's own lines set its capacity and planned total; gene
     row("R1", "PE22001 CdP INFRA", "PMO", "PX2", "Alpha", "8", "0"),
   ]);
   assert.deepEqual(table.persons, [{
-    matricule: "M1", name: "Jean ROCA", jh: 70, done: 35, plannedJh: 70, plannedDone: 35, capacityJh: 200, capacityDone: 120,
+    matricule: "M1", name: "Jean ROCA", organisation: "DSI", metier: "PMO", profileId: "pmo", external: false,
+    jh: 70, done: 35, plannedJh: 70, plannedDone: 35, capacityJh: 200, capacityDone: 120,
   }]);
   assert.equal(table.projects.size, 2, "two projects under one repeated name, keyed by code");
   const first = table.projects.get("code:pe11111");
@@ -161,4 +163,14 @@ test("ADR 029: a planned line that disagrees with the sum is signaled; missing o
   assert.ok(report.warnings.some((w) => /1 personne\(s\) dont la somme des affectations diffère/.test(w.message)));
   assert.ok(report.warnings.some((w) => /2 personne\(s\) sans ligne « Disponible ressource »/.test(w.message)));
   assert.ok(report.warnings.some((w) => /1 personne\(s\) sans ligne « Planifiée projet »/.test(w.message)));
+});
+
+test("ADR 029 (soir) : the person carries its organisation, métier, profile and « Externe » from its own rows; the name loses its matricule", () => {
+  const { table } = run([
+    "M7;DUPONT, Léa M7;DSI NEXTER.DOMAINE INFRASTRUCTURE;Externe.PMO;PE1;Alpha;T;P;;;;;;;10;0;;;;;;;;;;;;;;",
+    "M7;DUPONT, Léa M7;DSI NEXTER.DOMAINE INFRASTRUCTURE;Externe.PMO;Disponible ressource (en jour);;;;;;;;;;150;90;;;;;;;;;;;;;;",
+  ]);
+  const lea = table.persons[0];
+  assert.deepEqual([lea?.name, lea?.organisation, lea?.metier, lea?.profileId, lea?.external, lea?.capacityJh],
+    ["DUPONT, Léa", "DSI NEXTER.DOMAINE INFRASTRUCTURE", "Externe.PMO", "pmo", true, 150]);
 });

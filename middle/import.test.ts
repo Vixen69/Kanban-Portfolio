@@ -58,7 +58,7 @@ test("auditImport over the synthetic fixtures renders the CLI's report and its c
   const result = auditImport(CONFIG, fixtureFiles(), NOW);
   assert.deepEqual([result.summary.received, result.summary.recognized, result.summary.missing, result.loadable], [7, 7, [], true]);
   assert.equal(result.summary.taken, 6);
-  assert.match(result.report, /capacité : 5 personne\(s\)/);
+  assert.match(result.report, /capacité : 3 personne\(s\)/);
   const partial = auditImport(CONFIG, fixtureFiles(["PARAM.csv"]), NOW);
   assert.equal(partial.loadable, false);
   assert.ok(partial.summary.missing.includes("Projets"));
@@ -70,9 +70,9 @@ test("loadImport writes the deck and the capacity; a second load updates; no per
     try {
       const first = await loadImport(storage, CONFIG, fixtureFiles(), NOW);
       assert.deepEqual([first.load.created, first.load.updated, first.load.unlisted], [6, 0, 0]);
-      assert.deepEqual(first.load.capacity, { persons: 5, assignments: 3 });
+      assert.deepEqual(first.load.capacity, { persons: 3, assignments: 3 });
       assert.equal((await storage.listBaseCards()).length, 6);
-      assert.equal((await storage.getCapacity())?.persons.length, 5);
+      assert.equal((await storage.getCapacity())?.persons.length, 3);
       const second = await loadImport(storage, CONFIG, fixtureFiles(), new Date("2026-09-09T09:00:00.000Z"));
       assert.deepEqual([second.load.created, second.load.updated], [0, 6]);
       await assert.rejects(() => loadImport(storage, CONFIG, fixtureFiles(["PARAM.csv"]), NOW), /aucune carte assemblée/);

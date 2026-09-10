@@ -436,8 +436,15 @@ un Réel de l'exercice. Règles :
 - Chiffres nouveaux : **reste disponible** (capacité − projeté par personne,
   sommé) et **surcharge cumulée** (projeté − capacité), en tête de la vue ☷
   et dans les barres par domaine / profil.
+- **Le plan de charge est la seule source des personnes** (auteur, soir du
+  2026-09-10) : métier et profil DSI = « Métier » (préfixe « Externe. » =
+  externe) ; domaine = « Organisation » traduite par PARAM (chemin exact),
+  sinon un segment du chemin lu comme libellé de domaine, sinon Ress.Profils
+  par matricule (repli compté), sinon « sans domaine » ; nom = « Ressource »
+  sans son matricule. Le rapport ajoute une ligne « capacité · <domaine> »
+  par domaine. Ress.Profils est facultatif.
 
-## `Ress.Profils` — structure et mapping (ADR 024, 2026-09-07)
+## `Ress.Profils` — structure et mapping (ADR 024, 2026-09-07 ; facultatif depuis l'ADR 029 : repli pour le domaine seulement)
 
 Une ligne = une personne de la DSI (interne ou externe). Onglet du classeur
 de consolidation, converti en CSV comme les autres ; en-têtes en ligne 2

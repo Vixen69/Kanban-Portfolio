@@ -67,13 +67,26 @@ test("the five fixture files assemble the full deck", () => {
   assert.match(byLabel.get("coûts 2026 (SP)") ?? "", /^4\/6 jointes \(Id 3 · nom 1 · code 0\) · sans correspondance : 2 · sujets SP hors périmètre : 1 · RDLI/);
   assert.match(byLabel.get("plan de charge") ?? "", /^3\/6 cartes couvertes .* projets PdC hors périmètre : 1 · cartes sans charge : 3 · non nominatives : 3 ligne\(s\) \(75 j\.h, gardées sur les projets\)$/);
   assert.equal(chargeStats?.covered, 3);
+});
+
+test("capacity (ADR 029): the plan de charge is the only source of persons; per-domain lines", () => {
+  const { report, capacity } = audit(ALL.map(fixture));
+  const byLabel = new Map(report.assembly.map((a) => [a.subject, a.status]));
   const snapshot = capacity?.snapshot;
   assert.ok(snapshot);
   assert.equal(snapshot.exerciseYear, 2026);
   assert.ok(snapshot.assignments.every((a) => /^p-[0-9a-f]{16}$/.test(a.personId)));
   assert.ok(snapshot.assignments.every((a) => snapshot.persons.some((p) => p.id === a.personId)));
-  assert.deepEqual(snapshot.persons.map((p) => p.source), ["profils", "profils", "profils", "profils", "profils"]);
-  assert.match(byLabel.get("capacité") ?? "", /^5 personne\(s\) dont 1 externe\(s\) · capacité 780 j\.h · 0 sans fiche · affectations : 3 sur 3 carte\(s\) · demande du tableau 85 j\.h · projeté \(tout le plan de charge\) [\d,]+ j\.h · réalisé [\d,]+ j\.h · 2 hors plan de charge · capacité lue dans le PdC pour 2 personne\(s\)$/);
+  assert.deepEqual(snapshot.persons.map((p) => p.source), ["pdc", "pdc", "pdc"], "the plan de charge is the only source of persons (ADR 029)");
+  assert.deepEqual(snapshot.persons.map((p) => [p.name, p.domain, p.profileId, p.external, p.capacityJh, p.plannedJh]).sort(), [
+    ["Jean ROCA", "infra", "pmo", false, 200, 70], ["Luc BER", "ad", "pmo", true, null, 25], ["Zoé LANE", "ad", null, false, 180, 15],
+  ]);
+  assert.equal(byLabel.get("capacité"),
+    "3 personne(s) nominatives du plan de charge dont 1 externe(s) · capacité 380 j.h (1 sans ligne « Disponible ») · domaine 3/3 (Organisation → PARAM 3)" +
+    " · affectations : 3 sur 3 carte(s) · demande du tableau 85 j.h · projeté (tout le plan de charge) 110 j.h · réalisé 58 j.h");
+  assert.equal(byLabel.get("capacité · INFRA"),
+    "1 personne(s) (1 interne(s) · 0 externe(s)) · capacité 200 j.h · projeté 70 j.h · demande du tableau 70 j.h · libre 130 j.h · surcharge 0 j.h");
+  assert.match(byLabel.get("capacité · A&D") ?? "", /^2 personne\(s\) \(1 interne\(s\) · 1 externe\(s\)\) · capacité 180 j\.h \(1 sans ligne « Disponible »\)/);
   const alice = snapshot.persons.find((p) => p.name === "Jean ROCA");
   assert.ok(alice && alice.plannedJh !== null && alice.plannedJh > 0, "whole-plan totals reach the person");
 });

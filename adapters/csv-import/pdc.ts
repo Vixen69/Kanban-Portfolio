@@ -22,7 +22,7 @@ import type { HeaderMatch } from "./contract.ts";
 import { discard, doubt, warn } from "./report.ts";
 import type { ImportReport, RowRef } from "./report.ts";
 import { excludedLabel, lineKind, personFor, resourceKind, setPersonLine } from "./pdc-lines.ts";
-import type { PdcExcluded, PdcPerson, ResourceKind } from "./pdc-lines.ts";
+import type { PdcExcluded, PdcPerson, ResourceFacts, ResourceKind } from "./pdc-lines.ts";
 
 export type { PdcExcluded, PdcPerson } from "./pdc-lines.ts";
 
@@ -65,6 +65,8 @@ interface PdcContext {
   idIdx: number;
   matriculeIdx: number;
   resourceIdx: number;
+  orgIdx: number;
+  metierIdx: number;
   profileLookup: (cell: string) => TolerantHit | null;
   projects: Map<string, PdcProject>;
   persons: Map<string, PdcPerson>;
@@ -96,6 +98,7 @@ export function parsePdc(
   const ctx: PdcContext = {
     report, fileName, year, prevIdx, reelIdx: prevIdx + 1,
     nameIdx: idx("Nom Projet"), idIdx: idx("Id Projet"), matriculeIdx: idx("Matricule"), resourceIdx: idx("Ressource"),
+    orgIdx: idx("Organisation"), metierIdx: idx("Métier"),
     profileLookup: createTolerantLookup(
       config.profiles.flatMap((p): Array<[string, string]> => [[p.id, p.id], [p.name, p.id]]),
     ),
@@ -104,7 +107,7 @@ export function parsePdc(
     unknownMetiers: new Map(), prefixes: new Map(), tallies: new Map(),
   };
   const dataRows = consumeSubHeader(ctx, rows);
-  for (const row of dataRows) readPdcRow(ctx, match, row);
+  for (const row of dataRows) readPdcRow(ctx, row);
   finalize(ctx);
   return {
     projects: ctx.projects,
@@ -135,7 +138,7 @@ function cellAt(row: CsvRow, index: number): string {
 
 // One row: gates (empty, nameless, total), the exercise-year pair, then
 // routed by the natures of its line and of its resource.
-function readPdcRow(ctx: PdcContext, match: HeaderMatch, row: CsvRow): void {
+function readPdcRow(ctx: PdcContext, row: CsvRow): void {
   if (row.cells.every((c) => c.trim() === "")) return;
   const ref: RowRef = { file: ctx.fileName, line: row.line };
   const idCell = cellAt(row, ctx.idIdx);
@@ -154,24 +157,25 @@ function readPdcRow(ctx: PdcContext, match: HeaderMatch, row: CsvRow): void {
   const matricule = cellAt(row, ctx.matriculeIdx);
   const resource = cellAt(row, ctx.resourceIdx) || matricule;
   const kind = resourceKind(resource, matricule);
+  const facts: ResourceFacts = { organisation: cellAt(row, ctx.orgIdx), metier: cellAt(row, ctx.metierIdx), profileId: resolveMetier(ctx, row) };
   if (line !== "project") {
-    if (kind === "nominative") setPersonLine(ctx.persons, matricule, resource, line, jh, done);
+    if (kind === "nominative") setPersonLine(personFor(ctx.persons, matricule, resource, facts), line, jh, done);
     return;
   }
   if (done > jh) tallyInto(ctx.tallies, `réel ${ctx.year} > prévisionnel ${ctx.year} (cas réel, conservé)`, row.line);
   const project = projectFor(ctx, ref, idCell, nameCell || idCell);
-  addCharge(project, resolveMetier(ctx, match, row), jh, done);
+  addCharge(project, facts.profileId, jh, done);
   ctx.totals.jh = round2(ctx.totals.jh + jh);
   ctx.totals.done = round2(ctx.totals.done + done);
-  if (kind === "nominative") addNominative(ctx, project, matricule, resource, jh, done);
+  if (kind === "nominative") addNominative(ctx, project, matricule, resource, facts, jh, done);
   else addExcluded(ctx, project, kind, jh, done, row.line);
 }
 
 // Métier -> profile: direct tolerant match, else with successive dotted
 // prefixes stripped until a profile matches (« Externe. », company names,
 // « NEXTER.ZZ_A NE PAS UTILISER. » seen in August) — prefixes surveyed.
-function resolveMetier(ctx: PdcContext, match: HeaderMatch, row: CsvRow): string | null {
-  const raw = cellAt(row, match.columnIndex.get("Métier") ?? -1);
+function resolveMetier(ctx: PdcContext, row: CsvRow): string | null {
+  const raw = cellAt(row, ctx.metierIdx);
   if (raw === "") {
     tallyInto(ctx.tallies, "« Métier » vide — charge comptée « non attribué »", row.line);
     return null;
@@ -222,12 +226,14 @@ function addCharge(project: PdcProject, profileId: string | null, jh: number, do
 }
 
 // A nominative assignment: the project's person and the person's own sum.
-function addNominative(ctx: PdcContext, project: PdcProject, matricule: string, name: string, jh: number, done: number): void {
-  const load = project.persons.get(matricule) ?? { name, jh: 0, done: 0 };
+function addNominative(
+  ctx: PdcContext, project: PdcProject, matricule: string, resource: string, facts: ResourceFacts, jh: number, done: number,
+): void {
+  const person = personFor(ctx.persons, matricule, resource, facts);
+  const load = project.persons.get(matricule) ?? { name: person.name, jh: 0, done: 0 };
   load.jh = round2(load.jh + jh);
   load.done = round2(load.done + done);
   project.persons.set(matricule, load);
-  const person = personFor(ctx.persons, matricule, name);
   person.jh = round2(person.jh + jh);
   person.done = round2(person.done + done);
 }

@@ -134,8 +134,7 @@ export function OverloadsPanel({ rows }: { rows: Overload[] }) {
 function coverageLines(c: Coverage): string[] {
   const lines = [`${c.assignedCards} carte(s) avec au moins une affectation nominative · ${c.cardsWithoutAssignment} sans.`];
   if (c.genericJh > 0) lines.push(`${fmtUnit(c.genericJh)} j.h de charge des cartes sans personne nommée (lignes génériques du plan de charge) — hors de cette vue.`);
-  if (c.stubs > 0) lines.push(`${c.stubs} personne(s) du plan de charge sans fiche Ress.Profils — domaine et capacité inconnus.`);
-  if (c.unknownCapacity > 0) lines.push(`${c.unknownCapacity} personne(s) à capacité inconnue — leur charge compte, pas leur capacité.`);
+  if (c.unknownCapacity > 0) lines.push(`${c.unknownCapacity} personne(s) sans ligne « Disponible ressource » — leur charge compte, pas leur capacité.`);
   if (c.withoutPlan > 0) lines.push(`${c.withoutPlan} personne(s) absentes du plan de charge — projeté inconnu, seule leur part du tableau est lue.`);
   if (c.outsideJh > 0) lines.push(`${fmtUnit(c.outsideJh)} j.h affectés à des cartes hors tableau (archivées, supprimées ou hors périmètre).`);
   return lines;
@@ -154,7 +153,7 @@ export function CoveragePanel({ coverage }: { coverage: Coverage }) {
       </div>
       <div className="m2-note">
         Lecture annuelle : projeté de l’exercice (tout le plan de charge, pas seulement le tableau) contre
-        la capacité déclarée (« Disponibilité » de Ress.Profils, 200 j.h = 1 ETP). L’avancement compare le
+        la capacité de chacun (ligne « Disponible ressource » du plan de charge, 200 j.h ≈ 1 ETP). L’avancement compare le
         réalisé au projeté : un constat, pas une prévision.
       </div>
     </Panel>

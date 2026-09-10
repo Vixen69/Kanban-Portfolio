@@ -58,3 +58,20 @@ pour une dizaine d'internes réels.
 - Fixtures synthétiques enrichies des deux lignes propres, d'un code « zz »
   et d'un rôle « PE22 » ; tests unitaires sur la classification, la clé par
   code, les écarts signalés.
+
+## Complément (soir du 2026-09-10) — le plan de charge seul
+
+Après le premier ré-import, A&D affichait toujours 33 personnes : la liste
+des personnes venait de Ress.Profils, dont les ressources génériques et les
+rôles figurent aussi. Décision de l'auteur : « oublie Ress.Profils, tire
+tout depuis PdC 2026 ». Désormais **les personnes sont les ressources
+nominatives du plan de charge, et rien d'autre** : capacité = ligne
+« Disponible ressource », projeté = ligne « Planifiée projet », métier et
+profil DSI = colonne « Métier » (préfixe « Externe. » = externe), domaine =
+colonne « Organisation » traduite par PARAM (comme un export Projets brut),
+nom = cellule « Ressource » sans son matricule. Ress.Profils devient
+facultatif : il ne sert plus que de repli pour le domaine d'une personne
+dont le chemin d'organisation n'est pas dans PARAM. Le rapport ajoute une
+ligne « capacité · <domaine> » par domaine (personnes internes/externes,
+capacité, projeté, demande du tableau, libre, surcharge) pour lire d'où
+vient chaque effectif.
