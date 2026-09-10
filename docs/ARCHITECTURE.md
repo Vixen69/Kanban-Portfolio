@@ -637,6 +637,19 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-10 (soir) — Passe de perf : horloge à la minute, gzip et cache au bord
+
+- **Constat de l'auteur** : réactivité faible sur la VM, réseau mauvais par
+  nature (bureau distant Guacamole, pas de GPU). Sans mesure possible sur
+  place, on améliore ce qui est sûr.
+- **Front** : l'horloge partagée passait de seconde en seconde et
+  re-rendait tout le tableau (150 tickets) et les délais de la fiche à
+  chaque tick, pour des âges affichés en jours. Un tick par minute : 60 fois
+  moins de rendu à vide.
+- **Bord (nginx)** : gzip sur les réponses texte, le JSON de /api à travers
+  le proxy compris ; les assets hachés de Vite en cache un an immuable, les
+  polices une semaine. Rien ne change dans le middle ni dans le modèle.
+
 ### 2026-09-10 (soir) — Le plan de charge, seule source des personnes (ADR 029, complément)
 
 - **Constat** : après le premier ré-import, A&D affichait toujours 33

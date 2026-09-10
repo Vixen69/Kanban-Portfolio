@@ -236,7 +236,11 @@ function Screen({ ctx }: { ctx: Ctx }) {
 
 // The ready application: hooks are unconditional here (config is loaded).
 function Shell({ store, config }: { store: BoardStore; config: BoardConfig }) {
-  const nowMs = useNow(1000);
+  // One tick a minute: ages are worn in days, and every tick re-renders the
+  // whole board (150 tickets) plus the detail's délais — a second-by-second
+  // clock was the front's main idle cost on the remote desktop (author,
+  // 2026-09-10, perf pass).
+  const nowMs = useNow(60_000);
   const now = useMemo(() => new Date(nowMs), [nowMs]);
   const ui = useUiState();
   const searchRef = useRef<HTMLInputElement>(null);
