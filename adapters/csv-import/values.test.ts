@@ -83,3 +83,11 @@ test("August export shapes: « ke » amounts and « o »/« n » booleans", () =
   assert.equal(parseFrenchBoolean("n"), false);
   assert.equal(parseFrenchBoolean("peut-être"), "invalid");
 });
+
+test("September export shape: a bare « k » is the k€ unit (264 cells were unreadable)", () => {
+  assert.deepEqual(parseFrenchAmount("501 k"), { kind: "value", value: 501, unit: "k" });
+  assert.deepEqual(parseFrenchAmount("1 736 k"), { kind: "value", value: 1736, unit: "k" });
+  assert.deepEqual(parseFrenchAmount("118k"), { kind: "value", value: 118, unit: "k" });
+  assert.deepEqual(parseFrenchAmount("0 K"), { kind: "value", value: 0, unit: "K" });
+  assert.equal(parseFrenchAmount("ok").kind, "invalid");
+});

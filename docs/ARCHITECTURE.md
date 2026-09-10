@@ -637,6 +637,17 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-10 — Budget SP : l'unité « k » nue
+
+- **Constat (rapport d'audit de septembre)** : aucun budget sur les cartes.
+  Le fichier SP était reconnu et joint, mais « Coût prév (ME) » illisible
+  sur 264 cellules (« 501 k », « 1 736 k ») : l'export de septembre écrit
+  l'unité « k » toute seule, là où août écrivait « ke ». Le lecteur ne
+  connaissait que € / k€ / eur / ke.
+- **Correctif** : « k » nu accepté comme k€ (`parseFrenchAmount`), sans
+  conversion. Rien d'autre ne change : mapping des colonnes et jointure
+  étaient corrects.
+
 ### 2026-09-10 — Code retiré du titre partout, MEP → MEO
 
 - **Code dans le titre** : le nettoyage ne retirait le code qu'en tête du

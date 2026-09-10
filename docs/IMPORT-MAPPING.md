@@ -781,7 +781,7 @@ office de vérification sur site.
 | Q24 | `Ress.Profils` « Disponibilité » : unité **tranchée par l'export d'août (jours ; 0 = non déclarée)** ; reste la fenêtre (capacité annuelle ou résiduelle ?) | PMO |
 | Q27 | Domaines Orga vus dans PARAM / Ress.Profils hors vocabulaire du tableau : « CONTROLE DE GESTION », « ING & PLM » — à ajouter, ou à rattacher à un domaine existant ? | PMO |
 | Q28 | `Projets` d'août : « Responsable » vide sur toutes les lignes — l'export peut-il porter le chef de projet ? | PMO |
-| Q29 | `SP_2026` d'août : « Engagé Achats » et « * Budget validé RDLI » — **tranchée** : les cellules portent l'unité « ke » (« 400 ke »), lue comme k€ depuis le 2026-09-08 | — |
+| Q29 | `SP_2026` d'août : « Engagé Achats » et « * Budget validé RDLI » — **tranchée** : les cellules portent l'unité « ke » (« 400 ke »), lue comme k€ depuis le 2026-09-08 ; l'export de septembre écrit un « k » nu (« 501 k », « 1 736 k »), lu comme k€ depuis le 2026-09-10 (264 cellules « Coût prév (ME) » étaient illisibles) | — |
 | Q21 | `ProjetsJalons` — **tranchée par l'auteur (2026-09-08)** : la position vient des **dates** des colonnes RDO / RDLI / RDR, passées ou non au jour de l'audit ; les cellules « franchi » (« o » / « n » dans l'export d'août) ne servent qu'en repli quand la date manque, et un désaccord date / franchi est signalé | — |
 | Q25 | `Ress.Profils` « Int/Ext » : valeurs exactes (Interne/Externe ? O/N ?) | PMO |
 | Q26 | Matricule joint au plan de charge : « Id » ou « pk Contact » ? (les deux sont acceptés, l'un des deux doit correspondre) | PMO |

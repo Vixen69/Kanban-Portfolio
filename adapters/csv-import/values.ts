@@ -21,7 +21,7 @@ const NNBSP = String.fromCharCode(0x202f);
  * Parses a French-formatted amount cell.
  * Inputs: the raw cell text.
  * Outputs: value (comma or dot decimals, space/NBSP thousand separators;
- * a stray unit suffix like « € »/« k€ »/« ke » is stripped, kept in `unit` so the
+ * a stray unit suffix like « € »/« k€ »/« ke »/« k » is stripped, kept in `unit` so the
  * caller can signal it — the column's unit is the contract's, never the
  * cell's), empty (blank cell), or invalid (dashes, N/A, question marks,
  * formula errors, anything unreadable). Negative values are returned as
@@ -36,8 +36,9 @@ export function parseFrenchAmount(raw: string): ParsedAmount {
     return { kind: "invalid", raw: cell };
   }
   const compact = cell.replaceAll(NBSP, "").replaceAll(NNBSP, "").replaceAll(" ", "");
-  // Units seen: € / k€, « eur », and « ke » (the August SP export's k€).
-  const unitMatch = compact.match(/(k?€|k?eur(?:os?)?|ke)$/i);
+  // Units seen: € / k€, « eur », « ke » (the August SP export's k€) and a
+  // bare « k » (the September SP export: « 501 k », « 1 736 k »).
+  const unitMatch = compact.match(/(k?€|k?eur(?:os?)?|ke|k)$/i);
   const cleaned = (unitMatch === null ? compact : compact.slice(0, -unitMatch[0].length))
     .replace(",", ".");
   if (!/^-?\d+(\.\d+)?$/.test(cleaned)) return { kind: "invalid", raw: cell };
