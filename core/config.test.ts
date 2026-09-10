@@ -23,7 +23,8 @@ test("the repository's config/board.json is valid", () => {
   assert.equal(config.domains.length, 10);
   assert.equal(config.types.length, 4);
   assert.equal(config.types.find((t) => t.id === "obsolescence")?.name, "Obsolescence");
-  assert.deepEqual(config.types.find((t) => t.id === "obsolescence")?.aliases, ["Projet de gestion d’obsolescence"]);
+  assert.deepEqual(config.types.find((t) => t.id === "obsolescence")?.aliases,
+    ["Projet de gestion d’obsolescence", "Projet de gestion d'obscolescence", "Projet de gestion de l'obsolescence"]);
   // ADR 022: only A&D and CORPORATE are detailed into sub-domains.
   const detailed = config.domains.filter((d) => d.subDomains !== undefined).map((d) => [d.id, d.subDomains?.length]);
   assert.deepEqual(detailed, [["ad", 4], ["corporate", 9]]);

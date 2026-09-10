@@ -61,11 +61,13 @@ export function TypeTag({ type, big }: { type: ProjectType | null; big?: boolean
  * Input: the card state.
  * Output: the two-stat row, or null when the card carries neither an
  * estimate nor a plan de charge.
- * Failure modes: none — a card with no per-profile plan falls back to its
- * card-level effort (same rule as core/totals).
+ * Failure modes: none. The k€ estimate never borrows the effort (j.h):
+ * without a budget the figure reads « — » (author, 2026-09-10 — a 31 j.h
+ * effort was shown as 31 k€). The RAF still falls back on the card-level
+ * effort when there is no per-profile plan (same rule as core/totals).
  */
 export function EstimeBar({ card }: { card: CardState }) {
-  const est = card.budgetEstimated ?? card.effortEstimated ?? 0;
+  const est = card.budgetEstimated;
   const plan = card.chargeByProfile;
   const jh = plan.length > 0
     ? plan.reduce((total, entry) => total + entry.jh, 0)
@@ -74,10 +76,11 @@ export function EstimeBar({ card }: { card: CardState }) {
     ? plan.reduce((total, entry) => total + entry.done, 0)
     : card.effortConsumed ?? 0;
   const raf = Math.max(0, jh - done);
-  if (est === 0 && jh === 0) return null;
+  if (est === null && jh === 0) return null;
+  const estLabel = est === null ? "non renseigné" : `${fmtNum(est)} k€`;
   return (
-    <div className="ec-row" title={`Meilleur estimé ${fmtNum(est)} k€ · Reste à faire ${fmtNum(raf)} j.h`}>
-      <span className="ec-stat">est. <b>{fmtNum(est)}</b> k€</span>
+    <div className="ec-row" title={`Meilleur estimé ${estLabel} · Reste à faire ${fmtNum(raf)} j.h`}>
+      <span className="ec-stat">est. <b>{est === null ? "—" : fmtNum(est)}</b> k€</span>
       <span className="ec-sep" />
       <span className="ec-stat">RAF <b>{fmtNum(raf)}</b> j.h</span>
     </div>

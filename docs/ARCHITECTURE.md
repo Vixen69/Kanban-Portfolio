@@ -637,6 +637,19 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-10 — Carte étendue : l'estimé ne prend plus la charge pour des k€ ; échantillons révélateurs ; alias obsolescence
+
+- **Bug d'affichage** vu par l'auteur : « est. 31 k€ » à côté de « RAF
+  31 j.h ». Sans estimé k€, la carte étendue retombait sur la charge
+  estimée en j.h et l'affichait comme des k€. Désormais « est. — ».
+- **Échantillons du rapport** : la ligne « … illisible … ex. » épelle les
+  caractères invisibles (⟨U+00A0⟩, ⟨U+202F⟩, ⟨U+FEFF⟩…) au lieu de les
+  cacher — « 501 k » paraissait lisible et ne l'était pas.
+- **Type obsolescence** : « hors des quatre retenus 34 » dans l'audit de
+  septembre ; alias ajoutés tels que l'auteur dicte le libellé Sciforma
+  (« d'obscolescence », « de l'obsolescence »), à confirmer par la ligne
+  douteux « type hors des quatre retenus : « … » ».
+
 ### 2026-09-10 — Les montants k€ viennent de SP seul (Q23 tranchée)
 
 - **Constat de l'auteur** : enveloppes RDLI « délirantes » et peu de

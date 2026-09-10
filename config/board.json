@@ -212,7 +212,7 @@
       "id": "obsolescence",
       "name": "Obsolescence",
       "short": "OBS",
-      "aliases": ["Projet de gestion d’obsolescence"],
+      "aliases": ["Projet de gestion d’obsolescence", "Projet de gestion d'obscolescence", "Projet de gestion de l'obsolescence"],
       "color": "#b45309"
     },
     {

@@ -2,6 +2,7 @@
 // cells with their anomalies aggregated into a tallies map (tallies.ts).
 
 import { parseFrenchAmount, parseFrenchDate } from "./values.ts";
+import { sampleOf } from "./cell-sample.ts";
 import { tallyInto } from "./tallies.ts";
 import type { Tally } from "./tallies.ts";
 
@@ -17,7 +18,7 @@ export function amountCell(
   const parsed = parseFrenchAmount(raw);
   if (parsed.kind === "empty") return null;
   if (parsed.kind === "invalid") {
-    tallyInto(tallies, `« ${column} » illisible`, line, raw.trim().slice(0, 40));
+    tallyInto(tallies, `« ${column} » illisible`, line, sampleOf(raw));
     return null;
   }
   if (parsed.unit !== undefined) tallyInto(tallies, `« ${column} » : unité écrite dans la cellule`, line);
@@ -39,7 +40,7 @@ export function dateCell(
     if (parsed.via === "serial") tallyInto(tallies, `« ${column} » lu comme numéro de série Excel`, line);
     return parsed.iso;
   }
-  if (parsed.kind !== "empty") tallyInto(tallies, `« ${column} » illisible`, line, raw.trim().slice(0, 40));
+  if (parsed.kind !== "empty") tallyInto(tallies, `« ${column} » illisible`, line, sampleOf(raw));
   return null;
 }
 
@@ -56,7 +57,7 @@ export function moneyCell(
   const parsed = parseFrenchAmount(raw);
   if (parsed.kind === "empty") return null;
   if (parsed.kind === "invalid") {
-    tallyInto(tallies, `« ${column} » illisible`, line, raw.trim().slice(0, 40));
+    tallyInto(tallies, `« ${column} » illisible`, line, sampleOf(raw));
     return null;
   }
   let value = parsed.value;

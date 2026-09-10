@@ -52,7 +52,7 @@ function run(header: string, dataLines: string[], withParam: ParamTable | null):
 test("types: the four retained resolve whatever their suffix; others are kept and questioned", () => {
   const { table, report } = run(ORGA_HEADER, [
     "PE1;Un;INFRA;;Etude (Opportunité);Nouveau;;;;;;;;;",
-    "PE2;Deux;INFRA;;Projet de gestion d'obsolescence (Projet);Nouveau;;;;;;;;;",
+    "PE2;Deux;INFRA;;Projet de gestion d'obscolescence (Projet);Nouveau;;;;;;;;;",
     "PE3;Trois;INFRA;;Projet de mise en oeuvre (Projet);Nouveau;;;;;;;;;",
     "PE4;Quatre;INFRA;;Projet IA (Projet);Nouveau;;;;;;;;;",
     "PE5;Cinq;INFRA;;TMA Corrective (Run);Nouveau;;;;;;;;;",
