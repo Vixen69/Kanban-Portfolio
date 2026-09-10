@@ -637,6 +637,17 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-10 — Code retiré du titre partout, MEP → MEO
+
+- **Code dans le titre** : le nettoyage ne retirait le code qu'en tête du
+  nom ; quand le code était ailleurs (ou différait de l'Id en tête), il
+  restait dans le titre affiché malgré l'interrupteur « Codes projet ». Le
+  retrait est désormais fait **partout où le code apparaît comme jeton
+  isolé** (`stripCode`, ex-`stripCodePrefix`). Le titre est un fait de
+  l'instantané : un ré-import corrige les cartes déjà chargées.
+- **Type « mise en œuvre »** : abréviation `MEP` (lue « mise en prod »)
+  remplacée par **`MEO`** (demande de l'auteur). Simple libellé de config.
+
 ### 2026-09-09 — Tickets : le code sort du titre, interrupteur « Types de projet »
 
 - **Constat de l'auteur** : le nom Sciforma répète l'Id en tête, donc

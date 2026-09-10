@@ -105,7 +105,7 @@ function CodesSection(props: SidebarProps) {
       <DisplayToggle label="Codes projet" on={props.showCodes} onToggle={() => props.setShowCodes(!props.showCodes)}
         hint={props.showCodes ? "Affichés sur les cartes (ex. PX4520155)" : "Masqués — recherchables dans la barre ci-dessus"} />
       <DisplayToggle label="Types de projet" on={props.showTypes} onToggle={() => props.setShowTypes(!props.showTypes)}
-        hint={props.showTypes ? "Affichés devant le nom (ETU, OBS, MEP, IA)" : "Masqués — le nom seul"} />
+        hint={props.showTypes ? "Affichés devant le nom (ETU, OBS, MEO, IA)" : "Masqués — le nom seul"} />
     </div>
   );
 }

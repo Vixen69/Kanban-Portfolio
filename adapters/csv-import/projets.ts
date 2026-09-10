@@ -9,7 +9,7 @@
 import type { BoardConfig } from "../../core/types.ts";
 import { normalizeLabel } from "./normalize.ts";
 import { splitSubjectName } from "./subject-name.ts";
-import { stripCodePrefix } from "./code-prefix.ts";
+import { stripCode } from "./code-prefix.ts";
 import { createDomainLookup, createSubDomainLookups, createTypeLookup, isDomainLead } from "./domains.ts";
 import type { Lookup } from "./domains.ts";
 import { amountCell, dateCell, moneyCell } from "./cells.ts";
@@ -185,10 +185,11 @@ function buildEntry(
   if (owner !== null) ctx.counts.withOwner++;
   const state = cell(ctx, row, "État du processus");
   if (state !== "") ctx.states.set(state, (ctx.states.get(state) ?? 0) + 1);
+  const codename = id !== "" ? id : split.codename;
   return {
-    id, name: nom, title: id !== "" ? stripCodePrefix(nom, id) : split.title,
+    id, name: nom, title: stripCode(split.title, codename),
     normalizedName, normalizedTitle: normalizeLabel(split.title),
-    codename: id !== "" ? id : split.codename,
+    codename,
     typeId: deriveType(ctx, row),
     createdAt: dateCell(cell(ctx, row, "Début"), "Début", row.line, ctx.tallies),
     dateRdr: dateCell(cell(ctx, row, "Fin"), "Fin", row.line, ctx.tallies),
