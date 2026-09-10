@@ -46,6 +46,19 @@ export interface PdcExcluded {
   done: number;
 }
 
+/** How the file was read — the report's self-diagnosis of the reader. */
+export interface PdcReading {
+  /** Non-empty data rows. */
+  rows: number;
+  projectRows: number;
+  capacityLines: number;
+  plannedLines: number;
+  /** Rows whose matricule came from the trailing token of « Ressource ». */
+  matriculeFromResource: number;
+  /** Rows without any matricule (« Matricule » empty, none in « Ressource »). */
+  emptyMatricule: number;
+}
+
 export type ResourceKind = "nominative" | "generic" | "zz" | "role";
 export type LineKind = "project" | "capacity" | "planned";
 
@@ -65,6 +78,25 @@ export function lineKind(idCell: string): LineKind {
   if (key.startsWith("disponible ressource")) return "capacity";
   if (key.startsWith("planifiee projet")) return "planned";
   return "project";
+}
+
+/** A matricule-looking token: 5 to 10 letters/digits with at least three digits (« 00P4583 », « 9105322 »). */
+const MATRICULE_TOKEN = /^(?=(?:.*\d){3})[0-9A-Z]{5,10}$/i;
+
+/**
+ * The matricule of a row: the « Matricule » cell, else the trailing token
+ * of the « Ressource » cell when it looks like one (« MEFTAHI, Larbi
+ * 00P4583 ») — some exports carry the matricule only there.
+ * Inputs: both raw cells. Output: the matricule ("" when none) and whether
+ * it was read from « Ressource ». Failure: none.
+ */
+export function matriculeOf(matriculeCell: string, resource: string): { matricule: string; fromResource: boolean } {
+  const direct = matriculeCell.trim();
+  if (direct !== "") return { matricule: direct, fromResource: false };
+  const tokens = resource.trim().split(/\s+/);
+  const last = tokens[tokens.length - 1] ?? "";
+  if (tokens.length >= 2 && MATRICULE_TOKEN.test(last)) return { matricule: last, fromResource: true };
+  return { matricule: "", fromResource: false };
 }
 
 /**

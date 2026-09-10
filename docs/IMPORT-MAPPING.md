@@ -443,6 +443,13 @@ un Réel de l'exercice. Règles :
   par matricule (repli compté), sinon « sans domaine » ; nom = « Ressource »
   sans son matricule. Le rapport ajoute une ligne « capacité · <domaine> »
   par domaine. Ress.Profils est facultatif.
+- **Auto-diagnostic du lecteur** : la ligne « plan de charge · lecture » de
+  l'assemblage compte les lignes lues par nature (affectations projet,
+  « Disponible ressource », « Planifiée projet »), les matricules vides et
+  ceux lus **en fin de cellule « Ressource »** (« MEFTAHI, Larbi 00P4583 » —
+  certains exports ne remplissent pas la colonne « Matricule »), et les
+  personnes nominatives obtenues. Première ligne à lire quand les chiffres
+  de capacité paraissent faux.
 
 ## `Ress.Profils` — structure et mapping (ADR 024, 2026-09-07 ; facultatif depuis l'ADR 029 : repli pour le domaine seulement)
 

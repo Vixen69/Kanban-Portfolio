@@ -21,10 +21,10 @@ import type { CsvRow } from "./csv.ts";
 import type { HeaderMatch } from "./contract.ts";
 import { discard, doubt, warn } from "./report.ts";
 import type { ImportReport, RowRef } from "./report.ts";
-import { excludedLabel, lineKind, personFor, resourceKind, setPersonLine } from "./pdc-lines.ts";
-import type { PdcExcluded, PdcPerson, ResourceFacts, ResourceKind } from "./pdc-lines.ts";
+import { excludedLabel, lineKind, matriculeOf, personFor, resourceKind, setPersonLine } from "./pdc-lines.ts";
+import type { LineKind, PdcExcluded, PdcPerson, PdcReading, ResourceFacts, ResourceKind } from "./pdc-lines.ts";
 
-export type { PdcExcluded, PdcPerson } from "./pdc-lines.ts";
+export type { PdcExcluded, PdcPerson, PdcReading } from "./pdc-lines.ts";
 
 /** Aggregated exercise-year charge of one project (by profile; "" = unassigned). */
 export interface PdcProject {
@@ -53,6 +53,8 @@ export interface PdcTable {
   /** Exercise-year totals of the project rows (nominative + generic). */
   totals: { jh: number; done: number };
   excluded: PdcExcluded;
+  /** How the file was read — the report's self-diagnosis. */
+  reading: PdcReading;
 }
 
 interface PdcContext {
@@ -72,6 +74,7 @@ interface PdcContext {
   persons: Map<string, PdcPerson>;
   totals: { jh: number; done: number };
   excluded: PdcExcluded;
+  reading: PdcReading;
   unknownMetiers: Map<string, Tally>;
   prefixes: Map<string, number>;
   tallies: Map<string, Tally>;
@@ -104,6 +107,7 @@ export function parsePdc(
     ),
     projects: new Map(), persons: new Map(),
     totals: { jh: 0, done: 0 }, excluded: { generic: 0, zz: 0, roles: 0, jh: 0, done: 0 },
+    reading: { rows: 0, projectRows: 0, capacityLines: 0, plannedLines: 0, matriculeFromResource: 0, emptyMatricule: 0 },
     unknownMetiers: new Map(), prefixes: new Map(), tallies: new Map(),
   };
   const dataRows = consumeSubHeader(ctx, rows);
@@ -115,6 +119,7 @@ export function parsePdc(
       .sort((a, b) => (b.plannedJh ?? b.jh) - (a.plannedJh ?? a.jh) || a.name.localeCompare(b.name, "fr")),
     totals: ctx.totals,
     excluded: ctx.excluded,
+    reading: ctx.reading,
   };
 }
 
@@ -154,9 +159,10 @@ function readPdcRow(ctx: PdcContext, row: CsvRow): void {
   }
   const jh = amountCell(row.cells[ctx.prevIdx] ?? "", `${ctx.year} Prév.`, row.line, ctx.tallies) ?? 0;
   const done = amountCell(row.cells[ctx.reelIdx] ?? "", `${ctx.year} Réel`, row.line, ctx.tallies) ?? 0;
-  const matricule = cellAt(row, ctx.matriculeIdx);
+  const { matricule, fromResource } = matriculeOf(cellAt(row, ctx.matriculeIdx), cellAt(row, ctx.resourceIdx));
   const resource = cellAt(row, ctx.resourceIdx) || matricule;
   const kind = resourceKind(resource, matricule);
+  countReading(ctx, line, matricule, fromResource);
   const facts: ResourceFacts = { organisation: cellAt(row, ctx.orgIdx), metier: cellAt(row, ctx.metierIdx), profileId: resolveMetier(ctx, row) };
   if (line !== "project") {
     if (kind === "nominative") setPersonLine(personFor(ctx.persons, matricule, resource, facts), line, jh, done);
@@ -169,6 +175,18 @@ function readPdcRow(ctx: PdcContext, row: CsvRow): void {
   ctx.totals.done = round2(ctx.totals.done + done);
   if (kind === "nominative") addNominative(ctx, project, matricule, resource, facts, jh, done);
   else addExcluded(ctx, project, kind, jh, done, row.line);
+}
+
+// The reader's self-diagnosis for the report: which natures of lines were
+// seen, and where the matricules came from.
+function countReading(ctx: PdcContext, line: LineKind, matricule: string, fromResource: boolean): void {
+  const r = ctx.reading;
+  r.rows++;
+  if (line === "project") r.projectRows++;
+  else if (line === "capacity") r.capacityLines++;
+  else r.plannedLines++;
+  if (fromResource) r.matriculeFromResource++;
+  if (matricule === "") r.emptyMatricule++;
 }
 
 // Métier -> profile: direct tolerant match, else with successive dotted

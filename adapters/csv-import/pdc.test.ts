@@ -174,3 +174,13 @@ test("ADR 029 (soir) : the person carries its organisation, métier, profile and
   assert.deepEqual([lea?.name, lea?.organisation, lea?.metier, lea?.profileId, lea?.external, lea?.capacityJh],
     ["DUPONT, Léa", "DSI NEXTER.DOMAINE INFRASTRUCTURE", "Externe.PMO", "pmo", true, 150]);
 });
+
+test("ADR 029 (soir) : the matricule is read from the end of « Ressource » when the column is empty; the reading counters say what was seen", () => {
+  const { table } = run([
+    ";MEFTAHI, Larbi 00P4583;DSI;PMO;PE1;Alpha;T;P;;;;;;;12;0;;;;;;;;;;;;;;",
+    ";MEFTAHI, Larbi 00P4583;DSI;PMO;Disponible ressource (en jour);;;;;;;;;;200;0;;;;;;;;;;;;;;",
+    ";Ressource générique;DSI;PMO;PE1;Alpha;T;P;;;;;;;5;0;;;;;;;;;;;;;;",
+  ]);
+  assert.deepEqual(table.persons.map((p) => [p.matricule, p.name, p.capacityJh, p.jh]), [["00P4583", "MEFTAHI, Larbi", 200, 12]]);
+  assert.deepEqual(table.reading, { rows: 3, projectRows: 2, capacityLines: 1, plannedLines: 0, matriculeFromResource: 2, emptyMatricule: 1 });
+});

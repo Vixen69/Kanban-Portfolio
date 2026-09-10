@@ -72,6 +72,9 @@ test("the five fixture files assemble the full deck", () => {
 test("capacity (ADR 029): the plan de charge is the only source of persons; per-domain lines", () => {
   const { report, capacity } = audit(ALL.map(fixture));
   const byLabel = new Map(report.assembly.map((a) => [a.subject, a.status]));
+  assert.equal(byLabel.get("plan de charge · lecture"),
+    "12 ligne(s) lue(s) : 7 affectations projet · 2 lignes « Disponible ressource » · 3 lignes « Planifiée projet »" +
+    " · matricule vide : 1 · matricule lu dans « Ressource » : 0 · personnes nominatives : 3");
   const snapshot = capacity?.snapshot;
   assert.ok(snapshot);
   assert.equal(snapshot.exerciseYear, 2026);

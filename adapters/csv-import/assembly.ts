@@ -80,8 +80,19 @@ export function emitAssembly(report: ImportReport, data: AssemblyData, config: B
   if (data.cards !== null && data.projets !== null) emitDeck(report, data, data.cards, data.projets, config);
   else emitWaiting(report, data, config.exercise.year);
   report.assembly.push({ subject: "plan de charge", status: chargeStatus(data, config.exercise.year) });
+  if (data.pdc !== null) report.assembly.push({ subject: "plan de charge · lecture", status: readingStatus(data.pdc) });
   report.assembly.push({ subject: "capacité", status: capacityStatus(data) });
   if (data.capacity !== null) emitCapacityByDomain(report, data.capacity, config);
+}
+
+// The PdC reader's self-diagnosis: which natures of lines were seen and
+// where the matricules came from — the first thing to read when the
+// capacity figures look wrong (ADR 029).
+function readingStatus(pdc: PdcTable): string {
+  const r = pdc.reading;
+  return `${r.rows} ligne(s) lue(s) : ${r.projectRows} affectations projet · ${r.capacityLines} lignes « Disponible ressource »` +
+    ` · ${r.plannedLines} lignes « Planifiée projet » · matricule vide : ${r.emptyMatricule}` +
+    ` · matricule lu dans « Ressource » : ${r.matriculeFromResource} · personnes nominatives : ${pdc.persons.length}`;
 }
 
 // The capacity snapshot (ADR 024): who, how much capacity, how much demand.

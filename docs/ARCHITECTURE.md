@@ -663,6 +663,11 @@ de son ADR.
   une ligne « capacité · <domaine> » par domaine (internes/externes,
   capacité, projeté, demande, libre, surcharge). Vue ☷ : couverture et
   libellés parlent la langue du plan de charge.
+- **Auto-diagnostic** : la ligne « plan de charge · lecture » compte les
+  lignes lues par nature, les matricules vides et ceux lus en fin de
+  cellule « Ressource » (le matricule y figure dans l'export de septembre ;
+  si la colonne « Matricule » est vide, sans ce repli il n'y aurait aucune
+  personne).
 
 ### 2026-09-10 — Plan de charge : trois natures de lignes, personnes nominatives, capacité lue dans le PdC (ADR 029)
 
