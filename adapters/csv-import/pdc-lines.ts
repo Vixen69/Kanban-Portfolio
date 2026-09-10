@@ -171,3 +171,18 @@ export function setPersonLine(person: PdcPerson, line: LineKind, jh: number, don
     person.plannedDone = done;
   }
 }
+
+/**
+ * Counts one row for the reader's self-diagnosis: its line nature, and
+ * where its matricule came from.
+ * Inputs: the counters (mutated), the line kind, the matricule ("" when
+ * none), whether it was read from « Ressource ». Output: none. Failure: none.
+ */
+export function countReading(reading: PdcReading, line: LineKind, matricule: string, fromResource: boolean): void {
+  reading.rows++;
+  if (line === "project") reading.projectRows++;
+  else if (line === "capacity") reading.capacityLines++;
+  else reading.plannedLines++;
+  if (fromResource) reading.matriculeFromResource++;
+  if (matricule === "") reading.emptyMatricule++;
+}

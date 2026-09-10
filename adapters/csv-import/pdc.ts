@@ -21,8 +21,8 @@ import type { CsvRow } from "./csv.ts";
 import type { HeaderMatch } from "./contract.ts";
 import { discard, doubt, warn } from "./report.ts";
 import type { ImportReport, RowRef } from "./report.ts";
-import { excludedLabel, lineKind, matriculeOf, personFor, resourceKind, setPersonLine } from "./pdc-lines.ts";
-import type { LineKind, PdcExcluded, PdcPerson, PdcReading, ResourceFacts, ResourceKind } from "./pdc-lines.ts";
+import { countReading, excludedLabel, lineKind, matriculeOf, personFor, resourceKind, setPersonLine } from "./pdc-lines.ts";
+import type { PdcExcluded, PdcPerson, PdcReading, ResourceFacts, ResourceKind } from "./pdc-lines.ts";
 
 export type { PdcExcluded, PdcPerson, PdcReading } from "./pdc-lines.ts";
 
@@ -162,7 +162,7 @@ function readPdcRow(ctx: PdcContext, row: CsvRow): void {
   const { matricule, fromResource } = matriculeOf(cellAt(row, ctx.matriculeIdx), cellAt(row, ctx.resourceIdx));
   const resource = cellAt(row, ctx.resourceIdx) || matricule;
   const kind = resourceKind(resource, matricule);
-  countReading(ctx, line, matricule, fromResource);
+  countReading(ctx.reading, line, matricule, fromResource);
   const facts: ResourceFacts = { organisation: cellAt(row, ctx.orgIdx), metier: cellAt(row, ctx.metierIdx), profileId: resolveMetier(ctx, row) };
   if (line !== "project") {
     if (kind === "nominative") setPersonLine(personFor(ctx.persons, matricule, resource, facts), line, jh, done);
@@ -175,18 +175,6 @@ function readPdcRow(ctx: PdcContext, row: CsvRow): void {
   ctx.totals.done = round2(ctx.totals.done + done);
   if (kind === "nominative") addNominative(ctx, project, matricule, resource, facts, jh, done);
   else addExcluded(ctx, project, kind, jh, done, row.line);
-}
-
-// The reader's self-diagnosis for the report: which natures of lines were
-// seen, and where the matricules came from.
-function countReading(ctx: PdcContext, line: LineKind, matricule: string, fromResource: boolean): void {
-  const r = ctx.reading;
-  r.rows++;
-  if (line === "project") r.projectRows++;
-  else if (line === "capacity") r.capacityLines++;
-  else r.plannedLines++;
-  if (fromResource) r.matriculeFromResource++;
-  if (matricule === "") r.emptyMatricule++;
 }
 
 // Métier -> profile: direct tolerant match, else with successive dotted
