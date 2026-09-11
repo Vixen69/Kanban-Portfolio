@@ -57,7 +57,7 @@ ne peuvent pas porter le même nom.
 | `Projets.csv` **(requis sans `Cout.csv`)** | Le périmètre : chaque ligne est une carte (Id, nom, type, domaine et sous-domaine, dates). L'onglet consolidé (colonnes « Domaine (Orga) ») ou l'export brut (chemin d'organisation, traduit par PARAM). **Sans colonnes Responsable** : si deux fichiers ont la forme Projets, c'est celui-là qui fait foi. |
 | `ProjetsCdP.csv` | Les chefs de projet : l'export complet des projets avec Responsable 1→3 (responsables de domaine de PARAM exclus). Jamais le périmètre, quel que soit son nom. |
 | `PARAM.csv` | La table de correspondance du PMO : responsables de domaine (exclus du chef de projet) et chemins d'organisation → domaine / sous-domaine. |
-| `ProjetsJalons.csv` | La position initiale : RDO / RDLI / RDR « franchi » → Études / Actifs / Exploitation, sinon Demandes. |
+| `ProjetsJalons.csv` | La position initiale : le **statut** des jalons — RDO / RDLI / RDR « Approuvé » → Études / Actifs / Done, sinon Demandes (date et « franchi » en repli et en contrôle, ADR 032). |
 | `SP_2026.csv` | Les coûts 2026 : meilleur estimé, réel, engagé (l'export `SP_total` est accepté aussi, jointure par nom). |
 | `Ressources_PdC.csv` | Plan de charge 2026 par profil, plus la consolidation nominative (taux ETP). |
 | `Ress.Profils.csv` | Les personnes de la DSI : domaine Orga, métier, Int/Ext, disponibilité de l'exercice — la capacité de la vue ☷. |
@@ -188,8 +188,9 @@ d'une carte déplacée à la main — la divergence est signalée, jamais écras
 - **Périmètre** : la liste `Projets.csv` fait foi — aucune exclusion par
   portefeuille ; un type hors des types retenus est signalé, jamais exclu
   (onglet Projets) — dans l'export COUT PREV, il exclut le projet (ADR 030).
-- **Position** : le dernier jalon franchi (RDR → Exploitation, RDLI →
-  Actifs, RDO → Études), sinon Demandes.
+- **Position** : le dernier jalon au statut « Approuvé » (RDR → Done, RDLI
+  → Actifs, RDO → Études), sinon Demandes ; la date et la cellule
+  « franchi » ne font que confirmer (ADR 032).
 - **Âge** : depuis la date de début du projet.
 - **Canal** : toutes les cartes importées entrent en « Projets ».
 

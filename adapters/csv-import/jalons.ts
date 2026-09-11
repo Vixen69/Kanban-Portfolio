@@ -1,11 +1,14 @@
-// Reader for the ProjetsJalons sheet — the initial position (R7): a
-// milestone is passed when its date column (« RDO », « RDLI », « RDR ») is
-// at or before the audit day (author's rule, 2026-09-08); the « … franchi »
-// cell (o/n, VRAI/FAUX, a date) only decides when the date is missing, and
-// a disagreement between the two is signaled. The last milestone passed
-// maps onto the config's stage anchors: RDR -> Exploitation, else RDLI ->
-// Actifs, else RDO -> Études, else the entry column. « Prêts » is never
-// derived. The raw « franchi » values are surveyed (Q21).
+// Reader for the ProjetsJalons sheet — the initial position (R7). The
+// milestone's « (Statut) » cell decides when the file carries it (author,
+// 2026-09-11): « Approuvé » = passed, anything else (« Planifié »…) = not
+// passed; the date column and the « … franchi » cell only confirm — a
+// disagreement is signaled and the statut wins. Without a statut (column
+// absent or cell empty) the earlier rule applies: the date at or before
+// the audit day, else the « franchi » cell. The last milestone passed maps
+// onto the config's stage anchors: RDR -> Done, else RDLI -> Actifs, else
+// RDO -> Études, else the entry column (« RDR approuvé = Done », author).
+// « Prêts » and « Exploitation » are never derived. The raw « franchi »
+// and statut values are surveyed; which path decided each cell is counted.
 
 import type { BoardConfig } from "../../core/types.ts";
 import { resolveFlowAnchors } from "../../core/flow.ts";
@@ -19,7 +22,16 @@ import { discard, doubt, warn } from "./report.ts";
 import type { ImportReport, RowRef } from "./report.ts";
 
 /** The stage a project reached, in the flow's own words. */
-export type Stage = "exploitation" | "actifs" | "etudes" | "entree";
+export type Stage = "done" | "actifs" | "etudes" | "entree";
+
+type Milestone = "RDO" | "RDLI" | "RDR";
+
+/** How many milestone cells each path decided — the report's self-diagnosis. */
+export interface JalonsReading {
+  statut: number;
+  date: number;
+  franchi: number;
+}
 
 /** One project's milestones and the stage they imply. */
 export interface JalonEntry {
@@ -41,6 +53,9 @@ export interface JalonsTable {
   byName: ReadonlyMap<string, JalonEntry>;
   /** Raw « franchi » cell values (normalized) -> count — the Q21 survey. */
   franchiValues: ReadonlyMap<string, number>;
+  /** Raw « (Statut) » cell values (normalized) -> count. */
+  statutValues: ReadonlyMap<string, number>;
+  reading: JalonsReading;
   stageCounts: ReadonlyMap<Stage, number>;
 }
 
@@ -54,18 +69,20 @@ interface JalonsContext {
   byId: Map<string, JalonEntry>;
   byName: Map<string, JalonEntry>;
   franchiValues: Map<string, number>;
+  statutValues: Map<string, number>;
+  reading: JalonsReading;
   tallies: Map<string, Tally>;
 }
 
 /**
  * Parses the ProjetsJalons data rows (header excluded).
  * Inputs: the data rows, the header match, the board config (stage
- * anchors), the report, the file name and `now` (a milestone dated in the
- * future is counted passed but signaled).
+ * anchors), the report, the file name and `now` (the audit day the date
+ * fallback compares against).
  * Outputs: the JalonsTable; side effects: écarté (empty rows, rows without
  * id nor name), douteux (duplicate ids), aggregated signalements
- * (unreadable or future cells, incoherent milestone combinations), the
- * « franchi » value survey.
+ * (statut/date/franchi disagreements, unreadable or future cells,
+ * incoherent milestone combinations), the « franchi » and statut surveys.
  * Failure modes: none — every anomaly is reported, nothing throws.
  */
 export function parseJalons(
@@ -77,20 +94,25 @@ export function parseJalons(
     match, report, fileName,
     stageColumns: stageColumns(config, report, fileName),
     todayIso: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
-    entries: [], byId: new Map(), byName: new Map(), franchiValues: new Map(), tallies: new Map(),
+    entries: [], byId: new Map(), byName: new Map(), franchiValues: new Map(), statutValues: new Map(),
+    reading: { statut: 0, date: 0, franchi: 0 }, tallies: new Map(),
   };
   for (const row of rows) readRow(ctx, row);
   finalize(ctx);
   const stageCounts = new Map<Stage, number>();
   for (const entry of ctx.entries) stageCounts.set(entry.stage, (stageCounts.get(entry.stage) ?? 0) + 1);
-  return { entries: ctx.entries, byId: ctx.byId, byName: ctx.byName, franchiValues: ctx.franchiValues, stageCounts };
+  return {
+    entries: ctx.entries, byId: ctx.byId, byName: ctx.byName,
+    franchiValues: ctx.franchiValues, statutValues: ctx.statutValues, reading: ctx.reading, stageCounts,
+  };
 }
 
 /**
  * The column id each stage maps to, from the config anchors: entry = first
  * column; études = column « etudes », else the qualification anchor; actifs
- * = the activation anchor; exploitation = the last column. A missing anchor
- * degrades to the entry column and is said in the report.
+ * = the activation anchor; done = the terminal anchor (column « done »,
+ * else the DoD-gated one). A missing anchor degrades to the entry column
+ * and is said in the report.
  * Inputs: the board config, the report, the file name. Failure: none.
  */
 export function stageColumns(config: BoardConfig, report: ImportReport, fileName: string): Record<Stage, string> {
@@ -100,10 +122,13 @@ export function stageColumns(config: BoardConfig, report: ImportReport, fileName
   if (anchors?.activation == null) {
     warn(report, "ancre d'activation introuvable dans la topologie — RDLI franchi positionne en colonne d'entrée", fileName);
   }
+  if (anchors?.terminal == null) {
+    warn(report, "ancre terminale (Done) introuvable dans la topologie — RDR franchi positionne en colonne d'entrée", fileName);
+  }
   return {
     entree, etudes,
     actifs: anchors?.activation?.id ?? entree,
-    exploitation: config.columns[config.columns.length - 1]?.id ?? entree,
+    done: anchors?.terminal?.id ?? entree,
   };
 }
 
@@ -134,7 +159,7 @@ function readRow(ctx: JalonsContext, row: CsvRow): void {
   const rdr = passed(ctx, row, "RDR");
   if (rdr && !rdli) tallyInto(ctx.tallies, "RDR franchi sans RDLI franchi — règle ordonnée appliquée", row.line);
   if (rdli && !rdo) tallyInto(ctx.tallies, "RDLI franchi sans RDO franchi — règle ordonnée appliquée", row.line);
-  const stage: Stage = rdr ? "exploitation" : rdli ? "actifs" : rdo ? "etudes" : "entree";
+  const stage: Stage = rdr ? "done" : rdli ? "actifs" : rdo ? "etudes" : "entree";
   const entry: JalonEntry = {
     id, name, normalizedName: normalizeLabel(name), rdo, rdli, rdr, stage,
     columnId: ctx.stageColumns[stage], ref,
@@ -159,10 +184,40 @@ function quietFlag(raw: string): boolean | null {
   return date.kind === "no" ? false : null;
 }
 
-// The milestone's date column decides (passed = at or before the audit
-// day); the « franchi » cell is the fallback when that date is missing or
-// unreadable, and a disagreement is signaled — the date wins.
-function passed(ctx: JalonsContext, row: CsvRow, milestone: "RDO" | "RDLI" | "RDR"): boolean {
+// The statut cell decides when filled (author, 2026-09-11); otherwise the
+// date, then the « franchi » cell (the earlier rule).
+function passed(ctx: JalonsContext, row: CsvRow, milestone: Milestone): boolean {
+  const statut = cell(ctx, row, `${milestone} (Statut)`);
+  if (statut !== "") return byStatut(ctx, row, milestone, statut);
+  return byDate(ctx, row, milestone);
+}
+
+// « Approuvé » = passed, any other statut = not passed (surveyed). The date
+// and the « franchi » cell only confirm: a disagreement is signaled, the
+// statut wins.
+function byStatut(ctx: JalonsContext, row: CsvRow, milestone: Milestone, statut: string): boolean {
+  const key = normalizeLabel(statut);
+  ctx.statutValues.set(key, (ctx.statutValues.get(key) ?? 0) + 1);
+  ctx.reading.statut++;
+  const approved = key === "approuve";
+  const dated = parseFrenchDate(cell(ctx, row, milestone));
+  if (dated.kind === "date" && (dated.iso <= ctx.todayIso) !== approved) {
+    tallyInto(ctx.tallies,
+      `« ${milestone} » ${dated.iso <= ctx.todayIso ? "passé" : "à venir"} mais statut « ${statut} » — le statut fait foi`, row.line);
+  }
+  const flagRaw = cell(ctx, row, `${milestone} franchi`);
+  surveyFranchi(ctx, flagRaw);
+  const flag = quietFlag(flagRaw);
+  if (flag !== null && flag !== approved) {
+    tallyInto(ctx.tallies, `« ${milestone} franchi » dit ${flag ? "oui" : "non"} mais statut « ${statut} » — le statut fait foi`, row.line);
+  }
+  return approved;
+}
+
+// No statut: the milestone's date column decides (passed = at or before
+// the audit day); the « franchi » cell is the fallback when that date is
+// missing or unreadable, and a disagreement is signaled — the date wins.
+function byDate(ctx: JalonsContext, row: CsvRow, milestone: Milestone): boolean {
   const dated = parseFrenchDate(cell(ctx, row, milestone));
   if (dated.kind !== "date") {
     if (dated.kind === "invalid") {
@@ -170,25 +225,27 @@ function passed(ctx: JalonsContext, row: CsvRow, milestone: "RDO" | "RDLI" | "RD
     }
     return franchi(ctx, row, `${milestone} franchi`);
   }
+  ctx.reading.date++;
   const flagRaw = cell(ctx, row, `${milestone} franchi`);
   surveyFranchi(ctx, flagRaw);
-  const byDate = dated.iso <= ctx.todayIso;
+  const passedByDate = dated.iso <= ctx.todayIso;
   const flag = quietFlag(flagRaw);
-  if (flag !== null && flag !== byDate) {
+  if (flag !== null && flag !== passedByDate) {
     tallyInto(ctx.tallies,
-      `« ${milestone} » ${byDate ? "passé" : "à venir"} mais « ${milestone} franchi » dit ${flag ? "oui" : "non"} — la date fait foi`,
+      `« ${milestone} » ${passedByDate ? "passé" : "à venir"} mais « ${milestone} franchi » dit ${flag ? "oui" : "non"} — la date fait foi`,
       row.line);
   }
-  return byDate;
+  return passedByDate;
 }
 
-// A « franchi » cell (fallback path): booleans (VRAI/FAUX, oui/non, o/n,
+// A « franchi » cell (last fallback): booleans (VRAI/FAUX, oui/non, o/n,
 // 1/0) as they are; a date counts as passed (a future one is signaled);
 // « x » counts as passed; empty = not passed; anything else is unreadable
 // = not passed.
 function franchi(ctx: JalonsContext, row: CsvRow, column: string): boolean {
   const raw = cell(ctx, row, column);
   surveyFranchi(ctx, raw);
+  ctx.reading.franchi++;
   const bool = parseFrenchBoolean(raw);
   if (bool === null) return false;
   if (bool !== "invalid") return bool;
@@ -205,6 +262,10 @@ function franchi(ctx: JalonsContext, row: CsvRow, column: string): boolean {
 
 function finalize(ctx: JalonsContext): void {
   for (const [message, t] of ctx.tallies) warn(ctx.report, `${message} : ${tallyLabel(t)}`, ctx.fileName);
-  const seen = [...ctx.franchiValues.entries()].map(([label, count]) => `« ${label} » (${count})`).join(" ; ");
+  const survey = (values: Map<string, number>): string =>
+    [...values.entries()].map(([label, count]) => `« ${label} » (${count})`).join(" ; ");
+  const statuts = survey(ctx.statutValues);
+  if (statuts !== "") warn(ctx.report, `cellules « (Statut) » — valeurs vues : ${statuts} (« approuve » = franchi)`, ctx.fileName);
+  const seen = survey(ctx.franchiValues);
   if (seen !== "") warn(ctx.report, `cellules « franchi » — valeurs vues : ${seen} (relevé Q21)`, ctx.fileName);
 }

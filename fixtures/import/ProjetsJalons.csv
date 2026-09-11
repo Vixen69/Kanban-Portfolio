@@ -1,8 +1,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Id;Nom du projet;Etat du processus;Type;Domaine (Ptf);Sous domaine (Ptf);Début;Fin;CAT;Début T0;Budg;Pré;RDO;RDLI;RDR;RVAV;RVSR;Process RTM;Jalon en cours;Next jalon;Planif next jalon;RDO franchi;RDO (Statut);RDLI franchi;RDLI (Statut);RDR franchi;RDR (Statut);Début (calculé);Fin (calculé);MEF Fin calc;Année ID PE;PDSI2026 O/N
-PE10001;Modernisation atelier;En cours;Projet de mise en oeuvre (Projet);INFRA;INFRA OPE;12/01/2025;15/09/2026;;;;;;;;;;;RDR;RVSR;;VRAI;Validé;VRAI;Validé;VRAI;Validé;;;;2025;O
-PE10002;Refonte portail interne;Nouveau;Etude (Opportunité);A&D;DEVELOPPEMENTS RAPIDES;05/02/2025;15/12/2026;;;;;;;;;;;RDLI;RDR;;VRAI;Validé;VRAI;Validé;FAUX;;;;;2025;O
-PE10003;Montée de version calcul;Nouveau;Projet de gestion d'obsolescence (Projet);ING;ING SYSTEMES;10/03/2026;;;;;;;;;;;;RDO;RDLI;;OUI;Validé;FAUX;;FAUX;;;;;2026;O
+PE10001;Modernisation atelier;En cours;Projet de mise en oeuvre (Projet);INFRA;INFRA OPE;12/01/2025;15/09/2026;;;;;;;;;;;RDR;RVSR;;VRAI;Approuvé;VRAI;Approuvé;VRAI;Approuvé;;;;2025;O
+PE10002;Refonte portail interne;Nouveau;Etude (Opportunité);A&D;DEVELOPPEMENTS RAPIDES;05/02/2025;15/12/2026;;;;;;;;;;;RDLI;RDR;;VRAI;Approuvé;VRAI;Approuvé;FAUX;Planifié;;;;2025;O
+PE10003;Montée de version calcul;Nouveau;Projet de gestion d'obsolescence (Projet);ING;ING SYSTEMES;10/03/2026;;;;;;;;;;;;RDO;RDLI;;OUI;Approuvé;FAUX;Planifié;FAUX;Planifié;;;;2026;O
 MEWTBN7Q;Étude connectivité site B;Nouveau;Etude (Projet);CORPORATE;ACHATS;01/07/2026;;;;;;;;;;;;;RDO;;FAUX;;FAUX;;FAUX;;;;;2026;O
-PE10007;Sécurisation accès;En cours;Projet IA (Projet);CORPORATE;QUALITE;20/03/2025;02/05/2026;;;;;;;;;;;RDR;RVSR;;x;;;;01/06/2026;Validé;;;;2025;O
+PE10007;Sécurisation accès;En cours;Projet IA (Projet);CORPORATE;QUALITE;20/03/2025;02/05/2026;;;;;;;;;;;RDR;RVSR;;x;;;;01/06/2026;Approuvé;;;;2025;O
 PE99999;Projet hors périmètre;Annulé;Etude (Projet);INFRA;INFRA OPE;01/01/2024;;;;;;;;;;;;;;;VRAI;;;;;;;;;2024;N

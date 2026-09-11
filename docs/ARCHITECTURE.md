@@ -637,6 +637,19 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-11 (soir) — La position lue dans le statut des jalons ; RDR approuvé = Done (ADR 032)
+
+- **Décision de l'auteur** : la règle par dates (2026-09-08) était « trop
+  imparfaite » (désaccords date / « franchi » sur les exports réels). Le
+  lecteur `jalons.ts` lit désormais **« RDO / RDLI / RDR (Statut) »** :
+  « Approuvé » = franchi, tout le reste = non ; date et « franchi » ne font
+  que confirmer (désaccords comptés, le statut gagne) ; sans statut,
+  l'ancienne règle reste en repli.
+- **RDR approuvé = Done** (colonne terminale), RDLI → Actifs, RDO →
+  Études, sinon Demandes ; Exploitation n'est plus dérivée de l'import.
+- La ligne « position » du rapport compte les cellules décidées par
+  statut / date / « franchi » ; les valeurs de statut sont relevées.
+
 ### 2026-09-11 (soir) — Les filtres masquent, les colonnes comptent, plus de WIP provisoires (ADR 031)
 
 - **Décision de l'auteur**, devant le périmètre réel : les filtres du

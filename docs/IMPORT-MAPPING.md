@@ -120,15 +120,22 @@ table DOMAINES de `PARAM`), exclusions comptées. L'export brut `projet`
 n'est plus nécessaire (Q20 sans objet).
 
 **R7 — Position initiale : `ProjetsJalons`.** Jointure par Id (nom en
-contrôle). Un jalon est franchi quand sa **date** (colonnes **« RDO »**,
-**« RDLI »**, **« RDR »**) est passée au jour de l'audit (auteur,
-2026-09-08) ; la cellule « … franchi » (o/n) ne décide qu'à défaut de date,
-et un désaccord date / franchi est signalé. Règle ordonnée : RDR franchi →
-**Exploitation** ; sinon RDLI franchi → **Actifs** ; sinon RDO franchi →
-**Études** ; sinon **Demandes**. « Prêts » n'est jamais dérivé (ne se sait qu'à l'oral).
-Les colonnes « (Statut) », « Jalon en cours », « Next jalon » sont relevées
-au rapport. *Remplace* : Q19 (« Jalon en cours ») et les jalons datés de
-`SP_total`. Cibles toujours ancrées sur la config, jamais un id en dur.
+contrôle). **Le statut du jalon décide** (auteur, 2026-09-11, ADR 032) :
+la cellule **« RDO (Statut) »** / **« RDLI (Statut) »** / **« RDR
+(Statut) »** vaut « Approuvé » → jalon franchi ; « Planifié » ou toute
+autre valeur → non franchi. La date du jalon (colonnes « RDO », « RDLI »,
+« RDR ») et la cellule « … franchi » (o/n) ne font que **confirmer** : un
+désaccord est signalé, le statut gagne. Sans statut (colonne absente ou
+cellule vide), l'ancienne règle s'applique : la date passée au jour de
+l'audit (2026-09-08), sinon la cellule « franchi ». Règle ordonnée : RDR
+franchi → **Done** (« RDR approuvé = done », auteur) ; sinon RDLI franchi →
+**Actifs** ; sinon RDO franchi → **Études** ; sinon **Demandes**.
+« Prêts » et « Exploitation » ne sont jamais dérivés. Les valeurs de
+statut et de « franchi » sont relevées au rapport ; la ligne « position »
+dit combien de cellules chaque chemin a décidées (statut / date /
+franchi). *Remplace* : la règle par date de 2026-09-08 (repli), Q19
+(« Jalon en cours ») et les jalons datés de `SP_total`. Cibles toujours
+ancrées sur la config, jamais un id en dur.
 
 **R8 — Budgets 2026 : `SP_2026`.** Jointure par **Id** (SP_2026 en a un,
 contrairement à SP_total ; nom en contrôle croisé). « Coût prév (ME) » →

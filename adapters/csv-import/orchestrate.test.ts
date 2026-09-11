@@ -56,9 +56,10 @@ test("the five fixture files assemble the full deck", () => {
   const byLabel = new Map(report.assembly.map((a) => [a.subject, a.status]));
   assert.equal(byLabel.get("table PARAM"), "prête (5 responsable(s) de domaine · 7 ligne(s) organisation, 7 avec chemin)");
   assert.match(byLabel.get("périmètre `projets`") ?? "", /^6 carte\(s\) — la liste fait foi \(« Projets\.csv »\) · types : .*Étude 2.*hors des types retenus 1 · domaine : colonnes Orga \(direct\)$/);
-  assert.equal(byLabel.get("cartes"), "6 — répartition : Demandes 2 · Études 1 · Actifs 1 · Exploitation 2");
+  assert.equal(byLabel.get("cartes"), "6 — répartition : Demandes 2 · Études 1 · Actifs 1 · Done 2");
   assert.equal(byLabel.get("position"),
-    "jalons 5/6 (Exploitation 2 · Actifs 1 · Études 1 · entrée 1) · sans jalon : 1 → colonne d'entrée · lignes jalons hors périmètre : 1");
+    "jalons 5/6 (Done 2 · Actifs 1 · Études 1 · entrée 1) · sans jalon : 1 → colonne d'entrée · lignes jalons hors périmètre : 1" +
+    " · cellules décidées par : statut 10 · date 0 · « franchi » 8");
   assert.equal(byLabel.get("domaine"), "6/6 (direct 6 · via PARAM 0 · manquant 0) · sous-domaine : 3 détaillé(s), 2 replié(s) dans leur domaine");
   assert.equal(byLabel.get("chef de projet"),
     "6/6 (dont 1 via ProjetsCdP · 1 ligne(s) ProjetsCdP hors périmètre) · responsables de domaine exclus : 4");
@@ -98,7 +99,7 @@ test("each card carries the right position, vocabulary and costs", () => {
   const { cards } = audit(ALL.map(fixture));
   const byCode = new Map(cards?.cards.map((c) => [c.codename, c]));
   const atelier = byCode.get("PE10001");
-  assert.equal(atelier?.columnId, "exploitation");
+  assert.equal(atelier?.columnId, "done", "RDR approuvé = Done (author, 2026-09-11)");
   assert.deepEqual([atelier?.domainId, atelier?.subDomainId, atelier?.domainSource], ["infra", null, "orga"]);
   assert.equal(atelier?.owner, "Alice MERLE", "LAMBERT Luc is a domain lead");
   assert.equal(atelier?.typeId, "mise_en_oeuvre");
@@ -113,7 +114,7 @@ test("each card carries the right position, vocabulary and costs", () => {
   const carto = byCode.get("PE10008");
   assert.deepEqual([carto?.columnId, carto?.typeId, carto?.subDomainId, carto?.owner, carto?.budgetEstimated],
     ["demandes", null, null, "Farid KOVAC", null]);
-  assert.equal(byCode.get("PE10007")?.columnId, "exploitation", "RDR dated 01/06/2026, past");
+  assert.equal(byCode.get("PE10007")?.columnId, "done", "RDR statut Approuvé (its « franchi » cell is a date)");
 });
 
 test("the doubts name the vocabulary questions to settle", () => {
@@ -184,7 +185,7 @@ test("the COUT PREV export is the perimeter when present; the Projets onglet onl
   assert.ok(report.warnings.some((w) => w.file === "Projets.csv" && /ne sert qu'au recoupement/.test(w.message)));
   const byCode = new Map(cards?.cards.map((c) => [c.codename, c]));
   const atelier = byCode.get("PE10001");
-  assert.deepEqual([atelier?.domainId, atelier?.domainSource, atelier?.columnId, atelier?.budgetEstimated], ["infra", "param", "exploitation", 120.5]);
+  assert.deepEqual([atelier?.domainId, atelier?.domainSource, atelier?.columnId, atelier?.budgetEstimated], ["infra", "param", "done", 120.5]);
   assert.deepEqual([byCode.get("PE10017")?.columnId, byCode.get("PE10017")?.typeId, byCode.get("PE10017")?.domainId], ["demandes", "etude", null],
     "no jalon, PROJETS VENDUS resolves to no domain");
   assert.equal(byCode.has("PE10009"), false, "« Budget présenté » is outside the retained states");

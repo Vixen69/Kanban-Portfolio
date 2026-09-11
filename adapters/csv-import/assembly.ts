@@ -214,11 +214,13 @@ function positionStatus(data: AssemblyData, deck: CardAssembly): string {
   const s = deck.stats;
   if (data.jalons === null) return `en attente de \`ProjetsJalons\` — ${s.total} carte(s) en colonne d'entrée`;
   const stages: Array<[string, string]> = [
-    ["exploitation", "Exploitation"], ["actifs", "Actifs"], ["etudes", "Études"], ["entree", "entrée"],
+    ["done", "Done"], ["actifs", "Actifs"], ["etudes", "Études"], ["entree", "entrée"],
   ];
   const detail = stages.map(([key, label]) => `${label} ${s.stageCounts.get(key as never) ?? 0}`).join(" · ");
+  const r = data.jalons.reading;
   return `jalons ${s.positioned}/${s.total} (${detail}) · sans jalon : ${s.withoutJalons} → colonne d'entrée` +
-    ` · lignes jalons hors périmètre : ${s.jalonsOutside}`;
+    ` · lignes jalons hors périmètre : ${s.jalonsOutside}` +
+    ` · cellules décidées par : statut ${r.statut} · date ${r.date} · « franchi » ${r.franchi}`;
 }
 
 function spStatus(sp: SpTable | null, deck: CardAssembly, year: number): string {
