@@ -14,24 +14,17 @@ import type {
 import { ageCategory, ageLabel } from "../../core/aging.ts";
 import { fmtNum } from "../format.ts";
 
-// Gold crown for a top-criticality card (design/board.jsx CrownSVG).
-function CrownSVG({ s }: { s: number }) {
-  return (
-    <svg className="crit-crown" width={s} height={s} viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M2 7l4.5 3.5L12 3l5.5 7.5L22 7l-1.8 12H3.8L2 7z" fill="#d4a017" stroke="#a16207" strokeWidth="1" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 /**
- * Criticality marker: top = gold crown, major = gold star, normal = none.
+ * Criticality marker (author, 2026-09-11 — the crown is gone): top = gold
+ * star, major = slate dot, normal = none.
  * Inputs: c — the card's criticality; big — expanded-card variant.
  * Output: the marker element, or null for "normal". Failure modes: none.
  */
 export function CritMark({ c, big }: { c: Criticality; big?: boolean }) {
-  if (c === "top") return <CrownSVG s={big ? 16 : 12} />;
+  if (c === "top") return <span className="crit-star" title="Top" style={{ fontSize: big ? 14 : 11 }}>{"★"}</span>;
   if (c === "major") {
-    return <span className="crit-star" style={{ fontSize: big ? 14 : 11 }}>{"★"}</span>;
+    const size = big ? 8 : 6;
+    return <span className="crit-dot" title="Majeur" style={{ width: size, height: size }} />;
   }
   return null;
 }

@@ -162,7 +162,7 @@ function PaletteRows({ items, onChange, shortTitle, addLabel, makeNew }: { items
 // Fixed vocabularies: keys never change, only labels/colors do.
 const NATURE_KEYS: NatureKey[] = ["simple", "complicated", "complex"];
 const CRIT_KEYS: Criticality[] = ["top", "major", "normal"];
-const CRIT_ICONS: Record<Criticality, string> = { top: "★", major: "◆", normal: "·" };
+const CRIT_ICONS: Record<Criticality, string> = { top: "★", major: "•", normal: "·" };
 
 // Nature rows: renamable label and color (bg follows fg at 13% alpha).
 function NatureRows({ draft, patch }: TabProps) {

@@ -77,7 +77,7 @@ export function testConfig(): BoardConfig {
     },
     criticalities: {
       top: { label: "Top", badge: "TOP", bg: "#eab308", fg: "#1a1505" },
-      major: { label: "Major", badge: "MAJOR", bg: "#475569", fg: "#e2e8f0" },
+      major: { label: "Majeur", badge: "MAJEUR", bg: "#475569", fg: "#e2e8f0" },
       normal: { label: "Normal", badge: null },
     },
     gateDefs: {

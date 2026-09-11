@@ -60,8 +60,8 @@ function TopBar({ card, onClose, onPatch }: { card: CardState; onClose: () => vo
 }
 
 // Tag row: type (big), domain (+ its sub-domain when detailed, ADR 022),
-// colonne, criticality crown/star, project-constraint tags and the +
-// button opening the constraint editor. No nature tag and, since design
+// colonne, criticality star/dot, project-constraint tags and the + button
+// opening the constraint + criticality editor. No nature tag and, since design
 // v12, no canal tag either: the canal IS the nature and it is already read
 // spatially from the board row, so the tag was restating the card's
 // position. Stale config references are remapped for display only (never
@@ -78,13 +78,13 @@ function TagRow({ card, config, onToggleConstraints }: { card: CardState; config
       <Tag color={domain.color}>{domain.name}</Tag>
       {sub && <Tag color={domain.color}>{sub.name}</Tag>}
       <Tag color="#94a3b8">{column.name}</Tag>
-      {card.criticality === "top" && <Tag color="#d4a017" solid>♛ TOP</Tag>}
-      {card.criticality === "major" && <Tag color="#d4a017">★ MAJOR</Tag>}
+      {card.criticality === "top" && <Tag color="#d4a017" solid>★ {config.criticalities.top.badge ?? config.criticalities.top.label}</Tag>}
+      {card.criticality === "major" && <Tag color="#475569">• {config.criticalities.major.badge ?? config.criticalities.major.label}</Tag>}
       {card.projectConstraints.map((id) => {
         const pc = config.projectConstraints.find((entry) => entry.id === id);
         return pc ? <Tag key={id} color={pc.color}>{pc.name}</Tag> : null;
       })}
-      <button className="tag-edit" title="Contraintes du projet" onClick={onToggleConstraints}>＋</button>
+      <button className="tag-edit" title="Contraintes du projet et criticité" onClick={onToggleConstraints}>＋</button>
     </div>
   );
 }
@@ -202,13 +202,14 @@ function MidSections({ card, config, now, onPatch, onBlock, onUnblock }: {
   );
 }
 
-// The project-constraint editor popover under the tag row.
+// The project-constraint + criticality editor popover under the tag row
+// (author, 2026-09-11: the criticality is ticked by hand like a constraint).
 function ConstraintPop({ card, config, onPatch, onClose }: { card: CardState; config: BoardConfig; onPatch: (patch: CardPatch) => void; onClose: () => void }) {
   return (
     <div className="constraint-pop">
       <span className="field-label" style={{ marginBottom: 6, display: "block" }}>Contraintes du projet</span>
-      <ConstraintEditor config={config} constraints={card.projectConstraints}
-        onSave={(ids) => { onPatch({ projectConstraints: ids }); onClose(); }} onCancel={onClose} />
+      <ConstraintEditor config={config} constraints={card.projectConstraints} criticality={card.criticality}
+        onSave={(ids, criticality) => { onPatch({ projectConstraints: ids, criticality }); onClose(); }} onCancel={onClose} />
     </div>
   );
 }

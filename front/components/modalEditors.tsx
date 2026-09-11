@@ -4,7 +4,7 @@
 // patch callback wired to editCard in App; none holds board state.
 
 import { type ReactNode, useState } from "react";
-import type { BoardConfig, ChargeEntry, Risk } from "../../core/types.ts";
+import type { BoardConfig, ChargeEntry, Criticality, Risk } from "../../core/types.ts";
 import { fmtNum } from "../format.ts";
 
 /** A value the InlineEdit control can display and edit. */
@@ -209,24 +209,30 @@ export function RiskEditor({ config, risks, onSave, onCancel }: {
 }
 
 /**
- * Project-constraint editor: a checklist (Légale, Groupe…).
- * Inputs: the config (project constraints), the card's constraints, save/
- * cancel. Output: the editor DOM.
+ * Project-constraint editor: a checklist (Légale, Groupe…), then the
+ * criticality ticked the same way (author, 2026-09-11): ★ Top or • Majeur,
+ * one at most — neither ticked = Normal.
+ * Inputs: the config (project constraints, criticality labels), the card's
+ * constraints and criticality, save/cancel. Output: the editor DOM.
  */
-export function ConstraintEditor({ config, constraints, onSave, onCancel }: {
+export function ConstraintEditor({ config, constraints, criticality, onSave, onCancel }: {
   config: BoardConfig;
   constraints: string[];
-  onSave: (ids: string[]) => void;
+  criticality: Criticality;
+  onSave: (ids: string[], criticality: Criticality) => void;
   onCancel: () => void;
 }) {
   // Seed from config-known ids only (see ContentionEditor): a stale id with no
   // checkbox could never be deselected and would 400 the whole save.
   const [sel, setSel] = useState<Set<string>>(() => new Set(constraints.filter((id) => config.projectConstraints.some((c) => c.id === id))));
+  const [crit, setCrit] = useState<Criticality>(criticality);
   const toggle = (id: string) => setSel((current) => {
     const next = new Set(current);
     if (next.has(id)) next.delete(id); else next.add(id);
     return next;
   });
+  const pick = (c: Criticality) => setCrit((current) => (current === c ? "normal" : c));
+  const crits = config.criticalities;
   return (
     <div className="charge-editor">
       <div className="ce-list">
@@ -234,7 +240,12 @@ export function ConstraintEditor({ config, constraints, onSave, onCancel }: {
           <CeRow key={pc.id} on={sel.has(pc.id)} color={pc.color} label={pc.name} onToggle={() => toggle(pc.id)} />
         ))}
       </div>
-      <EditorFoot summary={<><b>{sel.size}</b> contrainte(s)</>} onSave={() => onSave([...sel])} onCancel={onCancel} />
+      <span className="field-label" style={{ margin: "9px 0 6px", display: "block" }}>Criticité</span>
+      <div className="ce-list">
+        <CeRow on={crit === "top"} color="#d4a017" label={`★ ${crits.top.label}`} onToggle={() => pick("top")} />
+        <CeRow on={crit === "major"} color="#475569" label={`• ${crits.major.label}`} onToggle={() => pick("major")} />
+      </div>
+      <EditorFoot summary={<><b>{sel.size}</b> contrainte(s) · {crits[crit].label}</>} onSave={() => onSave([...sel], crit)} onCancel={onCancel} />
     </div>
   );
 }

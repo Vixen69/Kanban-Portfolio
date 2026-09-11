@@ -264,8 +264,8 @@
       "fg": "#1a1505"
     },
     "major": {
-      "label": "Major",
-      "badge": "MAJOR",
+      "label": "Majeur",
+      "badge": "MAJEUR",
       "bg": "#475569",
       "fg": "#e2e8f0"
     },

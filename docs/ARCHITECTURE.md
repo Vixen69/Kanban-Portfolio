@@ -637,6 +637,18 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-11 (nuit) — Criticité : ★ Top, • Majeur, cochée à la main dans la fiche
+
+- **Pictos** (décision auteur) : plus de couronne ; **★** = Top, **•** = Majeur
+  (point ardoise) sur les tickets, la fiche, le panneau latéral et le
+  panneau d'administration. Le libellé de la config passe de « Major » à
+  **« Majeur »** (badge « MAJEUR »).
+- **Édition** : le « ＋ » de la ligne de tags de la fiche ouvre l'éditeur
+  des contraintes, qui porte désormais une seconde liste **« Criticité »**
+  (★ Top / • Majeur, une case au plus, aucune = Normal). L'enregistrement
+  envoie un seul patch (`projectConstraints` + `criticality`) → évènement
+  `edited`, comme avant. Vérifié dans le navigateur.
+
 ### 2026-09-11 (nuit) — Types de ressource par métier, charge « à pourvoir », personnes en tension (ADR 033)
 
 - **Décision de l'auteur**, à partir de la macro PDSI du collègue et des

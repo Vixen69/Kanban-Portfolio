@@ -244,7 +244,8 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
   banner), reason on the card in focus and in the detail; per-cell blocked
   count badge.
 - Ticket layout: type tag first, then the name (aligned across tickets),
-  the criticality picto (♛/★) AFTER the name, age pill on the right
+  the criticality picto (★ Top / • Majeur — author's call 2026-09-11, the
+  crown is gone) AFTER the name, age pill on the right
   (author's call, 2026-07-10).
 - Radiator bars (~16px) are THE default view; **one click on a card opens
   its detail** (v11); clicking a column header focuses that stage (2.6fr,

@@ -101,7 +101,7 @@
 
 /* ===== Design v10 : sections détail (plan de charge, contention, budget croisé, risques & alertes, RDR, crown) ===== */
 .crit-star { color: #d4a017; flex: 0 0 auto; line-height: 1; text-shadow: 0 0 1px rgba(161,98,7,.4); }
-.crit-crown { flex: 0 0 auto; display: block; }
+.crit-dot { flex: 0 0 auto; display: inline-block; background: #475569; border-radius: 50%; }
 .tag-edit { width: 18px; height: 18px; border-radius: 4px; border: 1px dashed var(--bd); background: #fff; color: var(--tx-3); font-size: 12px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
 .tag-edit:hover { border-color: var(--accent); color: var(--accent); border-style: solid; }
 .constraint-pop { border: 1px solid var(--bd-sub); border-radius: 7px; padding: 10px 11px; margin-bottom: 13px; background: #fafbfd; }

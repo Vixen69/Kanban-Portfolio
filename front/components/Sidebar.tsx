@@ -172,15 +172,15 @@ function BlocageSection(props: SidebarProps) {
   );
 }
 
-// Glyphs match the cards' iconography (design chrome.jsx): ★ = Major, ♛ = Top.
+// Glyphs match the cards' iconography (author, 2026-09-11): ★ = Top, • = Majeur.
 function CritSection(props: SidebarProps) {
   const { crit } = props.filters;
   const crits = props.config.criticalities;
   return (
     <GroupSection label="Criticité" group="crit" filters={props.filters} onSetGroup={props.onSetGroup}>
       <Pill active={crit.normal !== false} onClick={() => props.onToggle("crit", "normal")}>{crits.normal.label}</Pill>
-      <Pill active={crit.major !== false} onClick={() => props.onToggle("crit", "major")} color="#d4a017">★ {crits.major.label}</Pill>
-      <Pill active={crit.top !== false} onClick={() => props.onToggle("crit", "top")} color="#d4a017">♛ {crits.top.label}</Pill>
+      <Pill active={crit.major !== false} onClick={() => props.onToggle("crit", "major")} color="#475569">• {crits.major.label}</Pill>
+      <Pill active={crit.top !== false} onClick={() => props.onToggle("crit", "top")} color="#d4a017">★ {crits.top.label}</Pill>
     </GroupSection>
   );
 }
@@ -194,8 +194,8 @@ function StatsBlock(props: SidebarProps) {
       <StatRow label="Bloqués" value={view.blocked} total={stats.blocked} alert active={active} />
       <StatRow label={`Stagnants (> ${config.age.agingMaxDays}j)`} value={view.stale} total={stats.stale} active={active} />
       <div className="stat-divider" />
-      <StatRow label={`♛ ${config.criticalities.top.label}`} value={view.top} total={stats.top} active={active} />
-      <StatRow label={`★ ${config.criticalities.major.label}`} value={view.major} total={stats.major} active={active} />
+      <StatRow label={`★ ${config.criticalities.top.label}`} value={view.top} total={stats.top} active={active} />
+      <StatRow label={`• ${config.criticalities.major.label}`} value={view.major} total={stats.major} active={active} />
       <StatRow label={config.criticalities.normal.label} value={view.normal} total={stats.normal} active={active} />
       <StatRow label="Réexamen de décision dépassé" value={view.toReview} total={stats.toReview} alert active={active} />
       <StatRow label="Absentes du dernier import" value={view.absent} total={stats.absent} active={active} />
