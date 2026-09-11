@@ -533,6 +533,19 @@ un Réel de l'exercice. Règles :
   personnes nominatives obtenues. Première ligne à lire quand les chiffres
   de capacité paraissent faux.
 
+## `Ressources_PdC` — la charge « à pourvoir » et les types de ressource (ADR 033, 2026-09-11)
+
+Les lignes non nominatives (affectation générique, codes « zz… », rôles
+« PE22… ») ne sont plus seulement comptées : elles entrent dans le snapshot
+de capacité **par métier** (colonne « Métier »), avec le domaine de leur
+« Organisation » et la carte du tableau quand leur projet en a rejoint une
+(`CapacitySnapshot.generic`). La vue ☷ les porte dans « Types de
+ressource » (un métier = un type de ressource, comme la macro PDSI) et dans
+le KPI « À pourvoir ». La capacité de chaque personne reste sa ligne
+« Disponible ressource » — pas d'ETP forfaitaire (auteur : « ça dépend des
+personnes »). Le seuil de tension (`capacity.tension`, 0,9) vit dans la
+config.
+
 ## `Ress.Profils` — structure et mapping (ADR 024, 2026-09-07 ; facultatif depuis l'ADR 029 : repli pour le domaine seulement)
 
 Une ligne = une personne de la DSI (interne ou externe). Onglet du classeur

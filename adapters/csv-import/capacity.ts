@@ -8,7 +8,7 @@
 // Person ids are opaque (a hash of the matricule): the matricule itself
 // never leaves the run, and the event log only ever sees the id.
 
-import type { Assignment, BoardConfig, CapacitySnapshot, Person } from "../../core/types.ts";
+import type { Assignment, BoardConfig, CapacitySnapshot, GenericDemand, Person } from "../../core/types.ts";
 import { normalizeLabel } from "./normalize.ts";
 import { createDomainLookup } from "./domains.ts";
 import type { Lookup } from "./domains.ts";
@@ -68,21 +68,23 @@ function opaqueId(matricule: string): string {
   return `p-${hash.toString(16).padStart(16, "0")}`;
 }
 
-// Domain of a person: the organisation path through PARAM, else one of
+// Domain of a resource: the organisation path through PARAM, else one of
 // the path's segments read as a domain label (last first), else
-// Ress.Profils by matricule, else unknown.
-function domainOf(entry: PdcPerson, param: ParamTable | null, domainLookup: Lookup, profils: ProfilsTable | null): DomainHit {
-  const path = normalizeLabel(entry.organisation);
+// Ress.Profils by matricule (persons only), else unknown.
+function domainOf(
+  organisation: string, matricule: string, param: ParamTable | null, domainLookup: Lookup, profils: ProfilsTable | null,
+): DomainHit {
+  const path = normalizeLabel(organisation);
   const viaParam = path === "" || param === null ? undefined : param.byPath.get(path);
   if (viaParam !== undefined && viaParam.domainId !== null) {
     return { domain: viaParam.domainId, subDomain: viaParam.subDomainId, via: "path" };
   }
-  const segments = entry.organisation.split(".").map((s) => s.trim()).filter((s) => s !== "");
+  const segments = organisation.split(".").map((s) => s.trim()).filter((s) => s !== "");
   for (let i = segments.length - 1; i >= 0; i--) {
     const hit = domainLookup(segments[i] ?? "");
     if (hit !== null) return { domain: hit.id, subDomain: null, via: "path" };
   }
-  const profil = profils?.byKey.get(normalizeLabel(entry.matricule));
+  const profil = matricule === "" ? undefined : profils?.byKey.get(normalizeLabel(matricule));
   if (profil !== undefined && profil.domainId !== null) {
     return { domain: profil.domainId, subDomain: profil.subDomainId, via: "profils" };
   }
@@ -122,14 +124,31 @@ export function buildCapacity(
   const via = { path: 0, profils: 0, none: 0 };
   for (const entry of pdc.persons) {
     const id = opaqueId(entry.matricule);
-    const hit = domainOf(entry, param, domainLookup, profils);
+    const hit = domainOf(entry.organisation, entry.matricule, param, domainLookup, profils);
     via[hit.via ?? "none"]++;
     persons.push(personOf(entry, id, hit));
     idByMatricule.set(normalizeLabel(entry.matricule), id);
   }
   const assignments = collectAssignments(pdc, cards, idByMatricule, report);
-  const snapshot: CapacitySnapshot = { exerciseYear: config.exercise.year, persons, assignments };
+  const generic = collectGeneric(pdc, cards, param, domainLookup, profils);
+  const snapshot: CapacitySnapshot = { exerciseYear: config.exercise.year, persons, assignments, generic };
   return { snapshot, stats: statsOf(snapshot, cards, pdc, via) };
+}
+
+// The non-nominative rows as demand « à pourvoir » (ADR 033): by métier,
+// with the domain of their organisation and the board card their project
+// joined (null when the project is outside the board).
+function collectGeneric(
+  pdc: PdcTable, cards: readonly EnrichedCard[], param: ParamTable | null, domainLookup: Lookup, profils: ProfilsTable | null,
+): GenericDemand[] {
+  const cardByPdcKey = new Map<string, string>();
+  for (const card of cards) {
+    if (card.pdcKey !== null) cardByPdcKey.set(card.pdcKey, cardId(card));
+  }
+  return pdc.generic.map((row): GenericDemand => ({
+    metier: row.metier, domain: domainOf(row.organisation, "", param, domainLookup, profils).domain,
+    cardId: cardByPdcKey.get(row.projectKey) ?? null, jh: row.jh, done: row.done,
+  }));
 }
 
 // One assignment per (PdC person, card): the PdC project a card joined

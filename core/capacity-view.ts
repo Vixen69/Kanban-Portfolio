@@ -12,8 +12,12 @@ import { demandByPersonDomain, emptyGroupLoad, loadByGroup, personLoads } from "
 import type { GroupLoad, PersonLoad } from "./capacity.ts";
 import { coverageOf, overloadRows, weighingFor } from "./capacity-levers.ts";
 import type { Coverage, Overload, WeighingRow } from "./capacity-levers.ts";
+import { loadByMetier, tensionByMetier } from "./capacity-metiers.ts";
+import type { MetierLoad, MetierTension } from "./capacity-metiers.ts";
+import { DEFAULT_TENSION } from "./config-exercise.ts";
 
 export type { Coverage, Overload, WeighingCard, WeighingRow } from "./capacity-levers.ts";
+export type { MetierLoad, MetierTension } from "./capacity-metiers.ts";
 
 /** Key of persons outside every group (no domain / no profile). */
 const NONE = "";
@@ -38,6 +42,8 @@ export interface CapacityKpis {
   freeJh: number;
   /** Planned beyond capacity, j.h (persons' overloads summed). */
   overJh: number;
+  /** Generic demand nobody carries — the « à pourvoir », j.h (ADR 033). */
+  genericJh: number;
   /** demandJh / capacityJh, null when no capacity is known. */
   ratio: number | null;
   /** plannedJh / capacityJh — the real engagement; null when unknown. */
@@ -48,7 +54,7 @@ export interface CapacityKpis {
   progress: number | null;
   /** Fraction of the exercise year elapsed at `now` (0..1). */
   yearElapsed: number;
-  /** Persons above 100 % (engagement, else board ratio). */
+  /** Persons at or above the tension threshold (engagement, else board ratio). */
   overloaded: number;
   cardsWithoutAssignment: number;
   /** Persons absent from the plan de charge (planned load unknown). */
@@ -93,12 +99,17 @@ export interface ProfileLoadRow extends GroupLoad {
 /** Everything the capacity view renders. */
 export interface CapacityReadout {
   exerciseYear: number;
+  /** The tension threshold the overloads are filtered on (config). */
+  tension: number;
   kpis: CapacityKpis;
   transverse: TransverseRow[];
   domains: DomainLoadRow[];
   profiles: ProfileLoadRow[];
+  /** The « types de ressource »: the plan de charge's métiers (ADR 033). */
+  metiers: MetierLoad[];
   weighing: WeighingRow[];
   overloads: Overload[];
+  tensionByMetier: MetierTension[];
   coverage: Coverage;
 }
 
@@ -138,17 +149,22 @@ export function computeCapacityReadout(
   const assignedCards = new Set(
     snapshot.assignments.filter((a) => cardIds.has(a.cardId)).map((a) => a.cardId),
   );
-  const overloads = overloadRows(loads, config);
+  // A config served by a middle that predates ADR 033 carries no threshold.
+  const tension = config.capacity?.tension ?? DEFAULT_TENSION;
+  const overloads = overloadRows(loads, config, tension);
   return {
     exerciseYear: snapshot.exerciseYear,
+    tension,
     kpis: kpisOf(snapshot, loads, cards.length - assignedCards.size, overloads.length, now),
     transverse: transverseRows(snapshot, cards, config),
     domains: domainRows(snapshot, config),
     profiles: profileRows(snapshot, config),
+    metiers: loadByMetier(snapshot),
     weighing: config.domains
       .filter((domain) => domain.transverse === true)
       .map((domain) => weighingFor(domain.id, domain.name, snapshot, cards, config, topCards)),
     overloads,
+    tensionByMetier: tensionByMetier(loads, tension),
     coverage: coverageOf(snapshot, cards, assignedCards),
   };
 }
@@ -170,10 +186,12 @@ function kpisOf(
     }
   }
   const planKnown = loads.length > sums.withoutPlan;
+  let genericJh = 0;
+  for (const row of snapshot.generic ?? []) genericJh = round2(genericJh + row.jh);
   return {
     persons: snapshot.persons.length,
     external: snapshot.persons.filter((person) => person.external).length,
-    ...sums,
+    ...sums, genericJh,
     ratio: ratioOf(sums.demandJh, sums.capacityJh),
     engagement: planKnown ? ratioOf(sums.plannedJh, sums.capacityJh) : null,
     perimeterShare: ratioOf(sums.demandJh, sums.plannedJh),

@@ -93,6 +93,10 @@ test("capacity (ADR 029): the plan de charge is the only source of persons; per-
   assert.match(byLabel.get("capacité · A&D") ?? "", /^2 personne\(s\) \(1 interne\(s\) · 1 externe\(s\)\) · capacité 180 j\.h \(1 sans ligne « Disponible »\)/);
   const alice = snapshot.persons.find((p) => p.name === "Jean ROCA");
   assert.ok(alice && alice.plannedJh !== null && alice.plannedJh > 0, "whole-plan totals reach the person");
+  const atelierId = snapshot.assignments.find((a) => a.personId === alice?.id)?.cardId;
+  assert.deepEqual(snapshot.generic?.map((g) => [g.metier, g.domain, g.cardId === atelierId, g.jh, g.done]), [
+    ["Externe.Concept.Dév.", "ad", true, 60, 20], ["PMO", "infra", true, 15, 0],
+  ], "ADR 033: the generic rows reach the snapshot by métier, with domain and card");
 });
 
 test("each card carries the right position, vocabulary and costs", () => {

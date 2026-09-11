@@ -507,6 +507,9 @@
     "year": 2026,
     "states": ["Basculé en projet", "Budget validé", "Terminé"]
   },
+  "capacity": {
+    "tension": 0.9
+  },
   "decisions": [
     {
       "id": "D1",

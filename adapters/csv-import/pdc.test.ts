@@ -148,6 +148,10 @@ test("ADR 029: the resource's own lines set its capacity and planned total; gene
   assert.deepEqual([first?.charges.get("pmo"), first?.genericJh, [...(first?.persons.keys() ?? [])]], [{ jh: 65, done: 25 }, 25, ["M1"]]);
   assert.deepEqual([second?.charges.get("pmo"), second?.genericJh, [...(second?.persons.keys() ?? [])]], [{ jh: 38, done: 10 }, 8, ["M1"]]);
   assert.deepEqual(table.excluded, { generic: 1, zz: 1, roles: 1, jh: 33, done: 0 });
+  assert.deepEqual(table.generic, [
+    { projectKey: "code:pe11111", metier: "PMO", organisation: "DSI", jh: 25, done: 0 },
+    { projectKey: "code:px2", metier: "PMO", organisation: "DSI", jh: 8, done: 0 },
+  ], "ADR 033: the generic demand by (project, métier, organisation)");
   assert.deepEqual(table.totals, { jh: 103, done: 35 }, "the two own lines never count as charge");
   assert.ok(!report.warnings.some((w) => /diffère de la ligne « Planifiée projet »/.test(w.message)));
   assert.ok(report.warnings.some((w) => /affectation générique \(sans personne nommée\)/.test(w.message)));

@@ -637,6 +637,26 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-11 (nuit) — Types de ressource par métier, charge « à pourvoir », personnes en tension (ADR 033)
+
+- **Décision de l'auteur**, à partir de la macro PDSI du collègue et des
+  vraies valeurs de « Métier » (20 : CdP INFRA BUILD, Concept.Dév., Pilote
+  de service, PMO…) : « récupérer les deux » — les personnes surchargées
+  **en entier** avec leur rôle, et les **types de ressource** comme la
+  macro, tirés du plan de charge lui-même.
+- **Charge « à pourvoir »** : les lignes non nominatives du PdC (génériques,
+  zz, PE22) entrent dans le snapshot par métier (`CapacitySnapshot.generic`,
+  facultatif — anciens snapshots lus sans), avec domaine et carte.
+- **Panneau « Types de ressource »** (`core/capacity-metiers.ts`,
+  `front/components/capacityMetiers.tsx`) : par métier, personnes, capacité
+  (lignes « Disponible »), projeté, part du tableau, à pourvoir, pression =
+  (projeté + à pourvoir) / capacité. KPI « À pourvoir ».
+- **Personnes en tension** : liste entière ≥ `capacity.tension` (config,
+  0,9 par défaut), métier et domaine, rouge > 100 %, cumul par métier en
+  tête. Plus de « top 15 ».
+- **Pas d'ETP forfaitaire** : la capacité de chacun est sa ligne
+  « Disponible » (auteur : « ça dépend des personnes »).
+
 ### 2026-09-11 (soir) — La position lue dans le statut des jalons ; RDR approuvé = Done (ADR 032)
 
 - **Décision de l'auteur** : la règle par dates (2026-09-08) était « trop

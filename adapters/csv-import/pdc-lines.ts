@@ -46,6 +46,15 @@ export interface PdcExcluded {
   done: number;
 }
 
+/** A non-nominative project row, aggregated by (project, métier, organisation): demand nobody carries yet (ADR 033). */
+export interface PdcGeneric {
+  projectKey: string;
+  metier: string;
+  organisation: string;
+  jh: number;
+  done: number;
+}
+
 /** How the file was read — the report's self-diagnosis of the reader. */
 export interface PdcReading {
   /** Non-empty data rows. */
@@ -170,6 +179,36 @@ export function setPersonLine(person: PdcPerson, line: LineKind, jh: number, don
     person.plannedJh = jh;
     person.plannedDone = done;
   }
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+/**
+ * Records a non-nominative project row: the project keeps the load, the
+ * kind is counted, and the row joins the generic demand of its (project,
+ * métier, organisation) — the « à pourvoir » of the capacity view (ADR 033).
+ * Inputs: the excluded counters, the generic registry, the project (its
+ * key and generic sums, mutated), the resource kind, the row's facts, the
+ * exercise-year pair. Output: none. Failure: none.
+ */
+export function recordExcluded(
+  excluded: PdcExcluded, generic: Map<string, PdcGeneric>, project: { key: string; genericJh: number; genericDone: number },
+  kind: ResourceKind, facts: ResourceFacts, jh: number, done: number,
+): void {
+  project.genericJh = round2(project.genericJh + jh);
+  project.genericDone = round2(project.genericDone + done);
+  excluded.jh = round2(excluded.jh + jh);
+  excluded.done = round2(excluded.done + done);
+  if (kind === "zz") excluded.zz++;
+  else if (kind === "role") excluded.roles++;
+  else excluded.generic++;
+  const key = `${project.key}|${normalizeLabel(facts.metier)}|${normalizeLabel(facts.organisation)}`;
+  const row = generic.get(key) ?? { projectKey: project.key, metier: facts.metier, organisation: facts.organisation, jh: 0, done: 0 };
+  row.jh = round2(row.jh + jh);
+  row.done = round2(row.done + done);
+  generic.set(key, row);
 }
 
 /**

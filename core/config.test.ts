@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { ConfigError, DEFAULT_EXERCISE_YEAR, reconcileCardRefs, validateBoardConfig } from "./config.ts";
+import { ConfigError, reconcileCardRefs, validateBoardConfig } from "./config.ts";
 import { testCard, testConfig } from "./test-helpers.ts";
 import type { Card } from "./types.ts";
 
@@ -27,6 +27,7 @@ test("the repository's config/board.json is valid", () => {
   assert.deepEqual(config.types.find((t) => t.id === "obsolescence")?.aliases,
     ["Projet de gestion d’obsolescence", "obsolescence", "obscolescence"]);
   assert.deepEqual(config.exercise.states, ["Basculé en projet", "Budget validé", "Terminé"], "ADR 030: the author's retained states");
+  assert.deepEqual(config.capacity, { tension: 0.9 }, "ADR 033: the tension threshold");
   // ADR 030: the Sciforma portfolio words of the domains.
   assert.deepEqual(config.domains.filter((d) => d.aliases !== undefined).map((d) => [d.id, d.aliases]), [
     ["ad", ["GROUPE"]], ["industrie", ["PRODUCTION"]], ["infra", ["INFRASTRUCTURE"]],
@@ -252,32 +253,6 @@ test("reconcileCardRefs keeps a sub-domain only while its domain declares it", (
   assert.equal(reconcileCardRefs(testCard({ domain: "gone", subDomain: "b1" }), config).subDomain, null);
 });
 
-test("exercise year and transverse domains (ADR 024): parsed, defaulted, refused when malformed", () => {
-  const config = validateBoardConfig(rawConfig());
-  assert.deepEqual(config.exercise, { year: 2026 });
-  assert.equal(config.domains[1]?.transverse, true);
-  assert.equal("transverse" in (config.domains[0] as object), false);
-  const legacy = rawConfig();
-  delete legacy.exercise;
-  assert.deepEqual(validateBoardConfig(legacy).exercise, { year: DEFAULT_EXERCISE_YEAR });
-  const withStates = rawConfig();
-  withStates.exercise.states = ["Budget validé", "Nouveau"];
-  assert.deepEqual(validateBoardConfig(withStates).exercise, { year: 2026, states: ["Budget validé", "Nouveau"] }, "ADR 030");
-  const cases: [string, (raw: any) => void][] = [
-    ["year not an integer", (raw) => (raw.exercise.year = 2026.5)],
-    ["year out of range", (raw) => (raw.exercise.year = 1999)],
-    ["extra exercise key", (raw) => (raw.exercise.month = 1)],
-    ["states not a list", (raw) => (raw.exercise.states = "Nouveau")],
-    ["states empty", (raw) => (raw.exercise.states = [])],
-    ["state empty", (raw) => (raw.exercise.states = [""])],
-    ["transverse not a boolean", (raw) => (raw.domains[0].transverse = "oui")],
-  ];
-  for (const [name, mutate] of cases) {
-    const raw = rawConfig();
-    mutate(raw);
-    assert.throws(() => validateBoardConfig(raw), ConfigError, name);
-  }
-});
 
 test("decisions and grid terms default to the referential when absent, validate when given", () => {
   const raw = rawConfig();

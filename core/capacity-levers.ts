@@ -36,11 +36,15 @@ export interface WeighingRow {
   cards: WeighingCard[];
 }
 
-/** A person above 100 %, with display names resolved. */
+/** A person at or above the tension threshold, with display names resolved (ADR 033). */
 export interface Overload {
   load: PersonLoad;
   domainName: string;
   profileName: string;
+  /** The level ranked on (engagement, else board ratio). */
+  level: number;
+  /** True beyond 100 %. */
+  over: boolean;
 }
 
 /** How far to trust the figures. */
@@ -96,27 +100,27 @@ export function weighingFor(
 }
 
 /**
- * The persons above 100 % (whole-plan engagement, else board ratio), most
- * loaded first, with display names resolved.
- * Inputs: the person loads (personLoads), the config. Output: the overloads.
- * Failure: none.
+ * The persons at or above the config's tension threshold (whole-plan
+ * engagement, else board ratio) — every one of them, most loaded first,
+ * with display names resolved (ADR 033: the whole list, not a top).
+ * Inputs: the person loads (personLoads), the config (names), the tension
+ * threshold. Output: the overloads. Failure: none.
  */
-export function overloadRows(loads: PersonLoad[], config: BoardConfig): Overload[] {
+export function overloadRows(loads: PersonLoad[], config: BoardConfig, tension: number): Overload[] {
   const domains = new Map(config.domains.map((domain) => [domain.id, domain.name]));
   const profiles = new Map(config.profiles.map((profile) => [profile.id, profile.name]));
-  return loads
-    .filter((load) => {
-      const level = loadLevel(load);
-      return level !== null && level > 1;
-    })
-    .map((load): Overload => {
-      const { domain, profileId, metier } = load.person;
-      return {
-        load,
-        domainName: domain === null ? "Sans domaine" : (domains.get(domain) ?? domain),
-        profileName: profileId === null ? (metier || "Sans profil") : (profiles.get(profileId) ?? profileId),
-      };
+  const rows: Overload[] = [];
+  for (const load of loads) {
+    const level = loadLevel(load);
+    if (level === null || level < tension) continue;
+    const { domain, profileId, metier } = load.person;
+    rows.push({
+      load, level, over: level > 1,
+      domainName: domain === null ? "Sans domaine" : (domains.get(domain) ?? domain),
+      profileName: profileId === null ? (metier || "Sans profil") : (profiles.get(profileId) ?? profileId),
     });
+  }
+  return rows;
 }
 
 /**

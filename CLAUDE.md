@@ -290,12 +290,15 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
   natureKey. Capacity view (☷, ADR 024/025/029 — replaces the v12 Metrics
   read-out, author's call 2026-09-07): the arbitration read-out computed
   from the imported capacity snapshot + the active cards by
-  `core/capacity-view.ts` — 6 KPIs, then demande sur les domaines
+  `core/capacity-view.ts` — 9 KPIs, then demande sur les domaines
   transverses (matrix domain × consumer domain), charge par domaine, charge
-  par profil, cartes qui pèsent (top 5 per transverse domain), personnes
-  au-delà de 100 % (names shown), couverture des chiffres. Annual reading
-  (planned j.h vs declared capacity). `core/metrics*.ts` stay in core
-  (pure, tested) without a view.
+  par profil, **types de ressource** (the plan de charge's métiers, generic
+  demand « à pourvoir » included, pressure = (planned + generic) / capacity
+  — ADR 033), cartes qui pèsent (top 5 per transverse domain), **personnes
+  en tension** (every person at or above `capacity.tension`, métier shown,
+  red beyond 100 %, métier roll-up), couverture des chiffres. Annual
+  reading (planned j.h vs each person's declared « Disponible » line — no
+  flat ETP). `core/metrics*.ts` stay in core (pure, tested) without a view.
 
 ## 6. Security posture (shapes every choice)
 

@@ -171,6 +171,12 @@ export interface ExerciseConfig {
   states?: string[];
 }
 
+/** Capacity read-out thresholds (ADR 033). */
+export interface CapacityThresholds {
+  /** Level (planned / capacity) from which a person or a métier is « en tension » (0.9 = 90 %). */
+  tension: number;
+}
+
 /** Day thresholds separating fresh / recent / aging / stale. */
 export interface AgeThresholds {
   freshMaxDays: number;
@@ -230,6 +236,8 @@ export interface BoardConfig {
   andonThresholdDays: number;
   /** The exercise year (ADR 024) — the PdC / SP window the import reads. */
   exercise: ExerciseConfig;
+  /** Capacity thresholds (ADR 033); absent in the raw config = tension 0.9. */
+  capacity: CapacityThresholds;
   /** The portfolio decisions D1–D6 (ADR 026). */
   decisions: DecisionType[];
   /** The arbitration grid's terms (ADR 026). */

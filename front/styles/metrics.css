@@ -87,6 +87,11 @@
 .cap-val { width: 210px; }
 .cap-val small { display: block; font-weight: 400; color: var(--tx-4); }
 .cap-over { color: var(--danger-strong); font-weight: 700; }
+.cap-tense { color: var(--warn); font-weight: 700; }
+/* Métier roll-up of the tense persons (ADR 033). */
+.cap-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 9px; }
+.cap-chip { font-size: 9px; color: var(--tx-2); background: #f7f9fc; border: 1px solid var(--bd-sub); border-radius: 10px; padding: 2px 8px; white-space: nowrap; }
+.cap-chip b { color: var(--tx-1); } .cap-chip i { font-style: normal; }
 .cap-scroll { overflow-x: auto; }
 .cap-table { border-collapse: collapse; width: 100%; font-size: 10px; }
 .cap-table th, .cap-table td { padding: 5px 8px; text-align: right; border-bottom: 1px solid var(--bd-sub); white-space: nowrap; font-variant-numeric: tabular-nums; vertical-align: top; }

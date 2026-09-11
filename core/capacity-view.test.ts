@@ -43,10 +43,11 @@ const READOUT = computeCapacityReadout(SNAPSHOT, CARDS, CONFIG, NOW);
 test("kpis: capacity, board demand, whole-plan engagement, board share, progress, elapsed year", () => {
   const { freeJh, overJh, ...kpis } = READOUT.kpis;
   assert.deepEqual(kpis, {
-    persons: 4, external: 1, capacityJh: 240, demandJh: 250, doneJh: 50, plannedJh: 370, doneAllJh: 120,
+    persons: 4, external: 1, capacityJh: 240, demandJh: 250, doneJh: 50, plannedJh: 370, doneAllJh: 120, genericJh: 0,
     ratio: 1.04, engagement: 1.54, perimeterShare: 0.68, progress: 0.32, yearElapsed: 0.69,
     overloaded: 2, cardsWithoutAssignment: 1, withoutPlan: 1,
   });
+  assert.equal(READOUT.tension, 0.9);
   // ADR 029: free and over are the two sides of planned − capacity, summed per known person.
   const net = SNAPSHOT.persons
     .filter((p) => p.capacityJh !== null && p.plannedJh !== null)
@@ -103,9 +104,38 @@ test("the cards weighing on a transverse domain, with their share of its capacit
 });
 
 test("overloads rank on the whole-plan engagement, most loaded first, names resolved", () => {
-  assert.deepEqual(READOUT.overloads.map((o) => [o.load.person.id, o.load.engagement, o.load.ratio, o.domainName, o.profileName, o.load.cards.length]), [
-    ["p1", 1.5, 0.75, "Beta", "Profil A", 2],
-    ["p2", 1.5, 1.5, "Beta", "Profil B", 1],
+  assert.deepEqual(READOUT.overloads.map((o) => [o.load.person.id, o.load.engagement, o.load.ratio, o.domainName, o.profileName, o.load.cards.length, o.over]), [
+    ["p1", 1.5, 0.75, "Beta", "Profil A", 2, true],
+    ["p2", 1.5, 1.5, "Beta", "Profil B", 1, true],
+  ]);
+});
+
+test("ADR 033: the tension threshold keeps persons from 90 %, the métiers carry the generic demand « à pourvoir »", () => {
+  const snapshot: CapacitySnapshot = {
+    exerciseYear: 2026,
+    persons: [
+      testPerson({ id: "p1", name: "Un", metier: "CdP INFRA BUILD", capacityJh: 200, plannedJh: 185, doneJh: 0 }),
+      testPerson({ id: "p2", name: "Deux", metier: "CdP INFRA BUILD", capacityJh: 200, plannedJh: 100, doneJh: 0 }),
+      testPerson({ id: "p3", name: "Trois", metier: "Concept.Dév.", capacityJh: 100, plannedJh: 120, doneJh: 0 }),
+    ],
+    assignments: [{ personId: "p1", cardId: "S001", jh: 50, done: 0 }],
+    generic: [
+      { metier: "Concept.Dév.", domain: "alpha", cardId: "S001", jh: 60, done: 20 },
+      { metier: "Concept.Dév.", domain: "alpha", cardId: null, jh: 40, done: 0 },
+      { metier: "Data Business", domain: null, cardId: "S002", jh: 30, done: 0 },
+    ],
+  };
+  const readout = computeCapacityReadout(snapshot, CARDS, CONFIG, NOW);
+  assert.deepEqual(readout.overloads.map((o) => [o.load.person.id, o.level, o.over]), [["p3", 1.2, true], ["p1", 0.93, false]]);
+  assert.equal(readout.kpis.overloaded, 2);
+  assert.equal(readout.kpis.genericJh, 130);
+  assert.deepEqual(readout.tensionByMetier, [
+    { metier: "Concept.Dév.", persons: 1, tense: 1, over: 1 }, { metier: "CdP INFRA BUILD", persons: 2, tense: 1, over: 0 },
+  ]);
+  assert.deepEqual(readout.metiers.map((m) => [m.metier, m.persons, m.capacityJh, m.plannedJh, m.demandJh, m.genericJh, m.genericBoardJh, m.pressure]), [
+    ["Concept.Dév.", 1, 100, 120, 0, 100, 60, 2.2],
+    ["CdP INFRA BUILD", 2, 400, 285, 50, 0, 0, 0.71],
+    ["Data Business", 0, 0, 0, 0, 30, 30, null],
   ]);
 });
 
@@ -119,7 +149,7 @@ test("coverage counts stubs, unknown capacities and plans, uncovered cards, gene
 test("an empty snapshot reads as zeros, not NaN", () => {
   const empty = computeCapacityReadout({ exerciseYear: 2027, persons: [], assignments: [] }, [], CONFIG, NOW);
   assert.deepEqual(empty.kpis, {
-    persons: 0, external: 0, capacityJh: 0, demandJh: 0, doneJh: 0, plannedJh: 0, doneAllJh: 0, freeJh: 0, overJh: 0,
+    persons: 0, external: 0, capacityJh: 0, demandJh: 0, doneJh: 0, plannedJh: 0, doneAllJh: 0, freeJh: 0, overJh: 0, genericJh: 0,
     ratio: null, engagement: null, perimeterShare: null, progress: null, yearElapsed: 0,
     overloaded: 0, cardsWithoutAssignment: 0, withoutPlan: 0,
   });

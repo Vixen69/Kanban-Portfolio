@@ -88,7 +88,7 @@ export function testConfig(): BoardConfig {
     ...testVocabularies(),
     age: { freshMaxDays: 7, recentMaxDays: 28, agingMaxDays: 60 },
     andonThresholdDays: 5,
-    exercise: { year: 2026 },
+    exercise: { year: 2026 }, capacity: { tension: 0.9 },
   };
 }
 

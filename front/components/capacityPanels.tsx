@@ -8,11 +8,8 @@
 import type { ReactNode } from "react";
 import type { GroupLoad, PersonLoad } from "../../core/capacity.ts";
 import { loadLevel } from "../../core/capacity.ts";
-import type { Coverage, DomainLoadRow, Overload, ProfileLoadRow } from "../../core/capacity-view.ts";
+import type { Coverage, DomainLoadRow, MetierTension, Overload, ProfileLoadRow } from "../../core/capacity-view.ts";
 import { fmtUnit } from "../format.ts";
-
-/** How many overloaded persons the panel lists before summarising the rest. */
-const TOP_OVERLOADS = 15;
 
 /** Percentage of a ratio ("88 %"), "—" when the capacity is unknown. */
 export function pct(ratio: number | null): string {
@@ -99,41 +96,61 @@ export function ProfilesPanel({ rows }: { rows: ProfileLoadRow[] }) {
   );
 }
 
-function OverloadFigure({ load }: { load: PersonLoad }) {
+function OverloadFigure({ load, over }: { load: PersonLoad; over: boolean }) {
   const { plannedJh, capacityJh } = load.person;
   return (
     <span className="cap-fig">
-      <b className="cap-over">{pct(loadLevel(load))}</b> · {fmtUnit(plannedJh ?? load.jh)} / {fmtUnit(capacityJh ?? 0)} j.h
+      <b className={over ? "cap-over" : "cap-tense"}>{pct(loadLevel(load))}</b> · {fmtUnit(plannedJh ?? load.jh)} / {fmtUnit(capacityJh ?? 0)} j.h
       {plannedJh !== null ? ` · tableau ${shareOf(load.jh, plannedJh)}` : " · hors plan de charge"}
     </span>
   );
 }
 
-/**
- * Personnes au-delà de 100 %: name, domain · profile, whole-plan load over
- * capacity, the board's share — most loaded first.
- * Inputs: the overloads. Output: the panel. Failure: none.
- */
-export function OverloadsPanel({ rows }: { rows: Overload[] }) {
-  const rest = rows.length - TOP_OVERLOADS;
+// Which métiers the tense persons belong to: « CdP INFRA BUILD 4/7 » = four
+// of its seven persons at or above the threshold (ADR 033).
+function MetierChips({ rows, tension }: { rows: MetierTension[]; tension: number }) {
+  if (rows.length === 0) return null;
   return (
-    <Panel title="Personnes au-delà de 100 %" hint="projeté sur tout le plan de charge / capacité déclarée · les plus chargées d’abord">
-      {rows.length === 0 && <div className="mp-empty">Personne au-delà de sa capacité.</div>}
-      {rows.slice(0, TOP_OVERLOADS).map(({ load, domainName, profileName }) => (
+    <div className="cap-chips">
+      {rows.map((m) => (
+        <span className="cap-chip" key={m.metier}
+          title={`${m.tense} personne(s) ≥ ${pct(tension)} dont ${m.over} au-delà de 100 %, sur ${m.persons} au niveau connu`}>
+          {m.metier || "Sans métier"} <b>{m.tense}/{m.persons}</b>
+          {m.over > 0 && <i className="cap-over"> · {m.over} &gt; 100 %</i>}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Personnes en tension: EVERY person at or above the config's tension
+ * threshold (ADR 033) — name, domain · métier, whole-plan load over
+ * capacity, the board's share — most loaded first, red beyond 100 %; the
+ * métier roll-up on top says which roles are saturated.
+ * Inputs: the overloads, the threshold, the métier roll-up. Output: the
+ * panel. Failure: none.
+ */
+export function OverloadsPanel({ rows, tension, byMetier }: { rows: Overload[]; tension: number; byMetier: MetierTension[] }) {
+  return (
+    <Panel title={`Personnes en tension (≥ ${pct(tension)})`}
+      hint="projeté sur tout le plan de charge / capacité déclarée · toutes, les plus chargées d’abord · rouge au-delà de 100 %">
+      <MetierChips rows={byMetier} tension={tension} />
+      {rows.length === 0 && <div className="mp-empty">Personne au-dessus du seuil de tension.</div>}
+      {rows.map(({ load, domainName, profileName, over }) => (
         <div className="cap-item" key={load.person.id}>
           <span className="cap-name">{load.person.name}{load.person.external && <small> (ext.)</small>}</span>
-          <span className="cap-meta">{domainName} · {profileName} · {load.cards.length} carte{load.cards.length > 1 ? "s" : ""} du tableau</span>
-          <OverloadFigure load={load} />
+          <span className="cap-meta">{domainName} · {load.person.metier || profileName} · {load.cards.length} carte{load.cards.length > 1 ? "s" : ""} du tableau</span>
+          <OverloadFigure load={load} over={over} />
         </div>
       ))}
-      {rest > 0 && <div className="m2-note">… et {rest} autre{rest > 1 ? "s" : ""} personne{rest > 1 ? "s" : ""} au-delà de 100 %.</div>}
     </Panel>
   );
 }
 
 function coverageLines(c: Coverage): string[] {
   const lines = [`${c.assignedCards} carte(s) avec au moins une affectation nominative · ${c.cardsWithoutAssignment} sans.`];
-  if (c.genericJh > 0) lines.push(`${fmtUnit(c.genericJh)} j.h de charge des cartes sans personne nommée (lignes génériques du plan de charge) — hors de cette vue.`);
+  if (c.genericJh > 0) lines.push(`${fmtUnit(c.genericJh)} j.h de charge des cartes sans personne nommée (lignes génériques du plan de charge) — portés par métier dans « Types de ressource », hors des personnes.`);
   if (c.unknownCapacity > 0) lines.push(`${c.unknownCapacity} personne(s) sans ligne « Disponible ressource » — leur charge compte, pas leur capacité.`);
   if (c.withoutPlan > 0) lines.push(`${c.withoutPlan} personne(s) absentes du plan de charge — projeté inconnu, seule leur part du tableau est lue.`);
   if (c.outsideJh > 0) lines.push(`${fmtUnit(c.outsideJh)} j.h affectés à des cartes hors tableau (archivées, supprimées ou hors périmètre).`);
@@ -153,8 +170,8 @@ export function CoveragePanel({ coverage }: { coverage: Coverage }) {
       </div>
       <div className="m2-note">
         Lecture annuelle : projeté de l’exercice (tout le plan de charge, pas seulement le tableau) contre
-        la capacité de chacun (ligne « Disponible ressource » du plan de charge, 200 j.h ≈ 1 ETP). L’avancement compare le
-        réalisé au projeté : un constat, pas une prévision.
+        la capacité de chacun — sa propre ligne « Disponible ressource » du plan de charge, pas un ETP forfaitaire.
+        L’avancement compare le réalisé au projeté : un constat, pas une prévision.
       </div>
     </Panel>
   );

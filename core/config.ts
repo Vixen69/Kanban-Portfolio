@@ -4,7 +4,7 @@
 // stays hard-coded.
 
 import type {
-  AgeThresholds, BoardConfig, Column, CriticalityStyle, ExerciseConfig,
+  AgeThresholds, BoardConfig, Column, CriticalityStyle,
   FieldDef, FieldOption, FieldType, GateCode, GateDef, Lane, NatureKey,
   NatureStyle, RiskSeverityStyle,
 } from "./types.ts";
@@ -14,8 +14,10 @@ import {
 } from "./config-parse.ts";
 import { parseColored, parseDomain, parseIdNameColor, parseProjectType } from "./config-vocab.ts";
 import { parseDecisionGrounds, parseDecisions } from "./config-decisions.ts";
+import { parseCapacity, parseExercise } from "./config-exercise.ts";
 
 export { ConfigError } from "./config-parse.ts";
+export { DEFAULT_EXERCISE_YEAR, DEFAULT_TENSION } from "./config-exercise.ts";
 export { laneNature, reconcileCardRefs, subDomainsOf } from "./config-derive.ts";
 
 const NATURE_KEYS = ["simple", "complicated", "complex"] as const;
@@ -24,28 +26,6 @@ const GATE_CODES: readonly GateCode[] = ["DoR", "DoD"];
 const FIELD_TYPES: readonly FieldType[] = ["text", "number", "date", "select", "checkbox", "person"];
 const AGE_KEYS = ["freshMaxDays", "recentMaxDays", "agingMaxDays"] as const;
 const RISK_SEVERITY_KEYS = ["faible", "moyen", "eleve"] as const;
-
-/** Exercise year assumed by a config that predates ADR 024 (runtime overrides stored before). */
-export const DEFAULT_EXERCISE_YEAR = 2026;
-
-// exercise.year: an integer year; absent = the pre-ADR-024 default, so an
-// admin override stored earlier keeps validating. exercise.states: the
-// process states kept in the COUT PREV perimeter (ADR 030) — optional, a
-// non-empty list of labels when present.
-function parseExercise(value: unknown): ExerciseConfig {
-  if (value === undefined) return { year: DEFAULT_EXERCISE_YEAR };
-  const record = requireRecord(value, "exercise");
-  for (const key of Object.keys(record)) {
-    if (key !== "year" && key !== "states") fail(`exercise : clé inattendue « ${key} »`);
-  }
-  const year = record.year;
-  if (typeof year !== "number" || !Number.isInteger(year) || year < 2000 || year > 2100) {
-    fail("exercise.year doit être une année entière (2000–2100)");
-  }
-  if (record.states === undefined) return { year };
-  if (!Array.isArray(record.states) || record.states.length === 0) fail("exercise.states doit être une liste non vide d'états");
-  return { year, states: record.states.map((state, i) => requireText(state, `exercise.states[${i}]`)) };
-}
 
 // natureKey: one of the three fixed keys; absent defaults to "complicated"
 // (back-compat with runtime overrides stored before design v11).
@@ -282,6 +262,7 @@ export function validateBoardConfig(raw: unknown): BoardConfig {
     age: parseAge(raw.age),
     andonThresholdDays: andon,
     exercise: parseExercise(raw.exercise),
+    capacity: parseCapacity(raw.capacity),
     decisions: parseDecisions(raw.decisions),
     decisionGrounds: parseDecisionGrounds(raw.decisionGrounds),
   };

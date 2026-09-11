@@ -12,6 +12,7 @@ import { computeCapacityReadout, type CapacityKpis, type CapacityReadout } from 
 import { fetchCapacity } from "../api.ts";
 import { fmtUnit } from "../format.ts";
 import { CoveragePanel, DomainsPanel, OverloadsPanel, ProfilesPanel, pct } from "./capacityPanels.tsx";
+import { MetiersPanel } from "./capacityMetiers.tsx";
 import { TransversePanel, WeighingPanel } from "./capacityTables.tsx";
 
 const DAY_MS = 86_400_000;
@@ -89,10 +90,12 @@ function Kpis({ readout }: { readout: CapacityReadout }) {
       <Kpi num={pct(kpis.progress)} label={`Avancement · réalisé / projeté · ${pct(kpis.yearElapsed)} de l’année écoulée`}
         tone={progressTone(kpis)} />
       <Kpi num={pct(kpis.perimeterShare)} label="Part du tableau dans le projeté" />
-      <Kpi num={kpis.overloaded} label="Personnes au-delà de 100 %" tone={kpis.overloaded > 0 ? "alert" : "ok"} />
+      <Kpi num={kpis.overloaded} label={`Personnes en tension · ≥ ${pct(readout.tension)}`} tone={kpis.overloaded > 0 ? "alert" : "ok"} />
       <Kpi num={fmtUnit(kpis.freeJh)} unit="j.h" label="Reste disponible · capacité non planifiée" tone="ok" />
       <Kpi num={fmtUnit(kpis.overJh)} unit="j.h" label="Surcharge cumulée · planifié au-delà des capacités"
         tone={kpis.overJh > 0 ? "alert" : "ok"} />
+      <Kpi num={fmtUnit(kpis.genericJh)} unit="j.h" label="À pourvoir · charge sans personne nommée"
+        tone={kpis.genericJh > 0 ? "warn" : null} />
     </div>
   );
 }
@@ -103,8 +106,9 @@ function Panels({ readout }: { readout: CapacityReadout }) {
       <TransversePanel rows={readout.transverse} />
       <DomainsPanel rows={readout.domains} />
       <ProfilesPanel rows={readout.profiles} />
+      <MetiersPanel rows={readout.metiers} tension={readout.tension} />
       <WeighingPanel rows={readout.weighing} />
-      <OverloadsPanel rows={readout.overloads} />
+      <OverloadsPanel rows={readout.overloads} tension={readout.tension} byMetier={readout.tensionByMetier} />
       <CoveragePanel coverage={readout.coverage} />
     </div>
   );

@@ -77,7 +77,11 @@ vivant) et `docs/adr/` (décisions). Le contrat de travail est `CLAUDE.md`.
   **surcharge cumulée**. Depuis le complément de l'ADR 029, le plan de
   charge est la seule source des personnes : capacité, projeté, métier,
   interne/externe et domaine (via PARAM) en viennent ; Ress.Profils est
-  facultatif. Lecture annuelle : projeté contre capacité.
+  facultatif. Lecture annuelle : projeté contre capacité. Depuis l'ADR 033 :
+  **types de ressource** (les métiers du plan de charge, charge « à
+  pourvoir » des lignes sans personne nommée comprise, pression = (projeté +
+  à pourvoir) / capacité) et **personnes en tension** en entier (≥ seuil
+  `capacity.tension`, métier affiché, cumul par métier).
 - **Décision tracée** (ADR 026) : dans la fiche, une décision D1–D6 du
   référentiel (faire entrer, continuer, réduire, mettre en pause,
   requalifier, stopper) se trace avec sa raison dans les termes de la

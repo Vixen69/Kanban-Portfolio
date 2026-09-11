@@ -271,11 +271,29 @@ export interface Assignment {
 }
 
 /**
+ * Demand carried by no named person (ADR 033): a generic, « zz » or
+ * « PE22 » row of the plan de charge, aggregated by métier — the « à
+ * pourvoir » of the capacity view. cardId names the board card its project
+ * joined, null when the project is outside the board.
+ */
+export interface GenericDemand {
+  /** « Métier » label as exported ("" when absent). */
+  metier: string;
+  domain: string | null;
+  cardId: string | null;
+  jh: number;
+  done: number;
+}
+
+/**
  * The capacity snapshot an import replaces as a whole — a fact table, never
- * event-sourced (ADR 024): persons, their assignments, the exercise year.
+ * event-sourced (ADR 024): persons, their assignments, the exercise year,
+ * and the generic demand by métier (ADR 033).
  */
 export interface CapacitySnapshot {
   exerciseYear: number;
   persons: Person[];
   assignments: Assignment[];
+  /** Absent on snapshots stored before ADR 033 (read as empty). */
+  generic?: GenericDemand[];
 }

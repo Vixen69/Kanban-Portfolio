@@ -21,10 +21,10 @@ import type { CsvRow } from "./csv.ts";
 import type { HeaderMatch } from "./contract.ts";
 import { discard, doubt, warn } from "./report.ts";
 import type { ImportReport, RowRef } from "./report.ts";
-import { countReading, excludedLabel, lineKind, matriculeOf, personFor, resourceKind, setPersonLine } from "./pdc-lines.ts";
-import type { PdcExcluded, PdcPerson, PdcReading, ResourceFacts, ResourceKind } from "./pdc-lines.ts";
+import { countReading, excludedLabel, lineKind, matriculeOf, personFor, recordExcluded, resourceKind, setPersonLine } from "./pdc-lines.ts";
+import type { PdcExcluded, PdcGeneric, PdcPerson, PdcReading, ResourceFacts } from "./pdc-lines.ts";
 
-export type { PdcExcluded, PdcPerson, PdcReading } from "./pdc-lines.ts";
+export type { PdcExcluded, PdcGeneric, PdcPerson, PdcReading } from "./pdc-lines.ts";
 
 /** Aggregated exercise-year charge of one project (by profile; "" = unassigned). */
 export interface PdcProject {
@@ -53,6 +53,8 @@ export interface PdcTable {
   /** Exercise-year totals of the project rows (nominative + generic). */
   totals: { jh: number; done: number };
   excluded: PdcExcluded;
+  /** The non-nominative rows by (project, métier, organisation) — demand « à pourvoir » (ADR 033). */
+  generic: PdcGeneric[];
   /** How the file was read — the report's self-diagnosis. */
   reading: PdcReading;
 }
@@ -74,6 +76,7 @@ interface PdcContext {
   persons: Map<string, PdcPerson>;
   totals: { jh: number; done: number };
   excluded: PdcExcluded;
+  generic: Map<string, PdcGeneric>;
   reading: PdcReading;
   unknownMetiers: Map<string, Tally>;
   prefixes: Map<string, number>;
@@ -106,7 +109,7 @@ export function parsePdc(
       config.profiles.flatMap((p): Array<[string, string]> => [[p.id, p.id], [p.name, p.id]]),
     ),
     projects: new Map(), persons: new Map(),
-    totals: { jh: 0, done: 0 }, excluded: { generic: 0, zz: 0, roles: 0, jh: 0, done: 0 },
+    totals: { jh: 0, done: 0 }, excluded: { generic: 0, zz: 0, roles: 0, jh: 0, done: 0 }, generic: new Map(),
     reading: { rows: 0, projectRows: 0, capacityLines: 0, plannedLines: 0, matriculeFromResource: 0, emptyMatricule: 0 },
     unknownMetiers: new Map(), prefixes: new Map(), tallies: new Map(),
   };
@@ -119,6 +122,7 @@ export function parsePdc(
       .sort((a, b) => (b.plannedJh ?? b.jh) - (a.plannedJh ?? a.jh) || a.name.localeCompare(b.name, "fr")),
     totals: ctx.totals,
     excluded: ctx.excluded,
+    generic: [...ctx.generic.values()],
     reading: ctx.reading,
   };
 }
@@ -174,7 +178,10 @@ function readPdcRow(ctx: PdcContext, row: CsvRow): void {
   ctx.totals.jh = round2(ctx.totals.jh + jh);
   ctx.totals.done = round2(ctx.totals.done + done);
   if (kind === "nominative") addNominative(ctx, project, matricule, resource, facts, jh, done);
-  else addExcluded(ctx, project, kind, jh, done, row.line);
+  else {
+    recordExcluded(ctx.excluded, ctx.generic, project, kind, facts, jh, done);
+    tallyInto(ctx.tallies, `${excludedLabel(kind)} — charge gardée sur le projet, hors personnes`, row.line);
+  }
 }
 
 // Métier -> profile: direct tolerant match, else with successive dotted
@@ -242,19 +249,6 @@ function addNominative(
   project.persons.set(matricule, load);
   person.jh = round2(person.jh + jh);
   person.done = round2(person.done + done);
-}
-
-// A non-nominative row: the project keeps the load as demand without a
-// named person; the kind is counted for the report.
-function addExcluded(ctx: PdcContext, project: PdcProject, kind: ResourceKind, jh: number, done: number, line: number): void {
-  project.genericJh = round2(project.genericJh + jh);
-  project.genericDone = round2(project.genericDone + done);
-  ctx.excluded.jh = round2(ctx.excluded.jh + jh);
-  ctx.excluded.done = round2(ctx.excluded.done + done);
-  if (kind === "zz") ctx.excluded.zz++;
-  else if (kind === "role") ctx.excluded.roles++;
-  else ctx.excluded.generic++;
-  tallyInto(ctx.tallies, `${excludedLabel(kind)} — charge gardée sur le projet, hors personnes`, line);
 }
 
 // Aggregated signalements, unknown-métier questions, prefix survey, the
