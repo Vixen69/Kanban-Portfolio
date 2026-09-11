@@ -87,6 +87,7 @@
       "transverse": true,
       "name": "A&D",
       "short": "A&D",
+      "aliases": ["GROUPE"],
       "color": "#14b8a6",
       "subDomains": [
         {
@@ -161,6 +162,7 @@
       "id": "industrie",
       "name": "INDUSTRIE",
       "short": "IND",
+      "aliases": ["PRODUCTION"],
       "color": "#f59e0b"
     },
     {
@@ -168,12 +170,14 @@
       "transverse": true,
       "name": "INFRA",
       "short": "INF",
+      "aliases": ["INFRASTRUCTURE"],
       "color": "#ec4899"
     },
     {
       "id": "ing",
       "name": "ING",
       "short": "ING",
+      "aliases": ["INGENIERIE SYSTEMES", "INGENIERIE MUNITIONS"],
       "color": "#10b981"
     },
     {

@@ -37,7 +37,7 @@ test("a July RDOM file is inventoried as a retired contract, never parsed", () =
   assert.equal(report.inventory[0]?.contractId, "rdom");
   assert.equal(param, null);
   assert.deepEqual(report.missingExpected.map((m) => m.name),
-    ["Projets", "PARAM", "ProjetsJalons", "SP (exercice ou total)", "Ressources_PdC", "Ress.Profils", "ProjetsCdP"]);
+    ["Coût prévisionnel (COUT PREV)", "Projets", "PARAM", "ProjetsJalons", "SP (exercice ou total)", "Ressources_PdC", "Ress.Profils", "ProjetsCdP"]);
 });
 
 test("the five fixture files assemble the full deck", () => {
@@ -46,7 +46,7 @@ test("the five fixture files assemble the full deck", () => {
     ["PARAM.csv", "recognized-with-deviations"], ["Projets.csv", "recognized"], ["ProjetsCdP.csv", "recognized"],
     ["ProjetsJalons.csv", "recognized"], ["Ress.Profils.csv", "recognized"], ["Ressources_PdC.csv", "recognized-with-deviations"], ["SP_2026.csv", "recognized"],
   ]);
-  assert.deepEqual(report.missingExpected, []);
+  assert.deepEqual(report.missingExpected.map((m) => m.name), ["Coût prévisionnel (COUT PREV)"], "the COUT PREV export is preferred, not required");
   assert.ok(report.warnings.some((w) => w.file === "SP_2026.csv" && /en-têtes reconnus ligne 2 — 1 ligne\(s\) ignorée\(s\)/.test(w.message)));
   assert.equal(projets?.entries.length, 6);
   assert.equal(jalons?.entries.length, 6);
@@ -161,6 +161,39 @@ test("the audit is deterministic for identical inputs", () => {
   const second = audit(ALL.map(fixture));
   assert.deepEqual(second.report, first.report);
   assert.deepEqual(second.cards, first.cards);
+});
+
+test("the COUT PREV export is the perimeter when present; the Projets onglet only cross-checks (ADR 030)", () => {
+  const { report, projets, couts, perimeterCheck, cards } = audit([...ALL, "Couts.csv"].map(fixture));
+  assert.ok(couts);
+  assert.equal(projets, couts, "the perimeter is the COUT PREV table");
+  assert.deepEqual(projets.entries.map((e) => e.id), ["PE10001", "PE10002", "PE10003", "MEWTBN7Q", "PE10009", "PE10013"]);
+  assert.deepEqual(report.missingExpected, []);
+  assert.ok(report.inventory.some((f) => f.name === "Couts.csv" && f.status === "recognized"));
+  const byLabel = new Map(report.assembly.map((a) => [a.subject, a.status]));
+  assert.match(byLabel.get("périmètre `projets`") ?? "",
+    /^6 carte\(s\) — la liste fait foi \(« Couts\.csv »\) · types : .*hors des quatre retenus 2 · domaine : portefeuille Sciforma/);
+  assert.equal(byLabel.get("périmètre · lecture COUT PREV"),
+    "12 ligne(s) · 11 projet(s) distinct(s) · retenus 6 · écartés : Achat 1 · TMA 1 · Annulé 1 · Reporté 1 · sans ligne 2026 1" +
+    " · « Projet.Actif » faux gardés 1 · domaine via portefeuille 5/6");
+  assert.equal(byLabel.get("périmètre · recoupement"),
+    "6 projet(s) dans « Couts.csv » (COUT PREV, fait foi) · 6 dans « Projets.csv » · 4 commun(s)" +
+    " · seulement COUT PREV : 2 (PE10009, PE10013) · seulement Projets : 2 (PE10007, PE10008)");
+  assert.deepEqual(perimeterCheck?.onlyProjets, ["PE10007", "PE10008"]);
+  assert.ok(report.warnings.some((w) => w.file === "Projets.csv" && /ne sert qu'au recoupement/.test(w.message)));
+  const byCode = new Map(cards?.cards.map((c) => [c.codename, c]));
+  const atelier = byCode.get("PE10001");
+  assert.deepEqual([atelier?.domainId, atelier?.domainSource, atelier?.columnId, atelier?.budgetEstimated], ["infra", "param", "exploitation", 120.5]);
+  assert.deepEqual([byCode.get("PE10009")?.columnId, byCode.get("PE10009")?.typeId], ["demandes", null], "no jalon, unknown type kept");
+  assert.equal(byCode.get("PE10013")?.domainId, null, "PROJETS VENDUS resolves to no domain");
+});
+
+test("with COUT PREV as perimeter, a Projets onglet carrying Responsable lends its chefs de projet when no ProjetsCdP came", () => {
+  const files = ALL.filter((name) => name !== "ProjetsCdP.csv");
+  const { report, cards, cdp } = audit([...files, "Couts.csv"].map(fixture));
+  assert.ok(cdp);
+  assert.ok(report.warnings.some((w) => w.file === "Projets.csv" && /lu aussi comme ProjetsCdP/.test(w.message)));
+  assert.equal(new Map(cards?.cards.map((c) => [c.codename, c])).get("PE10001")?.owner, "Alice MERLE");
 });
 
 test("a second full Projets export lends its chefs de projet when no ProjetsCdP file came", () => {

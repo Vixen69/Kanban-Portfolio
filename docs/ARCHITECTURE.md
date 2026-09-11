@@ -637,6 +637,37 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-11 — Le périmètre lu à la source : l'export COUT PREV (ADR 030)
+
+- **Constat de l'auteur** : le périmètre embarqué depuis l'onglet Projets
+  était faux — mauvais exports, et l'outil ne pouvait pas le savoir. Le
+  PMO fournit l'export brut des coûts prévisionnels de Sciforma
+  (« Coût », plus de 12 000 lignes projet × centre de coût × année — celui
+  que lit la macro du collègue, docs/CAPACITE-MACRO-PDSI.md).
+- **Huitième contrat, prioritaire** (`adapters/csv-import/couts.ts`) :
+  reconnu par ses en-têtes « Projet. Id », « Projet. Nom », « Projet.Type »,
+  « Projet.Etat du processus », « Année » (les espaces autour d'un point
+  sont désormais ignorés dans les en-têtes). Un projet unique par Id est
+  retenu s'il a une ligne sur l'année de l'exercice, si son type n'est ni
+  Achat ni TMA, si son état n'est ni Annulé ni Reporté ; les types hors
+  config (Pilotage, ATLAS, RUN) sont gardés sans type et questionnés. Rien
+  d'autre n'est lu : ni montants, ni charges, ni « Projet.Responsable 1 ».
+- **Domaine depuis le portefeuille** (`portfolio.ts`) : dernier segment de
+  « Projet.Portefeuille » rapproché par mots entiers du nom, du code court,
+  des **alias** du domaine (nouveau champ `domains[].aliases`, même
+  mécanisme que les types) ou du nom d'un sous-domaine ; ambiguïté → sans
+  domaine. Les règles de la macro (`groupeDom`) vivent dans la config.
+- **Le rapport dit le désaccord** : quand l'onglet Projets est déposé
+  aussi, il ne sert qu'au recoupement — la ligne « périmètre ·
+  recoupement » donne les effectifs, les communs et les codes présents
+  d'un seul côté ; la ligne « périmètre · lecture COUT PREV » détaille les
+  exclusions par motif. L'assemblage (jalons, SP, PdC, CdP) ne change pas :
+  le lecteur produit une `ProjetsTable`. Un onglet Projets qui porte les
+  Responsable prête ses chefs de projet si aucun ProjetsCdP n'est venu.
+- Ouvert (décision auteur) : déclarer Pilotage / Projet ATLAS / RUN dans
+  les types de la config ; lire un jour les lignes « Charge » de cet export
+  par centre de coût pour le recouper avec le plan de charge.
+
 ### 2026-09-10 (soir) — Passe de perf : horloge à la minute, gzip et cache au bord
 
 - **Constat de l'auteur** : réactivité faible sur la VM, réseau mauvais par

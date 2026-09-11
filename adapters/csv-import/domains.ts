@@ -3,7 +3,9 @@
 // parenthesized type suffix the exports append (« (Projet) »,
 // « (Opportunité) », « (Run) » — ignored by decision), and the
 // whole-word person matching used to exclude domain leads from the chef
-// de projet. Pure and dependency-free.
+// de projet. Domains and types may carry `aliases` — export labels
+// searched INSIDE a label as whole words (ADR 029/030). Pure and
+// dependency-free.
 
 import type { BoardConfig } from "../../core/types.ts";
 import { createTolerantLookup, normalizeLabel } from "./normalize.ts";
@@ -12,14 +14,53 @@ import type { TolerantHit } from "./normalize.ts";
 /** A tolerant label -> id lookup (null = unknown or ambiguous). */
 export type Lookup = (cell: string) => TolerantHit | null;
 
+interface Keyword {
+  re: RegExp;
+  id: string;
+}
+
 /**
- * Builds a tolerant domain lookup accepting id, name or short code.
+ * A normalized alias as a whole-word pattern inside a normalized label
+ * (« obsolescence » inside « projet de gestion de l'obsolescence »,
+ * « infrastructure » inside « infrastructure ope »): the alias's words, any
+ * separator run between them, a non-alphanumeric or an edge on both sides.
+ * Built without escapes — only [a-z0-9] words survive.
+ * Input: the raw alias. Output: the pattern. Failure: none.
+ */
+export function keywordPattern(alias: string): RegExp {
+  const core = normalizeLabel(alias).split(/[^a-z0-9]+/).filter((w) => w !== "").join("[^a-z0-9]+");
+  return new RegExp("(?:^|[^a-z0-9])" + core + "(?:[^a-z0-9]|$)");
+}
+
+// Exact (then accent-damage tolerant) lookup first; then the aliases
+// searched inside the prepared label as whole words. A keyword hitting
+// several ids is ambiguous and yields null, never a guess.
+function withKeywords(lookup: Lookup, keywords: readonly Keyword[], prepare: (cell: string) => string): Lookup {
+  return (cell) => {
+    const base = prepare(cell);
+    const direct = lookup(base);
+    if (direct !== null) return direct;
+    const key = normalizeLabel(base);
+    const ids = [...new Set(keywords.filter((k) => k.re.test(key)).map((k) => k.id))];
+    const id = ids[0];
+    return ids.length === 1 && id !== undefined ? { id, repaired: true } : null;
+  };
+}
+
+/**
+ * Builds a tolerant domain lookup accepting id, name, short code or alias
+ * (exact, then the aliases as whole words inside the label — ADR 030).
  * Inputs: the board config. Outputs: cell -> hit or null. Failure: none.
  */
 export function createDomainLookup(config: BoardConfig): Lookup {
-  return createTolerantLookup(
-    config.domains.flatMap((d): Array<[string, string]> => [[d.id, d.id], [d.name, d.id], [d.short, d.id]]),
+  const lookup = createTolerantLookup(
+    config.domains.flatMap((d): Array<[string, string]> => [
+      [d.id, d.id], [d.name, d.id], [d.short, d.id],
+      ...(d.aliases ?? []).map((alias): [string, string] => [alias, d.id]),
+    ]),
   );
+  const keywords = config.domains.flatMap((d) => (d.aliases ?? []).map((alias): Keyword => ({ re: keywordPattern(alias), id: d.id })));
+  return withKeywords(lookup, keywords, (cell) => cell);
 }
 
 /**
@@ -48,22 +89,12 @@ export function typeBaseLabel(raw: string): string {
   return raw.replace(/\s*\([^()]*\)\s*$/, "").trim();
 }
 
-// A normalized alias as a whole-word pattern inside a normalized label
-// (« obsolescence » inside « projet de gestion de l'obsolescence »): the
-// alias's words, any separator run between them, a non-alphanumeric or an
-// edge on both sides. Built without escapes — only [a-z0-9] words survive.
-function keywordPattern(alias: string): RegExp {
-  const core = normalizeLabel(alias).split(/[^a-z0-9]+/).filter((w) => w !== "").join("[^a-z0-9]+");
-  return new RegExp("(?:^|[^a-z0-9])" + core + "(?:[^a-z0-9]|$)");
-}
-
 /**
  * Builds a tolerant type lookup over the base label: id, name, short or
  * alias (exact, then accent-damage tolerant), then — for the aliases only —
  * the alias searched INSIDE the label as a whole word (author, 2026-09-10:
  * the September « obsolescence » labels matched none of the spellings
- * dictated so far; a keyword survives every variant). A keyword hitting
- * several types is ambiguous and yields null, never a guess.
+ * dictated so far; a keyword survives every variant).
  * Inputs: the board config. Outputs: cell -> hit or null. Failure: none.
  */
 export function createTypeLookup(config: BoardConfig): Lookup {
@@ -73,16 +104,8 @@ export function createTypeLookup(config: BoardConfig): Lookup {
       ...(t.aliases ?? []).map((alias): [string, string] => [alias, t.id]),
     ]),
   );
-  const keywords = config.types.flatMap((t) => (t.aliases ?? []).map((alias) => ({ re: keywordPattern(alias), id: t.id })));
-  return (cell) => {
-    const base = typeBaseLabel(cell);
-    const direct = lookup(base);
-    if (direct !== null) return direct;
-    const key = normalizeLabel(base);
-    const ids = [...new Set(keywords.filter((k) => k.re.test(key)).map((k) => k.id))];
-    const id = ids[0];
-    return ids.length === 1 && id !== undefined ? { id, repaired: true } : null;
-  };
+  const keywords = config.types.flatMap((t) => (t.aliases ?? []).map((alias): Keyword => ({ re: keywordPattern(alias), id: t.id })));
+  return withKeywords(lookup, keywords, typeBaseLabel);
 }
 
 /**

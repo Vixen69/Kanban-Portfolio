@@ -173,8 +173,9 @@ export function ImportView({ onClose, onLoaded }: { onClose: () => void; onLoade
             <button className="btn ghost" onClick={onClose}>Fermer ✕</button>
           </div>
           <div className="import-note">
-            Déposer les CSV du classeur (PARAM, Projets, ProjetsCdP, ProjetsJalons, SP, Ressources_PdC — reconnus par
-            leurs en-têtes, pas par leur nom ; Ress.Profils facultatif). L’audit ne modifie rien ; le chargement n’efface jamais une carte.
+            Déposer les CSV (Coût — l’export COUT PREV, le périmètre —, PARAM, Projets, ProjetsCdP, ProjetsJalons, SP,
+            Ressources_PdC — reconnus par leurs en-têtes, pas par leur nom ; Ress.Profils facultatif). L’audit ne modifie
+            rien ; le chargement n’efface jamais une carte.
           </div>
           <ImportForm files={files} busy={phase.kind === "busy"}
             onPick={(list) => { void readFiles(list).then((picked) => { setFiles(picked); reset(); }); }}

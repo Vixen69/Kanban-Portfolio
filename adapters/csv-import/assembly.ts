@@ -4,7 +4,8 @@
 
 import type { BoardConfig } from "../../core/types.ts";
 import type { ParamTable } from "./param.ts";
-import type { ProjetsTable } from "./projets.ts";
+import type { DomainShape, ProjetsTable } from "./projets.ts";
+import type { CoutsTable, PerimeterCheck } from "./couts.ts";
 import type { JalonsTable } from "./jalons.ts";
 import type { SpTable } from "./sp.ts";
 import type { CardAssembly, EnrichedCard } from "./enrich.ts";
@@ -22,6 +23,9 @@ import type { ImportReport } from "./report.ts";
 /** Presence flags of the expected sources. */
 export interface Presence {
   param: boolean;
+  /** The COUT PREV export — the perimeter when present (ADR 030). */
+  couts: boolean;
+  /** The Projets onglet — the perimeter without COUT PREV, the cross-check with it. */
   projets: boolean;
   jalons: boolean;
   sp: boolean;
@@ -37,7 +41,8 @@ export interface Presence {
  */
 export function emitMissing(report: ImportReport, present: Presence, year: number): void {
   const expected: Array<[keyof Presence, string, string]> = [
-    ["projets", "Projets", "le périmètre et les cartes (identité, type, domaine, chef de projet) — sans lui, pas d'assemblage"],
+    ["couts", "Coût prévisionnel (COUT PREV)", "le périmètre lu à la source Sciforma (projets uniques de l'exercice, sans Achat ni TMA, ni Annulé ni Reporté ; domaine par portefeuille) — fait foi quand il est là, l'onglet Projets ne servant qu'au recoupement (ADR 030) ; à défaut, Projets fait foi"],
+    ["projets", "Projets", "le périmètre et les cartes (identité, type, domaine, chef de projet) — sans lui ni COUT PREV, pas d'assemblage"],
     ["param", "PARAM", "responsables de domaine (exclus du chef de projet) et traduction des chemins d'organisation"],
     ["jalons", "ProjetsJalons", "position initiale (RDO / RDLI / RDR franchi) — sans lui, tout en colonne d'entrée"],
     ["sp", "SP (exercice ou total)", `coûts ${year} : meilleur estimé, réel, engagé`],
@@ -46,6 +51,7 @@ export function emitMissing(report: ImportReport, present: Presence, year: numbe
     ["cdp", "ProjetsCdP", "chefs de projet (Responsable 1→3, responsables de domaine exclus) quand `projets` ne les porte pas — facultatif"],
   ];
   for (const [key, name, note] of expected) {
+    if (key === "projets" && present.couts) continue;
     if (!present[key]) report.missingExpected.push({ name, note });
   }
 }
@@ -53,7 +59,9 @@ export function emitMissing(report: ImportReport, present: Presence, year: numbe
 /** The parsed tables and the deck, for the assembly read-out. */
 export interface AssemblyData {
   param: ParamTable | null;
+  couts: CoutsTable | null;
   projets: ProjetsTable | null;
+  perimeterCheck: PerimeterCheck | null;
   jalons: JalonsTable | null;
   sp: SpTable | null;
   pdc: PdcTable | null;
@@ -76,6 +84,12 @@ export function emitAssembly(report: ImportReport, data: AssemblyData, config: B
   report.assembly.push({ subject: "table PARAM", status: paramStatus(data.param) });
   if (data.projets !== null) {
     report.assembly.push({ subject: "périmètre `projets`", status: perimeterStatus(data.projets, config) });
+  }
+  if (data.couts !== null) {
+    report.assembly.push({ subject: "périmètre · lecture COUT PREV", status: coutsStatus(data.couts, config.exercise.year) });
+  }
+  if (data.perimeterCheck !== null) {
+    report.assembly.push({ subject: "périmètre · recoupement", status: checkStatus(data.perimeterCheck) });
   }
   if (data.cards !== null && data.projets !== null) emitDeck(report, data, data.cards, data.projets, config);
   else emitWaiting(report, data, config.exercise.year);
@@ -114,14 +128,41 @@ function paramStatus(param: ParamTable | null): string {
   return `prête (${c.leads} responsable(s) de domaine · ${c.orgaRows} ligne(s) organisation, ${c.withPath} avec chemin)`;
 }
 
+const SHAPES: Record<DomainShape, string> = {
+  orga: "colonnes Orga (direct)", path: "chemin d'organisation (via PARAM)", none: "aucune colonne de domaine",
+  portefeuille: "portefeuille Sciforma (« Projet.Portefeuille » → alias et sous-domaines de la config)",
+};
+
 // The perimeter line: the list rules; types are counted by config name.
 function perimeterStatus(projets: ProjetsTable, config: BoardConfig): string {
   const names = new Map(config.types.map((t) => [t.id, t.name]));
   const parts = [...projets.typeCounts.entries()]
     .map(([id, count]) => `${id === "?" ? "hors des quatre retenus" : (names.get(id) ?? id)} ${count}`);
-  const shape = projets.shape === "orga" ? "colonnes Orga (direct)"
-    : projets.shape === "path" ? "chemin d'organisation (via PARAM)" : "aucune colonne de domaine";
-  return `${projets.entries.length} carte(s) — la liste fait foi (« ${projets.fileName} ») · types : ${parts.join(" · ")} · domaine : ${shape}`;
+  return `${projets.entries.length} carte(s) — la liste fait foi (« ${projets.fileName} ») · types : ${parts.join(" · ")}` +
+    ` · domaine : ${SHAPES[projets.shape]}`;
+}
+
+// The COUT PREV reading (ADR 030): what the rows became, exclusions by reason.
+function coutsStatus(couts: CoutsTable, year: number): string {
+  const s = couts.stats;
+  const x = s.excluded;
+  return `${s.rows} ligne(s) · ${s.projectsSeen} projet(s) distinct(s) · retenus ${s.retained}` +
+    ` · écartés : Achat ${x.achat} · TMA ${x.tma} · Annulé ${x.annule} · Reporté ${x.reporte} · sans ligne ${year} ${x.noYear}` +
+    ` · « Projet.Actif » faux gardés ${s.inactive} · domaine via portefeuille ${s.domainResolved}/${s.retained}`;
+}
+
+const CODES_SHOWN = 20;
+
+function codeList(codes: readonly string[]): string {
+  if (codes.length === 0) return "aucun";
+  const rest = codes.length - CODES_SHOWN;
+  return `${codes.length} (${codes.slice(0, CODES_SHOWN).join(", ")}${rest > 0 ? `, … +${rest}` : ""})`;
+}
+
+// Both perimeters came: the disagreement is the information (ADR 030).
+function checkStatus(c: PerimeterCheck): string {
+  return `${c.couts} projet(s) dans « ${c.coutsFile} » (COUT PREV, fait foi) · ${c.projets} dans « ${c.projetsFile} »` +
+    ` · ${c.common} commun(s) · seulement COUT PREV : ${codeList(c.onlyCouts)} · seulement Projets : ${codeList(c.onlyProjets)}`;
 }
 
 function chargeStatus(data: AssemblyData, year: number): string {

@@ -60,6 +60,12 @@ export interface Domain {
    * portfolio's binding constraint and the arbitration read-outs single it out.
    */
   transverse?: boolean;
+  /**
+   * Export labels the import reads this domain from (« INFRASTRUCTURE »,
+   * « GROUPE ») — matched as whole words inside a « Domaine (Orga) » label
+   * or a Sciforma portfolio segment (ADR 030).
+   */
+  aliases?: string[];
 }
 
 /** A project type ("Achat", "Étude"…) — more visible than the domain on cards. */

@@ -19,6 +19,8 @@ const CASES: Array<[string, string, string]> = [
   ["oe ligature expanded", "Œuvre", "oeuvre"],
   ["ae ligature expanded", "Ægide", "aegide"],
   ["cedilla and grave", "Reçu à", "recu a"],
+  ["spaces around a dot dropped (COUT PREV headers, ADR 030)", "Projet. Id", "projet.id"],
+  ["dot inside a word untouched", "v2.0", "v2.0"],
   ["empty stays empty", "", ""],
   ["whitespace-only collapses to empty", " \t ", ""],
 ];

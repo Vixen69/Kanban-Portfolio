@@ -33,10 +33,17 @@ export function parseColored(value: unknown, kind: string, index: number): Domai
 export function parseProjectType(value: unknown, index: number): ProjectType {
   const base = parseColored(value, "types", index);
   const record = requireRecord(value, `types[${index}]`);
-  if (record.aliases === undefined) return base;
-  if (!Array.isArray(record.aliases)) fail(`types[${index}].aliases doit être une liste de libellés`);
-  const aliases = record.aliases.map((alias, j) => requireText(alias, `types[${index}].aliases[${j}]`));
-  return { ...base, aliases };
+  const aliases = parseAliases(record.aliases, `types[${index}].aliases`);
+  return aliases === undefined ? base : { ...base, aliases };
+}
+
+// The optional `aliases` of a type or a domain (ADR 029/030): the export
+// labels the import reads it from. Absent = none; present = a list of
+// non-empty labels.
+function parseAliases(value: unknown, path: string): string[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) fail(`${path} doit être une liste de libellés`);
+  return value.map((alias, j) => requireText(alias, `${path}[${j}]`));
 }
 
 /**
@@ -73,9 +80,11 @@ function parseSubDomains(value: unknown, path: string): SubDomain[] | undefined 
 }
 
 /**
- * Parses one domain: the colored entry plus its optional sub-domains.
+ * Parses one domain: the colored entry plus its optional sub-domains,
+ * `transverse` flag and `aliases` (the export labels and Sciforma
+ * portfolio words it is read from, ADR 030).
  * Inputs: the raw value, its index in `domains`.
- * Output: a Domain (subDomains present only when declared).
+ * Output: a Domain (optional fields present only when declared).
  * Failure: ConfigError naming the first bad field.
  */
 export function parseDomain(value: unknown, index: number): Domain {
@@ -83,6 +92,8 @@ export function parseDomain(value: unknown, index: number): Domain {
   const record = value as Record<string, unknown>;
   const subDomains = parseSubDomains(record.subDomains, `domains[${index}].subDomains`);
   if (subDomains !== undefined) domain.subDomains = subDomains;
+  const aliases = parseAliases(record.aliases, `domains[${index}].aliases`);
+  if (aliases !== undefined) domain.aliases = aliases;
   if (record.transverse !== undefined) {
     if (typeof record.transverse !== "boolean") fail(`domains[${index}].transverse doit être un booléen`);
     if (record.transverse) domain.transverse = true;

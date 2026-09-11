@@ -13,7 +13,9 @@ const BOM = String.fromCharCode(0xfeff);
  * Outputs: trimmed, BOM-free, whitespace-collapsed, lowercased, accent-free
  * string; œ/æ are expanded to oe/ae because NFD does not decompose them;
  * typographic apostrophes are unified to the ASCII one (the board config
- * uses « ’ », the exports use « ' » — both must compare equal).
+ * uses « ’ », the exports use « ' » — both must compare equal); spaces
+ * around a dot are dropped (« Projet. Id » ≡ « Projet.Id », the COUT PREV
+ * headers — ADR 030).
  * Failure modes: none — total function, empty input yields "".
  */
 export function normalizeLabel(raw: string): string {
@@ -21,6 +23,7 @@ export function normalizeLabel(raw: string): string {
     .replaceAll(BOM, "")
     .replace(/[’‘ʼ´]/g, "'")
     .replace(/\s+/g, " ")
+    .replace(/\s*\.\s*/g, ".")
     .trim()
     .toLowerCase()
     .normalize("NFD")
@@ -36,6 +39,7 @@ function cleanKeepAccents(raw: string): string {
     .replaceAll(BOM, "")
     .replace(/[’‘ʼ´]/g, "'")
     .replace(/\s+/g, " ")
+    .replace(/\s*\.\s*/g, ".")
     .trim()
     .toLowerCase()
     .normalize("NFC");

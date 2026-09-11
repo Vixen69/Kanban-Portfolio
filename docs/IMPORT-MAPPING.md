@@ -48,6 +48,12 @@ puis le moins d'écarts d'en-têtes, puis le nom. Les autres candidats sont
 signalés douteux avec la raison ; la ligne « périmètre » de l'état
 d'assemblage nomme le fichier élu.
 
+**Périmètre depuis COUT PREV (2026-09-11, ADR 030).** Quand l'export brut
+« Coût » de Sciforma est déposé, il **est** le périmètre (projets uniques
+de l'exercice, sans Achat ni TMA, ni Annulé ni Reporté ; domaine lu dans
+« Projet.Portefeuille ») et l'onglet Projets ne sert qu'au recoupement —
+cf. « `Coût` (COUT PREV) — le périmètre lu à la source ».
+
 **Titre de la carte (2026-09-09, élargi le 2026-09-10).** Le « Nom »
 Sciforma répète souvent le code du projet (« PX4520155 - Modernisation
 atelier », « Cartographie PE10008 ») : le titre de la carte est le nom
@@ -406,6 +412,61 @@ pas un responsable de domaine de PARAM. Jointure par Id (le code de la
 carte), puis par nom ; seules les cartes **sans** chef de projet en
 prennent un ; les lignes hors périmètre sont comptées. La ligne « chef de
 projet » de l'état d'assemblage dit « dont N via ProjetsCdP ».
+
+## `Coût` (COUT PREV) — le périmètre lu à la source (ADR 030, 2026-09-11)
+
+L'export brut des coûts prévisionnels de Sciforma (le classeur « Coût »,
+plus de douze mille lignes : une par projet × centre de coût × année) est
+celui que lit la macro « Consolidation PDSI » (docs/CAPACITE-MACRO-PDSI.md).
+Quand il est déposé, **il est le périmètre** — les onglets consolidés
+s'étaient révélés faux (mauvais exports, invisibles pour l'outil) — et
+l'onglet Projets ne sert plus qu'au recoupement.
+
+Contrat `couts` : requis « Projet. Id », « Projet. Nom », « Projet.Type »,
+« Projet.Etat du processus », « Année » ; optionnels « Projet.Portefeuille »,
+« Projet.Actif » ; tout le reste (montants, charges, entités payeuses,
+nature, criticité, priorité, score, **« Projet.Responsable 1 »**, date
+d'export) est déclaré ignoré : **jamais lu**. Les espaces autour d'un point
+sont ignorés dans les en-têtes (« Projet. Id » ≡ « Projet.Id »).
+
+Règle de périmètre (auteur, 2026-09-11) — un projet **unique par Id** est
+retenu si :
+
+- il a au moins une ligne sur l'**année de l'exercice** (`exercise.year`) ;
+- son type n'est ni **Achat** ni une **TMA** (« Evolution - TMA », « TMA
+  Corrective ») — les types retenus du PMO sont Etude, Pilotage, Projet
+  ATLAS [Hors PDSI], Projet de gestion d'obsolescence, Projet de mise en
+  oeuvre, Projet IA, RUN ; ceux hors config (Pilotage, ATLAS, RUN) sont
+  **gardés sans type** et questionnés ;
+- son état n'est ni **Annulé** ni **Reporté**.
+
+« Projet.Actif » faux est compté, jamais exclu. Un Id sous plusieurs noms
+est questionné (premier nom conservé). Aucun montant ni charge de ce fichier
+n'entre dans une carte : SP reste la source des k€ (Q23), le plan de charge
+celle des j.h.
+
+Domaine : le **dernier segment** de « Projet.Portefeuille » (« DSI
+NEXTER.INFRASTRUCTURE OPE » → « INFRASTRUCTURE OPE ») est rapproché du
+vocabulaire du board par **mots entiers** — nom, code court ou `aliases`
+du domaine (nouveau champ, même mécanisme que les types : INFRA porte
+« INFRASTRUCTURE », A&D « GROUPE », ING « INGENIERIE SYSTEMES » et
+« INGENIERIE MUNITIONS », INDUSTRIE « PRODUCTION »), ou nom d'un
+sous-domaine (plus spécifique : « GROUPE : Forge Logiciels » → A&D /
+FORGE LOGICIELS, « CORPORATE.ACHATS » → CORPORATE / ACHATS) ; à défaut sur
+le chemin entier ; ambiguïté (« ING & PLM ») → sans domaine, questionné
+par libellé de portefeuille. Les règles de la macro (`groupeDom`) vivent
+ainsi dans la config, pas dans le code.
+
+Rapport : ligne « périmètre `projets` » (nomme le fichier, forme
+« portefeuille Sciforma »), ligne « périmètre · lecture COUT PREV »
+(lignes, projets distincts, retenus, écartés par motif, actifs faux gardés,
+domaines résolus), et quand l'onglet Projets est là aussi la ligne
+« périmètre · recoupement » : effectifs, communs et **codes** présents d'un
+seul côté (20 au plus par côté). Un onglet Projets qui porte les
+Responsable prête ses chefs de projet si aucun ProjetsCdP n'est venu.
+
+Sur la VM : le classeur « Coût » (un onglet) se convertit comme les autres
+(commande LibreOffice du RUNBOOK) et se dépose avec les autres CSV.
 
 ## `Ressources_PdC` — les trois natures de lignes (ADR 029, 2026-09-10)
 

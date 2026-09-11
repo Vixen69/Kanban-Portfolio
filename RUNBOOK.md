@@ -53,7 +53,8 @@ ne peuvent pas porter le même nom.
 
 | Fichier | Ce qu'il apporte |
 |---|---|
-| `Projets.csv` **(requis)** | Le périmètre : chaque ligne est une carte (Id, nom, type, domaine et sous-domaine, dates). L'onglet consolidé (colonnes « Domaine (Orga) ») ou l'export brut (chemin d'organisation, traduit par PARAM). **Sans colonnes Responsable** : si deux fichiers ont la forme Projets, c'est celui-là qui fait foi. |
+| `Cout.csv` (export « Coût », COUT PREV) | **Le périmètre depuis le 2026-09-11 (ADR 030)** : l'export brut Sciforma des coûts prévisionnels (une ligne par projet × centre de coût × année). Projets uniques de l'exercice, types Achat / TMA écartés, états Annulé / Reporté écartés ; domaine lu dans « Projet.Portefeuille » ; rien d'autre n'est lu (ni montants, ni charges, ni Responsable). Quand il est là, `Projets.csv` ne sert qu'au recoupement (ligne « périmètre · recoupement » du rapport : codes présents d'un seul côté). |
+| `Projets.csv` **(requis sans `Cout.csv`)** | Le périmètre : chaque ligne est une carte (Id, nom, type, domaine et sous-domaine, dates). L'onglet consolidé (colonnes « Domaine (Orga) ») ou l'export brut (chemin d'organisation, traduit par PARAM). **Sans colonnes Responsable** : si deux fichiers ont la forme Projets, c'est celui-là qui fait foi. |
 | `ProjetsCdP.csv` | Les chefs de projet : l'export complet des projets avec Responsable 1→3 (responsables de domaine de PARAM exclus). Jamais le périmètre, quel que soit son nom. |
 | `PARAM.csv` | La table de correspondance du PMO : responsables de domaine (exclus du chef de projet) et chemins d'organisation → domaine / sous-domaine. |
 | `ProjetsJalons.csv` | La position initiale : RDO / RDLI / RDR « franchi » → Études / Actifs / Exploitation, sinon Demandes. |
@@ -70,6 +71,8 @@ soffice --headless -env:UserInstallation=file:///tmp/lo_conv --convert-to 'csv:T
 ```
 
 > Le `-1` final exporte **tous les onglets** (LibreOffice ≥ 7.2) ; les fichiers s'appellent `Classeur-Onglet.csv`, la reconnaissance se fait par les en-têtes. Commande à valider au premier passage sur la VM.
+>
+> Le classeur « Coût » (COUT PREV, un seul onglet) se convertit avec la même commande (`… --outdir imports/ Cout.xlsx`) ; le CSV se dépose avec les autres.
 
 **1. Auditer** — n'écrit rien dans le tableau
 

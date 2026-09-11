@@ -22,8 +22,9 @@ import { discard, doubt, warn } from "./report.ts";
 import type { ImportReport, RowRef } from "./report.ts";
 
 /** How the file carries the domain: resolved Orga columns, an organisation
- * path to translate through PARAM, or nothing. */
-export type DomainShape = "orga" | "path" | "none";
+ * path to translate through PARAM, a Sciforma portfolio (COUT PREV, ADR
+ * 030), or nothing. */
+export type DomainShape = "orga" | "path" | "portefeuille" | "none";
 
 /** One retained project (a future card). */
 export interface ProjetEntry {

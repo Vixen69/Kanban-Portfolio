@@ -9,8 +9,8 @@ import { damageTolerantPattern, normalizeLabel } from "./normalize.ts";
 import { CONTRACTS } from "./registry.ts";
 
 export {
-  CDP_CONTRACT, CONTRACTS, JALONS_CONTRACT, PARAM_CONTRACT, PDC_CONTRACT, PROFILS_CONTRACT, PROJETS_CONTRACT,
-  RDOM_CONTRACT, SP_CONTRACT, contractsFor, pdcContract,
+  CDP_CONTRACT, CONTRACTS, COUTS_CONTRACT, JALONS_CONTRACT, PARAM_CONTRACT, PDC_CONTRACT, PROFILS_CONTRACT,
+  PROJETS_CONTRACT, RDOM_CONTRACT, SP_CONTRACT, contractsFor, pdcContract,
 } from "./registry.ts";
 
 /** One recognizable source file: canonical column labels. */

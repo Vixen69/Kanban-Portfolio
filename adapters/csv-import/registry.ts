@@ -1,13 +1,33 @@
 // The header-contract registry (docs/IMPORT-MAPPING.md « Contrat
 // d'en-têtes »): one FileContract per recognizable source file, live
-// since the PMO revision of 2026-09-04 (R1/R9) — PARAM, SP (exercise year
-// or total), ProjetsJalons, Projets (the perimeter), Ress.Profils and
+// since the PMO revision of 2026-09-04 (R1/R9) — the COUT PREV export (the
+// perimeter when present, ADR 030), PARAM, SP (exercise year or total),
+// ProjetsJalons, Projets (the perimeter otherwise), Ress.Profils and
 // Ressources_PdC (built for the exercise year, ADR 024). The July RDOM
 // table stays registered as RETIRED: inventoried by name, never parsed.
 // The matching engine lives in contract.ts.
 
 import { DEFAULT_EXERCISE_YEAR } from "../../core/config.ts";
 import type { FileContract } from "./contract.ts";
+
+/** The COUT PREV export (« Coût », ADR 030): the raw Sciforma cost
+ * forecast, one row per project × cost centre × year — THE perimeter when
+ * present. Only the identity, year, type, state, portfolio and active flag
+ * are read; every amount, charge and « Projet.Responsable 1 » is declared
+ * ignored (author, 2026-09-11: not to be read). Registered first: its
+ * dotted labels match no other contract, and it outranks Projets. */
+export const COUTS_CONTRACT: FileContract = {
+  id: "couts",
+  displayName: "Coût prévisionnel (COUT PREV)",
+  columns: ["Projet. Id", "Projet. Nom", "Projet.Type", "Projet.Etat du processus", "Année"],
+  optional: ["Projet.Portefeuille", "Projet.Actif"],
+  ignored: [
+    "Fichier", "Type de centre de coût", "Centre de coût", "Charge finale ME (Res) (J)", "Charge réelle ME (Res) (J)",
+    "Coût final ME (Res ouTrans)", "Coût réel ME (Res ouTrans)", "Projet. Entité payeur", "Projet.Entité payeur mutualisée",
+    "Projet.Nature du projet", "Projet.Etat du budget", "Projet.Criticité", "Projet.Priorité", "Projet.Score criblage",
+    "Projet.Responsable 1", "Portefeuille.Responsable 1", "Date d'export",
+  ],
+};
 
 /** The PMO's PARAM sheet (R5): four tables side by side, row 1 = titles,
  * row 2 = headers. Only DOMAINES (Domaine, Responsable) and ORGANISATION
@@ -170,7 +190,7 @@ export const RDOM_CONTRACT: FileContract = {
  * Input: the exercise year. Output: the ordered registry. Failure: none. */
 export function contractsFor(year: number): readonly FileContract[] {
   return [
-    PARAM_CONTRACT, SP_CONTRACT, JALONS_CONTRACT, PROJETS_CONTRACT, CDP_CONTRACT, PROFILS_CONTRACT,
+    COUTS_CONTRACT, PARAM_CONTRACT, SP_CONTRACT, JALONS_CONTRACT, PROJETS_CONTRACT, CDP_CONTRACT, PROFILS_CONTRACT,
     pdcContract(year), RDOM_CONTRACT,
   ];
 }
