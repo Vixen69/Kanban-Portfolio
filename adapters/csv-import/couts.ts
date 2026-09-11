@@ -2,20 +2,24 @@
 // one row per project × cost centre × year — twelve thousand rows for a
 // hundred-odd projects. It is the SOURCE OF THE PERIMETER when present:
 // the consolidated onglets proved wrong, this export comes straight from
-// Sciforma. A project is in the exercise when it has at least one row on
-// the exercise year, its type is not a purchase nor a TMA, and its state
-// is neither « Annulé » nor « Reporté ». Amounts and days of this file are
-// NOT read (unreliable, author's call); the chef de projet neither
-// (« Projet.Responsable 1 » is not the right one — ProjetsCdP rules). The
-// portfolio gives the domain (portfolio.ts). Output: a ProjetsTable, so
-// the assembly (jalons, SP, PdC, CdP) runs unchanged.
+// Sciforma. A project (unique « Projet. Id ») is in the exercise when it
+// has a row on the exercise year, its state is one of the config's
+// retained states (`exercise.states`), its type is one of the config's
+// types, its name is not an « arbitrage » line (a contrôle de gestion
+// artefact) and at least one of its four ME cells is non-zero (all empty
+// or zero = cancelled in fact, never marked). The amounts serve that
+// existence test only — never read into a card; the chef de projet
+// neither (« Projet.Responsable 1 » is not the right one — ProjetsCdP
+// rules). The portfolio gives the domain (portfolio.ts). Output: a
+// ProjetsTable, so the assembly (jalons, SP, PdC, CdP) runs unchanged.
 
 import type { BoardConfig } from "../../core/types.ts";
-import { normalizeLabel } from "./normalize.ts";
+import { createTolerantLookup, normalizeLabel } from "./normalize.ts";
 import { createTypeLookup, typeBaseLabel } from "./domains.ts";
 import type { Lookup } from "./domains.ts";
 import { createPortfolioResolver, lastSegment } from "./portfolio.ts";
 import type { PortfolioHit } from "./portfolio.ts";
+import { parseFrenchAmount } from "./values.ts";
 import { splitSubjectName } from "./subject-name.ts";
 import { stripCode } from "./code-prefix.ts";
 import { tallyInto, tallyLabel } from "./tallies.ts";
@@ -25,34 +29,20 @@ import type { HeaderMatch } from "./contract.ts";
 import { doubt, warn } from "./report.ts";
 import type { ImportReport, RowRef } from "./report.ts";
 import type { ProjetEntry, ProjetsTable } from "./projets.ts";
+import { excludedSummary } from "./couts-stats.ts";
+import type { CoutsStats } from "./couts-stats.ts";
 
-/** Counters of the COUT PREV reading, for the report. */
-export interface CoutsStats {
-  rows: number;
-  otherYearRows: number;
-  projectsSeen: number;
-  retained: number;
-  excluded: { achat: number; tma: number; annule: number; reporte: number; noYear: number };
-  /** Retained projects whose « Projet.Actif » says false (kept, informational). */
-  inactive: number;
-  domainResolved: number;
-  domainUnknown: number;
-}
+export { checkPerimeters, excludedSummary } from "./couts-stats.ts";
+export type { CoutsExcluded, CoutsStats, PerimeterCheck } from "./couts-stats.ts";
+
+/** The four ME cells whose non-zero presence keeps a project alive. */
+export const ME_COLUMNS = [
+  "Charge finale ME (Res) (J)", "Charge réelle ME (Res) (J)", "Coût final ME (Res ouTrans)", "Coût réel ME (Res ouTrans)",
+] as const;
 
 /** The perimeter read from COUT PREV: a ProjetsTable plus its counters. */
 export interface CoutsTable extends ProjetsTable {
   stats: CoutsStats;
-}
-
-/** Codes present on one side only, when both COUT PREV and Projets came. */
-export interface PerimeterCheck {
-  coutsFile: string;
-  projetsFile: string;
-  couts: number;
-  projets: number;
-  common: number;
-  onlyCouts: string[];
-  onlyProjets: string[];
 }
 
 interface Seen {
@@ -64,6 +54,7 @@ interface Seen {
   portfolio: string;
   actif: string;
   onYear: boolean;
+  hasMe: boolean;
   ref: RowRef;
 }
 
@@ -72,11 +63,13 @@ interface CoutsContext {
   fileName: string;
   year: string;
   match: HeaderMatch;
+  /** null = no `exercise.states` in the config: every state kept (said). */
+  states: Lookup | null;
   typeLookup: Lookup;
   resolve: (portfolio: string) => PortfolioHit | null;
   seen: Map<string, Seen>;
   stats: CoutsStats;
-  unknownTypes: Map<string, Tally>;
+  nonPe: string[];
   unknownPortfolios: Map<string, Tally>;
   tallies: Map<string, Tally>;
 }
@@ -89,26 +82,29 @@ function cell(ctx: CoutsContext, row: CsvRow, column: string): string {
 /**
  * Parses the COUT PREV data rows into the exercise's perimeter.
  * Inputs: the data rows, the header match, the board config (exercise
- * year, types with aliases, domains with aliases and sub-domains), the
- * report and the file name.
+ * year and retained states, types with aliases, domains with aliases and
+ * sub-domains), the report and the file name.
  * Outputs: the CoutsTable (a ProjetsTable: one entry per retained project,
  * first-seen order); side effects: signalements (rows read, other years,
- * exclusions by type and state, inactive kept), douteux (unknown types
- * kept without type, unknown portfolios kept without domain, one Id under
- * several names). Failure modes: none — nothing throws.
+ * exclusions by reason, inactive kept, unreadable ME cells), douteux
+ * (unknown portfolios kept without domain, non-PE codes retained, one Id
+ * under several names). Failure modes: none — nothing throws.
  */
 export function parseCouts(
   rows: CsvRow[], match: HeaderMatch, config: BoardConfig, report: ImportReport, fileName: string,
 ): CoutsTable {
+  const states = config.exercise.states;
   const ctx: CoutsContext = {
     report, fileName, year: String(config.exercise.year), match,
+    states: states === undefined ? null : createTolerantLookup(states.map((s): [string, string] => [s, s])),
     typeLookup: createTypeLookup(config), resolve: createPortfolioResolver(config),
     seen: new Map(),
     stats: {
       rows: 0, otherYearRows: 0, projectsSeen: 0, retained: 0,
-      excluded: { achat: 0, tma: 0, annule: 0, reporte: 0, noYear: 0 }, inactive: 0, domainResolved: 0, domainUnknown: 0,
+      excluded: { noYear: 0, etat: new Map(), type: new Map(), arbitrage: 0, noMe: 0 },
+      inactive: 0, nonPe: 0, domainResolved: 0, domainUnknown: 0,
     },
-    unknownTypes: new Map(), unknownPortfolios: new Map(), tallies: new Map(),
+    nonPe: [], unknownPortfolios: new Map(), tallies: new Map(),
   };
   for (const row of rows) readRow(ctx, row);
   const entries: ProjetEntry[] = [];
@@ -131,8 +127,9 @@ export function parseCouts(
   };
 }
 
-// One row: counted, then folded into its project (first row's facts win,
-// later names are only checked for divergence).
+// One row: counted, then folded into its project (first row's facts win;
+// the year and ME presence accumulate; later names are checked for
+// divergence).
 function readRow(ctx: CoutsContext, row: CsvRow): void {
   if (row.cells.every((c) => c.trim() === "")) return;
   ctx.stats.rows++;
@@ -144,10 +141,12 @@ function readRow(ctx: CoutsContext, row: CsvRow): void {
   const yearCell = cell(ctx, row, "Année");
   const onYear = normalizeLabel(yearCell) === ctx.year || Number(yearCell.replace(",", ".")) === Number(ctx.year);
   if (!onYear) ctx.stats.otherYearRows++;
+  const hasMe = onYear && rowHasMe(ctx, row);
   const name = cell(ctx, row, "Projet. Nom");
   const existing = ctx.seen.get(id);
   if (existing !== undefined) {
     existing.onYear = existing.onYear || onYear;
+    existing.hasMe = existing.hasMe || hasMe;
     if (name !== "") existing.names.add(name);
     return;
   }
@@ -155,52 +154,66 @@ function readRow(ctx: CoutsContext, row: CsvRow): void {
     id, name, names: new Set(name === "" ? [] : [name]),
     type: cell(ctx, row, "Projet.Type"), etat: cell(ctx, row, "Projet.Etat du processus"),
     portfolio: cell(ctx, row, "Projet.Portefeuille"), actif: cell(ctx, row, "Projet.Actif"),
-    onYear, ref: { file: ctx.fileName, line: row.line },
+    onYear, hasMe, ref: { file: ctx.fileName, line: row.line },
   });
 }
 
-/** True for the export's purchase and TMA types (« Achat », « Evolution - TMA », « TMA Corrective »). */
-function excludedType(type: string): "achat" | "tma" | null {
-  const base = normalizeLabel(typeBaseLabel(type));
-  if (base.startsWith("achat")) return "achat";
-  if (/(^|[^a-z0-9])tma([^a-z0-9]|$)/.test(base)) return "tma";
-  return null;
+// At least one of the four ME cells carries a non-zero figure; an
+// unreadable cell counts as empty (tallied).
+function rowHasMe(ctx: CoutsContext, row: CsvRow): boolean {
+  let found = false;
+  for (const column of ME_COLUMNS) {
+    const parsed = parseFrenchAmount(cell(ctx, row, column));
+    if (parsed.kind === "invalid") tallyInto(ctx.tallies, `« ${column} » illisible — comptée vide`, row.line);
+    else if (parsed.kind === "value" && parsed.value !== 0) found = true;
+  }
+  return found;
 }
 
-// The perimeter rule (author, 2026-09-11): on the exercise year, not a
-// purchase nor a TMA, neither cancelled nor postponed.
+function bump(map: Map<string, number>, label: string): void {
+  map.set(label, (map.get(label) ?? 0) + 1);
+}
+
+// The perimeter rule (author, 2026-09-11, tightened the same afternoon):
+// on the exercise year, state in the retained list, type in the config,
+// not an arbitrage line, some ME figure. First failing reason is counted.
 function decide(ctx: CoutsContext, seen: Seen): ProjetEntry | null {
   ctx.stats.projectsSeen++;
-  const s = ctx.stats;
+  const x = ctx.stats.excluded;
   if (!seen.onYear) {
-    s.excluded.noYear++;
+    x.noYear++;
     return null;
   }
-  const badType = excludedType(seen.type);
-  if (badType !== null) {
-    s.excluded[badType]++;
+  if (ctx.states !== null && ctx.states(seen.etat) === null) {
+    bump(x.etat, seen.etat || "(vide)");
     return null;
   }
-  const etat = normalizeLabel(seen.etat);
-  if (etat.startsWith("annule")) {
-    s.excluded.annule++;
+  const typeId = ctx.typeLookup(seen.type)?.id ?? null;
+  if (typeId === null) {
+    bump(x.type, typeBaseLabel(seen.type) || "(vide)");
     return null;
   }
-  if (etat.startsWith("reporte")) {
-    s.excluded.reporte++;
+  if (normalizeLabel(seen.name).includes("arbitrage")) {
+    x.arbitrage++;
     return null;
   }
-  s.retained++;
-  if (["faux", "false", "0", "non", "n"].includes(normalizeLabel(seen.actif))) s.inactive++;
+  if (!seen.hasMe) {
+    x.noMe++;
+    return null;
+  }
+  ctx.stats.retained++;
+  if (["faux", "false", "0", "non", "n"].includes(normalizeLabel(seen.actif))) ctx.stats.inactive++;
+  if (!/^pe\d/i.test(seen.id)) {
+    ctx.stats.nonPe++;
+    ctx.nonPe.push(seen.id);
+  }
   if (seen.names.size > 1) {
     doubt(ctx.report, ctx.fileName, `Id « ${seen.id} » porté par ${seen.names.size} noms différents — premier conservé`, { ref: seen.ref });
   }
-  return buildEntry(ctx, seen);
+  return buildEntry(ctx, seen, typeId);
 }
 
-function buildEntry(ctx: CoutsContext, seen: Seen): ProjetEntry {
-  const typeId = ctx.typeLookup(seen.type)?.id ?? null;
-  if (typeId === null) tallyInto(ctx.unknownTypes, typeBaseLabel(seen.type) || "(vide)", seen.ref.line);
+function buildEntry(ctx: CoutsContext, seen: Seen, typeId: string): ProjetEntry {
   const hit = ctx.resolve(seen.portfolio);
   if (hit === null) {
     ctx.stats.domainUnknown++;
@@ -225,40 +238,30 @@ function countTypes(entries: readonly ProjetEntry[]): Map<string, number> {
   return counts;
 }
 
-// The reading in figures, then the questions: types kept without type,
-// portfolios kept without domain.
+const CODES_SHOWN = 20;
+
+function codes(list: readonly string[]): string {
+  const rest = list.length - CODES_SHOWN;
+  return `${list.slice(0, CODES_SHOWN).join(", ")}${rest > 0 ? `, … +${rest}` : ""}`;
+}
+
+// The reading in figures, then the questions: portfolios kept without
+// domain, non-PE codes retained.
 function finalize(ctx: CoutsContext, entries: readonly ProjetEntry[]): void {
   const s = ctx.stats;
+  if (ctx.states === null) warn(ctx.report, "aucune liste d'états dans la config (`exercise.states`) — tous les états gardés", ctx.fileName);
   warn(ctx.report,
     `${s.rows} ligne(s) lue(s) · ${s.projectsSeen} projet(s) distinct(s) · ${s.otherYearRows} ligne(s) hors ${ctx.year}` +
-      ` · périmètre ${entries.length} : écartés Achat ${s.excluded.achat} · TMA ${s.excluded.tma} · Annulé ${s.excluded.annule}` +
-      ` · Reporté ${s.excluded.reporte} · sans ligne ${ctx.year} ${s.excluded.noYear}` +
+      ` · périmètre ${entries.length} : écartés ${excludedSummary(s.excluded, ctx.year)}` +
       (s.inactive > 0 ? ` · ${s.inactive} retenu(s) avec « Projet.Actif » faux (gardés, information)` : ""),
     ctx.fileName);
   for (const [message, t] of ctx.tallies) warn(ctx.report, `${message} : ${tallyLabel(t)}`, ctx.fileName);
-  for (const [label, t] of ctx.unknownTypes) {
-    doubt(ctx.report, ctx.fileName,
-      `type hors des types de la config : « ${label} » (${t.count} projet(s)) — gardé(s) sans type ; à déclarer dans \`types\` (nom ou alias) ?`);
-  }
   for (const [label, t] of ctx.unknownPortfolios) {
     doubt(ctx.report, ctx.fileName,
       `portefeuille sans domaine : « ${label} » (${t.count} projet(s)) — à déclarer dans \`domains[].aliases\` ou en sous-domaine ?`);
   }
-}
-
-/**
- * Compares the COUT PREV perimeter with the Projets onglet, code by code.
- * Inputs: both tables. Output: the counts and the codes present on one
- * side only (sorted). Failure modes: none.
- */
-export function checkPerimeters(couts: ProjetsTable, projets: ProjetsTable): PerimeterCheck {
-  const key = (id: string): string => normalizeLabel(id);
-  const inCouts = new Map(couts.entries.map((e) => [key(e.id), e.id]));
-  const inProjets = new Map(projets.entries.filter((e) => e.id !== "").map((e) => [key(e.id), e.id]));
-  const onlyCouts = [...inCouts].filter(([k]) => !inProjets.has(k)).map(([, id]) => id).sort();
-  const onlyProjets = [...inProjets].filter(([k]) => !inCouts.has(k)).map(([, id]) => id).sort();
-  return {
-    coutsFile: couts.fileName, projetsFile: projets.fileName,
-    couts: inCouts.size, projets: inProjets.size, common: inCouts.size - onlyCouts.length, onlyCouts, onlyProjets,
-  };
+  if (ctx.nonPe.length > 0) {
+    doubt(ctx.report, ctx.fileName,
+      `codes retenus hors PE : ${ctx.nonPe.length} (${codes(ctx.nonPe)}) — l'auteur en attend 4 ou 5 ; davantage = une règle manque`);
+  }
 }

@@ -60,3 +60,35 @@ Décision de l'auteur : « retirer la liste des projets par cet endroit-là ».
   (décision auteur) ; lire un jour les lignes « Charge » de ce fichier par
   centre de coût (l'« appel de charges » de la macro) pour le recouper
   avec le plan de charge.
+
+## Complément (2026-09-11, après-midi) — la règle resserrée
+
+Avec le vrai fichier sous les yeux, l'auteur resserre la décision 2 : le
+périmètre embarquait « beaucoup trop » de projets. Un projet unique par
+« Projet. Id » est retenu si, dans cet ordre (le premier motif d'exclusion
+est compté) :
+
+1. il a une ligne sur l'année de l'exercice (le fichier est annualisé —
+   le test reste, il ne coûte rien) ;
+2. son « Projet.Etat du processus » est dans la **liste blanche**
+   `exercise.states` de la config (nouveau champ, facultatif : absent =
+   tous les états gardés, dit dans le rapport) — on passe d'une exclusion
+   (Annulé, Reporté) à une liste fermée, celle des cases cochées par
+   l'auteur ;
+3. son type est **un type de la config** (nom ou alias) — un type hors
+   config **exclut** désormais le projet (plus de « gardé sans type ») ;
+   Pilotage / ATLAS / RUN n'entrent que si l'auteur les déclare ;
+4. son nom ne contient pas le mot **« arbitrage »** : ces lignes sont des
+   artefacts du contrôle de gestion, pas des projets ;
+5. au moins une de ses **quatre cellules ME** (Charge finale ME, Charge
+   réelle ME, Coût final ME, Coût réel ME) porte un chiffre non nul sur
+   l'exercice — tout vide ou tout zéro = projet annulé de fait, jamais
+   marqué. Les montants ne servent qu'à ce test d'existence, jamais lus
+   dans une carte (Q23 : SP reste la source des k€).
+
+Contrôle attendu par l'auteur : presque uniquement des codes PE (4 ou 5
+exceptions). L'outil ne filtre pas sur le code : les codes retenus hors
+PE sont listés en douteux — davantage que quelques-uns = une règle manque.
+La ligne « périmètre · lecture COUT PREV » compte les écartés par motif
+(hors année, état hors liste par état, type hors config par type,
+arbitrage, sans ME).

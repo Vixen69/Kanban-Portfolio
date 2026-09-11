@@ -664,9 +664,20 @@ de son ADR.
   exclusions par motif. L'assemblage (jalons, SP, PdC, CdP) ne change pas :
   le lecteur produit une `ProjetsTable`. Un onglet Projets qui porte les
   Responsable prête ses chefs de projet si aucun ProjetsCdP n'est venu.
-- Ouvert (décision auteur) : déclarer Pilotage / Projet ATLAS / RUN dans
-  les types de la config ; lire un jour les lignes « Charge » de cet export
-  par centre de coût pour le recouper avec le plan de charge.
+- **Règle resserrée l'après-midi** (auteur, le vrai fichier sous les
+  yeux : « on en embarque beaucoup trop ») : l'état doit être dans la
+  **liste blanche** `exercise.states` de la config (nouveau champ,
+  facultatif — absent = tous gardés, dit dans le rapport) ; le type doit
+  être **un type de la config** (hors config = exclu, plus « gardé sans
+  type ») ; une ligne dont le nom contient **« arbitrage »** est un artefact
+  du contrôle de gestion, exclue ; un projet dont les **quatre cellules ME**
+  sont vides ou nulles est annulé de fait, exclu (montants testés, jamais
+  lus dans les cartes). Contrôle : presque que des codes PE — les codes
+  retenus hors PE sont listés en douteux (4–5 attendus).
+- Ouvert (décision auteur) : la liste `exercise.states` et les types
+  Pilotage / Projet ATLAS / RUN (aujourd'hui exclus) attendent ses deux
+  captures ; lire un jour les lignes « Charge » de cet export par centre de
+  coût pour le recouper avec le plan de charge.
 
 ### 2026-09-10 (soir) — Passe de perf : horloge à la minute, gzip et cache au bord
 

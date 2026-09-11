@@ -5,6 +5,7 @@
 import type { BoardConfig } from "../../core/types.ts";
 import type { ParamTable } from "./param.ts";
 import type { DomainShape, ProjetsTable } from "./projets.ts";
+import { excludedSummary } from "./couts.ts";
 import type { CoutsTable, PerimeterCheck } from "./couts.ts";
 import type { JalonsTable } from "./jalons.ts";
 import type { SpTable } from "./sp.ts";
@@ -145,9 +146,8 @@ function perimeterStatus(projets: ProjetsTable, config: BoardConfig): string {
 // The COUT PREV reading (ADR 030): what the rows became, exclusions by reason.
 function coutsStatus(couts: CoutsTable, year: number): string {
   const s = couts.stats;
-  const x = s.excluded;
-  return `${s.rows} ligne(s) · ${s.projectsSeen} projet(s) distinct(s) · retenus ${s.retained}` +
-    ` · écartés : Achat ${x.achat} · TMA ${x.tma} · Annulé ${x.annule} · Reporté ${x.reporte} · sans ligne ${year} ${x.noYear}` +
+  return `${s.rows} ligne(s) · ${s.projectsSeen} projet(s) distinct(s) · retenus ${s.retained} (${s.nonPe} hors PE)` +
+    ` · écartés : ${excludedSummary(s.excluded, year)}` +
     ` · « Projet.Actif » faux gardés ${s.inactive} · domaine via portefeuille ${s.domainResolved}/${s.retained}`;
 }
 

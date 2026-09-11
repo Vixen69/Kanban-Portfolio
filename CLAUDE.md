@@ -217,8 +217,9 @@ Sciforma portfolio of the COUT PREV export, ADR 030; a domain may be
 `transverse` — its people serve the whole portfolio, ADR 024),
 nature/criticality labels,
 custom field definitions, `age` thresholds (fresh/recent/aging/stale),
-`andonThresholdDays`, and `exercise.year` (the year the import reads and
-the capacity is counted in, ADR 024), `decisions` / `decisionGrounds` (the
+`andonThresholdDays`, `exercise.year` (the year the import reads and
+the capacity is counted in, ADR 024) and `exercise.states` (the Sciforma
+process states kept in the COUT PREV perimeter, ADR 030), `decisions` / `decisionGrounds` (the
 referential's D1–D6 and the arbitration grid's terms, ADR 026). `wip: null` shows the bare count and enforces nothing;
 a set WIP shows count/limit, warns at ≥ 80 %, reddens beyond 100 % (warns,
 never hard-blocks). An admin-panel override is persisted server-side with an

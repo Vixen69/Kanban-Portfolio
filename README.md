@@ -87,9 +87,11 @@ vivant) et `docs/adr/` (décisions). Le contrat de travail est `CLAUDE.md`.
   (`node sync/cloture.ts`, simulation par défaut).
 - **Périmètre depuis l'export « Coût »** (ADR 030) : quand l'export brut
   COUT PREV de Sciforma est déposé, il est le périmètre (projets uniques de
-  l'exercice, sans Achat ni TMA, ni Annulé ni Reporté ; domaine lu dans le
-  portefeuille via les alias de domaines de la config) ; l'onglet Projets ne
-  sert qu'au recoupement, dit code par code dans le rapport.
+  l'exercice, état dans la liste `exercise.states` de la config, type de la
+  config, lignes « arbitrage » et projets sans aucun chiffre ME écartés ;
+  domaine lu dans le portefeuille via les alias de domaines de la config) ;
+  l'onglet Projets ne sert qu'au recoupement, dit code par code dans le
+  rapport.
 - **Import depuis l'outil** (⬆, ADR 027) : déposer les CSV du classeur,
   lire le rapport d'audit, charger — même moteur et même rapport que la
   ligne de commande. Sans authentification jusqu'à RP3, comme le reste de

@@ -163,6 +163,12 @@ export interface FieldDef {
 /** The exercise (budget year) the board reads: charges, costs and capacity are that year's. */
 export interface ExerciseConfig {
   year: number;
+  /**
+   * The Sciforma process states that keep a project in the perimeter read
+   * from the COUT PREV export (ADR 030); absent = no state filter (the
+   * import says so in its report).
+   */
+  states?: string[];
 }
 
 /** Day thresholds separating fresh / recent / aging / stale. */

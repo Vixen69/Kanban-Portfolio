@@ -424,26 +424,34 @@ l'onglet Projets ne sert plus qu'au recoupement.
 
 Contrat `couts` : requis « Projet. Id », « Projet. Nom », « Projet.Type »,
 « Projet.Etat du processus », « Année » ; optionnels « Projet.Portefeuille »,
-« Projet.Actif » ; tout le reste (montants, charges, entités payeuses,
-nature, criticité, priorité, score, **« Projet.Responsable 1 »**, date
-d'export) est déclaré ignoré : **jamais lu**. Les espaces autour d'un point
-sont ignorés dans les en-têtes (« Projet. Id » ≡ « Projet.Id »).
+« Projet.Actif » et les quatre cellules ME (Charge finale ME (Res) (J),
+Charge réelle ME (Res) (J), Coût final ME (Res ouTrans), Coût réel ME (Res
+ouTrans) — testées, jamais lues dans une carte) ; tout le reste (entités
+payeuses, nature, criticité, priorité, score, **« Projet.Responsable 1 »**,
+date d'export) est déclaré ignoré : **jamais lu**. Les espaces autour d'un
+point sont ignorés dans les en-têtes (« Projet. Id » ≡ « Projet.Id »).
 
-Règle de périmètre (auteur, 2026-09-11) — un projet **unique par Id** est
-retenu si :
+Règle de périmètre (auteur, 2026-09-11, resserrée l'après-midi) — un projet
+**unique par Id** est retenu si, dans cet ordre (le premier motif
+d'exclusion est compté) :
 
-- il a au moins une ligne sur l'**année de l'exercice** (`exercise.year`) ;
-- son type n'est ni **Achat** ni une **TMA** (« Evolution - TMA », « TMA
-  Corrective ») — les types retenus du PMO sont Etude, Pilotage, Projet
-  ATLAS [Hors PDSI], Projet de gestion d'obsolescence, Projet de mise en
-  oeuvre, Projet IA, RUN ; ceux hors config (Pilotage, ATLAS, RUN) sont
-  **gardés sans type** et questionnés ;
-- son état n'est ni **Annulé** ni **Reporté**.
+1. il a au moins une ligne sur l'**année de l'exercice** (`exercise.year`) ;
+2. son « Etat du processus » est dans la **liste blanche** `exercise.states`
+   de la config (les cases cochées par l'auteur ; champ facultatif : absent
+   = tous les états gardés, dit dans le rapport) ;
+3. son type est **un type de la config** (nom ou alias) — hors config, le
+   projet est **exclu** et compté par libellé (Achat, Evolution - TMA, TMA
+   Corrective, Pilotage, ATLAS, RUN… n'entrent que s'ils sont déclarés) ;
+4. son nom ne contient pas le mot **« arbitrage »** (lignes factices du
+   contrôle de gestion) ;
+5. au moins une de ses **quatre cellules ME** porte un chiffre non nul sur
+   l'exercice — tout vide ou tout zéro = annulé de fait, jamais marqué.
 
 « Projet.Actif » faux est compté, jamais exclu. Un Id sous plusieurs noms
-est questionné (premier nom conservé). Aucun montant ni charge de ce fichier
-n'entre dans une carte : SP reste la source des k€ (Q23), le plan de charge
-celle des j.h.
+est questionné (premier nom conservé). Contrôle attendu : presque uniquement
+des codes PE — les codes retenus hors PE sont listés en douteux (l'auteur en
+attend 4 ou 5). Aucun montant de ce fichier n'entre dans une carte : SP
+reste la source des k€ (Q23), le plan de charge celle des j.h.
 
 Domaine : le **dernier segment** de « Projet.Portefeuille » (« DSI
 NEXTER.INFRASTRUCTURE OPE » → « INFRASTRUCTURE OPE ») est rapproché du
@@ -459,8 +467,9 @@ ainsi dans la config, pas dans le code.
 
 Rapport : ligne « périmètre `projets` » (nomme le fichier, forme
 « portefeuille Sciforma »), ligne « périmètre · lecture COUT PREV »
-(lignes, projets distincts, retenus, écartés par motif, actifs faux gardés,
-domaines résolus), et quand l'onglet Projets est là aussi la ligne
+(lignes, projets distincts, retenus dont hors PE, écartés par motif — hors
+année, état hors liste par état, type hors config par type, arbitrage, sans
+ME —, actifs faux gardés, domaines résolus), et quand l'onglet Projets est là aussi la ligne
 « périmètre · recoupement » : effectifs, communs et **codes** présents d'un
 seul côté (20 au plus par côté). Un onglet Projets qui porte les
 Responsable prête ses chefs de projet si aucun ProjetsCdP n'est venu.

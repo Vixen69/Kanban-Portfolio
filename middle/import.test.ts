@@ -58,7 +58,7 @@ test("auditImport over the synthetic fixtures renders the CLI's report and its c
   const result = auditImport(CONFIG, fixtureFiles(), NOW);
   assert.deepEqual([result.summary.received, result.summary.recognized, result.summary.missing, result.loadable],
     [8, 8, [], true], "the fixture folder carries Couts.csv — COUT PREV is the perimeter (ADR 030)");
-  assert.equal(result.summary.taken, 6);
+  assert.equal(result.summary.taken, 5);
   assert.match(result.report, /capacité : 3 personne\(s\)/);
   const partial = auditImport(CONFIG, fixtureFiles(["PARAM.csv"]), NOW);
   assert.equal(partial.loadable, false);
@@ -70,12 +70,12 @@ test("loadImport writes the deck and the capacity; a second load updates; no per
     const storage = createJsonlStorage(join(dir, "board.jsonl"));
     try {
       const first = await loadImport(storage, CONFIG, fixtureFiles(), NOW);
-      assert.deepEqual([first.load.created, first.load.updated, first.load.unlisted], [6, 0, 0]);
+      assert.deepEqual([first.load.created, first.load.updated, first.load.unlisted], [5, 0, 0], "the COUT PREV fixture is the perimeter (ADR 030)");
       assert.deepEqual(first.load.capacity, { persons: 3, assignments: 3 });
-      assert.equal((await storage.listBaseCards()).length, 6);
+      assert.equal((await storage.listBaseCards()).length, 5);
       assert.equal((await storage.getCapacity())?.persons.length, 3);
       const second = await loadImport(storage, CONFIG, fixtureFiles(), new Date("2026-09-09T09:00:00.000Z"));
-      assert.deepEqual([second.load.created, second.load.updated], [0, 6]);
+      assert.deepEqual([second.load.created, second.load.updated], [0, 5]);
       await assert.rejects(() => loadImport(storage, CONFIG, fixtureFiles(["PARAM.csv"]), NOW), /aucune carte assemblée/);
     } finally {
       await storage.close();
@@ -113,8 +113,8 @@ test("audit answers the report and load writes the deck; the 40 MB cap is theirs
     assert.deepEqual([body.loadable, body.summary.received], [true, 8]);
     const load = await post(base, "/api/import/load", payload(fixtureFiles()));
     assert.equal(load.status, 200);
-    assert.equal(((await load.json()) as { load: { created: number } }).load.created, 6);
-    assert.equal((await (await fetch(`${base}/api/board`)).json() as { cards: unknown[] }).cards.length, 6);
+    assert.equal(((await load.json()) as { load: { created: number } }).load.created, 5);
+    assert.equal((await (await fetch(`${base}/api/board`)).json() as { cards: unknown[] }).cards.length, 5);
     // A 100 KB file passes the import cap; the same body on /api/events is 413.
     const big = { files: [{ name: "gros.csv", base64: Buffer.alloc(100 * 1024, "a").toString("base64") }] };
     assert.equal((await post(base, "/api/import/audit", big)).status, 200);

@@ -497,7 +497,8 @@
   },
   "andonThresholdDays": 5,
   "exercise": {
-    "year": 2026
+    "year": 2026,
+    "states": ["Basculé en projet", "Budget validé", "Budget présenté", "Nouveau", "Terminé"]
   },
   "decisions": [
     {

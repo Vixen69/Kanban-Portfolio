@@ -29,15 +29,22 @@ const RISK_SEVERITY_KEYS = ["faible", "moyen", "eleve"] as const;
 export const DEFAULT_EXERCISE_YEAR = 2026;
 
 // exercise.year: an integer year; absent = the pre-ADR-024 default, so an
-// admin override stored earlier keeps validating.
+// admin override stored earlier keeps validating. exercise.states: the
+// process states kept in the COUT PREV perimeter (ADR 030) — optional, a
+// non-empty list of labels when present.
 function parseExercise(value: unknown): ExerciseConfig {
   if (value === undefined) return { year: DEFAULT_EXERCISE_YEAR };
-  const record = requireExactKeys(value, "exercise", ["year"]);
+  const record = requireRecord(value, "exercise");
+  for (const key of Object.keys(record)) {
+    if (key !== "year" && key !== "states") fail(`exercise : clé inattendue « ${key} »`);
+  }
   const year = record.year;
   if (typeof year !== "number" || !Number.isInteger(year) || year < 2000 || year > 2100) {
     fail("exercise.year doit être une année entière (2000–2100)");
   }
-  return { year };
+  if (record.states === undefined) return { year };
+  if (!Array.isArray(record.states) || record.states.length === 0) fail("exercise.states doit être une liste non vide d'états");
+  return { year, states: record.states.map((state, i) => requireText(state, `exercise.states[${i}]`)) };
 }
 
 // natureKey: one of the three fixed keys; absent defaults to "complicated"

@@ -25,6 +25,7 @@ test("the repository's config/board.json is valid", () => {
   assert.equal(config.types.find((t) => t.id === "obsolescence")?.name, "Obsolescence");
   assert.deepEqual(config.types.find((t) => t.id === "obsolescence")?.aliases,
     ["Projet de gestion d’obsolescence", "obsolescence", "obscolescence"]);
+  assert.ok((config.exercise.states?.length ?? 0) >= 3, "ADR 030: the retained process states are declared");
   // ADR 030: the Sciforma portfolio words of the domains.
   assert.deepEqual(config.domains.filter((d) => d.aliases !== undefined).map((d) => [d.id, d.aliases]), [
     ["ad", ["GROUPE"]], ["industrie", ["PRODUCTION"]], ["infra", ["INFRASTRUCTURE"]],
@@ -258,10 +259,16 @@ test("exercise year and transverse domains (ADR 024): parsed, defaulted, refused
   const legacy = rawConfig();
   delete legacy.exercise;
   assert.deepEqual(validateBoardConfig(legacy).exercise, { year: DEFAULT_EXERCISE_YEAR });
+  const withStates = rawConfig();
+  withStates.exercise.states = ["Budget validé", "Nouveau"];
+  assert.deepEqual(validateBoardConfig(withStates).exercise, { year: 2026, states: ["Budget validé", "Nouveau"] }, "ADR 030");
   const cases: [string, (raw: any) => void][] = [
     ["year not an integer", (raw) => (raw.exercise.year = 2026.5)],
     ["year out of range", (raw) => (raw.exercise.year = 1999)],
     ["extra exercise key", (raw) => (raw.exercise.month = 1)],
+    ["states not a list", (raw) => (raw.exercise.states = "Nouveau")],
+    ["states empty", (raw) => (raw.exercise.states = [])],
+    ["state empty", (raw) => (raw.exercise.states = [""])],
     ["transverse not a boolean", (raw) => (raw.domains[0].transverse = "oui")],
   ];
   for (const [name, mutate] of cases) {
