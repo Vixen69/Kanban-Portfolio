@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { CapacitySnapshot, CardState } from "./types.ts";
 import { computeCapacityReadout, yearElapsed } from "./capacity-view.ts";
+import { metierKey } from "./capacity-metiers.ts";
 import { testCard, testConfig, testPerson } from "./test-helpers.ts";
 
 const CONFIG = testConfig(); // alpha; beta is transverse (ADR 024)
@@ -132,20 +133,23 @@ test("ADR 033: the tension threshold keeps persons from 90 %, the métiers carry
     assignments: [{ personId: "p1", cardId: "S001", jh: 50, done: 0 }],
     generic: [
       { metier: "Concept.Dév.", domain: "alpha", cardId: "S001", jh: 60, done: 20 },
-      { metier: "Concept.Dév.", domain: "alpha", cardId: null, jh: 40, done: 0 },
+      { metier: "Externe.Concept.Dév.", domain: "alpha", cardId: null, jh: 40, done: 0 },
       { metier: "Data Business", domain: null, cardId: "S002", jh: 30, done: 0 },
     ],
-    // ADR 034: the COUT PREV cost centres join the métiers by normalized label.
+    // ADR 034: the COUT PREV cost centres join the métiers by normalized label,
+    // a leading dotted prefix dropped when the remainder is a known label
+    // (« NEXTER.CdP INFRA BUILD » = « CdP INFRA BUILD »; « Concept.Dév. ERP » stays).
     coutsDemand: [
-      { centre: "CDP INFRA BUILD", cardId: "S001", jh: 150, done: 20 },
+      { centre: "NEXTER.CDP INFRA BUILD", cardId: "S001", jh: 150, done: 20 },
       { centre: "Expert", cardId: null, jh: 12, done: 0 },
+      { centre: "Concept.Dév. ERP", cardId: null, jh: 8, done: 0 },
     ],
   };
   const readout = computeCapacityReadout(snapshot, CARDS, CONFIG, NOW);
   assert.deepEqual(readout.overloads.map((o) => [o.load.person.id, o.level, o.over]), [["p3", 1.2, true], ["p1", 0.93, false]]);
   assert.equal(readout.kpis.overloaded, 2);
   assert.equal(readout.kpis.genericJh, 130);
-  assert.equal(readout.kpis.coutsJh, 162);
+  assert.equal(readout.kpis.coutsJh, 170);
   assert.deepEqual(readout.tensionByMetier, [
     { metier: "Concept.Dév.", persons: 1, tense: 1, over: 1 }, { metier: "CdP INFRA BUILD", persons: 2, tense: 1, over: 0 },
   ]);
@@ -154,7 +158,17 @@ test("ADR 033: the tension threshold keeps persons from 90 %, the métiers carry
     ["CdP INFRA BUILD", 2, 400, 285, 50, 0, 0, 0.71, 150, 0.38],
     ["Data Business", 0, 0, 0, 0, 30, 30, null, 0, null],
     ["Expert", 0, 0, 0, 0, 0, 0, null, 12, null],
+    ["Concept.Dév. ERP", 0, 0, 0, 0, 0, 0, null, 8, null],
   ]);
+});
+
+test("metierKey merges a dotted prefix only onto a known label", () => {
+  const known = new Set(["cdp it4it", "concept.dev.", "concept.dev. erp"]);
+  assert.equal(metierKey(known, "NEXTER.CdP IT4IT"), "cdp it4it");
+  assert.equal(metierKey(known, " Externe.Concept.Dév. "), "concept.dev.");
+  assert.equal(metierKey(known, "Concept.Dév. ERP"), "concept.dev. erp");
+  assert.equal(metierKey(known, "NEXTER"), "nexter");
+  assert.equal(metierKey(known, ""), "");
 });
 
 test("coverage counts stubs, unknown capacities and plans, uncovered cards, generic and outside j.h", () => {

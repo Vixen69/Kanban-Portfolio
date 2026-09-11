@@ -17,7 +17,7 @@ export const NO_METIER = "";
 
 /** Loads of one métier, generic demand and COUT PREV demand included. */
 export interface MetierLoad extends GroupLoad {
-  /** Display label: the métier as first seen (a person's, a generic row's, a cost centre). */
+  /** Display label: the unprefixed spelling when one was seen, else the first seen. */
   metier: string;
   /** Generic demand of this métier (rows without a named person), j.h. */
   genericJh: number;
@@ -50,24 +50,54 @@ function ratioOf(demand: number, capacity: number): number | null {
   return capacity > 0 ? round2(demand / capacity) : null;
 }
 
-// Métiers and cost centres share a vocabulary, not always a spelling: the
-// key folds case, accents and spacing; the display keeps the first spelling.
-function keyOf(label: string): string {
-  return label.trim().toLowerCase().normalize("NFD").replace(/\p{M}/gu, "").replace(/\s+/g, " ") || NO_METIER;
+function normalize(label: string): string {
+  return label.trim().toLowerCase().normalize("NFD").replace(/\p{M}/gu, "").replace(/\s+/g, " ");
 }
 
-function emptyMetier(key: string, label: string): MetierLoad {
+/**
+ * The key a métier or cost centre label groups under. Métiers and cost
+ * centres share a vocabulary, not always a spelling nor a prefix (author,
+ * 2026-09-12): « NEXTER.CdP IT4IT » (COUT PREV) and « CdP IT4IT » (PdC)
+ * are one type of resource, « Externe.Concept.Dév. » and « Concept.Dév. »
+ * too. The key folds case, accents and spacing, then drops a leading
+ * dotted segment whenever the remainder is itself a known label — data-
+ * driven, so « Concept.Dév. ERP » (no known remainder) stays whole.
+ * Inputs: the normalized labels known in the snapshot, the raw label.
+ * Output: the key ("" for no métier). Failure: none.
+ */
+export function metierKey(known: ReadonlySet<string>, label: string): string {
+  let key = normalize(label);
+  let dot = key.indexOf(".");
+  while (dot > 0) {
+    const rest = key.slice(dot + 1).trim();
+    if (!known.has(rest)) break;
+    key = rest;
+    dot = key.indexOf(".");
+  }
+  return key || NO_METIER;
+}
+
+// Every label the snapshot carries, normalized: the merge candidates.
+function knownLabels(snapshot: CapacitySnapshot): Set<string> {
+  const known = new Set<string>();
+  for (const person of snapshot.persons) known.add(normalize(person.metier));
+  for (const row of snapshot.generic ?? []) known.add(normalize(row.metier));
+  for (const row of snapshot.coutsDemand ?? []) known.add(normalize(row.centre));
+  known.delete("");
+  return known;
+}
+
+// The display label of a key: the unprefixed spelling wins over a prefixed one.
+function remember(labels: Map<string, string>, key: string, label: string): void {
+  const clean = label.trim();
+  if (normalize(clean) === key || !labels.has(key)) labels.set(key, clean);
+}
+
+function emptyMetier(key: string): MetierLoad {
   return {
-    ...emptyGroupLoad(key), metier: label, genericJh: 0, genericDone: 0, genericBoardJh: 0,
+    ...emptyGroupLoad(key), metier: "", genericJh: 0, genericDone: 0, genericBoardJh: 0,
     coutsJh: 0, coutsDone: 0, pressure: null, coutsPressure: null,
   };
-}
-
-function groupFor(groups: Map<string, MetierLoad>, label: string): MetierLoad {
-  const key = keyOf(label);
-  const group = groups.get(key) ?? emptyMetier(key, label.trim());
-  groups.set(key, group);
-  return group;
 }
 
 // Highest pressure first; unknown pressure last, then by every demand summed.
@@ -82,34 +112,41 @@ function comparePressure(a: MetierLoad, b: MetierLoad): number {
 /**
  * Loads per métier — the persons' capacity, planned load and board demand
  * (loadByGroup), the generic demand of the same métier, and the COUT PREV
- * demand of the same cost centre — highest pressure first.
+ * demand of the same cost centre (prefixes merged, see metierKey) —
+ * highest pressure first.
  * Inputs: the snapshot (`generic` and `coutsDemand` absent on older
- * snapshots, read as none). Output: one MetierLoad per métier seen on a
- * person, a generic row or a cost centre. Failure: none.
+ * snapshots, read as none). Output: one MetierLoad per key. Failure: none.
  */
 export function loadByMetier(snapshot: CapacitySnapshot): MetierLoad[] {
-  const groups = new Map<string, MetierLoad>();
+  const known = knownLabels(snapshot);
+  const keyOf = (label: string): string => metierKey(known, label);
   const labels = new Map<string, string>();
-  for (const person of snapshot.persons) {
-    const key = keyOf(person.metier);
-    if (!labels.has(key)) labels.set(key, person.metier.trim());
-  }
+  const groups = new Map<string, MetierLoad>();
+  const groupFor = (label: string): MetierLoad => {
+    const key = keyOf(label);
+    remember(labels, key, label);
+    const group = groups.get(key) ?? emptyMetier(key);
+    groups.set(key, group);
+    return group;
+  };
+  for (const person of snapshot.persons) remember(labels, keyOf(person.metier), person.metier);
   for (const group of loadByGroup(snapshot, (person) => keyOf(person.metier))) {
-    groups.set(group.key, { ...emptyMetier(group.key, labels.get(group.key) ?? ""), ...group });
+    groups.set(group.key, { ...emptyMetier(group.key), ...group });
   }
   for (const row of snapshot.generic ?? []) {
-    const group = groupFor(groups, row.metier);
+    const group = groupFor(row.metier);
     group.genericJh = round2(group.genericJh + row.jh);
     group.genericDone = round2(group.genericDone + row.done);
     if (row.cardId !== null) group.genericBoardJh = round2(group.genericBoardJh + row.jh);
   }
   for (const row of snapshot.coutsDemand ?? []) {
-    const group = groupFor(groups, row.centre);
+    const group = groupFor(row.centre);
     group.coutsJh = round2(group.coutsJh + row.jh);
     group.coutsDone = round2(group.coutsDone + row.done);
   }
   const rows = [...groups.values()];
   for (const row of rows) {
+    row.metier = labels.get(row.key) ?? "";
     row.pressure = ratioOf(round2(row.plannedJh + row.genericJh), row.capacityJh);
     row.coutsPressure = ratioOf(row.coutsJh, row.capacityJh);
   }
@@ -117,20 +154,22 @@ export function loadByMetier(snapshot: CapacitySnapshot): MetierLoad[] {
 }
 
 /**
- * Which métiers are saturated: per métier, the persons whose level is
- * known, those at or above the tension threshold, those beyond 100 % —
- * only métiers with at least one tense person, most over then most tense
- * first.
+ * Which métiers are saturated: per métier (prefixes merged), the persons
+ * whose level is known, those at or above the tension threshold, those
+ * beyond 100 % — only métiers with at least one tense person, most over
+ * then most tense first.
  * Inputs: the person loads, the tension threshold (config). Output: the
  * roll-up rows. Failure: none.
  */
 export function tensionByMetier(loads: readonly PersonLoad[], tension: number): MetierTension[] {
+  const known = new Set(loads.map((load) => normalize(load.person.metier)).filter((key) => key !== ""));
   const rows = new Map<string, MetierTension>();
   for (const load of loads) {
     const level = loadLevel(load);
     if (level === null) continue;
-    const key = keyOf(load.person.metier);
+    const key = metierKey(known, load.person.metier);
     const row = rows.get(key) ?? { metier: load.person.metier.trim(), persons: 0, tense: 0, over: 0 };
+    if (normalize(load.person.metier) === key) row.metier = load.person.metier.trim();
     row.persons++;
     if (level >= tension) row.tense++;
     if (level > 1) row.over++;

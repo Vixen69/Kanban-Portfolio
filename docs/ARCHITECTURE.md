@@ -637,6 +637,15 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-12 — Types de ressource : les préfixes fusionnent (« NEXTER.CdP IT4IT » = « CdP IT4IT »)
+
+- Premier audit réel du recoupement (VM) : les centres de coût COUT PREV
+  arrivent préfixés « NEXTER.… » et faisaient des lignes à part, à zéro
+  personne. Règle (auteur) : un libellé « X.Y » rejoint « Y » dès que « Y »
+  est connu du snapshot (`metierKey`, guidé par les données — « Concept.Dév.
+  ERP » reste entier) ; même chose pour « Externe.Concept.Dév. » côté PdC.
+  L'affichage garde l'orthographe sans préfixe.
+
 ### 2026-09-11 (nuit) — La demande COUT PREV par centre de coût, recoupée au PdC (ADR 034)
 
 - **Décision de l'auteur** après la lecture détaillée de la macro PDSI :

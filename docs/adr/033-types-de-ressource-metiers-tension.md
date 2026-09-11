@@ -45,6 +45,13 @@ chacune (auteur).
    lignes génériques — rapportés à la capacité totale du domaine. Liste
    entière, les plus lourdes d'abord ; part générique dite.
 
+6. **Préfixes fusionnés** (auteur, 2026-09-12, sur les vraies données) :
+   les centres de coût COUT PREV arrivent préfixés « NEXTER.CdP IT4IT »,
+   certains métiers du PdC « Externe.Concept.Dév. ». Un libellé « X.Y »
+   rejoint la ligne « Y » dès que « Y » est un libellé connu du snapshot
+   (règle guidée par les données : « Concept.Dév. ERP », sans reste connu,
+   reste entier). L'affichage garde l'orthographe sans préfixe.
+
 ## Conséquences
 
 - `core/capacity-metiers.ts` (nouveau), `capacity-levers.ts` (seuil,
