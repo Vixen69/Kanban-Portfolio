@@ -14,9 +14,10 @@ import { FocusCard, MiniCard } from "./cards.tsx";
 export interface CellProps {
   lane: Lane;
   column: Column;
-  /** The cards of THIS cell only (BoardGrid filters via core cellCards). */
+  /** The cards of THIS cell only (BoardGrid filters via core cellCards),
+   * the sidebar filters already applied — hidden cards never reach the
+   * cell (ADR 031). */
   cards: CardState[];
-  dimmedIds: Set<string>;
   focused: boolean;
   config: BoardConfig;
   /** Epoch milliseconds of the shared "now" tick. */
@@ -78,11 +79,9 @@ function CellCardList({ props, listRef }: { props: CellProps; listRef: React.Ref
     <div className="cell-cards" ref={listRef}>
       {props.cards.map((card) =>
         props.focused ? (
-          <FocusCard key={card.id} card={card} dimmed={props.dimmedIds.has(card.id)}
-            dropTarget={props.dropCardId === card.id} {...shared} />
+          <FocusCard key={card.id} card={card} dropTarget={props.dropCardId === card.id} {...shared} />
         ) : (
-          <MiniCard key={card.id} card={card} dimmed={props.dimmedIds.has(card.id)}
-            dropTarget={props.dropCardId === card.id} {...shared} />
+          <MiniCard key={card.id} card={card} dropTarget={props.dropCardId === card.id} {...shared} />
         ),
       )}
       {props.cards.length === 0 && <span className="cell-empty" />}

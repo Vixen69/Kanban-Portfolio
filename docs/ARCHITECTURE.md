@@ -637,6 +637,20 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-11 (soir) — Les filtres masquent, les colonnes comptent, plus de WIP provisoires (ADR 031)
+
+- **Décision de l'auteur**, devant le périmètre réel : les filtres du
+  panneau latéral **masquent** les cartes écartées au lieu de les estomper
+  (l'ADR 005 / v12 « estomper, jamais retirer » est retirée sur ce point).
+  `core/filters.ts` : `hiddenCardIds` ; la grille ne donne aux cellules que
+  les cartes retenues ; le rendu « dimmed » disparaît. Les totaux v12
+  portaient déjà sur le visible.
+- **Compte par colonne** : chaque en-tête porte le nombre de sujets du
+  stade ; filtré, il devient « retenus/total » en couleur d'accent.
+- **WIP** : les limites provisoires de `config/board.json` (7/6/7/5/6/6,
+  valeurs de maquette) passent à `null` — compte nu, pas d'alerte ; le
+  mécanisme reste pour le panneau d'administration.
+
 ### 2026-09-11 — Le périmètre lu à la source : l'export COUT PREV (ADR 030)
 
 - **Constat de l'auteur** : le périmètre embarqué depuis l'onglet Projets

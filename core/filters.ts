@@ -1,8 +1,9 @@
 // Sidebar filters (design v11): search, the « Bloqués uniquement » toggle
 // and the pill groups — project type, criticality, domain (with its
 // sub-domains, ADR 022), constraint. (The nature group left in v11: nature
-// is positional, carried by the canal.) Filters DIM cards, they never
-// remove them: the spatial structure of the board is always the truth.
+// is positional, carried by the canal.) Filters HIDE the cards they exclude
+// (ADR 031, author's call 2026-09-11 — the v12 dimming is retired): the
+// board shows the retained subset and the counts say how much was kept.
 // Pure logic, rendered by front/components/Sidebar.tsx.
 
 import { reviewOverdue } from "./decisions.ts";
@@ -36,7 +37,7 @@ function subDomainKeys(config: BoardConfig): string[] {
 export interface FilterState {
   /** Matches title or codename, trimmed, case-insensitive. Empty = all. */
   search: string;
-  /** « Bloqués uniquement » — dims every card that is not blocked. */
+  /** « Bloqués uniquement » — hides every card that is not blocked. */
   blockedOnly: boolean;
   type: Record<string, boolean>;
   crit: Record<Criticality, boolean>;
@@ -61,7 +62,7 @@ export interface FilterState {
 
 /**
  * The live read-out of the sidebar and header: how many cards are shown
- * (non-dimmed) and how the shown subset splits by state and criticality.
+ * (not hidden) and how the shown subset splits by state and criticality.
  * `total` is always the whole portfolio.
  */
 export interface ViewCounts {
@@ -185,17 +186,17 @@ export function cardMatches(card: Card, filters: FilterState): boolean {
 }
 
 /**
- * Ids of the cards the filters dim (the complement of cardMatches).
+ * Ids of the cards the filters hide (the complement of cardMatches).
  * Inputs: all card states, the filters.
- * Output: a Set of card ids to render dimmed (empty when neutral).
+ * Output: a Set of card ids to leave off the board (empty when neutral).
  * Failure: none.
  */
-export function dimmedCardIds(cards: CardState[], filters: FilterState): Set<string> {
-  const dimmed = new Set<string>();
+export function hiddenCardIds(cards: CardState[], filters: FilterState): Set<string> {
+  const hidden = new Set<string>();
   for (const card of cards) {
-    if (!cardMatches(card, filters)) dimmed.add(card.id);
+    if (!cardMatches(card, filters)) hidden.add(card.id);
   }
-  return dimmed;
+  return hidden;
 }
 
 function emptyCounts(total: number): ViewCounts {
@@ -212,21 +213,21 @@ function tally(counts: ViewCounts, card: CardState, config: BoardConfig, now: Da
 }
 
 /**
- * Counts over the VISIBLE subset: only non-dimmed cards are tallied
+ * Counts over the VISIBLE subset: only the cards not hidden are tallied
  * (shown, blocked, stale, per-criticality); total is the whole portfolio
  * size.
- * Inputs: all card states, the dimmed id set, the board config (stale
+ * Inputs: all card states, the hidden id set, the board config (stale
  * threshold), now. Output: a ViewCounts. Failure: none.
  */
 export function viewCounts(
   cards: CardState[],
-  dimmed: ReadonlySet<string>,
+  hidden: ReadonlySet<string>,
   config: BoardConfig,
   now: Date,
 ): ViewCounts {
   const counts = emptyCounts(cards.length);
   for (const card of cards) {
-    if (!dimmed.has(card.id)) tally(counts, card, config, now);
+    if (!hidden.has(card.id)) tally(counts, card, config, now);
   }
   return counts;
 }

@@ -26,28 +26,28 @@
     {
       "id": "demandes",
       "name": "Demandes",
-      "wip": 7,
+      "wip": null,
       "gate": null,
       "note": "File d’entrée · priorité verticale"
     },
     {
       "id": "qualification",
       "name": "Qualification",
-      "wip": 6,
+      "wip": null,
       "gate": null,
       "note": "RDO · détection de nature"
     },
     {
       "id": "etudes",
       "name": "Études",
-      "wip": 7,
+      "wip": null,
       "gate": null,
       "note": "DAAT · estimation · dépendances"
     },
     {
       "id": "prets",
       "name": "Prêts",
-      "wip": 5,
+      "wip": null,
       "gate": "DoR",
       "note": "Qualifié, estimé — tiré par l’équipe"
     },
@@ -61,7 +61,7 @@
     {
       "id": "actifs",
       "name": "Actifs",
-      "wip": 6,
+      "wip": null,
       "gate": null,
       "note": "En cours · Andon si bloqué > 5j",
       "hasBlockedZone": true
@@ -69,7 +69,7 @@
     {
       "id": "done",
       "name": "Done",
-      "wip": 6,
+      "wip": null,
       "gate": "DoD",
       "note": "DoD atteinte · PV Reprise d’Exploitation"
     },

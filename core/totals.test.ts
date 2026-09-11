@@ -138,12 +138,12 @@ test("laneTotals groups by folded lane", () => {
   assert.equal(totals.laneB?.jh, 0);
 });
 
-test("dimmed cards are excluded from both groupings", () => {
-  const dimmed = new Set(["S001"]);
-  const byColumn = columnTotals([RICH, FALLBACK, EMPTY], dimmed, CONFIG);
+test("hidden cards are excluded from both groupings", () => {
+  const hidden = new Set(["S001"]);
+  const byColumn = columnTotals([RICH, FALLBACK, EMPTY], hidden, CONFIG);
   assert.equal(byColumn.col1?.count, 1);
   assert.equal(byColumn.col1?.rdli, 0);
-  const byLane = laneTotals([RICH, FALLBACK, EMPTY], dimmed, CONFIG);
+  const byLane = laneTotals([RICH, FALLBACK, EMPTY], hidden, CONFIG);
   assert.equal(byLane.laneA?.count, 1);
   assert.equal(byLane.laneA?.jh, 40);
 });

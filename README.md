@@ -35,8 +35,12 @@ vivant) et `docs/adr/` (décisions). Le contrat de travail est `CLAUDE.md`.
   « Aucune » ; une carte reste allumée tant qu'**une** de ses contraintes est
   active, ADR 020), interrupteur **« Bloqués uniquement »**, filtres type /
   criticité / domaine avec tout·rien (pas de filtre nature — la nature est le
-  canal, ADR 018). Les filtres **estompent**, ne retirent jamais (ADR 005).
-  Compteurs affichés/total et stats en direct ; état vide avec réinitialisation.
+  canal, ADR 018). Les filtres **masquent** les sujets écartés (ADR 031,
+  décision auteur du 2026-09-11 — l'ADR 005 « estomper, jamais retirer » est
+  retirée) ; chaque en-tête de colonne compte les sujets du stade, en
+  « retenus/total » quand le tableau est filtré. Compteurs affichés/total et
+  stats en direct ; état vide avec réinitialisation. Le modèle par défaut ne
+  porte plus de limite WIP (ADR 031) : compte nu dans les cellules.
 - Fiche détaillée (design v11, ADR 017/018/019) : **budget · graphe croisé**
   (enveloppe RDLI / estimé / engagé / réalisé) **avant** le **plan de charge
   par profil DSI** (j.h répartis, consommé éditable par profil), **risque de

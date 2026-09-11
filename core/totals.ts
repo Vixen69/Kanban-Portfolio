@@ -113,18 +113,18 @@ export function totalsOf(cards: readonly CardState[]): GroupTotals {
   return totals;
 }
 
-// Groups the non-dimmed cards by a key, seeding every id so a column or
+// Groups the cards not hidden by a key, seeding every id so a column or
 // canal with nothing visible still renders zeros instead of disappearing.
 function groupTotals(
   cards: readonly CardState[],
-  dimmed: ReadonlySet<string>,
+  hidden: ReadonlySet<string>,
   ids: string[],
   keyOf: (card: CardState) => string,
 ): Record<string, GroupTotals> {
   const groups: Record<string, GroupTotals> = {};
   for (const id of ids) groups[id] = emptyTotals();
   for (const card of cards) {
-    if (dimmed.has(card.id)) continue;
+    if (hidden.has(card.id)) continue;
     const group = groups[keyOf(card)];
     if (group !== undefined) addCard(group, card);
   }
@@ -132,36 +132,37 @@ function groupTotals(
 }
 
 /**
- * Per-column totals of the VISIBLE cards (filters dim, and dimmed cards are
- * excluded from the sums — the header reads what the eye sees).
- * Inputs: the folded card states, the dimmed id set, the board config.
+ * Per-column totals of the VISIBLE cards (the filters hide, ADR 031, and
+ * hidden cards are excluded from the sums — the header reads what the eye
+ * sees; `count` is the retained card count).
+ * Inputs: the folded card states, the hidden id set, the board config.
  * Output: columnId -> GroupTotals, one entry per configured column (zeroed
  * when empty). Cards in a column unknown to the config are ignored.
  * Failure: none.
  */
 export function columnTotals(
   cards: readonly CardState[],
-  dimmed: ReadonlySet<string>,
+  hidden: ReadonlySet<string>,
   config: BoardConfig,
 ): Record<string, GroupTotals> {
   const ids = config.columns.map((column) => column.id);
-  return groupTotals(cards, dimmed, ids, (card) => card.columnId);
+  return groupTotals(cards, hidden, ids, (card) => card.columnId);
 }
 
 /**
  * Per-canal totals of the VISIBLE cards — same arithmetic as columnTotals,
  * grouped by lane.
- * Inputs: the folded card states, the dimmed id set, the board config.
+ * Inputs: the folded card states, the hidden id set, the board config.
  * Output: laneId -> GroupTotals, one entry per configured lane. Cards in a
  * lane unknown to the config are ignored. Failure: none.
  */
 export function laneTotals(
   cards: readonly CardState[],
-  dimmed: ReadonlySet<string>,
+  hidden: ReadonlySet<string>,
   config: BoardConfig,
 ): Record<string, GroupTotals> {
   const ids = config.lanes.map((lane) => lane.id);
-  return groupTotals(cards, dimmed, ids, (card) => card.laneId);
+  return groupTotals(cards, hidden, ids, (card) => card.laneId);
 }
 
 /**

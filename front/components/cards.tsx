@@ -13,8 +13,6 @@ import { AbsentMark, DecisionMark } from "./cardMarks.tsx";
 /** Shared props of both card renderings (pinned build-spec contract). */
 export interface CardItemProps {
   card: CardState;
-  /** True when the sidebar filters dim this card (dimmed, never removed). */
-  dimmed: boolean;
   /** Epoch milliseconds of the shared "now" tick. */
   now: number;
   config: BoardConfig;
@@ -77,7 +75,7 @@ export function MiniCard(props: CardItemProps) {
   const domain = domainById(config)[card.domain];
   return (
     <div
-      className={"mini" + (props.dimmed ? " dimmed" : "") + (props.dropTarget ? " drop-before" : "")}
+      className={"mini" + (props.dropTarget ? " drop-before" : "")}
       draggable
       onClick={() => props.onOpen(card)}
       onDragStart={(e) => props.onDragStart(e, card)}
@@ -118,7 +116,7 @@ export function FocusCard(props: CardItemProps) {
   const acc = cardAccent(card, config);
   return (
     <div
-      className={"focus-card" + (props.dimmed ? " dimmed" : "") + (props.dropTarget ? " drop-before" : "")}
+      className={"focus-card" + (props.dropTarget ? " drop-before" : "")}
       draggable
       onClick={() => props.onOpen(card)}
       onDragStart={(e) => props.onDragStart(e, card)}

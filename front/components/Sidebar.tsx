@@ -1,7 +1,7 @@
 // The sidebar (design v11 chrome.jsx): search, live read-out, codes-projet
 // toggle, the Blocage toggle, the filter pill groups, the stats block and
-// the keyboard hints. Filters dim cards on the board, they never remove
-// them (spatial truth). Pure view over core/filters state owned by App.
+// the keyboard hints. Filters hide the cards they exclude (ADR 031); the
+// counts say how much was kept. Pure view over core/filters state owned by App.
 // The pill/section building blocks live in sidebarParts.tsx and the
 // Domaine group (with its unfoldable sub-domains, ADR 022) in
 // SidebarDomains.tsx.
@@ -26,7 +26,7 @@ export interface SidebarProps {
   onSetGroup: (group: FilterGroup, value: boolean) => void;
   /** Whole-portfolio counts (the muted reference totals). */
   stats: ViewCounts;
-  /** Counts over the visible (non-dimmed) subset. */
+  /** Counts over the visible (not hidden) subset. */
   view: ViewCounts;
   filtersActive: boolean;
   onReset: () => void;

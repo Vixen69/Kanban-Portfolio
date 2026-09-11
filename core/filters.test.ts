@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   cardMatches,
   defaultFilters,
-  dimmedCardIds,
+  hiddenCardIds,
   isFilterActive,
   portfolioCounts,
   viewCounts,
@@ -61,7 +61,7 @@ const PORTFOLIO: CardState[] = [
   ),
 ];
 
-test("default filters are neutral: every key true, blockedOnly off, nothing dimmed", () => {
+test("default filters are neutral: every key true, blockedOnly off, nothing hidden", () => {
   const filters = defaultFilters(CONFIG);
   assert.deepEqual(filters.type, { t1: true, t2: true });
   assert.deepEqual(filters.domain, { alpha: true, beta: true });
@@ -71,47 +71,47 @@ test("default filters are neutral: every key true, blockedOnly off, nothing dimm
   assert.equal(filters.noConstraint, true);
   assert.equal(filters.blockedOnly, false);
   assert.equal(isFilterActive(filters), false);
-  assert.equal(dimmedCardIds(PORTFOLIO, filters).size, 0);
+  assert.equal(hiddenCardIds(PORTFOLIO, filters).size, 0);
 });
 
 test("a blank search stays inactive", () => {
   const filters = defaultFilters(CONFIG);
   filters.search = "   ";
   assert.equal(isFilterActive(filters), false);
-  assert.equal(dimmedCardIds(PORTFOLIO, filters).size, 0);
+  assert.equal(hiddenCardIds(PORTFOLIO, filters).size, 0);
 });
 
 test("each filter dimension dims the right cards (table)", () => {
-  const cases: { name: string; mutate: (filters: FilterState) => void; dimmed: string[] }[] = [
-    { name: "search by title, case-insensitive", mutate: (f) => (f.search = "SUJET"), dimmed: ["S001", "S003"] },
-    { name: "search matches codename, trimmed", mutate: (f) => (f.search = "  px111  "), dimmed: ["S002", "S003", "S004"] },
-    { name: "search without match dims all", mutate: (f) => (f.search = "zzz"), dimmed: ["S001", "S002", "S003", "S004"] },
-    { name: "domain off", mutate: (f) => (f.domain["alpha"] = false), dimmed: ["S001", "S003"] },
+  const cases: { name: string; mutate: (filters: FilterState) => void; hidden: string[] }[] = [
+    { name: "search by title, case-insensitive", mutate: (f) => (f.search = "SUJET"), hidden: ["S001", "S003"] },
+    { name: "search matches codename, trimmed", mutate: (f) => (f.search = "  px111  "), hidden: ["S002", "S003", "S004"] },
+    { name: "search without match dims all", mutate: (f) => (f.search = "zzz"), hidden: ["S001", "S002", "S003", "S004"] },
+    { name: "domain off", mutate: (f) => (f.domain["alpha"] = false), hidden: ["S001", "S003"] },
     // A sub-domain pill dims only the card wearing it; the undetailed beta card follows its domain alone.
-    { name: "sub-domain off", mutate: (f) => (f.subDomain["beta/b1"] = false), dimmed: ["S002"] },
-    { name: "other sub-domain off dims nothing it does not own", mutate: (f) => (f.subDomain["beta/b2"] = false), dimmed: [] },
-    { name: "type off (null typeId passes)", mutate: (f) => (f.type["t1"] = false), dimmed: ["S001", "S004"] },
-    { name: "crit top off", mutate: (f) => (f.crit.top = false), dimmed: ["S001"] },
-    { name: "crit normal off", mutate: (f) => (f.crit.normal = false), dimmed: ["S002", "S004"] },
-    { name: "bloqués uniquement dims every unblocked card", mutate: (f) => (f.blockedOnly = true), dimmed: ["S001", "S002", "S004"] },
+    { name: "sub-domain off", mutate: (f) => (f.subDomain["beta/b1"] = false), hidden: ["S002"] },
+    { name: "other sub-domain off dims nothing it does not own", mutate: (f) => (f.subDomain["beta/b2"] = false), hidden: [] },
+    { name: "type off (null typeId passes)", mutate: (f) => (f.type["t1"] = false), hidden: ["S001", "S004"] },
+    { name: "crit top off", mutate: (f) => (f.crit.top = false), hidden: ["S001"] },
+    { name: "crit normal off", mutate: (f) => (f.crit.normal = false), hidden: ["S002", "S004"] },
+    { name: "bloqués uniquement dims every unblocked card", mutate: (f) => (f.blockedOnly = true), hidden: ["S001", "S002", "S004"] },
     // OR-shaped: S002 wears both constraints and survives while either pill is on.
-    { name: "constraint légale off", mutate: (f) => (f.constraint["legale"] = false), dimmed: ["S001"] },
-    { name: "constraint groupe off", mutate: (f) => (f.constraint["groupe"] = false), dimmed: ["S004"] },
+    { name: "constraint légale off", mutate: (f) => (f.constraint["legale"] = false), hidden: ["S001"] },
+    { name: "constraint groupe off", mutate: (f) => (f.constraint["groupe"] = false), hidden: ["S004"] },
     {
       name: "both constraints off leaves only the unconstrained card",
       mutate: (f) => {
         f.constraint["legale"] = false;
         f.constraint["groupe"] = false;
       },
-      dimmed: ["S001", "S002", "S004"],
+      hidden: ["S001", "S002", "S004"],
     },
-    { name: "aucune off dims the card carrying no constraint", mutate: (f) => (f.noConstraint = false), dimmed: ["S003"] },
+    { name: "aucune off dims the card carrying no constraint", mutate: (f) => (f.noConstraint = false), hidden: ["S003"] },
   ];
   for (const c of cases) {
     const filters = defaultFilters(CONFIG);
     c.mutate(filters);
     assert.equal(isFilterActive(filters), true, c.name);
-    assert.deepEqual([...dimmedCardIds(PORTFOLIO, filters)].sort(), c.dimmed, c.name);
+    assert.deepEqual([...hiddenCardIds(PORTFOLIO, filters)].sort(), c.hidden, c.name);
   }
 });
 
@@ -119,7 +119,7 @@ test("criteria combine with AND across search and groups", () => {
   const filters = defaultFilters(CONFIG);
   filters.search = "px"; // S003 has no codename and no "px" in its title
   filters.type["t1"] = false;
-  assert.deepEqual([...dimmedCardIds(PORTFOLIO, filters)].sort(), ["S001", "S003", "S004"]);
+  assert.deepEqual([...hiddenCardIds(PORTFOLIO, filters)].sort(), ["S001", "S003", "S004"]);
 });
 
 test("a key missing from a group map counts as enabled", () => {
@@ -172,11 +172,11 @@ test("isFilterActive sees a constraint pill and the aucune pill", () => {
   assert.equal(isFilterActive(aucuneOff), true);
 });
 
-test("viewCounts tallies only non-dimmed cards against the portfolio total", () => {
+test("viewCounts tallies only non-hidden cards against the portfolio total", () => {
   const filters = defaultFilters(CONFIG);
   filters.domain["beta"] = false; // dims S002 and S004 (the stale one)
-  const dimmed = dimmedCardIds(PORTFOLIO, filters);
-  assert.deepEqual(viewCounts(PORTFOLIO, dimmed, CONFIG, NOW), {
+  const hidden = hiddenCardIds(PORTFOLIO, filters);
+  assert.deepEqual(viewCounts(PORTFOLIO, hidden, CONFIG, NOW), {
     shown: 2,
     total: 4,
     blocked: 1,
@@ -204,6 +204,6 @@ test("portfolioCounts ignores filters: shown equals total", () => {
 });
 
 test("neutral viewCounts equals portfolioCounts", () => {
-  const dimmed = dimmedCardIds(PORTFOLIO, defaultFilters(CONFIG));
-  assert.deepEqual(viewCounts(PORTFOLIO, dimmed, CONFIG, NOW), portfolioCounts(PORTFOLIO, CONFIG, NOW));
+  const hidden = hiddenCardIds(PORTFOLIO, defaultFilters(CONFIG));
+  assert.deepEqual(viewCounts(PORTFOLIO, hidden, CONFIG, NOW), portfolioCounts(PORTFOLIO, CONFIG, NOW));
 });

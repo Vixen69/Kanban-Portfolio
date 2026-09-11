@@ -1,86 +1,31 @@
-// Board assembly (design grid.jsx): column headers (click to focus a
-// stage, caret to collapse it to a strip), vertical lane labels (click to
-// collapse a canal — the last expanded lane refuses), collapsed summary
-// cells with their one-click ticket popover (design v11), and the grid
-// itself. The grid templates come from core/layout — the single source of
-// truth for the focus/collapse geometry.
+// Board assembly (design grid.jsx): column headers (ColumnHeads.tsx —
+// click to focus a stage, caret to collapse it to a strip), vertical lane
+// labels (click to collapse a canal — the last expanded lane refuses),
+// collapsed summary cells with their one-click ticket popover (design
+// v11), and the grid itself. The grid templates come from core/layout —
+// the single source of truth for the focus/collapse geometry.
 //
 // Design v12: headers and canal labels wear the money/charge totals of the
 // VISIBLE cards, folded or unfolded by the two Σ toggles in the corner.
 // The column note moved to the header tooltip — the totals took its row,
 // but the note stays configurable and admin-editable (ADR 020).
+//
+// ADR 031 (author, 2026-09-11): the sidebar filters HIDE the cards they
+// exclude — cells receive the retained cards only (the v12 dimming is
+// retired) — and each column header counts them (« retenus/total » while
+// the board is narrowed).
 
 import { useMemo } from "react";
-import type { CSSProperties, DragEvent } from "react";
-import type { BoardConfig, CardState, Column, GateDef, Lane } from "../../core/types.ts";
+import type { DragEvent } from "react";
+import type { BoardConfig, CardState, Column, Lane } from "../../core/types.ts";
 import { cellCards } from "../../core/board.ts";
 import { LANE_GUTTER, columnTemplate, rowTemplate } from "../../core/layout.ts";
 import { columnTotals, emptyTotals, laneTotals, type GroupTotals } from "../../core/totals.ts";
 import { COLUMN_TOTALS_KEY, LANE_TOTALS_KEY, useStoredFlag } from "../useUiPrefs.ts";
 import { Cell } from "./Cell.tsx";
-import { ColumnTotals, LaneTotals, TotalsToggles } from "./BoardTotals.tsx";
+import { LaneTotals, TotalsToggles } from "./BoardTotals.tsx";
+import { ColumnHeads, gateDefOf } from "./ColumnHeads.tsx";
 import { CollapsedCell, CollapsedColCell } from "./CollapsedCells.tsx";
-
-// The gate definition of a column, or null when the column has no gate.
-function gateDefOf(config: BoardConfig, column: Column): GateDef | null {
-  return column.gate === null ? null : config.gateDefs[column.gate];
-}
-
-// Collapsed column: a 30px vertical strip, one click to unfold it again.
-function CollapsedColumnHead({ col, onToggleCollapse }: { col: Column; onToggleCollapse: (id: string) => void }) {
-  return (
-    <div className="col-head col-collapsed" onClick={() => onToggleCollapse(col.id)} title={"Déplier " + col.name}>
-      <span className="collapse-caret">{"›"}</span>
-      <span className="col-label-v">{col.name}</span>
-    </div>
-  );
-}
-
-/**
- * Column header. Clicking the body focuses the stage; the caret button
- * collapses the column to a 30px strip (design grid.jsx). The functional
- * note is carried by the tooltip since v12 gave its row to the totals.
- * Inputs: the column, its gate definition (null when ungated), focus and
- * collapse state, the visible totals of the column and whether they are
- * unfolded, and the callbacks (both receive the column id).
- * Output: the header element — a vertical label variant when collapsed.
- * Failure modes: none.
- */
-export function ColumnHeader({ col, gateDef, focused, colCollapsed, totals, totalsOpen, config, onFocus, onToggleCollapse }: {
-  col: Column;
-  gateDef: GateDef | null;
-  focused: boolean;
-  colCollapsed: boolean;
-  totals: GroupTotals;
-  totalsOpen: boolean;
-  config: BoardConfig;
-  onFocus: (id: string) => void;
-  onToggleCollapse: (id: string) => void;
-}) {
-  if (colCollapsed) return <CollapsedColumnHead col={col} onToggleCollapse={onToggleCollapse} />;
-  return (
-    <div
-      className={"col-head" + (focused ? " focused" : "")}
-      onClick={() => onFocus(col.id)}
-      title={col.note === "" ? "Cliquer pour focaliser ce stade" : col.note}
-    >
-      <div className="col-head-top">
-        <span className="col-label">{col.name}</span>
-        {gateDef !== null && col.gate !== null && (
-          <span className="gate-badge" style={{ "--gate": gateDef.color } as CSSProperties}>{col.gate}</span>
-        )}
-        <button
-          className="col-collapse"
-          onClick={(e) => { e.stopPropagation(); onToggleCollapse(col.id); }}
-          title={"Replier " + col.name}
-        >
-          {"‹"}
-        </button>
-      </div>
-      <ColumnTotals totals={totals} config={config} open={totalsOpen} />
-    </div>
-  );
-}
 
 /**
  * Vertical lane label; clicking collapses the canal to a summary strip.
@@ -121,8 +66,8 @@ export function LaneLabel({ lane, collapsed, disabled, totals, totalsOpen, confi
 export interface BoardGridProps {
   config: BoardConfig;
   cards: CardState[];
-  /** Ids of the cards the sidebar filters dim (dimmed, never removed). */
-  dimmedIds: Set<string>;
+  /** Ids of the cards the sidebar filters hide (ADR 031) — left off the cells. */
+  hiddenIds: Set<string>;
   focusedColumn: string | null;
   collapsedLanes: Set<string>;
   collapsedCols: Set<string>;
@@ -156,7 +101,6 @@ function BoardCell({ lane, col, cards, props }: { lane: Lane; col: Column; cards
       lane={lane}
       column={col}
       cards={cards}
-      dimmedIds={props.dimmedIds}
       focused={props.focusedColumn === col.id}
       config={props.config}
       now={props.now}
@@ -180,7 +124,8 @@ function BoardCell({ lane, col, cards, props }: { lane: Lane; col: Column; cards
 // One board row: the lane label plus one cell per column. Lane collapse
 // wins over column collapse (design grid.jsx render order). The label of
 // the last expanded lane is disabled (counted against the CURRENT config
-// lanes — collapsedLanes may hold stale ids after an admin edit).
+// lanes — collapsedLanes may hold stale ids after an admin edit). Every
+// cell — expanded or collapsed — receives the retained cards only.
 function LaneRow({ lane, props, totals, totalsOpen }: {
   lane: Lane;
   props: BoardGridProps;
@@ -195,7 +140,7 @@ function LaneRow({ lane, props, totals, totalsOpen }: {
         totals={totals} totalsOpen={totalsOpen} config={props.config}
         onToggle={() => props.onToggleLane(lane.id)} />
       {props.config.columns.map((col) => {
-        const inCell = cellCards(props.cards, lane.id, col.id);
+        const inCell = cellCards(props.cards, lane.id, col.id).filter((card) => !props.hiddenIds.has(card.id));
         if (laneCollapsed) {
           return <CollapsedCell key={col.id} cards={inCell} config={props.config} now={props.now} onOpen={props.onOpen} />;
         }
@@ -209,12 +154,12 @@ function LaneRow({ lane, props, totals, totalsOpen }: {
 }
 
 // Per-column and per-canal aggregates of the VISIBLE cards. Recomputed on
-// every filter keystroke (dimmedIds changes) but NOT on the one-second now
+// every filter keystroke (hiddenIds changes) but NOT on the one-minute now
 // tick — the totals carry no time-dependent figure, so `now` is absent
 // from the deps on purpose.
-function useVisibleTotals(cards: CardState[], dimmed: Set<string>, config: BoardConfig) {
-  const byColumn = useMemo(() => columnTotals(cards, dimmed, config), [cards, dimmed, config]);
-  const byLane = useMemo(() => laneTotals(cards, dimmed, config), [cards, dimmed, config]);
+function useVisibleTotals(cards: CardState[], hidden: Set<string>, config: BoardConfig) {
+  const byColumn = useMemo(() => columnTotals(cards, hidden, config), [cards, hidden, config]);
+  const byLane = useMemo(() => laneTotals(cards, hidden, config), [cards, hidden, config]);
   return { byColumn, byLane };
 }
 
@@ -224,7 +169,7 @@ function useVisibleTotals(cards: CardState[], dimmed: Set<string>, config: Board
  * strip or a lane to a 26px summary row — the grid templates come from
  * core/layout columnTemplate/rowTemplate. Unfolding the per-canal totals
  * widens the lane gutter to LANE_GUTTER.expanded.
- * Inputs: BoardGridProps (config, folded cards, dim/focus/collapse/drag
+ * Inputs: BoardGridProps (config, folded cards, hidden/focus/collapse/drag
  * state and the interaction callbacks).
  * Output: the .board grid element. Failure modes: none.
  */
@@ -232,7 +177,7 @@ export function BoardGrid(props: BoardGridProps) {
   const { config } = props;
   const [columnsOpen, toggleColumns] = useStoredFlag(COLUMN_TOTALS_KEY, false);
   const [lanesOpen, toggleLanes] = useStoredFlag(LANE_TOTALS_KEY, false);
-  const totals = useVisibleTotals(props.cards, props.dimmedIds, config);
+  const totals = useVisibleTotals(props.cards, props.hiddenIds, config);
   const laneWidth = lanesOpen ? LANE_GUTTER.expanded : LANE_GUTTER.compact;
   return (
     <div
@@ -246,20 +191,10 @@ export function BoardGrid(props: BoardGridProps) {
         <TotalsToggles columnsOpen={columnsOpen} lanesOpen={lanesOpen}
           onToggleColumns={toggleColumns} onToggleLanes={toggleLanes} />
       </div>
-      {config.columns.map((col) => (
-        <ColumnHeader
-          key={col.id}
-          col={col}
-          gateDef={gateDefOf(config, col)}
-          focused={props.focusedColumn === col.id}
-          colCollapsed={props.collapsedCols.has(col.id)}
-          totals={totals.byColumn[col.id] ?? emptyTotals()}
-          totalsOpen={columnsOpen}
-          config={config}
-          onFocus={props.onFocusColumn}
-          onToggleCollapse={props.onToggleColumnCollapse}
-        />
-      ))}
+      <ColumnHeads config={config} cards={props.cards} hiddenIds={props.hiddenIds}
+        focusedColumn={props.focusedColumn} collapsedCols={props.collapsedCols}
+        byColumn={totals.byColumn} totalsOpen={columnsOpen}
+        onFocus={props.onFocusColumn} onToggleCollapse={props.onToggleColumnCollapse} />
       {config.lanes.map((lane) => (
         <LaneRow key={lane.id} lane={lane} props={props}
           totals={totals.byLane[lane.id] ?? emptyTotals()} totalsOpen={lanesOpen} />

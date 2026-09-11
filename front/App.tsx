@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef } from "react";
 import type { BoardConfig, CardPatch, CardState } from "../core/types.ts";
 import { portfolioStats } from "../core/board.ts";
 import { laneNature, reconcileCardRefs } from "../core/config.ts";
-import { dimmedCardIds, portfolioCounts, viewCounts } from "../core/filters.ts";
+import { hiddenCardIds, portfolioCounts, viewCounts } from "../core/filters.ts";
 import { flowTimes, resolveFlowAnchors } from "../core/flow.ts";
 import { cardHistory } from "../core/history.ts";
 import type { DecisionInput, MoveTarget } from "./api.ts";
@@ -76,14 +76,14 @@ function useDisplayCards(cards: CardState[], config: BoardConfig): CardState[] {
 
 // Filter/count projections over the folded cards (all from core/).
 function useDerived(cards: CardState[], config: BoardConfig, filters: Filters, now: Date) {
-  const dimmed = useMemo(() => dimmedCardIds(cards, filters.state), [cards, filters.state]);
+  const hidden = useMemo(() => hiddenCardIds(cards, filters.state), [cards, filters.state]);
   const view = useMemo(
-    () => viewCounts(cards, dimmed, config, now),
-    [cards, dimmed, config, now],
+    () => viewCounts(cards, hidden, config, now),
+    [cards, hidden, config, now],
   );
   const all = useMemo(() => portfolioCounts(cards, config, now), [cards, config, now]);
   const stats = useMemo(() => portfolioStats(cards), [cards]);
-  return { dimmed, view, all, stats };
+  return { hidden, view, all, stats };
 }
 
 // One edit-form save, decomposed into its API intents in order: field
@@ -183,7 +183,7 @@ function BoardArea({ ctx }: { ctx: Ctx }) {
   const { config, ui, derived, drag, handlers } = ctx;
   return (
     <div className="board-area">
-      <BoardGrid config={config} cards={ctx.cards} dimmedIds={derived.dimmed}
+      <BoardGrid config={config} cards={ctx.cards} hiddenIds={derived.hidden}
         focusedColumn={ui.focusCol} collapsedLanes={ui.collapsedLanes}
         collapsedCols={ui.collapsedCols} now={ctx.nowMs} showCodes={ui.showCodes} showTypes={ui.showTypes}
         dragOver={ui.dragOver}

@@ -222,7 +222,9 @@ the capacity is counted in, ADR 024) and `exercise.states` (the Sciforma
 process states kept in the COUT PREV perimeter, ADR 030), `decisions` / `decisionGrounds` (the
 referential's D1–D6 and the arbitration grid's terms, ADR 026). `wip: null` shows the bare count and enforces nothing;
 a set WIP shows count/limit, warns at ≥ 80 %, reddens beyond 100 % (warns,
-never hard-blocks). An admin-panel override is persisted server-side with an
+never hard-blocks). The default model carries no WIP limit since ADR 031
+(the provisional values were removed; limits are calibrated later from real
+flow). An admin-panel override is persisted server-side with an
 append-only history; « Réinitialiser le modèle » returns to board.json
 (ADR 013). Diacritics in display names come from the config as-is.
 
@@ -264,8 +266,10 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
   pills (config-driven + a synthetic « Aucune »; OR-shaped — a card stays
   lit while ANY of its constraints is on), « Bloqués uniquement » toggle,
   filters by type / criticality / domain with tout·rien; live shown/total
-  counts. Filters dim, never remove (spatial truth). No nature filter (v11):
-  nature is the canal.
+  counts. Filters hide (ADR 031, author's call 2026-09-11 — v12's « dim,
+  never remove » is retired): only the retained cards stay on the board,
+  and each column header counts them (« retenus/total » while narrowed).
+  No nature filter (v11): nature is the canal.
 - All UI strings in French, exactly as written in config.
 - Card movement: drag and drop plus keyboard fallback. Every move POSTs an
   intent; the middle writes the event with server-assigned actor/ts.
