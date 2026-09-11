@@ -80,6 +80,16 @@ test("each retained project: title without its code, type through the aliases, d
   assert.equal(byId.get("PE10001")?.budgetRdli, null, "amounts of this file are not read into the card");
 });
 
+test("ADR 034: the « Charge » rows of the retained projects give the days by cost centre", () => {
+  const { table } = couts();
+  assert.deepEqual(table.charges, [
+    { projectId: "PE10001", centre: "CdP INFRA BUILD", jh: 40, done: 25 },
+    { projectId: "PE10002", centre: "Concept.Dév.", jh: 30, done: 10 },
+    { projectId: "PE10003", centre: "Architecte", jh: 15, done: 18 },
+    { projectId: "PE10017", centre: "Concept.Dév.", jh: 3, done: 0 },
+  ], "Prestation / Licence rows carry no days; excluded projects carry nothing");
+});
+
 test("the ME test: a project whose four ME cells are empty or zero on every row is cancelled in fact", () => {
   const { table } = couts();
   assert.equal(table.byId.has("PE10015"), false, "0 / 0 / 0,00 € then all empty");

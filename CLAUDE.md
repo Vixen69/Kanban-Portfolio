@@ -295,7 +295,9 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
   transverses (matrix domain × consumer domain), charge par domaine, charge
   par profil, **types de ressource** (the plan de charge's métiers, generic
   demand « à pourvoir » included, pressure = (planned + generic) / capacity
-  — ADR 033), cartes qui pèsent (top 5 per transverse domain), **personnes
+  — ADR 033; next to it the COUT PREV « Charge » days of the same cost
+  centre, the second reading of one demand — ADR 034), cartes qui pèsent
+  (top 5 per transverse domain), **personnes
   en tension** (every person at or above `capacity.tension`, métier shown,
   red beyond 100 %, métier roll-up), couverture des chiffres. Annual
   reading (planned j.h vs each person's declared « Disponible » line — no

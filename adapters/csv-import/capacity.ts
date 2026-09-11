@@ -8,7 +8,8 @@
 // Person ids are opaque (a hash of the matricule): the matricule itself
 // never leaves the run, and the event log only ever sees the id.
 
-import type { Assignment, BoardConfig, CapacitySnapshot, GenericDemand, Person } from "../../core/types.ts";
+import type { Assignment, BoardConfig, CapacitySnapshot, CoutsDemand, GenericDemand, Person } from "../../core/types.ts";
+import type { CoutsTable } from "./couts.ts";
 import { normalizeLabel } from "./normalize.ts";
 import { createDomainLookup } from "./domains.ts";
 import type { Lookup } from "./domains.ts";
@@ -43,6 +44,9 @@ export interface CapacityStats {
   /** Non-nominative project rows set aside from the persons, and their load. */
   genericRows: number;
   genericJh: number;
+  /** COUT PREV « Charge » rows on the cards, and their days (ADR 034; 0 without the file). */
+  coutsRows: number;
+  coutsJh: number;
 }
 
 /** The built snapshot with its counters. */
@@ -108,14 +112,15 @@ function personOf(entry: PdcPerson, id: string, hit: DomainHit): Person {
  * Inputs: the Ress.Profils table (nullable — domain fallback only), the PdC
  * table (nullable), the cards (their `pdcKey` names the PdC project they
  * joined), the config (exercise year, domains), the report, the PARAM
- * table (nullable — organisation path → domain).
+ * table (nullable — organisation path → domain), the COUT PREV table
+ * (nullable — its « Charge » rows become the second demand, ADR 034).
  * Outputs: the snapshot + stats, or null without a plan de charge; side
  * effects: a signalement when an assignment names an unknown matricule.
  * Failure: none.
  */
 export function buildCapacity(
   profils: ProfilsTable | null, pdc: PdcTable | null, cards: readonly EnrichedCard[],
-  config: BoardConfig, report: ImportReport, param: ParamTable | null,
+  config: BoardConfig, report: ImportReport, param: ParamTable | null, couts: CoutsTable | null = null,
 ): CapacityBuild | null {
   if (pdc === null) return null;
   const domainLookup = createDomainLookup(config);
@@ -131,8 +136,22 @@ export function buildCapacity(
   }
   const assignments = collectAssignments(pdc, cards, idByMatricule, report);
   const generic = collectGeneric(pdc, cards, param, domainLookup, profils);
-  const snapshot: CapacitySnapshot = { exerciseYear: config.exercise.year, persons, assignments, generic };
+  const coutsDemand = collectCoutsDemand(couts, cards);
+  const snapshot: CapacitySnapshot = { exerciseYear: config.exercise.year, persons, assignments, generic, coutsDemand };
   return { snapshot, stats: statsOf(snapshot, cards, pdc, via) };
+}
+
+// The COUT PREV « Charge » rows of the retained projects as demand by cost
+// centre, on the card the project became (ADR 034).
+function collectCoutsDemand(couts: CoutsTable | null, cards: readonly EnrichedCard[]): CoutsDemand[] {
+  if (couts === null) return [];
+  const cardByCode = new Map<string, string>();
+  for (const card of cards) {
+    if (card.codename !== null) cardByCode.set(normalizeLabel(card.codename), cardId(card));
+  }
+  return couts.charges.map((c): CoutsDemand => ({
+    centre: c.centre, cardId: cardByCode.get(normalizeLabel(c.projectId)) ?? null, jh: c.jh, done: c.done,
+  }));
 }
 
 // The non-nominative rows as demand « à pourvoir » (ADR 033): by métier,
@@ -180,8 +199,9 @@ function statsOf(
 ): CapacityStats {
   const round2 = (v: number): number => Math.round(v * 100) / 100;
   const covered = new Set(snapshot.assignments.map((a) => a.cardId));
-  const sums = { capacityJh: 0, demandJh: 0, plannedJh: 0, doneAllJh: 0 };
+  const sums = { capacityJh: 0, demandJh: 0, plannedJh: 0, doneAllJh: 0, coutsJh: 0 };
   for (const assignment of snapshot.assignments) sums.demandJh = round2(sums.demandJh + assignment.jh);
+  for (const demand of snapshot.coutsDemand ?? []) sums.coutsJh = round2(sums.coutsJh + demand.jh);
   for (const person of snapshot.persons) {
     sums.capacityJh = round2(sums.capacityJh + (person.capacityJh ?? 0));
     sums.plannedJh = round2(sums.plannedJh + (person.plannedJh ?? 0));
@@ -196,6 +216,7 @@ function statsOf(
     cardsCovered: cards.filter((card) => covered.has(cardId(card))).length,
     genericRows: pdc.excluded.generic + pdc.excluded.zz + pdc.excluded.roles,
     genericJh: pdc.excluded.jh,
+    coutsRows: snapshot.coutsDemand?.length ?? 0,
     ...sums,
   };
 }

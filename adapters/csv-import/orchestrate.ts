@@ -109,7 +109,7 @@ export function runImportAudit(files: InputFile[], config: BoardConfig, now: Dat
   const cards = assembleCards(projets, jalons, sp, config, report);
   const ownerStats = attachOwners(cards, cdp, report);
   const chargeStats = attachCharges(cards?.cards ?? [], pdc, report, config.exercise.year);
-  const capacity = buildCapacity(profils, pdc, cards?.cards ?? [], config, report, param);
+  const capacity = buildCapacity(profils, pdc, cards?.cards ?? [], config, report, param, perimeter.couts);
   emitMissing(report, {
     param: param !== null, couts: perimeter.couts !== null, projets: perimeter.onglet !== null, jalons: jalons !== null,
     sp: sp !== null, pdc: pdc !== null, profils: profils !== null, cdp: cdp !== null,

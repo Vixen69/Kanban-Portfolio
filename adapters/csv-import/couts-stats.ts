@@ -32,6 +32,17 @@ export interface CoutsStats {
   domainUnknown: number;
 }
 
+/** One « Charge » row family of a retained project: days by cost centre (ADR 034). */
+export interface CoutsCharge {
+  projectId: string;
+  /** « Centre de coût » as exported — the type of resource. */
+  centre: string;
+  /** « Charge finale ME (Res) (J) » summed on the exercise year. */
+  jh: number;
+  /** « Charge réelle ME (Res) (J) » summed on the exercise year. */
+  done: number;
+}
+
 /** Codes present on one side only, when both COUT PREV and Projets came. */
 export interface PerimeterCheck {
   coutsFile: string;

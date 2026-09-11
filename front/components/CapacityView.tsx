@@ -96,6 +96,7 @@ function Kpis({ readout }: { readout: CapacityReadout }) {
         tone={kpis.overJh > 0 ? "alert" : "ok"} />
       <Kpi num={fmtUnit(kpis.genericJh)} unit="j.h" label="À pourvoir · charge sans personne nommée"
         tone={kpis.genericJh > 0 ? "warn" : null} />
+      <Kpi num={fmtUnit(kpis.coutsJh)} unit="j.h" label="Demande COUT PREV · lignes « Charge » des cartes" />
     </div>
   );
 }

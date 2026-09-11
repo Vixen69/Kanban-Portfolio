@@ -120,7 +120,8 @@ function capacityStatus(data: AssemblyData): string {
     ` · domaine ${s.persons - s.domainUnknown}/${s.persons} (Organisation → PARAM ${s.domainViaPath}${viaProfils})` +
     ` · affectations : ${s.assignments} sur ${s.cardsCovered} carte(s)` +
     ` · demande du tableau ${formatJh(s.demandJh)} j.h · projeté (tout le plan de charge) ${formatJh(s.plannedJh)} j.h` +
-    ` · réalisé ${formatJh(s.doneAllJh)} j.h`;
+    ` · réalisé ${formatJh(s.doneAllJh)} j.h` +
+    (s.coutsRows > 0 ? ` · demande COUT PREV sur les cartes ${formatJh(s.coutsJh)} j.h (${s.coutsRows} ligne(s) « Charge »)` : "");
 }
 
 function paramStatus(param: ParamTable | null): string {

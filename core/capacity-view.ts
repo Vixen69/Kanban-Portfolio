@@ -44,6 +44,8 @@ export interface CapacityKpis {
   overJh: number;
   /** Generic demand nobody carries — the « à pourvoir », j.h (ADR 033). */
   genericJh: number;
+  /** COUT PREV « Charge » days on the cards — the second reading of the demand, j.h (ADR 034). */
+  coutsJh: number;
   /** demandJh / capacityJh, null when no capacity is known. */
   ratio: number | null;
   /** plannedJh / capacityJh — the real engagement; null when unknown. */
@@ -188,10 +190,12 @@ function kpisOf(
   const planKnown = loads.length > sums.withoutPlan;
   let genericJh = 0;
   for (const row of snapshot.generic ?? []) genericJh = round2(genericJh + row.jh);
+  let coutsJh = 0;
+  for (const row of snapshot.coutsDemand ?? []) coutsJh = round2(coutsJh + row.jh);
   return {
     persons: snapshot.persons.length,
     external: snapshot.persons.filter((person) => person.external).length,
-    ...sums, genericJh,
+    ...sums, genericJh, coutsJh,
     ratio: ratioOf(sums.demandJh, sums.capacityJh),
     engagement: planKnown ? ratioOf(sums.plannedJh, sums.capacityJh) : null,
     perimeterShare: ratioOf(sums.demandJh, sums.plannedJh),

@@ -10,6 +10,7 @@ import { readFileSync } from "node:fs";
 import type { BoardConfig } from "../../core/types.ts";
 import { runImportAudit } from "./orchestrate.ts";
 import type { InputFile } from "./orchestrate.ts";
+import { cardId } from "./to-cards.ts";
 
 const CONFIG = JSON.parse(
   readFileSync(new URL("../../config/board.json", import.meta.url), "utf8"),
@@ -195,6 +196,16 @@ test("the COUT PREV export is the perimeter when present; the Projets onglet onl
   assert.equal(byCode.has("PE10009"), false, "« Budget présenté » is outside the retained states");
   assert.equal(byCode.get("PE10003")?.typeId, "atlas", "the author's fifth type, read through its alias");
   assert.ok(report.doubtful.some((d) => /codes retenus hors PE : 1 \(MEWTBN7Q\)/.test(d.question)));
+});
+
+test("ADR 034: the COUT PREV « Charge » rows reach the snapshot as demand by cost centre, on the cards", () => {
+  const { report, capacity, cards } = audit([...ALL, "Couts.csv"].map(fixture));
+  const codeOf = new Map(cards?.cards.map((c) => [cardId(c), c.codename]));
+  assert.deepEqual(capacity?.snapshot.coutsDemand?.map((d) => [d.centre, codeOf.get(d.cardId ?? ""), d.jh, d.done]), [
+    ["CdP INFRA BUILD", "PE10001", 40, 25], ["Concept.Dév.", "PE10002", 30, 10], ["Architecte", "PE10003", 15, 18], ["Concept.Dév.", "PE10017", 3, 0],
+  ]);
+  const byLabel = new Map(report.assembly.map((a) => [a.subject, a.status]));
+  assert.match(byLabel.get("capacité") ?? "", /demande COUT PREV sur les cartes 88 j\.h \(4 ligne\(s\) « Charge »\)$/);
 });
 
 test("with COUT PREV as perimeter, a Projets onglet carrying Responsable lends its chefs de projet when no ProjetsCdP came", () => {

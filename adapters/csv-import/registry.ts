@@ -25,9 +25,11 @@ export const COUTS_CONTRACT: FileContract = {
   optional: [
     "Projet.Portefeuille", "Projet.Actif",
     "Charge finale ME (Res) (J)", "Charge réelle ME (Res) (J)", "Coût final ME (Res ouTrans)", "Coût réel ME (Res ouTrans)",
+    // ADR 034: the « Charge » rows' days by cost centre — the macro's appel de charges, cross-checked with the PdC.
+    "Type de centre de coût", "Centre de coût",
   ],
   ignored: [
-    "Fichier", "Type de centre de coût", "Centre de coût", "Projet. Entité payeur", "Projet.Entité payeur mutualisée",
+    "Fichier", "Projet. Entité payeur", "Projet.Entité payeur mutualisée",
     "Projet.Nature du projet", "Projet.Etat du budget", "Projet.Criticité", "Projet.Priorité", "Projet.Score criblage",
     "Projet.Responsable 1", "Portefeuille.Responsable 1", "Date d'export",
   ],

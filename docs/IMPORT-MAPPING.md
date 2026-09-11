@@ -433,9 +433,12 @@ l'onglet Projets ne sert plus qu'au recoupement.
 
 Contrat `couts` : requis « Projet. Id », « Projet. Nom », « Projet.Type »,
 « Projet.Etat du processus », « Année » ; optionnels « Projet.Portefeuille »,
-« Projet.Actif » et les quatre cellules ME (Charge finale ME (Res) (J),
+« Projet.Actif », les quatre cellules ME (Charge finale ME (Res) (J),
 Charge réelle ME (Res) (J), Coût final ME (Res ouTrans), Coût réel ME (Res
-ouTrans) — testées, jamais lues dans une carte) ; tout le reste (entités
+ouTrans) — testées, jamais lues dans une carte) et, depuis l'ADR 034,
+« Type de centre de coût » et « Centre de coût » (les lignes « Charge » des
+projets retenus donnent la **demande par centre de coût**, recoupée avec le
+plan de charge dans la vue ☷ — jamais dans les cartes) ; tout le reste (entités
 payeuses, nature, criticité, priorité, score, **« Projet.Responsable 1 »**,
 date d'export) est déclaré ignoré : **jamais lu**. Les espaces autour d'un
 point sont ignorés dans les en-têtes (« Projet. Id » ≡ « Projet.Id »).

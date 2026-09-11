@@ -30,19 +30,21 @@ import { doubt, warn } from "./report.ts";
 import type { ImportReport, RowRef } from "./report.ts";
 import type { ProjetEntry, ProjetsTable } from "./projets.ts";
 import { excludedSummary } from "./couts-stats.ts";
-import type { CoutsStats } from "./couts-stats.ts";
+import type { CoutsCharge, CoutsStats } from "./couts-stats.ts";
 
 export { checkPerimeters, excludedSummary } from "./couts-stats.ts";
-export type { CoutsExcluded, CoutsStats, PerimeterCheck } from "./couts-stats.ts";
+export type { CoutsCharge, CoutsExcluded, CoutsStats, PerimeterCheck } from "./couts-stats.ts";
 
 /** The four ME cells whose non-zero presence keeps a project alive. */
 export const ME_COLUMNS = [
   "Charge finale ME (Res) (J)", "Charge réelle ME (Res) (J)", "Coût final ME (Res ouTrans)", "Coût réel ME (Res ouTrans)",
 ] as const;
 
-/** The perimeter read from COUT PREV: a ProjetsTable plus its counters. */
+/** The perimeter read from COUT PREV: a ProjetsTable plus its counters and
+ * the « Charge » rows of the retained projects (ADR 034). */
 export interface CoutsTable extends ProjetsTable {
   stats: CoutsStats;
+  charges: CoutsCharge[];
 }
 
 interface Seen {
@@ -55,6 +57,8 @@ interface Seen {
   actif: string;
   onYear: boolean;
   hasMe: boolean;
+  /** « Charge » rows of the exercise year by cost centre (normalized key). */
+  charges: Map<string, { centre: string; jh: number; done: number }>;
   ref: RowRef;
 }
 
@@ -69,6 +73,7 @@ interface CoutsContext {
   resolve: (portfolio: string) => PortfolioHit | null;
   seen: Map<string, Seen>;
   stats: CoutsStats;
+  charges: CoutsCharge[];
   nonPe: string[];
   unknownPortfolios: Map<string, Tally>;
   tallies: Map<string, Tally>;
@@ -104,7 +109,7 @@ export function parseCouts(
       excluded: { noYear: 0, etat: new Map(), type: new Map(), arbitrage: 0, noMe: 0 },
       inactive: 0, nonPe: 0, domainResolved: 0, domainUnknown: 0,
     },
-    nonPe: [], unknownPortfolios: new Map(), tallies: new Map(),
+    charges: [], nonPe: [], unknownPortfolios: new Map(), tallies: new Map(),
   };
   for (const row of rows) readRow(ctx, row);
   const entries: ProjetEntry[] = [];
@@ -124,12 +129,13 @@ export function parseCouts(
       subDetailed: entries.filter((e) => e.subDomainId !== null).length, subFolded: 0, withOwner: 0, leadsExcluded: 0,
     },
     stats: ctx.stats,
+    charges: ctx.charges,
   };
 }
 
 // One row: counted, then folded into its project (first row's facts win;
-// the year and ME presence accumulate; later names are checked for
-// divergence).
+// the year, ME presence and « Charge » days accumulate; later names are
+// checked for divergence).
 function readRow(ctx: CoutsContext, row: CsvRow): void {
   if (row.cells.every((c) => c.trim() === "")) return;
   ctx.stats.rows++;
@@ -148,14 +154,36 @@ function readRow(ctx: CoutsContext, row: CsvRow): void {
     existing.onYear = existing.onYear || onYear;
     existing.hasMe = existing.hasMe || hasMe;
     if (name !== "") existing.names.add(name);
+    if (onYear) foldCharge(ctx, row, existing);
     return;
   }
-  ctx.seen.set(id, {
+  const seen: Seen = {
     id, name, names: new Set(name === "" ? [] : [name]),
     type: cell(ctx, row, "Projet.Type"), etat: cell(ctx, row, "Projet.Etat du processus"),
     portfolio: cell(ctx, row, "Projet.Portefeuille"), actif: cell(ctx, row, "Projet.Actif"),
-    onYear, hasMe, ref: { file: ctx.fileName, line: row.line },
-  });
+    onYear, hasMe, charges: new Map(), ref: { file: ctx.fileName, line: row.line },
+  };
+  ctx.seen.set(id, seen);
+  if (onYear) foldCharge(ctx, row, seen);
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+// A « Charge » row (« Type de centre de coût ») adds its days to the
+// project's cost centre — the macro's « appel de charges » (ADR 034): days
+// = « Charge finale ME (Res) (J) », done = « Charge réelle ME (Res) (J) ».
+function foldCharge(ctx: CoutsContext, row: CsvRow, seen: Seen): void {
+  if (!normalizeLabel(cell(ctx, row, "Type de centre de coût")).startsWith("charge")) return;
+  const centre = cell(ctx, row, "Centre de coût") || "(Sans centre de coût)";
+  const jh = parseFrenchAmount(cell(ctx, row, "Charge finale ME (Res) (J)"));
+  const done = parseFrenchAmount(cell(ctx, row, "Charge réelle ME (Res) (J)"));
+  const key = normalizeLabel(centre);
+  const bucket = seen.charges.get(key) ?? { centre, jh: 0, done: 0 };
+  bucket.jh = round2(bucket.jh + (jh.kind === "value" ? jh.value : 0));
+  bucket.done = round2(bucket.done + (done.kind === "value" ? done.value : 0));
+  seen.charges.set(key, bucket);
 }
 
 // At least one of the four ME cells carries a non-zero figure; an
@@ -214,6 +242,7 @@ function decide(ctx: CoutsContext, seen: Seen): ProjetEntry | null {
 }
 
 function buildEntry(ctx: CoutsContext, seen: Seen, typeId: string): ProjetEntry {
+  for (const c of seen.charges.values()) ctx.charges.push({ projectId: seen.id, centre: c.centre, jh: c.jh, done: c.done });
   const hit = ctx.resolve(seen.portfolio);
   if (hit === null) {
     ctx.stats.domainUnknown++;

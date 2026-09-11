@@ -637,6 +637,20 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-11 (nuit) — La demande COUT PREV par centre de coût, recoupée au PdC (ADR 034)
+
+- **Décision de l'auteur** après la lecture détaillée de la macro PDSI :
+  « juste la demande COUT PREV, le fichier on l'a déjà, on tente le
+  recoupement » — pas de capacité démontrée N-1 pour l'instant.
+- Le lecteur COUT PREV capte les lignes **« Charge »** des projets retenus :
+  jours par (projet, **centre de coût**) — `Charge finale ME (Res) (J)` /
+  `Charge réelle ME (Res) (J)`. Elles entrent dans le snapshot
+  (`coutsDemand`, facultatif), jamais dans les cartes.
+- « Types de ressource » : le centre de coût rejoint le **métier** de même
+  libellé (clé normalisée) ; deux colonnes de plus, **COUT PREV j.h** et
+  **pression COUT PREV**, à côté du projeté PdC. KPI « Demande COUT PREV » ;
+  ligne « capacité » du rapport complétée.
+
 ### 2026-09-11 (nuit) — Criticité : ★ Top, • Majeur, cochée à la main dans la fiche
 
 - **Pictos** (décision auteur) : plus de couronne ; **★** = Top, **•** = Majeur
