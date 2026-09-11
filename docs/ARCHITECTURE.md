@@ -650,6 +650,13 @@ de son ADR.
   libellé (clé normalisée) ; deux colonnes de plus, **COUT PREV j.h** et
   **pression COUT PREV**, à côté du projeté PdC. KPI « Demande COUT PREV » ;
   ligne « capacité » du rapport complétée.
+- **Cartes qui pèsent sur les transverses**, précisé par l'auteur : tout
+  projet, quel que soit son portefeuille, qui prend des jours aux
+  ressources A&D / INFRA, rapporté à la **capacité totale** du domaine. La
+  liste est désormais **entière** (plus de top 5, défilement) et compte
+  aussi la charge **générique** du domaine (« dont à pourvoir ») ; l'en-tête
+  de chaque domaine donne sa capacité et le total que les cartes lui
+  prennent.
 
 ### 2026-09-11 (nuit) — Criticité : ★ Top, • Majeur, cochée à la main dans la fiche
 

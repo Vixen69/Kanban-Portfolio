@@ -39,6 +39,12 @@ chacune (auteur).
    personne est sa ligne « Disponible ». `ETP_JH` ne sert plus qu'au repli
    Ress.Profils (disponibilité en ETP) et aux fixtures.
 
+5. **Cartes qui pèsent sur les transverses** (précision de l'auteur, même
+   nuit) : toute carte, quel que soit son portefeuille, qui prend des jours
+   aux ressources du domaine transverse — ses personnes nommées **et** ses
+   lignes génériques — rapportés à la capacité totale du domaine. Liste
+   entière, les plus lourdes d'abord ; part générique dite.
+
 ## Conséquences
 
 - `core/capacity-metiers.ts` (nouveau), `capacity-levers.ts` (seuil,

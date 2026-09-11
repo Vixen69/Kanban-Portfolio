@@ -106,29 +106,38 @@ export function TransversePanel({ rows }: { rows: TransverseRow[] }) {
 }
 
 /**
- * Cartes qui pèsent: per transverse domain, the heaviest cards on its
- * people — title, code, requesting domain, j.h and share of the capacity.
+ * Cartes qui pèsent: per transverse domain, EVERY card taking days from
+ * its resources — named persons and generic rows — whatever the card's own
+ * domain (author, 2026-09-11), heaviest first: title, code, requesting
+ * domain, j.h (generic part said) and share of the domain's capacity; the
+ * domain's capacity and the cards' total on top.
  * Inputs: the weighing rows. Output: the (wide) panel. Failure: none.
  */
 export function WeighingPanel({ rows }: { rows: WeighingRow[] }) {
   return (
     <Panel title="Cartes qui pèsent sur les transverses" wide
-      hint="les leviers d’un arbitrage : pause, requalification, arrêt">
+      hint="toutes les cartes qui prennent des jours aux ressources du domaine, quel que soit leur portefeuille · part de la capacité du domaine · les leviers d’un arbitrage : pause, requalification, arrêt">
       {rows.length === 0 && <div className="mp-empty">Aucun domaine transverse dans la configuration.</div>}
       {rows.map((row) => (
         <div key={row.domainId}>
-          <div className="cap-sub">{row.name}</div>
+          <div className="cap-sub">
+            {row.name} · capacité {fmtUnit(row.capacityJh)} j.h · les cartes lui prennent {fmtUnit(row.totalJh)} j.h ({pct(row.share)})
+          </div>
           {row.cards.length === 0 && <div className="mp-empty">Aucune affectation sur ce domaine.</div>}
-          {row.cards.map((card) => (
-            <div className="cap-item" key={card.cardId}>
-              <span className="cap-name">{card.title}</span>
-              <span className="cap-meta">
-                <i className="lg-sw" style={{ background: card.domainColor }} />{card.domainName}
-                {card.codename !== null && ` · ${card.codename}`}
-              </span>
-              <span className="cap-fig"><b>{fmtUnit(card.jh)} j.h</b> · {pct(card.share)} de la capacité</span>
-            </div>
-          ))}
+          <div className="cap-list">
+            {row.cards.map((card) => (
+              <div className="cap-item" key={card.cardId}>
+                <span className="cap-name">{card.title}</span>
+                <span className="cap-meta">
+                  <i className="lg-sw" style={{ background: card.domainColor }} />{card.domainName}
+                  {card.codename !== null && ` · ${card.codename}`}
+                </span>
+                <span className="cap-fig">
+                  <b>{fmtUnit(card.jh)} j.h</b>{card.genericJh > 0 && ` (dont ${fmtUnit(card.genericJh)} à pourvoir)`} · {pct(card.share)} de la capacité
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       ))}
     </Panel>

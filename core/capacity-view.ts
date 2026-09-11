@@ -139,12 +139,14 @@ export function yearElapsed(now: Date, year: number): number {
  * Inputs: the snapshot, the folded cards shown on the board (their domain
  * and charges), the config (domain/profile order, names, colors,
  * `transverse` flags), now (the elapsed share of the year), the number of
- * weighing cards per transverse domain.
+ * weighing cards per transverse domain (every one by default — author,
+ * 2026-09-11).
  * Output: the CapacityReadout. Failure: none — an empty snapshot yields
  * zeroed figures and empty lists.
  */
 export function computeCapacityReadout(
-  snapshot: CapacitySnapshot, cards: readonly CardState[], config: BoardConfig, now: Date, topCards = 5,
+  snapshot: CapacitySnapshot, cards: readonly CardState[], config: BoardConfig, now: Date,
+  topCards = Number.POSITIVE_INFINITY,
 ): CapacityReadout {
   const loads = personLoads(snapshot);
   const cardIds = new Set(cards.map((card) => card.id));

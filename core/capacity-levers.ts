@@ -17,22 +17,31 @@ function ratioOf(demand: number, capacity: number): number | null {
   return capacity > 0 ? round2(demand / capacity) : null;
 }
 
-/** A card weighing on a transverse domain. */
+/** A card weighing on a transverse domain — whatever the card's own domain. */
 export interface WeighingCard {
   cardId: string;
   title: string;
   codename: string | null;
   domainName: string;
   domainColor: string;
+  /** Days the card takes from the domain's resources: named persons + generic rows, j.h. */
   jh: number;
+  /** Part of jh carried by no named person (generic rows of the domain, ADR 033). */
+  genericJh: number;
   /** jh / the transverse domain's capacity, null when unknown. */
   share: number | null;
 }
 
-/** The heaviest cards on one transverse domain. */
+/** Every card weighing on one transverse domain, heaviest first. */
 export interface WeighingRow {
   domainId: string;
   name: string;
+  /** Capacity of the domain's people (their « Disponible » lines), j.h. */
+  capacityJh: number;
+  /** Days every board card takes from the domain's resources, j.h. */
+  totalJh: number;
+  /** totalJh / capacityJh, null when unknown. */
+  share: number | null;
   cards: WeighingCard[];
 }
 
@@ -63,10 +72,15 @@ export interface Coverage {
 }
 
 /**
- * The cards that weigh most on one transverse domain's people.
+ * The cards that weigh on one transverse domain's resources — whatever
+ * portfolio the card belongs to (author, 2026-09-11: a SOUTIEN project
+ * taking 200 j of CdP A&D weighs on A&D). Resources = the domain's named
+ * persons (by their organisation) plus the domain's generic rows (ADR
+ * 033); weight = days on the card, share = weight / the domain's capacity.
  * Inputs: the domain id and name, the snapshot, the folded cards, the
- * config (card domain names/colors), how many cards to keep.
- * Output: the heaviest cards with their share of the domain's capacity.
+ * config (card domain names/colors), how many cards to keep (Infinity =
+ * every one).
+ * Output: the cards, heaviest first, with the domain's capacity and total.
  * Failure: none.
  */
 export function weighingFor(
@@ -80,23 +94,46 @@ export function weighingFor(
   for (const person of snapshot.persons) {
     if (people.has(person.id)) capacityJh = round2(capacityJh + (person.capacityJh ?? 0));
   }
-  const perCard = new Map<string, number>();
-  for (const assignment of snapshot.assignments) {
-    if (!people.has(assignment.personId) || !cardById.has(assignment.cardId)) continue;
-    perCard.set(assignment.cardId, round2((perCard.get(assignment.cardId) ?? 0) + assignment.jh));
-  }
-  const list = [...perCard.entries()].sort((a, b) => b[1] - a[1]).slice(0, top)
-    .flatMap(([cardId, jh]): WeighingCard[] => {
+  const perCard = weightsOn(domainId, people, snapshot, cardById);
+  let totalJh = 0;
+  for (const entry of perCard.values()) totalJh = round2(totalJh + entry.jh);
+  const list = [...perCard.entries()].sort((a, b) => b[1].jh - a[1].jh).slice(0, top)
+    .flatMap(([cardId, entry]): WeighingCard[] => {
       const card = cardById.get(cardId);
       if (card === undefined) return [];
       const cardDomain = domains.get(card.domain);
       return [{
         cardId, title: card.title, codename: card.codename,
         domainName: cardDomain?.name ?? card.domain, domainColor: cardDomain?.color ?? NEUTRAL,
-        jh, share: ratioOf(jh, capacityJh),
+        jh: entry.jh, genericJh: entry.genericJh, share: ratioOf(entry.jh, capacityJh),
       }];
     });
-  return { domainId, name, cards: list };
+  return { domainId, name, capacityJh, totalJh, share: ratioOf(totalJh, capacityJh), cards: list };
+}
+
+// Days each board card takes from a domain's resources: its named
+// persons' assignments plus its generic rows (kept apart in genericJh).
+function weightsOn(
+  domainId: string, people: Set<string>, snapshot: CapacitySnapshot, cardById: Map<string, CardState>,
+): Map<string, { jh: number; genericJh: number }> {
+  const perCard = new Map<string, { jh: number; genericJh: number }>();
+  const bucket = (cardId: string): { jh: number; genericJh: number } => {
+    const entry = perCard.get(cardId) ?? { jh: 0, genericJh: 0 };
+    perCard.set(cardId, entry);
+    return entry;
+  };
+  for (const assignment of snapshot.assignments) {
+    if (!people.has(assignment.personId) || !cardById.has(assignment.cardId)) continue;
+    const entry = bucket(assignment.cardId);
+    entry.jh = round2(entry.jh + assignment.jh);
+  }
+  for (const row of snapshot.generic ?? []) {
+    if (row.domain !== domainId || row.cardId === null || !cardById.has(row.cardId)) continue;
+    const entry = bucket(row.cardId);
+    entry.jh = round2(entry.jh + row.jh);
+    entry.genericJh = round2(entry.genericJh + row.jh);
+  }
+  return perCard;
 }
 
 /**

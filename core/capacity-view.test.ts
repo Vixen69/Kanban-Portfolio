@@ -96,11 +96,22 @@ test("profile rows follow the config order, then the persons without profile", (
 });
 
 test("the cards weighing on a transverse domain, with their share of its capacity", () => {
-  assert.deepEqual(READOUT.weighing.map((row) => [row.domainId, row.cards.map((c) => [c.cardId, c.title, c.domainName, c.jh, c.share])]), [
-    ["beta", [["S001", "Atelier", "Alpha", 120, 0.5], ["S002", "Portail", "Beta", 90, 0.38]]],
+  assert.deepEqual(READOUT.weighing.map((row) => [row.domainId, row.capacityJh, row.totalJh, row.share, row.cards.map((c) => [c.cardId, c.title, c.domainName, c.jh, c.share])]), [
+    ["beta", 240, 210, 0.88, [["S001", "Atelier", "Alpha", 120, 0.5], ["S002", "Portail", "Beta", 90, 0.38]]],
   ]);
   const top1 = computeCapacityReadout(SNAPSHOT, CARDS, CONFIG, NOW, 1);
   assert.equal(top1.weighing[0]?.cards.length, 1);
+  // ADR 033: the domain's generic rows weigh on it too — a card of another
+  // domain taking generic A&D days still shows, its share against the same capacity.
+  const withGeneric: CapacitySnapshot = { ...SNAPSHOT, generic: [
+    { metier: "CdP Beta", domain: "beta", cardId: "S003", jh: 60, done: 0 },
+    { metier: "CdP Beta", domain: "beta", cardId: "S001", jh: 12, done: 0 },
+    { metier: "CdP Alpha", domain: "alpha", cardId: "S001", jh: 99, done: 0 },
+  ] };
+  const row = computeCapacityReadout(withGeneric, CARDS, CONFIG, NOW).weighing[0];
+  assert.deepEqual([row?.totalJh, row?.share, row?.cards.map((c) => [c.cardId, c.jh, c.genericJh, c.share])], [
+    282, 1.18, [["S001", 132, 12, 0.55], ["S002", 90, 0, 0.38], ["S003", 60, 60, 0.25]],
+  ]);
 });
 
 test("overloads rank on the whole-plan engagement, most loaded first, names resolved", () => {
@@ -161,5 +172,5 @@ test("an empty snapshot reads as zeros, not NaN", () => {
     overloaded: 0, cardsWithoutAssignment: 0, withoutPlan: 0,
   });
   assert.deepEqual(empty.transverse.map((row) => [row.name, row.consumers, row.engagement]), [["Beta", [], null]]);
-  assert.deepEqual(empty.weighing, [{ domainId: "beta", name: "Beta", cards: [] }]);
+  assert.deepEqual(empty.weighing, [{ domainId: "beta", name: "Beta", capacityJh: 0, totalJh: 0, share: null, cards: [] }]);
 });

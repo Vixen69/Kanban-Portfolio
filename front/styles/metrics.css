@@ -88,6 +88,8 @@
 .cap-val small { display: block; font-weight: 400; color: var(--tx-4); }
 .cap-over { color: var(--danger-strong); font-weight: 700; }
 .cap-tense { color: var(--warn); font-weight: 700; }
+/* Whole card lists (cartes qui pèsent): capped in height, scrollable. */
+.cap-list { max-height: 340px; overflow-y: auto; }
 /* Métier roll-up of the tense persons (ADR 033). */
 .cap-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 9px; }
 .cap-chip { font-size: 9px; color: var(--tx-2); background: #f7f9fc; border: 1px solid var(--bd-sub); border-radius: 10px; padding: 2px 8px; white-space: nowrap; }
