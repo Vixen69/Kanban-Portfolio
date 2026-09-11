@@ -230,6 +230,13 @@
       "name": "Projet IA",
       "short": "IA",
       "color": "#7c3aed"
+    },
+    {
+      "id": "atlas",
+      "name": "ATLAS",
+      "short": "ATL",
+      "aliases": ["Projet ATLAS [Hors PDSI]", "ATLAS"],
+      "color": "#0e7490"
     }
   ],
   "natures": {
@@ -498,7 +505,7 @@
   "andonThresholdDays": 5,
   "exercise": {
     "year": 2026,
-    "states": ["Basculé en projet", "Budget validé", "Budget présenté", "Nouveau", "Terminé"]
+    "states": ["Basculé en projet", "Budget validé", "Terminé"]
   },
   "decisions": [
     {

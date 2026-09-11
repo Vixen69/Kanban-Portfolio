@@ -138,7 +138,7 @@ const SHAPES: Record<DomainShape, string> = {
 function perimeterStatus(projets: ProjetsTable, config: BoardConfig): string {
   const names = new Map(config.types.map((t) => [t.id, t.name]));
   const parts = [...projets.typeCounts.entries()]
-    .map(([id, count]) => `${id === "?" ? "hors des quatre retenus" : (names.get(id) ?? id)} ${count}`);
+    .map(([id, count]) => `${id === "?" ? "hors des types retenus" : (names.get(id) ?? id)} ${count}`);
   return `${projets.entries.length} carte(s) — la liste fait foi (« ${projets.fileName} ») · types : ${parts.join(" · ")}` +
     ` · domaine : ${SHAPES[projets.shape]}`;
 }

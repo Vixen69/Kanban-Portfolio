@@ -186,7 +186,8 @@ d'une carte déplacée à la main — la divergence est signalée, jamais écras
 
 - **Identité des cartes** : l'Id Sciforma, sinon le code PE, sinon le nom.
 - **Périmètre** : la liste `Projets.csv` fait foi — aucune exclusion par
-  portefeuille ; un type hors des quatre retenus est signalé, jamais exclu.
+  portefeuille ; un type hors des types retenus est signalé, jamais exclu
+  (onglet Projets) — dans l'export COUT PREV, il exclut le projet (ADR 030).
 - **Position** : le dernier jalon franchi (RDR → Exploitation, RDLI →
   Actifs, RDO → Études), sinon Demandes.
 - **Âge** : depuis la date de début du projet.

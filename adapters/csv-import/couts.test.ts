@@ -42,21 +42,21 @@ test("the perimeter: unique projects on the exercise year, retained state, confi
   const { table, report } = couts();
   assert.deepEqual(table.entries.map((e) => e.id), RETAINED);
   assert.deepEqual(table.stats, {
-    rows: 17, otherYearRows: 1, projectsSeen: 15, retained: 5,
+    rows: 18, otherYearRows: 1, projectsSeen: 16, retained: 5,
     excluded: {
       noYear: 1,
-      etat: new Map([["Annulé", 1], ["Reporté", 1], ["Fusionné", 1]]),
-      type: new Map([["Pilotage", 1], ["Achat", 1], ["Evolution - TMA", 1], ["RUN", 1]]),
+      etat: new Map([["Annulé", 1], ["Budget présenté", 1], ["Reporté", 1], ["Fusionné", 1], ["Nouveau", 1]]),
+      type: new Map([["Achat", 1], ["Evolution - TMA", 1], ["RUN", 1]]),
       arbitrage: 1, noMe: 1,
     },
     inactive: 1, nonPe: 1, domainResolved: 4, domainUnknown: 1,
   });
   assert.equal(excludedSummary(table.stats.excluded, 2026),
-    "hors 2026 1 · état hors liste 3 (Annulé 1, Reporté 1, Fusionné 1) · type hors config 4 (Pilotage 1, Achat 1, Evolution - TMA 1, RUN 1)" +
-    " · arbitrage 1 · sans ME 1");
+    "hors 2026 1 · état hors liste 5 (Annulé 1, Budget présenté 1, Reporté 1, Fusionné 1, Nouveau 1)" +
+    " · type hors config 3 (Achat 1, Evolution - TMA 1, RUN 1) · arbitrage 1 · sans ME 1");
   assert.equal(table.shape, "portefeuille");
   assert.equal(table.fileName, "Couts.csv");
-  assert.ok(report.warnings.some((w) => /17 ligne\(s\) lue\(s\) · 15 projet\(s\) distinct\(s\) · 1 ligne\(s\) hors 2026 · périmètre 5 : écartés hors 2026 1/.test(w.message)));
+  assert.ok(report.warnings.some((w) => /18 ligne\(s\) lue\(s\) · 16 projet\(s\) distinct\(s\) · 1 ligne\(s\) hors 2026 · périmètre 5 : écartés hors 2026 1/.test(w.message)));
 });
 
 test("each retained project: title without its code, type through the aliases, domain and sub-domain from the portfolio", () => {
@@ -70,12 +70,12 @@ test("each retained project: title without its code, type through the aliases, d
     [
       ["Modernisation atelier", "mise_en_oeuvre", "infra", null],
       ["Refonte portail interne", "etude", "ad", "developpements_rapides"],
-      ["Montée de version calcul", "etude", "ing", null],
+      ["Montée de version calcul", "atlas", "ing", null],
       ["Étude connectivité site B", "obsolescence", "corporate", "achats"],
       ["Outil vendu Y", "etude", null, null],
     ],
   );
-  assert.deepEqual([...table.typeCounts.entries()], [["mise_en_oeuvre", 1], ["etude", 3], ["obsolescence", 1]]);
+  assert.deepEqual([...table.typeCounts.entries()], [["mise_en_oeuvre", 1], ["etude", 2], ["atlas", 1], ["obsolescence", 1]]);
   assert.equal(byId.get("PE10001")?.owner, null, "Projet.Responsable 1 is never the chef de projet");
   assert.equal(byId.get("PE10001")?.budgetRdli, null, "amounts of this file are not read into the card");
 });
@@ -94,7 +94,8 @@ test("unknown portfolios and non-PE codes are questioned, never dropped; no stat
   assert.ok(!questions.some((q) => /type hors/.test(q)), "types outside the config are excluded, not questioned");
   const { table, report: noList } = couts({ ...CONFIG, exercise: { year: 2026 } });
   assert.deepEqual([...table.stats.excluded.etat.entries()], []);
-  assert.deepEqual(table.entries.map((e) => e.id), ["PE10001", "PE10002", "PE10003", "MEWTBN7Q", "PE10007", "PE10012", "PE10016", "PE10017"]);
+  assert.deepEqual(table.entries.map((e) => e.id),
+    ["PE10001", "PE10002", "PE10003", "MEWTBN7Q", "PE10007", "PE10012", "PE10016", "PE10017", "PE10018"]);
   assert.ok(noList.warnings.some((w) => /aucune liste d'états dans la config/.test(w.message)));
 });
 

@@ -21,11 +21,12 @@ test("the repository's config/board.json is valid", () => {
   assert.equal(config.lanes.length, 3);
   assert.equal(config.columns.length, 8);
   assert.equal(config.domains.length, 10);
-  assert.equal(config.types.length, 4);
+  assert.equal(config.types.length, 5);
+  assert.deepEqual(config.types.find((t) => t.id === "atlas")?.aliases, ["Projet ATLAS [Hors PDSI]", "ATLAS"], "ADR 030: the author's fifth type");
   assert.equal(config.types.find((t) => t.id === "obsolescence")?.name, "Obsolescence");
   assert.deepEqual(config.types.find((t) => t.id === "obsolescence")?.aliases,
     ["Projet de gestion d’obsolescence", "obsolescence", "obscolescence"]);
-  assert.ok((config.exercise.states?.length ?? 0) >= 3, "ADR 030: the retained process states are declared");
+  assert.deepEqual(config.exercise.states, ["Basculé en projet", "Budget validé", "Terminé"], "ADR 030: the author's retained states");
   // ADR 030: the Sciforma portfolio words of the domains.
   assert.deepEqual(config.domains.filter((d) => d.aliases !== undefined).map((d) => [d.id, d.aliases]), [
     ["ad", ["GROUPE"]], ["industrie", ["PRODUCTION"]], ["infra", ["INFRASTRUCTURE"]],

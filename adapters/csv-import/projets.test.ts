@@ -61,7 +61,7 @@ test("types: the four retained resolve whatever their suffix; others are kept an
   assert.deepEqual(table.entries.map((e) => e.typeId), ["etude", "obsolescence", "mise_en_oeuvre", "ia", null, null]);
   assert.deepEqual([...table.typeCounts.entries()], [["etude", 1], ["obsolescence", 1], ["mise_en_oeuvre", 1], ["ia", 1], ["?", 2]]);
   assert.equal(table.entries.length, 6, "no row is excluded on type");
-  assert.ok(report.doubtful.some((d) => /type hors des quatre retenus : « TMA Corrective \(Run\) »/.test(d.question)));
+  assert.ok(report.doubtful.some((d) => /type hors des types retenus : « TMA Corrective \(Run\) »/.test(d.question)));
   assert.ok(report.warnings.some((w) => /« Type » vide/.test(w.message)));
 });
 

@@ -55,7 +55,7 @@ test("the five fixture files assemble the full deck", () => {
   assert.equal(report.taken.length, 6, "the pris lines are the cards");
   const byLabel = new Map(report.assembly.map((a) => [a.subject, a.status]));
   assert.equal(byLabel.get("table PARAM"), "prête (5 responsable(s) de domaine · 7 ligne(s) organisation, 7 avec chemin)");
-  assert.match(byLabel.get("périmètre `projets`") ?? "", /^6 carte\(s\) — la liste fait foi \(« Projets\.csv »\) · types : .*Étude 2.*hors des quatre retenus 1 · domaine : colonnes Orga \(direct\)$/);
+  assert.match(byLabel.get("périmètre `projets`") ?? "", /^6 carte\(s\) — la liste fait foi \(« Projets\.csv »\) · types : .*Étude 2.*hors des types retenus 1 · domaine : colonnes Orga \(direct\)$/);
   assert.equal(byLabel.get("cartes"), "6 — répartition : Demandes 2 · Études 1 · Actifs 1 · Exploitation 2");
   assert.equal(byLabel.get("position"),
     "jalons 5/6 (Exploitation 2 · Actifs 1 · Études 1 · entrée 1) · sans jalon : 1 → colonne d'entrée · lignes jalons hors périmètre : 1");
@@ -120,7 +120,7 @@ test("the doubts name the vocabulary questions to settle", () => {
   const { report } = audit(ALL.map(fixture));
   const questions = report.doubtful.map((d) => d.question);
   assert.ok(questions.some((q) => /« Domaine \(Orga\) » inconnu du board : « CYBER »/.test(q)));
-  assert.ok(questions.some((q) => /type hors des quatre retenus : « TMA Corrective \(Run\) »/.test(q)));
+  assert.ok(questions.some((q) => /type hors des types retenus : « TMA Corrective \(Run\) »/.test(q)));
   assert.ok(questions.some((q) => /sous-domaine inconnu de la config : « corporate \/ INEXISTANT »/.test(q)));
   assert.ok(report.warnings.some((w) => /RDR franchi sans RDLI franchi/.test(w.message)));
   assert.ok(report.warnings.some((w) => /cellules « franchi » — valeurs vues/.test(w.message)));
@@ -172,10 +172,10 @@ test("the COUT PREV export is the perimeter when present; the Projets onglet onl
   assert.ok(report.inventory.some((f) => f.name === "Couts.csv" && f.status === "recognized"));
   const byLabel = new Map(report.assembly.map((a) => [a.subject, a.status]));
   assert.match(byLabel.get("périmètre `projets`") ?? "",
-    /^5 carte\(s\) — la liste fait foi \(« Couts\.csv »\) · types : .*Étude 3.* · domaine : portefeuille Sciforma/);
+    /^5 carte\(s\) — la liste fait foi \(« Couts\.csv »\) · types : .*Étude 2.*ATLAS 1.* · domaine : portefeuille Sciforma/);
   assert.equal(byLabel.get("périmètre · lecture COUT PREV"),
-    "17 ligne(s) · 15 projet(s) distinct(s) · retenus 5 (1 hors PE) · écartés : hors 2026 1" +
-    " · état hors liste 3 (Annulé 1, Reporté 1, Fusionné 1) · type hors config 4 (Pilotage 1, Achat 1, Evolution - TMA 1, RUN 1)" +
+    "18 ligne(s) · 16 projet(s) distinct(s) · retenus 5 (1 hors PE) · écartés : hors 2026 1" +
+    " · état hors liste 5 (Annulé 1, Budget présenté 1, Reporté 1, Fusionné 1, Nouveau 1) · type hors config 3 (Achat 1, Evolution - TMA 1, RUN 1)" +
     " · arbitrage 1 · sans ME 1 · « Projet.Actif » faux gardés 1 · domaine via portefeuille 4/5");
   assert.equal(byLabel.get("périmètre · recoupement"),
     "5 projet(s) dans « Couts.csv » (COUT PREV, fait foi) · 6 dans « Projets.csv » · 4 commun(s)" +
@@ -187,7 +187,8 @@ test("the COUT PREV export is the perimeter when present; the Projets onglet onl
   assert.deepEqual([atelier?.domainId, atelier?.domainSource, atelier?.columnId, atelier?.budgetEstimated], ["infra", "param", "exploitation", 120.5]);
   assert.deepEqual([byCode.get("PE10017")?.columnId, byCode.get("PE10017")?.typeId, byCode.get("PE10017")?.domainId], ["demandes", "etude", null],
     "no jalon, PROJETS VENDUS resolves to no domain");
-  assert.equal(byCode.has("PE10009"), false, "Pilotage is outside the config's types");
+  assert.equal(byCode.has("PE10009"), false, "« Budget présenté » is outside the retained states");
+  assert.equal(byCode.get("PE10003")?.typeId, "atlas", "the author's fifth type, read through its alias");
   assert.ok(report.doubtful.some((d) => /codes retenus hors PE : 1 \(MEWTBN7Q\)/.test(d.question)));
 });
 

@@ -66,12 +66,14 @@ des jointures par nom (SP, PdC).
 
 **R3 — Types.** Clé = colonne **« Type »** de `projets` (pas « Type Gpe »,
 pas SP_2026). Le suffixe parenthésé est retiré avant comparaison —
-« (Projet) », « (Opportunité) », « (Run) » ne distinguent rien. Quatre
+« (Projet) », « (Opportunité) », « (Run) » ne distinguent rien. Cinq
 types retenus → `typeId` : **Etude** → `etude` ; **Projet de gestion
 d'obsolescence** → `obsolescence` ; **Projet de mise en oeuvre** →
-`mise_en_oeuvre` ; **Projet IA** → `ia`. Libellés exclus connus (signalés
-s'ils apparaissent) : Achat, Evolution - TMA, TMA Corrective. Tout autre
-libellé → douteux. La config `types` ne porte plus que ces quatre. Le nom
+`mise_en_oeuvre` ; **Projet IA** → `ia` ; **Projet ATLAS [Hors PDSI]** →
+`atlas` (ajouté le 2026-09-11 d'après les filtres de l'auteur sur l'export
+COUT PREV). Libellés exclus connus (signalés s'ils apparaissent) : Achat,
+Evolution - TMA, TMA Corrective, RUN. Tout autre libellé → douteux (onglet
+Projets) ou exclu (COUT PREV). La config `types` ne porte que ces cinq. Le nom
 affiché est libre ; quand le libellé d'export en diffère, il vit dans
 `aliases` du type (« Obsolescence » affiché, « Projet de gestion
 d’obsolescence » lu à l'import — 2026-09-09). Un alias **court** est
@@ -437,11 +439,14 @@ d'exclusion est compté) :
 
 1. il a au moins une ligne sur l'**année de l'exercice** (`exercise.year`) ;
 2. son « Etat du processus » est dans la **liste blanche** `exercise.states`
-   de la config (les cases cochées par l'auteur ; champ facultatif : absent
-   = tous les états gardés, dit dans le rapport) ;
+   de la config (cases cochées par l'auteur le 2026-09-11 : Basculé en
+   projet, Budget validé, Terminé ; champ facultatif : absent = tous les
+   états gardés, dit dans le rapport) ;
 3. son type est **un type de la config** (nom ou alias) — hors config, le
-   projet est **exclu** et compté par libellé (Achat, Evolution - TMA, TMA
-   Corrective, Pilotage, ATLAS, RUN… n'entrent que s'ils sont déclarés) ;
+   projet est **exclu** et compté par libellé. Cases cochées par l'auteur :
+   Etude, Projet ATLAS [Hors PDSI] (cinquième type `atlas`, ajouté le
+   2026-09-11), Projet de gestion d'obsolescence, Projet de mise en
+   oeuvre, Projet IA ; Achat, Evolution - TMA, RUN, TMA Corrective dehors ;
 4. son nom ne contient pas le mot **« arbitrage »** (lignes factices du
    contrôle de gestion) ;
 5. au moins une de ses **quatre cellules ME** porte un chiffre non nul sur

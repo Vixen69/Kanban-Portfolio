@@ -287,7 +287,7 @@ function finalize(ctx: ProjetsContext): void {
   const question = (prefix: string, map: Map<string, Tally>, suffix: string): void => {
     for (const [label, t] of map) doubt(ctx.report, ctx.fileName, `${prefix} « ${label} » (${tallyLabel(t)}) — ${suffix}`);
   };
-  question("type hors des quatre retenus :", ctx.unknownTypes, "carte gardée sans type (la liste `projets` fait foi)");
+  question("type hors des types retenus :", ctx.unknownTypes, "carte gardée sans type (la liste `projets` fait foi)");
   question("« Domaine (Orga) » inconnu du board :", ctx.unknownDomains, "carte sans domaine");
   question("sous-domaine inconnu de la config :", ctx.unknownSubs, "replié dans le domaine — à déclarer ?");
   question("chemin d'organisation absent de PARAM :", ctx.unknownPaths, "carte sans domaine");

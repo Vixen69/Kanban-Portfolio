@@ -674,9 +674,12 @@ de son ADR.
   sont vides ou nulles est annulé de fait, exclu (montants testés, jamais
   lus dans les cartes). Contrôle : presque que des codes PE — les codes
   retenus hors PE sont listés en douteux (4–5 attendus).
-- Ouvert (décision auteur) : la liste `exercise.states` et les types
-  Pilotage / Projet ATLAS / RUN (aujourd'hui exclus) attendent ses deux
-  captures ; lire un jour les lignes « Charge » de cet export par centre de
+- **Les deux listes de l'auteur** (captures des filtres Excel) :
+  `exercise.states` = Basculé en projet, Budget validé, Terminé ; types =
+  les quatre de la config plus **ATLAS** (nouveau type `atlas`, alias
+  « Projet ATLAS [Hors PDSI] ») — Achat, Evolution - TMA, RUN, TMA
+  Corrective dehors.
+- Ouvert : lire un jour les lignes « Charge » de cet export par centre de
   coût pour le recouper avec le plan de charge.
 
 ### 2026-09-10 (soir) — Passe de perf : horloge à la minute, gzip et cache au bord

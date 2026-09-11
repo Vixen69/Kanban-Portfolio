@@ -76,8 +76,13 @@ est compté) :
    (Annulé, Reporté) à une liste fermée, celle des cases cochées par
    l'auteur ;
 3. son type est **un type de la config** (nom ou alias) — un type hors
-   config **exclut** désormais le projet (plus de « gardé sans type ») ;
-   Pilotage / ATLAS / RUN n'entrent que si l'auteur les déclare ;
+   config **exclut** désormais le projet (plus de « gardé sans type »).
+   Captures de l'auteur (même jour) : types cochés = Etude, Projet ATLAS
+   [Hors PDSI], Projet de gestion d'obsolescence, Projet de mise en
+   oeuvre, Projet IA → **ATLAS devient le cinquième type de la config**
+   (`atlas`, alias « Projet ATLAS [Hors PDSI] ») ; Achat, Evolution - TMA,
+   RUN, TMA Corrective restent dehors ; états cochés = Basculé en projet,
+   Budget validé, Terminé → `exercise.states` ;
 4. son nom ne contient pas le mot **« arbitrage »** : ces lignes sont des
    artefacts du contrôle de gestion, pas des projets ;
 5. au moins une de ses **quatre cellules ME** (Charge finale ME, Charge
