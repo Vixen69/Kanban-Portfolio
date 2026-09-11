@@ -105,13 +105,14 @@ function CodesSection(props: SidebarProps) {
       <DisplayToggle label="Codes projet" on={props.showCodes} onToggle={() => props.setShowCodes(!props.showCodes)}
         hint={props.showCodes ? "Affichés sur les cartes (ex. PX4520155)" : "Masqués — recherchables dans la barre ci-dessus"} />
       <DisplayToggle label="Types de projet" on={props.showTypes} onToggle={() => props.setShowTypes(!props.showTypes)}
-        hint={props.showTypes ? "Affichés devant le nom (ETU, OBS, MEO, IA)" : "Masqués — le nom seul"} />
+        hint={props.showTypes ? `Affichés devant le nom (${props.config.types.map((t) => t.short).join(", ")})` : "Masqués — le nom seul"} />
     </div>
   );
 }
 
-// Type de projet: the config's types — the four retained ones since the
-// 2026-09-04 PMO revision (ADR 022); the list stays config-driven.
+// Type de projet: the config's types — the retained ones since the
+// 2026-09-04 PMO revision (ADR 022, five with ATLAS since ADR 030); the
+// list stays config-driven.
 function TypeSection(props: SidebarProps) {
   return (
     <GroupSection label="Type de projet" group="type" wrap filters={props.filters} onSetGroup={props.onSetGroup}>
