@@ -39,3 +39,12 @@ test("lastSegment reads the domain label the PMO reads", () => {
   assert.equal(lastSegment(" ACHATS "), "ACHATS");
   assert.equal(lastSegment(""), "");
 });
+
+test("a hit says which rule fired: the last segment, or the whole path as a fallback", () => {
+  const resolve = createPortfolioResolver(CONFIG);
+  assert.deepEqual(resolve("DSI NEXTER.INFRASTRUCTURE OPE"),
+    { domainId: "infra", subDomainId: null, via: "domain", scope: "last", label: "INFRASTRUCTURE" });
+  assert.deepEqual(resolve("DSI NEXTER.GROUPE : Forge Logiciels.PROJETS VENDUS"),
+    { domainId: "ad", subDomainId: "forge_logiciels", via: "subdomain", scope: "path", label: "FORGE LOGICIELS" },
+    "a sold-projects leaf under a GROUPE branch falls back on the whole path - and lands in A&D");
+});

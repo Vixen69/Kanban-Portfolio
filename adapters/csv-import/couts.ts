@@ -22,15 +22,16 @@ import type { PortfolioHit } from "./portfolio.ts";
 import { parseFrenchAmount } from "./values.ts";
 import { splitSubjectName } from "./subject-name.ts";
 import { stripCode } from "./code-prefix.ts";
-import { tallyInto, tallyLabel } from "./tallies.ts";
+import { tallyInto } from "./tallies.ts";
 import type { Tally } from "./tallies.ts";
 import type { CsvRow } from "./csv.ts";
 import type { HeaderMatch } from "./contract.ts";
-import { doubt, warn } from "./report.ts";
+import { doubt } from "./report.ts";
 import type { ImportReport, RowRef } from "./report.ts";
 import type { ProjetEntry, ProjetsTable } from "./projets.ts";
-import { excludedSummary } from "./couts-stats.ts";
 import type { CoutsCharge, CoutsStats } from "./couts-stats.ts";
+import { emitCoutsReport } from "./couts-report.ts";
+import type { PortfolioTally } from "./couts-report.ts";
 
 export { checkPerimeters, excludedSummary } from "./couts-stats.ts";
 export type { CoutsCharge, CoutsExcluded, CoutsStats, PerimeterCheck } from "./couts-stats.ts";
@@ -75,7 +76,11 @@ interface CoutsContext {
   stats: CoutsStats;
   charges: CoutsCharge[];
   nonPe: string[];
+  /** Retained-shaped projects excluded for having no ME figure — named for the domain owners. */
+  noMe: string[];
   unknownPortfolios: Map<string, Tally>;
+  /** Every « Projet.Portefeuille » path of the retained projects, and where it landed. */
+  portfolios: Map<string, PortfolioTally>;
   tallies: Map<string, Tally>;
 }
 
@@ -109,7 +114,7 @@ export function parseCouts(
       excluded: { noYear: 0, etat: new Map(), type: new Map(), arbitrage: 0, noMe: 0 },
       inactive: 0, nonPe: 0, domainResolved: 0, domainUnknown: 0,
     },
-    charges: [], nonPe: [], unknownPortfolios: new Map(), tallies: new Map(),
+    charges: [], nonPe: [], noMe: [], unknownPortfolios: new Map(), portfolios: new Map(), tallies: new Map(),
   };
   for (const row of rows) readRow(ctx, row);
   const entries: ProjetEntry[] = [];
@@ -117,7 +122,10 @@ export function parseCouts(
     const entry = decide(ctx, seen);
     if (entry !== null) entries.push(entry);
   }
-  finalize(ctx, entries);
+  emitCoutsReport({
+    report, fileName, year: ctx.year, config, stats: ctx.stats, entries: entries.length, statesListed: ctx.states !== null,
+    tallies: ctx.tallies, unknownPortfolios: ctx.unknownPortfolios, portfolios: ctx.portfolios, nonPe: ctx.nonPe, noMe: ctx.noMe,
+  });
   return {
     fileName, entries,
     byId: new Map(entries.map((e) => [e.id, e])),
@@ -227,6 +235,7 @@ function decide(ctx: CoutsContext, seen: Seen): ProjetEntry | null {
   }
   if (!seen.hasMe) {
     x.noMe++;
+    ctx.noMe.push(seen.id);
     return null;
   }
   ctx.stats.retained++;
@@ -244,6 +253,9 @@ function decide(ctx: CoutsContext, seen: Seen): ProjetEntry | null {
 function buildEntry(ctx: CoutsContext, seen: Seen, typeId: string): ProjetEntry {
   for (const c of seen.charges.values()) ctx.charges.push({ projectId: seen.id, centre: c.centre, jh: c.jh, done: c.done });
   const hit = ctx.resolve(seen.portfolio);
+  const portfolio = ctx.portfolios.get(seen.portfolio) ?? { count: 0, hit };
+  portfolio.count++;
+  ctx.portfolios.set(seen.portfolio, portfolio);
   if (hit === null) {
     ctx.stats.domainUnknown++;
     tallyInto(ctx.unknownPortfolios, lastSegment(seen.portfolio) || "(vide)", seen.ref.line);
@@ -265,32 +277,4 @@ function countTypes(entries: readonly ProjetEntry[]): Map<string, number> {
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
   return counts;
-}
-
-const CODES_SHOWN = 20;
-
-function codes(list: readonly string[]): string {
-  const rest = list.length - CODES_SHOWN;
-  return `${list.slice(0, CODES_SHOWN).join(", ")}${rest > 0 ? `, … +${rest}` : ""}`;
-}
-
-// The reading in figures, then the questions: portfolios kept without
-// domain, non-PE codes retained.
-function finalize(ctx: CoutsContext, entries: readonly ProjetEntry[]): void {
-  const s = ctx.stats;
-  if (ctx.states === null) warn(ctx.report, "aucune liste d'états dans la config (`exercise.states`) — tous les états gardés", ctx.fileName);
-  warn(ctx.report,
-    `${s.rows} ligne(s) lue(s) · ${s.projectsSeen} projet(s) distinct(s) · ${s.otherYearRows} ligne(s) hors ${ctx.year}` +
-      ` · périmètre ${entries.length} : écartés ${excludedSummary(s.excluded, ctx.year)}` +
-      (s.inactive > 0 ? ` · ${s.inactive} retenu(s) avec « Projet.Actif » faux (gardés, information)` : ""),
-    ctx.fileName);
-  for (const [message, t] of ctx.tallies) warn(ctx.report, `${message} : ${tallyLabel(t)}`, ctx.fileName);
-  for (const [label, t] of ctx.unknownPortfolios) {
-    doubt(ctx.report, ctx.fileName,
-      `portefeuille sans domaine : « ${label} » (${t.count} projet(s)) — à déclarer dans \`domains[].aliases\` ou en sous-domaine ?`);
-  }
-  if (ctx.nonPe.length > 0) {
-    doubt(ctx.report, ctx.fileName,
-      `codes retenus hors PE : ${ctx.nonPe.length} (${codes(ctx.nonPe)}) — l'auteur en attend 4 ou 5 ; davantage = une règle manque`);
-  }
 }

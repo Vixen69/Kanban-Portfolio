@@ -2,10 +2,12 @@
 // export — a dotted path whose last segment names the domain the way the
 // PMO speaks it: « INFRASTRUCTURE OPE », « GROUPE : Forge Logiciels »,
 // « ACHATS ») resolved to a board domain and sub-domain. Rules, in order:
-// the domain's name / short / aliases as whole words in the last segment,
+// the domain's name / short / aliases as whole words in the LAST segment,
 // a sub-domain's name (which also gives its domain and is more specific),
-// then the same on the whole path. Ambiguity yields null, never a guess.
-// The keyword rules mirror the PDSI macro's « groupeDom » (docs/
+// then the same on the WHOLE path (fallback). Ambiguity yields null, never
+// a guess. Every hit says which rule fired: the audit report spells it out
+// per portfolio path (2026-09-15: sold projects found under A&D). The
+// keyword rules mirror the PDSI macro's « groupeDom » (docs/
 // CAPACITE-MACRO-PDSI.md) but live in the config (domains[].aliases, ADR 030).
 
 import type { BoardConfig } from "../../core/types.ts";
@@ -17,6 +19,10 @@ export interface PortfolioHit {
   domainId: string;
   subDomainId: string | null;
   via: "domain" | "subdomain";
+  /** Which part of the path matched: its last segment, or the whole path (fallback). */
+  scope: "last" | "path";
+  /** The config label that matched (domain name / short / alias, or a sub-domain name). */
+  label: string;
 }
 
 interface Rule {
@@ -24,11 +30,12 @@ interface Rule {
   domainId: string;
   subDomainId: string | null;
   via: "domain" | "subdomain";
+  label: string;
 }
 
 // A sub-domain hit is more specific than a domain hit; several distinct
 // domains in play = ambiguous.
-function matchIn(rules: readonly Rule[], key: string): PortfolioHit | null {
+function matchIn(rules: readonly Rule[], key: string, scope: "last" | "path"): PortfolioHit | null {
   if (key === "") return null;
   const hits = rules.filter((rule) => rule.re.test(key));
   const subs = hits.filter((hit) => hit.via === "subdomain");
@@ -37,7 +44,7 @@ function matchIn(rules: readonly Rule[], key: string): PortfolioHit | null {
   const first = pool[0];
   if (domains.size !== 1 || first === undefined) return null;
   const subDomainId = subs.length === 1 ? (subs[0]?.subDomainId ?? null) : null;
-  return { domainId: first.domainId, subDomainId, via: first.via };
+  return { domainId: first.domainId, subDomainId, via: first.via, scope, label: first.label };
 }
 
 /**
@@ -50,16 +57,16 @@ export function createPortfolioResolver(config: BoardConfig): (portfolio: string
   const rules: Rule[] = [];
   for (const domain of config.domains) {
     for (const label of [domain.name, domain.short, ...(domain.aliases ?? [])]) {
-      rules.push({ re: keywordPattern(label), domainId: domain.id, subDomainId: null, via: "domain" });
+      rules.push({ re: keywordPattern(label), domainId: domain.id, subDomainId: null, via: "domain", label });
     }
     for (const sub of domain.subDomains ?? []) {
-      rules.push({ re: keywordPattern(sub.name), domainId: domain.id, subDomainId: sub.id, via: "subdomain" });
+      rules.push({ re: keywordPattern(sub.name), domainId: domain.id, subDomainId: sub.id, via: "subdomain", label: sub.name });
     }
   }
   return (portfolio) => {
     const segments = portfolio.split(".").map((s) => normalizeLabel(s)).filter((s) => s !== "");
     const last = segments[segments.length - 1] ?? "";
-    return matchIn(rules, last) ?? matchIn(rules, normalizeLabel(portfolio));
+    return matchIn(rules, last, "last") ?? matchIn(rules, normalizeLabel(portfolio), "path");
   };
 }
 

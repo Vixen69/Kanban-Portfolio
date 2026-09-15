@@ -119,3 +119,17 @@ test("checkPerimeters names the codes present on one side only", () => {
     onlyCouts: ["PE10017"], onlyProjets: ["PE10007", "PE10008"],
   });
 });
+
+test("the report names the projects excluded for having no ME figure, and says where every portfolio lands and why", () => {
+  const { report } = couts();
+  const questions = report.doubtful.map((d) => d.question);
+  assert.ok(questions.some((q) => /projets écartés sans aucun chiffre ME \(quatre cellules vides ou à zéro\) : 1 — codes : PE10015/.test(q)));
+  const lines = report.warnings.filter((w) => w.message.startsWith("portefeuille « ")).map((w) => w.message);
+  assert.deepEqual(lines, [
+    "portefeuille « DSI NEXTER.CORPORATE.ACHATS » : 1 projet(s) → CORPORATE / ACHATS — dernier segment · « ACHATS »",
+    "portefeuille « DSI NEXTER.GROUPE : Développements rapides » : 1 projet(s) → A&D / DEVELOPPEMENTS RAPIDES — dernier segment · « DEVELOPPEMENTS RAPIDES »",
+    "portefeuille « DSI NEXTER.INFRASTRUCTURE OPE » : 1 projet(s) → INFRA — dernier segment · « INFRASTRUCTURE »",
+    "portefeuille « DSI NEXTER.INGENIERIE SYSTEMES » : 1 projet(s) → ING — dernier segment · « INGENIERIE SYSTEMES »",
+    "portefeuille « DSI NEXTER.PROJETS VENDUS » : 1 projet(s) → sans domaine — aucun mot connu (nom, code, alias de domaine, sous-domaine)",
+  ]);
+});

@@ -637,6 +637,23 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-15 — Entretiens RDOM : le rapport nomme les « sans ME » et explique chaque portefeuille
+
+- **Constats de l'auteur** (one-to-one avec les responsables de domaine) :
+  un projet majeur d'A&D manquait — quatre cellules ME à zéro, donc écarté
+  comme annulé de fait, à tort (qualité de saisie client ; règle inchangée
+  en attendant leur retour) ; et A&D embarquait des projets d'ingénierie et
+  des **projets vendus** sans qu'on sache pourquoi.
+- **Rapport** : douteux « projets écartés sans aucun chiffre ME : N — codes »
+  (à vérifier avec les RDOM) ; et un relevé **par chemin « Projet.
+  Portefeuille »** : projets retenus, domaine / sous-domaine obtenu, et la
+  règle qui a joué — « dernier segment · « INFRASTRUCTURE » » ou « chemin
+  entier (repli) · « FORGE LOGICIELS » » — ou « sans domaine — aucun mot
+  connu ». `PortfolioHit` porte `scope` et `label` ; `couts-report.ts`
+  sort de `couts.ts` (300 lignes).
+- Ouvert : le sort des projets vendus (domaine à part comme la macro,
+  contrainte, ou hors périmètre) — décision auteur.
+
 ### 2026-09-12 — Types de ressource : les préfixes fusionnent (« NEXTER.CdP IT4IT » = « CdP IT4IT »)
 
 - Premier audit réel du recoupement (VM) : les centres de coût COUT PREV

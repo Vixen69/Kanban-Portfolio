@@ -97,3 +97,19 @@ PE sont listés en douteux — davantage que quelques-uns = une règle manque.
 La ligne « périmètre · lecture COUT PREV » compte les écartés par motif
 (hors année, état hors liste par état, type hors config par type,
 arbitrage, sans ME).
+
+## Complément (2026-09-15) — le rapport dit où chaque portefeuille atterrit, et nomme les « sans ME »
+
+Retours des entretiens de l'auteur avec les responsables de domaine :
+(1) un projet majeur d'A&D manquait — ses quatre cellules ME à zéro l'ont
+écarté comme annulé de fait alors qu'il ne l'est probablement pas (qualité
+de saisie côté client ; règle inchangée en attendant leur retour, remise
+à la main possible) ; (2) le portefeuille A&D embarquait des projets
+d'ingénierie et des **projets vendus** sans qu'on sache par quelle règle.
+Décision : le rapport **nomme** les projets écartés « sans ME » (douteux,
+codes) et donne, **par chemin « Projet.Portefeuille »**, le nombre de
+projets retenus, le domaine (et sous-domaine) obtenu et **la règle qui a
+joué** — dernier segment ou chemin entier (repli), et le mot de la config
+qui a matché. `PortfolioHit` porte désormais `scope` et `label` ;
+`couts-report.ts` sort de `couts.ts`. Le sort des projets vendus (domaine
+à part, comme la macro ?) reste à trancher par l'auteur.
