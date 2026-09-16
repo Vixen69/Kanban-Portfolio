@@ -124,7 +124,24 @@ node sync/import.ts imports --charger
 > fichiers sans projet sur l'année demandée. Dans l'outil : le sélecteur
 > « Exercice » de l'importeur.
 
+> **Configuration appliquée et modèle versionné** (ADR 038) : une
+> configuration appliquée depuis ⚙ n'est gardée que tant que le
+> `config/board.json` du dépôt n'a pas changé. Après un `git pull` qui le
+> modifie, le middle l'écarte au démarrage (elle reste dans
+> `config-history.jsonl`) et sert le fichier versionné. Si un réglage fait
+> depuis ⚙ doit revenir, le refaire depuis ⚙. L'année en cours, elle, est
+> dans `exercise.json` et survit à tout.
+
+> **Changer d'année en cours** (ADR 035/038) : importer d'abord l'année
+> suivante (sélecteur « Exercice » de l'importeur), puis ⚙ › onglet
+> **Exercice** › cocher la confirmation › « Passer à l'exercice N+1 ». En
+> un lot : les cartes sans année sont épinglées sur l'année qui se clôt,
+> ses cartes actives sont archivées (son tableau reste lisible, clos), les
+> cartes de la nouvelle année démarrent leur horloge. Sauvegarde `pg_dump`
+> avant, comme pour tout chargement.
+
 > **Conflits de domaine** (ADR 036) : une carte déjà présente dont le
+
 > domaine diffère de ce que l'export propose n'est jamais remplacée sans
 > décision. Dans l'outil, l'audit les présente **un par un** (Garder /
 > Remplacer, « Tout remplacer » en raccourci) et le chargement attend que

@@ -5,7 +5,7 @@
 // never an event, the fold keeps the original references). The nature is
 // derived from the (remapped) canal (ADR 018: nature is positional).
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { BoardConfig, CardState } from "../core/types.ts";
 import { laneNature, reconcileCardRefs } from "../core/config.ts";
 import { cardCountsByYear, cardsOfExercise, selectableYears } from "../core/exercise.ts";
@@ -20,6 +20,8 @@ import type { YearPickerProps } from "./components/YearPicker.tsx";
  */
 export function useExerciseShown(cards: CardState[], currentYear: number): { viewYear: number; exercise: YearPickerProps } {
   const [viewYear, setViewYear] = useState(currentYear);
+  // The switch moved the current exercise: follow it (the old year is closed now).
+  useEffect(() => { setViewYear(currentYear); }, [currentYear]);
   const exercise = useMemo<YearPickerProps>(() => ({
     year: viewYear, years: selectableYears(cards, currentYear), currentYear,
     counts: cardCountsByYear(cards, currentYear), onYear: setViewYear,

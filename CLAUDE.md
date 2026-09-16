@@ -246,7 +246,13 @@ never hard-blocks). The default model carries no WIP limit since ADR 031
 (the provisional values were removed; limits are calibrated later from real
 flow). An admin-panel override is persisted server-side with an
 append-only history; « Réinitialiser le modèle » returns to board.json
-(ADR 013). Diacritics in display names come from the config as-is.
+(ADR 013). The override is adopted only while the versioned board.json it
+was applied on is unchanged: a changed board.json supersedes it at
+startup — set aside into the history, file removed (ADR 038, author's
+call 2026-09-16: the developers' fixes pass first while they are here).
+The current exercise year lives apart in `<data>/exercise.json`, written
+by the year switch and overlaid on every served config (ADR 038).
+Diacritics in display names come from the config as-is.
 
 ## 5. UI specification (carries over)
 
@@ -290,7 +296,11 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
   and card count; the year chosen bounds the board, the filters, the
   counts, the archives, the analytics, card creation and the importer's
   preselected exercise; away from the current year a chip says
-  « Préparation · horloge gelée » or « Exercice clos ». No « NMO » label.
+  « Préparation · horloge gelée » or « Exercice clos »; a closed year
+  shows its archived cards too (they were archived at the switch, ADR 038).
+  No « NMO » label. On the right: a labelled « Analytics » button and a
+  « ⋯ » menu (Archives with count, Importer, Configuration du tableau —
+  ADR 038).
 - Sidebar: search (title + codename), codes-projet and types toggles, « Contrainte »
   pills (config-driven + a synthetic « Aucune »; OR-shaped — a card stays
   lit while ANY of its constraints is on), « Bloqués uniquement » toggle,
@@ -318,7 +328,10 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
 - QuickAdd (« + Sujet », touche N): always enters the first column; the
   canal confers the nature.
 - Admin panel (⚙): topology/vocabulary only (ADR 013), incl. per-lane
-  natureKey. **Analytics** (☷, ADR 037): one view, a tab bar « Capacité »
+  natureKey, plus the **Exercice** tab (ADR 038): the year switch — pins
+  the unstamped cards on the closing year, archives its active cards,
+  activates the next year's (clock starts), then records the new current
+  exercise; next year only, explicit confirmation. **Analytics** (ADR 037): one view, a tab bar « Capacité »
   · « Flux »; every panel folds (closed by default, hint readable folded).
   The Flux tab (ADR 037) brings the flow diagnostics back: six KPIs
   (en cours, bloqués, livrés 30 j / 90 j, lead and cycle time), the

@@ -6,6 +6,7 @@ import type { BoardConfig } from "../../core/types.ts";
 import type { ViewCounts } from "../../core/filters.ts";
 import { YearPicker } from "./YearPicker.tsx";
 import type { YearPickerProps } from "./YearPicker.tsx";
+import { HeaderMenu } from "./HeaderMenu.tsx";
 
 /** Props of the app header. All data flows down from App — no context. */
 export interface HeaderProps {
@@ -50,8 +51,8 @@ function Legend({ config }: { config: BoardConfig }) {
 /**
  * App header: sidebar toggle, title, the exercise selector (ADR 035), the
  * "Filtré"/"Focus" chips, subject and blocked counts, the domain legend,
- * and the analytics (☷), archives, import (⬆), admin (⚙) and "+ Sujet"
- * actions.
+ * the « Analytics » button, the « ⋯ » menu (archives, import, admin) and
+ * the "+ Sujet" action.
  * Inputs: HeaderProps (config, counts, chip state, callbacks).
  * Output: the header element. Failure: none.
  */
@@ -80,15 +81,8 @@ export function Header(props: HeaderProps) {
           <span className="blk-dot-static" /> <b>{stats.blocked}</b> bloqués
         </div>
         <Legend config={props.config} />
-        <button className="icon-btn" onClick={props.onMetrics} title="Analytics : capacité, flux">☷</button>
-        <button className="icon-btn arch-btn" onClick={props.onArchive} title="Archives">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="4" width="18" height="4" rx="1" /><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8" /><path d="M10 12h4" />
-          </svg>
-          {props.archivedCount > 0 && <span className="arch-count">{props.archivedCount}</span>}
-        </button>
-        <button className="icon-btn" onClick={props.onImport} title="Importer un export PPM">⬆</button>
-        <button className="icon-btn" onClick={props.onAdmin} title="Configuration du tableau">⚙</button>
+        <button className="hd-btn" onClick={props.onMetrics} title="Analytics : capacité, flux">Analytics</button>
+        <HeaderMenu archivedCount={props.archivedCount} onArchive={props.onArchive} onImport={props.onImport} onAdmin={props.onAdmin} />
         <button className="add-btn" onClick={props.onAdd} title="Nouveau sujet (N)">+ Sujet</button>
       </div>
     </header>

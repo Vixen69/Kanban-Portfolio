@@ -123,6 +123,20 @@ function CardModals({ ctx }: { ctx: Ctx }) {
   );
 }
 
+// The admin panel's writes: each closes the panel on success and hands the
+// French failure back to it otherwise (the panel stays open with its draft).
+function adminWrites(store: BoardStore, ui: UiState) {
+  const closing = (write: Promise<string | null>) => write.then((failure) => {
+    if (failure === null) ui.setAdmin(false);
+    return failure;
+  });
+  return {
+    onApply: (next: BoardConfig) => closing(store.saveConfig(next)),
+    onReset: () => closing(store.resetConfig()),
+    onSwitch: (year: number) => closing(store.switchExercise(year)),
+  };
+}
+
 function ShellModals({ ctx }: { ctx: Ctx }) {
   const { store, config, ui } = ctx;
   return (
@@ -132,18 +146,7 @@ function ShellModals({ ctx }: { ctx: Ctx }) {
           onCreate={(input) => { void store.createCard({ ...input, exercise: ctx.viewYear }); ui.setAdding(false); }} />
       )}
       {ui.admin && (
-        <AdminPanel config={config}
-          onApply={async (next: BoardConfig) => {
-            const failure = await store.saveConfig(next);
-            if (failure === null) ui.setAdmin(false);
-            return failure;
-          }}
-          onReset={async () => {
-            const failure = await store.resetConfig();
-            if (failure === null) ui.setAdmin(false);
-            return failure;
-          }}
-          onClose={() => ui.setAdmin(false)} />
+        <AdminPanel config={config} cards={store.cards} {...adminWrites(store, ui)} onClose={() => ui.setAdmin(false)} />
       )}
       {ui.metrics && (
         <AnalyticsView cards={ctx.cards} events={store.events} config={config} now={ctx.nowMs} year={ctx.viewYear}
@@ -234,7 +237,9 @@ function Shell({ store, config }: { store: BoardStore; config: BoardConfig }) {
   // Archived subjects leave the board and every count entirely; they are
   // listed only by the Archives view (design v11, ADR 017). The detail
   // lookup searches ALL cards so an archived fiche opens from the archive.
-  const cards = useMemo(() => allCards.filter((card) => !card.archived), [allCards]);
+  // A closed year is read as it stood: its cards were archived at the switch (ADR 038).
+  const closed = viewYear < config.exercise.year;
+  const cards = useMemo(() => (closed ? allCards : allCards.filter((card) => !card.archived)), [allCards, closed]);
   const archivedCards = useMemo(() => allCards.filter((card) => card.archived), [allCards]);
 
   const derived = useDerived(cards, config, filters, now);

@@ -48,8 +48,10 @@ test("setRuntime persists the override and it wins after a re-open", () => {
     const reopened = createConfigStore(dir, defaults);
     assert.deepEqual(reopened.getRuntime(), next);
     assert.deepEqual(reopened.getDefaults(), defaults); // defaults untouched
-    const onDisk = JSON.parse(readFileSync(join(dir, "config.json"), "utf8")) as BoardConfig;
-    assert.deepEqual(onDisk, next);
+    const onDisk = JSON.parse(readFileSync(join(dir, "config.json"), "utf8")) as { defaultsHash: string; config: BoardConfig };
+    assert.deepEqual(onDisk.config, next);
+    assert.equal(typeof onDisk.defaultsHash, "string", "stamped with the defaults it was applied on (ADR 038)");
+
   });
 });
 
@@ -90,3 +92,50 @@ test("an unreadable or invalid override file is a hard French error", () => {
     assert.throws(() => createConfigStore(dir, testConfig()), /Configuration d’exécution illisible/);
   });
 });
+
+// ADR 038: an applied config is adopted only while the defaults it was
+// applied on are the ones running; the current exercise lives apart.
+test("a changed versioned model supersedes the applied config: set aside into the history, file removed", () => {
+  withDataDir((dir) => {
+    createConfigStore(dir, testConfig()).setRuntime(modifiedConfig(), "anonymous");
+    const changed = testConfig();
+    changed.domains.pop(); // a fix in config/board.json
+    const store = createConfigStore(dir, changed);
+    assert.deepEqual(store.getRuntime(), changed, "the versioned model wins");
+    assert.equal(existsSync(join(dir, "config.json")), false, "the applied config is gone from the data dir");
+    const lines = readFileSync(join(dir, "config-history.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l) as { actor: string; note?: string });
+    assert.deepEqual(lines.map((l) => l.actor), ["anonymous", "modèle versionné"]);
+    assert.match(lines[1]?.note ?? "", /écartée/);
+    assert.deepEqual(createConfigStore(dir, changed).getRuntime(), changed, "no second history line on the next restart");
+    assert.equal(readFileSync(join(dir, "config-history.jsonl"), "utf8").trim().split("\n").length, 2);
+  });
+});
+
+test("a bare override written before ADR 038 is superseded once; a stamped one on unchanged defaults is adopted", () => {
+  withDataDir((dir) => {
+    writeFileSync(join(dir, "config.json"), JSON.stringify(modifiedConfig()), "utf8");
+    assert.deepEqual(createConfigStore(dir, testConfig()).getRuntime(), testConfig());
+    const store = createConfigStore(dir, testConfig());
+    store.setRuntime(modifiedConfig(), "admin");
+    assert.deepEqual(createConfigStore(dir, testConfig()).getRuntime(), modifiedConfig(), "same defaults: adopted after a restart");
+  });
+});
+
+test("the current exercise year lives in exercise.json: served over any config, persisted, historised", () => {
+  withDataDir((dir) => {
+    const defaults = testConfig();
+    const store = createConfigStore(dir, defaults);
+    assert.equal(store.getExerciseYear(), defaults.exercise.year);
+    const runtime = store.setExerciseYear(defaults.exercise.year + 1, "anonymous");
+    assert.equal(runtime.exercise.year, defaults.exercise.year + 1);
+    assert.equal(store.getRuntime().exercise.year, defaults.exercise.year + 1);
+    store.setRuntime(modifiedConfig(), "admin");
+    assert.equal(store.getRuntime().exercise.year, defaults.exercise.year + 1, "an applied config never moves the year back");
+    assert.equal(store.getRuntime().andonThresholdDays, 9);
+    const reopened = createConfigStore(dir, defaults);
+    assert.equal(reopened.getExerciseYear(), defaults.exercise.year + 1);
+    const history = readFileSync(join(dir, "exercise-history.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l) as { from: number; year: number });
+    assert.deepEqual(history, [{ ...history[0], from: defaults.exercise.year, year: defaults.exercise.year + 1 }]);
+  });
+});
+

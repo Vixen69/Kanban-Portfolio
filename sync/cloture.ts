@@ -89,7 +89,7 @@ async function main(args: Args): Promise<void> {
     }
     console.log(`${finished.length} sujet(s) archivé(s) (acteur ${actor}) — désarchivables depuis la vue Archives.`);
     if (args.year !== null) {
-      configStore.setRuntime({ ...config, exercise: { year: args.year } }, actor);
+      configStore.setExerciseYear(args.year, actor); // exercise.json, apart from the topology (ADR 038)
       console.log(
         `exercice courant : ${args.year} (configuration d'exécution mise à jour).\n` +
           `Étape suivante : importer les fichiers ${args.year} — les sujets absents de cet import seront marqués, jamais supprimés.`,

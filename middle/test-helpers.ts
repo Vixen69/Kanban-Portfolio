@@ -1,6 +1,8 @@
 // Shared middle test scaffolding (test-only module, mirrors core/test-helpers).
 
 import type { BoardStorage } from "../core/ports.ts";
+import type { BoardConfig } from "../core/types.ts";
+import type { ConfigStore } from "./config-store.ts";
 import type { CardEventInput } from "../core/events.ts";
 import type { CapacitySnapshot, Card, CardEvent } from "../core/types.ts";
 import { testCard } from "../core/test-helpers.ts";
@@ -47,5 +49,28 @@ export function stubStorage(cards: Card[] = [testCard({ id: "S001" })]): BoardSt
       return baseCards.map((card) => ({ ...card }));
     },
     async close() {},
+  };
+}
+
+// ConfigStore stub recording every applied override.
+export function stubConfigStore(
+  defaults: BoardConfig,
+): ConfigStore & { applied: { actor: string; config: BoardConfig }[] } {
+  const applied: { actor: string; config: BoardConfig }[] = [];
+  let runtime = defaults;
+  return {
+    applied,
+    getRuntime: () => runtime,
+    getDefaults: () => defaults,
+    setRuntime(next: BoardConfig, actor: string): BoardConfig {
+      applied.push({ actor, config: next });
+      runtime = next;
+      return next;
+    },
+    getExerciseYear: () => runtime.exercise.year,
+    setExerciseYear(year: number): BoardConfig {
+      runtime = { ...runtime, exercise: { ...runtime.exercise, year } };
+      return runtime;
+    },
   };
 }

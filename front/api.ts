@@ -121,6 +121,26 @@ export function putConfig(config: BoardConfig): Promise<BoardConfig> {
   return request<BoardConfig>("/api/config", jsonInit("PUT", config));
 }
 
+/** What the year switch wrote, and the new runtime config (ADR 035/038). */
+export interface SwitchResult {
+  year: number;
+  pinned: number;
+  archived: number;
+  activated: number;
+  config: BoardConfig;
+}
+
+/**
+ * POST /api/exercise/switch — makes the next year the current exercise:
+ * unstamped cards pinned on the closing year, its active cards archived,
+ * the new year's clock started (ADR 035/038). Input: the year. Output: the
+ * counts and the new runtime config. Failure: throws ApiError (400 when it
+ * is not the year after the current exercise).
+ */
+export function postExerciseSwitch(year: number): Promise<SwitchResult> {
+  return request<SwitchResult>("/api/exercise/switch", jsonInit("POST", { year }));
+}
+
 /**
  * GET /api/board — base card snapshots and the full event log.
  * Output: BoardData (the caller folds it via core/state). Failure: ApiError.

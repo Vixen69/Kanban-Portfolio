@@ -3,8 +3,9 @@
 // Topology/vocabulary only — behavior is never configurable (ADR 013).
 
 import { useState } from "react";
-import type { BoardConfig } from "../../core/types.ts";
+import type { BoardConfig, CardState } from "../../core/types.ts";
 import { CategoriesTab, FieldsTab, StructureTab } from "./adminTabs.tsx";
+import { ExerciseTab } from "./adminExercise.tsx";
 
 /** Props of the admin configuration modal. */
 export interface AdminPanelProps {
@@ -18,15 +19,20 @@ export interface AdminPanelProps {
   onApply: (next: BoardConfig) => Promise<string | null>;
   /** « Réinitialiser le modèle » — same contract as onApply. */
   onReset: () => Promise<string | null>;
+  /** Every folded card (the Exercice tab announces what the switch will do). */
+  cards: CardState[];
+  /** « Passer à l'exercice suivant » (ADR 035/038) — same contract as onApply. */
+  onSwitch: (year: number) => Promise<string | null>;
   onClose: () => void;
 }
 
-type TabId = "structure" | "categories" | "champs";
+type TabId = "structure" | "categories" | "champs" | "exercice";
 
 const TABS: [TabId, string][] = [
   ["structure", "Structure"],
   ["categories", "Catégories"],
   ["champs", "Champs de carte"],
+  ["exercice", "Exercice"],
 ];
 
 const RESET_CONFIRM =
@@ -42,7 +48,7 @@ const RESET_CONFIRM =
  * the tabs and keeps the panel open with the draft intact; « Réinitialiser
  * le modèle » is guarded by window.confirm.
  */
-export function AdminPanel({ config, onApply, onReset, onClose }: AdminPanelProps) {
+export function AdminPanel({ config, onApply, onReset, cards, onSwitch, onClose }: AdminPanelProps) {
   const [draft, setDraft] = useState<BoardConfig>(() => JSON.parse(JSON.stringify(config)) as BoardConfig);
   const [tab, setTab] = useState<TabId>("structure");
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +74,7 @@ export function AdminPanel({ config, onApply, onReset, onClose }: AdminPanelProp
           {tab === "structure" && <StructureTab draft={draft} patch={patch} />}
           {tab === "categories" && <CategoriesTab draft={draft} patch={patch} />}
           {tab === "champs" && <FieldsTab draft={draft} patch={patch} />}
+          {tab === "exercice" && <ExerciseTab config={config} cards={cards} onSwitch={(year) => onSwitch(year).then((f) => { setError(f); return f; })} />}
           {error !== null && <div className="a-error" role="alert">{error}</div>}
           <div className="modal-actions">
             <button className="btn danger" title="Revenir au modèle NMO d’origine (colonnes, canaux, domaines, champs)" onClick={reset}>Réinitialiser le modèle</button>

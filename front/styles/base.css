@@ -57,6 +57,14 @@ body {
 .hd-year-item.on { background: #e7edfb; color: var(--accent); }
 .hd-year-item b { font-size: 12px; color: inherit; font-variant-numeric: tabular-nums; }
 .hd-year-item small { margin-left: auto; color: var(--tx-4); }
+/* Bouton « Analytics » et menu « ⋯ » (archives, import, configuration). */
+.hd-btn { height: 24px; padding: 0 10px; border-radius: 4px; border: 1px solid var(--bd); background: #fff; color: var(--tx-2); font-size: 11px; font-weight: 600; cursor: pointer; font-family: inherit; }
+.hd-btn:hover { color: var(--tx-1); border-color: #97a3b4; }
+.hd-menu-wrap { position: relative; }
+.hd-menu { position: absolute; top: 28px; right: 0; z-index: 61; list-style: none; margin: 0; padding: 4px; min-width: 210px; background: #fff; border: 1px solid var(--bd); border-radius: 6px; box-shadow: 0 8px 24px rgba(15, 23, 42, .12); }
+.hd-menu-item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 9px; border: 0; border-radius: 4px; background: none; text-align: left; cursor: pointer; font-size: 11px; color: var(--tx-2); font-family: inherit; white-space: nowrap; }
+.hd-menu-item:hover { background: #f1f5f9; color: var(--tx-1); }
+.hd-menu-item small { margin-left: auto; min-width: 16px; padding: 0 5px; border-radius: 8px; background: var(--accent); color: #fff; font-size: 9px; font-weight: 700; text-align: center; }
 .focus-chip { font-size: 9px; background: #e7edfb; border: 1px solid var(--accent); color: var(--accent); border-radius: 11px; padding: 3px 9px; cursor: pointer; font-weight: 600; }
 .filter-chip { font-size: 9px; background: #fff; border: 1px solid var(--bd); color: var(--tx-2); border-radius: 11px; padding: 3px 9px; cursor: pointer; font-weight: 600; }
 .filter-chip:hover { border-color: #97a3b4; color: var(--tx-1); }

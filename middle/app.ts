@@ -19,6 +19,7 @@ import { postCard } from "./cards.ts";
 import type { ConfigStore } from "./config-store.ts";
 import { logError, logRequest } from "./log.ts";
 import { auditImport, loadImport, parseDecisions, parseExercise, parseFiles } from "./import.ts";
+import { postExerciseSwitch } from "./exercise.ts";
 import { exerciseOrCurrent } from "./validation.ts";
 
 const SECURITY_HEADERS: Record<string, string> = {
@@ -113,6 +114,10 @@ function mountRoutes(app: Express, deps: MiddleDeps): void {
   });
   app.put("/api/config", (req: Request, res: Response) => {
     const result = putConfig(deps.configStore, req.body);
+    res.status(result.status).json(result.body);
+  });
+  app.post("/api/exercise/switch", async (req: Request, res: Response) => {
+    const result = await postExerciseSwitch(deps.storage, deps.configStore, req.body);
     res.status(result.status).json(result.body);
   });
   app.get("/api/board", async (_req: Request, res: Response) => {

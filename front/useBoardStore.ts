@@ -14,6 +14,7 @@ import {
   postArchive,
   postBlock,
   postCard,
+  postExerciseSwitch,
   postComment,
   postDecision,
   postDelete,
@@ -65,6 +66,8 @@ export interface BoardStore {
   /** Config writes resolve null on success, the French message on failure. */
   saveConfig(next: BoardConfig): Promise<string | null>;
   resetConfig(): Promise<string | null>;
+  /** The year switch (ADR 035/038): resolves null on success, the French message on failure. */
+  switchExercise(year: number): Promise<string | null>;
 }
 
 const NO_EVENTS: CardEvent[] = [];
@@ -215,6 +218,23 @@ function useConfigWrites(
   return { saveConfig, resetConfig };
 }
 
+// The year switch: POST it, refetch the runtime config (its exercise year
+// changed) then the board (its events changed) — same rule as config writes.
+function useExerciseSwitch(setConfig: (config: BoardConfig) => void, reload: () => Promise<void>) {
+  return useCallback(async (year: number): Promise<string | null> => {
+    try {
+      await postExerciseSwitch(year);
+      setConfig(await fetchConfig());
+      await reload();
+      return null;
+    } catch (cause) {
+      const message = messageOf(cause);
+      console.error("bascule refusée :", message);
+      return message;
+    }
+  }, [setConfig, reload]);
+}
+
 /**
  * Loads the runtime config and the board from the API, folds the event log
  * into CardState[] on every change, and exposes the write actions.
@@ -230,6 +250,7 @@ export function useBoardStore(): BoardStore {
   const reload = useReload(load.setBoard, setLastError);
   const cardActions = useCardActions(reload, setLastError);
   const configWrites = useConfigWrites(load.setConfig, load.defaults, reload);
+  const switchExercise = useExerciseSwitch(load.setConfig, reload);
   const dismissError = useCallback(() => setLastError(null), []);
   const cards = useMemo(
     () => (load.board ? foldEvents(load.board.cards, load.board.events) : []),
@@ -247,5 +268,6 @@ export function useBoardStore(): BoardStore {
     reload,
     ...cardActions,
     ...configWrites,
+    switchExercise,
   };
 }

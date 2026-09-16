@@ -637,6 +637,27 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-16 — Le modèle versionné passe devant la config appliquée ; exercise.json ; la bascule d'année ; menu « ⋯ » (ADR 038)
+
+- **Pourquoi** : sur la VM, l'auteur avait retiré SUP depuis ⚙ ; la config
+  appliquée gagnait sur tout et PROJETS VENDUS n'apparaissait pas. Règle de
+  l'auteur : « en tant que dev, on est plus important que les configs
+  appliquées ; une fois livré, ce sera l'inverse, mais on ne sera plus là ».
+  Et « où est le bouton on passe d'année ? » — il n'existait pas.
+- **Fait** : `config.json` porte l'empreinte du `board.json` sur lequel il a
+  été appliqué ; empreinte différente au démarrage = config écartée (ligne
+  d'historique, fichier retiré, console). L'année en cours vit dans
+  `exercise.json`, superposée à toute config (`getExerciseYear` /
+  `setExerciseYear`). `POST /api/exercise/switch` (année suivante seule) :
+  épingle les cartes sans année, archive les actives de l'année qui se
+  clôt, active celles de la nouvelle (`core/exercise-switch.ts`), puis
+  enregistre l'année. Panneau ⚙ › onglet **Exercice** (compte annoncé,
+  confirmation, bouton). Une année close montre aussi ses cartes archivées.
+  En-tête : bouton « Analytics » + menu « ⋯ » (Archives, Import,
+  Configuration). 545 tests, 0 échec.
+- **VM** : après le pull, la config appliquée (sans SUP, sans PROJETS
+  VENDUS) est écartée au démarrage → le `board.json` du dépôt fait foi.
+
 ### 2026-09-16 — Sélecteur d'exercice en en-tête ; analytics à onglets Capacité · Flux, panneaux repliables ; SUP retiré (ADR 037)
 
 - **Demandes de l'auteur** : afficher les années importées — « Portefeuille

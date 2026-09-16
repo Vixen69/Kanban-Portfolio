@@ -4,32 +4,13 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import type { BoardConfig, Card, CardEvent } from "../core/types.ts";
+import type { Card, CardEvent } from "../core/types.ts";
 import { testCard, testConfig } from "../core/test-helpers.ts";
 import { BadRequest, getBoard, getConfig, postEvent, putConfig, SERVER_ACTOR } from "./api.ts";
 import { postCard } from "./cards.ts";
-import { stubStorage } from "./test-helpers.ts";
-import type { ConfigStore } from "./config-store.ts";
+import { stubConfigStore, stubStorage } from "./test-helpers.ts";
 
 const config = testConfig();
-
-// ConfigStore stub recording every applied override.
-function stubConfigStore(
-  defaults: BoardConfig,
-): ConfigStore & { applied: { actor: string; config: BoardConfig }[] } {
-  const applied: { actor: string; config: BoardConfig }[] = [];
-  let runtime = defaults;
-  return {
-    applied,
-    getRuntime: () => runtime,
-    getDefaults: () => defaults,
-    setRuntime(next: BoardConfig, actor: string): BoardConfig {
-      applied.push({ actor, config: next });
-      runtime = next;
-      return next;
-    },
-  };
-}
 
 const VALID_CARD_BODY = {
   title: "Nouveau sujet",
