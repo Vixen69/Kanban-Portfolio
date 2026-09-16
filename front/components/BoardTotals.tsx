@@ -123,33 +123,16 @@ export function LaneTotals({ totals, config, open, laneName }: {
 }
 
 /**
- * The two Σ toggles of the grid corner: per-column totals and per-canal
- * totals, each remembered across reloads.
- * Inputs: both open flags and their toggles.
- * Output: the corner cell content. Failure modes: none.
+ * One Σ toggle: the per-column totals (grid corner, top left) or the
+ * per-canal totals (the lane gutter's head, ADR 039), each remembered
+ * across reloads.
+ * Inputs: the open flag, its toggle, what it unfolds.
+ * Output: the button. Failure modes: none.
  */
-export function TotalsToggles({ columnsOpen, lanesOpen, onToggleColumns, onToggleLanes }: {
-  columnsOpen: boolean;
-  lanesOpen: boolean;
-  onToggleColumns: () => void;
-  onToggleLanes: () => void;
-}) {
+export function TotalsToggle({ open, onToggle, what }: { open: boolean; onToggle: () => void; what: "colonne" | "canal" }) {
   return (
-    <>
-      <button
-        className="totals-toggle"
-        onClick={onToggleColumns}
-        title={(columnsOpen ? "Replier" : "Déplier") + " les totaux par colonne"}
-      >
-        {columnsOpen ? "▾" : "▸"} Σ
-      </button>
-      <button
-        className="totals-toggle"
-        onClick={onToggleLanes}
-        title={(lanesOpen ? "Replier" : "Déplier") + " les totaux par canal"}
-      >
-        {lanesOpen ? "▾" : "▸"} Σ
-      </button>
-    </>
+    <button className="totals-toggle" onClick={onToggle} title={(open ? "Replier" : "Déplier") + ` les totaux par ${what}`}>
+      {open ? "▾" : "▸"} Σ
+    </button>
   );
 }

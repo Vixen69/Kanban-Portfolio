@@ -6,6 +6,32 @@
 
 import type { BoardConfig, CardState, Column, Lane } from "./types.ts";
 import { cellCards } from "./board.ts";
+import { resolveFlowAnchors } from "./flow.ts";
+
+/**
+ * The lane marker of a drop into a unified cell (ADR 039): the card keeps
+ * its own canal — before the RDO a project has none to show.
+ */
+export const UNIFIED_LANE = "*";
+
+/**
+ * The columns shown WITHOUT canals (ADR 039, author 2026-09-16): before the
+ * RDO a project is neither small nor complex, so the intake columns up to
+ * and including the qualification stage are one cell tall as the board;
+ * the canals start right after. Derived from the flow anchors (the RDO
+ * column), never hardcoded — an admin may rename or move the stage.
+ * Inputs: the board config. Output: the unified column ids, in board order
+ * (empty when no qualification stage resolves, or when it is the last
+ * column — nothing would be left for the canals). Failure: none.
+ */
+export function unifiedColumnIds(config: BoardConfig): Set<string> {
+  const anchors = resolveFlowAnchors(config);
+  const qualification = anchors?.qualification ?? null;
+  if (qualification === null) return new Set();
+  const index = config.columns.findIndex((column) => column.id === qualification.id);
+  if (index < 0 || index >= config.columns.length - 1) return new Set();
+  return new Set(config.columns.slice(0, index + 1).map((column) => column.id));
+}
 
 /** Pixel constants shared between the CSS and the acceptance test. */
 export const LAYOUT = {
@@ -43,15 +69,18 @@ export const LANE_GUTTER = {
 } as const;
 
 /**
- * CSS grid-template-columns for the board: the lane-label gutter followed
- * by one weight per column. A collapsed column is a fixed 30px strip; the
- * focused column takes 2.6fr while the other expanded columns shrink to
- * 0.62fr; with no focus every expanded column gets 1fr. Collapse wins
+ * CSS grid-template-columns for the board. Without unified columns: the
+ * lane-label gutter followed by one weight per column. With them (ADR
+ * 039): the board-totals gutter, the unified columns, then the lane
+ * gutter and the canal columns. A collapsed column is a fixed 30px strip;
+ * the focused column takes 2.6fr while the other expanded columns shrink
+ * to 0.62fr; with no focus every expanded column gets 1fr. Collapse wins
  * over focus.
  * Inputs: columns in board order, the focused column id (or null), the
- * set of collapsed column ids, and the lane gutter width — the default
- * `var(--lane-w)` narrow strip, widened by the caller when the per-canal
- * totals are unfolded (design v12).
+ * set of collapsed column ids, the lane gutter width (the default
+ * `var(--lane-w)` narrow strip, widened when the per-canal totals are
+ * unfolded — design v12), the unified column ids and the board gutter
+ * width (widened when the per-column totals are unfolded).
  * Output: the grid-template-columns string. Failure: none.
  */
 export function columnTemplate(
@@ -59,17 +88,21 @@ export function columnTemplate(
   focusedColumnId: string | null,
   collapsedColumnIds: ReadonlySet<string>,
   laneWidth: string = LANE_GUTTER.compact,
+  unified: ReadonlySet<string> = new Set(),
+  boardWidth: string = LANE_GUTTER.compact,
 ): string {
-  const weights = columns.map((column) =>
+  const weight = (column: Column): string =>
     collapsedColumnIds.has(column.id)
       ? "30px"
       : column.id === focusedColumnId
         ? "2.6fr"
         : focusedColumnId !== null
           ? "0.62fr"
-          : "1fr",
-  );
-  return `${laneWidth} ${weights.join(" ")}`;
+          : "1fr";
+  if (unified.size === 0) return `${laneWidth} ${columns.map(weight).join(" ")}`;
+  const head = columns.filter((column) => unified.has(column.id)).map(weight);
+  const tail = columns.filter((column) => !unified.has(column.id)).map(weight);
+  return `${boardWidth} ${head.join(" ")} ${laneWidth} ${tail.join(" ")}`;
 }
 
 /**

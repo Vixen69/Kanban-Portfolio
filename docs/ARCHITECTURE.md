@@ -637,6 +637,23 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-16 — Demandes et Qualification sans canal ; la qualification, c'est le geste (ADR 039)
+
+- **Demande de l'auteur** : avant la RDO un projet n'est ni petit ni
+  complexe, il est unique ; Demandes et Qualification en bandes uniques,
+  les trois canaux à partir d'Études, et « ma seule angoisse, c'est ce truc
+  des totaux ». Trois maquettes et un croquis pour fixer la forme.
+- **Fait** : `unifiedColumnIds` (colonnes jusqu'à l'ancre de qualification,
+  déduites de la config) ; grille à **deux gouttières** — le total du
+  tableau entier à gauche de Demandes (avec le Σ des colonnes), la
+  gouttière des canaux avec son Σ↓ entre Qualification et Études ; cellules
+  unifiées hautes comme le tableau (`UnifiedZone.tsx`), sans étiquette ;
+  totaux de canal comptés à partir d'Études ; en-têtes inchangés. Aucun
+  changement de modèle : la carte garde son `laneId`, l'affichage l'ignore
+  avant la RDO ; **glisser vers un canal d'Études qualifie** ; un dépôt
+  dans une cellule unifiée conserve le canal (`UNIFIED_LANE`), y compris
+  sur une autre carte. 547 tests, 0 échec.
+
 ### 2026-09-16 — Le modèle versionné passe devant la config appliquée ; exercise.json ; la bascule d'année ; menu « ⋯ » (ADR 038)
 
 - **Pourquoi** : sur la VM, l'auteur avait retiré SUP depuis ⚙ ; la config

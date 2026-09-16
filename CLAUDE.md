@@ -262,7 +262,16 @@ and the scroll-hint bob (accepted v11 exception). (Implemented in
 hand-written CSS now; adapted to Tailwind/Radix later.)
 
 - Grid: lanes as horizontal swimlanes (canaux), columns as vertical stages;
-  gate badges (DoR/DoD) on their columns.
+  gate badges (DoR/DoD) on their columns. The intake columns up to the
+  qualification stage (the RDO) have NO canal (ADR 039, author
+  2026-09-16): each is one cell tall as the board, unlabelled; the canals
+  start right after. Two gutters: left of Demandes the board-wide totals
+  (count, estimé, RAF of everything shown, with the per-column Σ), and
+  between Qualification and Études the canal gutter with its own Σ (canal
+  totals count the canal columns only). No model change: a card keeps its
+  `laneId`, hidden before the RDO; qualification IS the drag into a canal
+  of Études; a drop into a unified cell keeps the card's canal.
+
 - Aging (design v9): age is worn as a text pill (3j/2s/4m; warn ≥ recent,
   danger ≥ aging thresholds). No background darkening by default.
 - Blocked: red card wash alone on tickets (one signal per information —

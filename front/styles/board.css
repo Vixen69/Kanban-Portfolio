@@ -12,6 +12,12 @@
 .board-area { grid-area: board; position: relative; overflow: hidden; }
 .board { height: 100%; width: 100%; display: grid; gap: 1px; background: var(--bd); transition: grid-template-columns .22s ease, grid-template-rows .2s ease; }
 .corner { background: var(--bg-page); display: flex; flex-direction: column; align-items: stretch; justify-content: center; gap: 3px; padding: 3px; }
+/* Gouttière des totaux du tableau, à gauche de Demandes (ADR 039) : même
+   étiquette verticale que les canaux, sans repli ni clic. */
+.board-gutter { cursor: default; }
+.board-gutter:hover { background: var(--bg-page); }
+.board-gutter .lane-name { color: var(--tx-1); }
+
 .totals-toggle { background: none; border: 1px solid var(--bd-sub); border-radius: 4px; color: var(--tx-3); cursor: pointer; font-size: 9px; font-family: inherit; padding: 2px 6px; }
 .totals-toggle:hover { color: var(--accent); border-color: var(--accent); }
 

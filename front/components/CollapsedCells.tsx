@@ -4,6 +4,7 @@
 // 300-line file cap once the v12 totals moved in.
 
 import { useState } from "react";
+import type { CSSProperties } from "react";
 import type { BoardConfig, CardState } from "../../core/types.ts";
 import { isStale } from "../../core/aging.ts";
 import { CollapsedTicketList } from "./CollapsedTicketList.tsx";
@@ -53,15 +54,17 @@ export function CollapsedCell({ cards, config, now, onOpen }: {
  * open-card callback. Output: the narrow strip content.
  * Failure modes: none.
  */
-export function CollapsedColCell({ cards, config, onOpen }: {
+export function CollapsedColCell({ cards, config, onOpen, style }: {
   cards: CardState[];
   config: BoardConfig;
   onOpen: (card: CardState) => void;
+  /** Grid placement (a unified column's strip spans the lane rows, ADR 039). */
+  style?: CSSProperties;
 }) {
   const blocked = cards.filter((card) => card.blocked).length;
   const pop = useCellPopover(cards.length);
   return (
-    <div className={"ccol-cell" + (cards.length ? " has" : "")} onMouseEnter={pop.open} onClick={pop.open}>
+    <div className={"ccol-cell" + (cards.length ? " has" : "")} style={style} onMouseEnter={pop.open} onClick={pop.open}>
       <span className="ccount">{cards.length || ""}</span>
       {blocked > 0 && <span className="cblk">{blocked}</span>}
       {pop.rect && <CollapsedTicketList anchorRect={pop.rect} list={cards} config={config} onOpen={onOpen} onClose={pop.close} />}

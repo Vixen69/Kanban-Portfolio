@@ -5,6 +5,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DragEvent, RefObject } from "react";
 import type { CardState, Lane } from "../core/types.ts";
+import { UNIFIED_LANE, unifiedColumnIds } from "../core/layout.ts";
+
 import type { MoveTarget } from "./api.ts";
 import type { BoardStore } from "./useBoardStore.ts";
 
@@ -155,8 +157,11 @@ export function useDragHandlers(store: BoardStore, ui: UiState) {
     setDropCardId(null);
     if (!id) return;
     const card = cards.find((candidate) => candidate.id === id);
-    if (!card || (card.laneId === laneId && card.columnId === columnId)) return;
-    void moveCard(id, { laneId, columnId });
+    if (!card) return;
+    // A unified cell (before the RDO, ADR 039) has no canal: the card keeps its own.
+    const target = laneId === UNIFIED_LANE ? card.laneId : laneId;
+    if (card.laneId === target && card.columnId === columnId) return;
+    void moveCard(id, { laneId: target, columnId });
   }, [cards, moveCard, setDragOver, setDropCardId]);
   const cellHover = useCellHoverHandlers(ui);
   const cardLevel = useCardDropHandlers(dragId, store, ui);
@@ -193,7 +198,7 @@ function useCardDropHandlers(
   ui: UiState,
 ) {
   const { setDragOver, setDropCardId } = ui;
-  const { moveCard } = store;
+  const { moveCard, cards, config } = store;
   const onCardOver = useCallback((event: DragEvent, card: CardState) => {
     event.preventDefault();
     event.stopPropagation();
@@ -217,7 +222,12 @@ function useCardDropHandlers(
     setDragOver(null);
     setDropCardId(null);
     if (!id || id === target.id) return;
-    void moveCard(id, { laneId: target.laneId, columnId: target.columnId, beforeId: target.id });
+    // Dropped onto a card of a unified cell (ADR 039): the dragged card keeps its
+    // own canal — a lane change there would count as a stage entry (ADR 019).
+    const unified = config === null ? new Set<string>() : unifiedColumnIds(config);
+    const dragged = cards.find((candidate) => candidate.id === id);
+    const laneId = unified.has(target.columnId) && dragged !== undefined ? dragged.laneId : target.laneId;
+    void moveCard(id, { laneId, columnId: target.columnId, beforeId: target.id });
   }, [dragId, moveCard, setDragOver, setDropCardId]);
   return { onCardOver, onCardDrop };
 }

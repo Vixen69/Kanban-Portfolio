@@ -97,8 +97,10 @@ export function ColumnHeader({ col, gateDef, focused, colCollapsed, totals, tota
  * state, the per-column totals, the unfolded flag, the callbacks.
  * Output: the header elements (a fragment). Failure modes: none.
  */
-export function ColumnHeads({ config, cards, hiddenIds, focusedColumn, collapsedCols, byColumn, totalsOpen, onFocus, onToggleCollapse }: {
+export function ColumnHeads({ config, columns, cards, hiddenIds, focusedColumn, collapsedCols, byColumn, totalsOpen, onFocus, onToggleCollapse }: {
   config: BoardConfig;
+  /** The columns to render (a slice of the config's, ADR 039); all of them by default. */
+  columns?: Column[];
   cards: CardState[];
   hiddenIds: Set<string>;
   focusedColumn: string | null;
@@ -111,7 +113,7 @@ export function ColumnHeads({ config, cards, hiddenIds, focusedColumn, collapsed
   const narrowed = hiddenIds.size > 0;
   return (
     <>
-      {config.columns.map((col) => (
+      {(columns ?? config.columns).map((col) => (
         <ColumnHeader
           key={col.id}
           col={col}

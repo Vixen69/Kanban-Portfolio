@@ -6,14 +6,19 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, DragEvent } from "react";
-import type { BoardConfig, CardState, Column, GateDef, Lane } from "../../core/types.ts";
+import type { BoardConfig, CardState, Column, GateDef } from "../../core/types.ts";
 import { wipDisplay, wipState } from "../../core/board.ts";
 import { FocusCard, MiniCard } from "./cards.tsx";
 
 /** Props of one cell (pinned build-spec contract). */
 export interface CellProps {
-  lane: Lane;
+  /** The canal of the cell, or UNIFIED_LANE for a cell without canal (ADR 039). */
+  laneId: string;
   column: Column;
+  /** WIP limit the read-out is measured against; defaults to the column's own. A unified cell passes the whole column's (lanes × wip). */
+  wipLimit?: number | null;
+  /** Grid placement of the cell root (the unified cells span the lane rows). */
+  style?: CSSProperties;
   /** The cards of THIS cell only (BoardGrid filters via core cellCards),
    * the sidebar filters already applied — hidden cards never reach the
    * cell (ADR 031). */
@@ -98,17 +103,19 @@ function CellCardList({ props, listRef }: { props: CellProps; listRef: React.Ref
  * Failure modes: none.
  */
 export function Cell(props: CellProps) {
-  const { lane, column, cards, gateDef } = props;
-  const wip = wipState(cards.length, column.wip);
+  const { laneId, column, cards, gateDef } = props;
+  const limit = props.wipLimit === undefined ? column.wip : props.wipLimit;
+  const wip = wipState(cards.length, limit);
   const blockedCount = cards.filter((card) => card.blocked).length;
   const scroll = useScrollHint(cards.length, props.focused);
   return (
     <div
       className={"cell" + (props.focused ? " focused" : "") + (props.dragOver ? " dragover" : "")}
       data-wip={wip}
-      onDragOver={(e) => props.onDragOverCell(e, lane.id, column.id)}
+      style={props.style}
+      onDragOver={(e) => props.onDragOverCell(e, laneId, column.id)}
       onDragLeave={props.onDragLeaveCell}
-      onDrop={(e) => props.onDrop(e, lane.id, column.id)}
+      onDrop={(e) => props.onDrop(e, laneId, column.id)}
     >
       {gateDef !== null && column.gate !== null && (
         <span
@@ -118,7 +125,7 @@ export function Cell(props: CellProps) {
         />
       )}
       <div className="cell-head">
-        <span className={"wip " + wip}>{wipDisplay(cards.length, column.wip)}</span>
+        <span className={"wip " + wip}>{wipDisplay(cards.length, limit)}</span>
         {blockedCount > 0 && <span className="cell-blocked">{blockedCount}</span>}
       </div>
       <CellCardList props={props} listRef={scroll.ref} />

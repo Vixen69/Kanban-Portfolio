@@ -7,6 +7,7 @@ import {
   fitsOneScreen,
   laneRequiredHeight,
   rowTemplate,
+  unifiedColumnIds,
 } from "./layout.ts";
 import { testCard, testConfig } from "./test-helpers.ts";
 import type { BoardConfig, CardState, Column, Lane } from "./types.ts";
@@ -119,4 +120,26 @@ test("150 cards at density 16 / gap 2 fit a 1080p viewport when spread over the 
   }
   assert.equal(cards.length, 150);
   assert.equal(fitsOneScreen(cards, config), true);
+});
+
+// ADR 039: the intake columns up to the qualification stage have no canal.
+test("unifiedColumnIds: the columns up to the qualification anchor; none when it is the last column or absent", () => {
+  assert.deepEqual([...unifiedColumnIds(CONFIG)], ["col1", "col2"], "col2 is the second column, the qualification fallback");
+  const named: BoardConfig = { ...CONFIG, columns: [
+    { id: "demandes", name: "Demandes", wip: null, gate: null, note: "" },
+    { id: "qualification", name: "Qualification", wip: null, gate: null, note: "" },
+    { id: "etudes", name: "Études", wip: null, gate: null, note: "" },
+    { id: "actifs", name: "Actifs", wip: null, gate: null, note: "" },
+  ] };
+  assert.deepEqual([...unifiedColumnIds(named)], ["demandes", "qualification"]);
+  const twoOnly: BoardConfig = { ...CONFIG, columns: CONFIG.columns.slice(0, 2) };
+  assert.deepEqual([...unifiedColumnIds(twoOnly)], [], "nothing would be left for the canals");
+  assert.deepEqual([...unifiedColumnIds({ ...CONFIG, columns: [] })], []);
+});
+
+test("columnTemplate with unified columns: board gutter, unified weights, lane gutter, canal weights", () => {
+  const unified = new Set(["col1", "col2"]);
+  assert.equal(columnTemplate(COLUMNS, null, new Set(), "var(--lane-w)", unified, "var(--lane-w)"), "var(--lane-w) 1fr 1fr var(--lane-w) 1fr");
+  assert.equal(columnTemplate(COLUMNS, "col3", new Set(["col1"]), "176px", unified, "var(--lane-w)"), "var(--lane-w) 30px 0.62fr 176px 2.6fr");
+  assert.equal(columnTemplate(COLUMNS, null, new Set(), "var(--lane-w)", new Set(), "176px"), "var(--lane-w) 1fr 1fr 1fr", "no unified column: the single gutter of before");
 });

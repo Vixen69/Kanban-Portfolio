@@ -6,26 +6,30 @@
 // the single source of truth for the focus/collapse geometry.
 //
 // Design v12: headers and canal labels wear the money/charge totals of the
-// VISIBLE cards, folded or unfolded by the two Σ toggles in the corner.
-// The column note moved to the header tooltip — the totals took its row,
-// but the note stays configurable and admin-editable (ADR 020).
+// VISIBLE cards, folded or unfolded by the two Σ toggles. The column note
+// moved to the header tooltip (ADR 020).
 //
 // ADR 031 (author, 2026-09-11): the sidebar filters HIDE the cards they
-// exclude — cells receive the retained cards only (the v12 dimming is
-// retired) — and each column header counts them (« retenus/total » while
-// the board is narrowed).
+// exclude — cells receive the retained cards only — and each column
+// header counts them (« retenus/total » while the board is narrowed).
+//
+// ADR 039 (author, 2026-09-16): the intake columns up to the RDO have no
+// canal — one cell tall as the board each (UnifiedZone.tsx); the board
+// totals sit in a gutter left of Demandes (with the per-column Σ), the
+// canals and their gutter (with the per-canal Σ) start after.
 
 import { useMemo } from "react";
 import type { DragEvent } from "react";
 import type { BoardConfig, CardState, Column, Lane } from "../../core/types.ts";
 import { cellCards } from "../../core/board.ts";
-import { LANE_GUTTER, columnTemplate, rowTemplate } from "../../core/layout.ts";
-import { columnTotals, emptyTotals, laneTotals, type GroupTotals } from "../../core/totals.ts";
+import { LANE_GUTTER, columnTemplate, rowTemplate, unifiedColumnIds } from "../../core/layout.ts";
+import { columnTotals, emptyTotals, laneTotals, totalsOf, type GroupTotals } from "../../core/totals.ts";
 import { COLUMN_TOTALS_KEY, LANE_TOTALS_KEY, useStoredFlag } from "../useUiPrefs.ts";
 import { Cell } from "./Cell.tsx";
-import { LaneTotals, TotalsToggles } from "./BoardTotals.tsx";
+import { LaneTotals, TotalsToggle } from "./BoardTotals.tsx";
 import { ColumnHeads, gateDefOf } from "./ColumnHeads.tsx";
 import { CollapsedCell, CollapsedColCell } from "./CollapsedCells.tsx";
+import { BoardGutter, LaneCorner, UnifiedCells } from "./UnifiedZone.tsx";
 
 /**
  * Vertical lane label; clicking collapses the canal to a summary strip.
@@ -98,7 +102,7 @@ function BoardCell({ lane, col, cards, props }: { lane: Lane; col: Column; cards
   const over = props.dragOver;
   return (
     <Cell
-      lane={lane}
+      laneId={lane.id}
       column={col}
       cards={cards}
       focused={props.focusedColumn === col.id}
@@ -121,13 +125,14 @@ function BoardCell({ lane, col, cards, props }: { lane: Lane; col: Column; cards
   );
 }
 
-// One board row: the lane label plus one cell per column. Lane collapse
-// wins over column collapse (design grid.jsx render order). The label of
-// the last expanded lane is disabled (counted against the CURRENT config
-// lanes — collapsedLanes may hold stale ids after an admin edit). Every
-// cell — expanded or collapsed — receives the retained cards only.
-function LaneRow({ lane, props, totals, totalsOpen }: {
+// One board row: the lane label plus one cell per canal column. Lane
+// collapse wins over column collapse (design grid.jsx render order). The
+// label of the last expanded lane is disabled (counted against the CURRENT
+// config lanes — collapsedLanes may hold stale ids after an admin edit).
+// Every cell — expanded or collapsed — receives the retained cards only.
+function LaneRow({ lane, columns, props, totals, totalsOpen }: {
   lane: Lane;
+  columns: Column[];
   props: BoardGridProps;
   totals: GroupTotals;
   totalsOpen: boolean;
@@ -139,7 +144,7 @@ function LaneRow({ lane, props, totals, totalsOpen }: {
       <LaneLabel lane={lane} collapsed={laneCollapsed} disabled={!laneCollapsed && expandedCount <= 1}
         totals={totals} totalsOpen={totalsOpen} config={props.config}
         onToggle={() => props.onToggleLane(lane.id)} />
-      {props.config.columns.map((col) => {
+      {columns.map((col) => {
         const inCell = cellCards(props.cards, lane.id, col.id).filter((card) => !props.hiddenIds.has(card.id));
         if (laneCollapsed) {
           return <CollapsedCell key={col.id} cards={inCell} config={props.config} now={props.now} onOpen={props.onOpen} />;
@@ -153,22 +158,28 @@ function LaneRow({ lane, props, totals, totalsOpen }: {
   );
 }
 
-// Per-column and per-canal aggregates of the VISIBLE cards. Recomputed on
-// every filter keystroke (hiddenIds changes) but NOT on the one-minute now
-// tick — the totals carry no time-dependent figure, so `now` is absent
-// from the deps on purpose.
-function useVisibleTotals(cards: CardState[], hidden: Set<string>, config: BoardConfig) {
+// Per-column, per-canal and board-wide aggregates of the VISIBLE cards.
+// The canal totals count the canal columns only (ADR 039: before the RDO
+// a card's canal is not shown, so it is not counted there either); the
+// board total counts everything shown. Recomputed on every filter
+// keystroke (hiddenIds changes) but NOT on the one-minute now tick — the
+// totals carry no time-dependent figure.
+function useVisibleTotals(cards: CardState[], hidden: Set<string>, config: BoardConfig, unified: Set<string>) {
   const byColumn = useMemo(() => columnTotals(cards, hidden, config), [cards, hidden, config]);
-  const byLane = useMemo(() => laneTotals(cards, hidden, config), [cards, hidden, config]);
-  return { byColumn, byLane };
+  const byLane = useMemo(
+    () => laneTotals(cards.filter((card) => !unified.has(card.columnId)), hidden, config),
+    [cards, hidden, config, unified],
+  );
+  const board = useMemo(() => totalsOf(cards.filter((card) => !hidden.has(card.id))), [cards, hidden]);
+  return { byColumn, byLane, board };
 }
 
 /**
- * The whole board: one CSS grid of column headers, lane labels and cells.
- * Focus widens a column (2.6fr), collapse shrinks a column to a 30px
- * strip or a lane to a 26px summary row — the grid templates come from
- * core/layout columnTemplate/rowTemplate. Unfolding the per-canal totals
- * widens the lane gutter to LANE_GUTTER.expanded.
+ * The whole board: one CSS grid of column headers, gutters, lane labels
+ * and cells. Focus widens a column (2.6fr), collapse shrinks a column to
+ * a 30px strip or a lane to a 26px summary row — the grid templates come
+ * from core/layout. Unfolding the per-canal totals widens the lane gutter,
+ * unfolding the per-column totals widens the board gutter (ADR 039).
  * Inputs: BoardGridProps (config, folded cards, hidden/focus/collapse/drag
  * state and the interaction callbacks).
  * Output: the .board grid element. Failure modes: none.
@@ -177,26 +188,34 @@ export function BoardGrid(props: BoardGridProps) {
   const { config } = props;
   const [columnsOpen, toggleColumns] = useStoredFlag(COLUMN_TOTALS_KEY, false);
   const [lanesOpen, toggleLanes] = useStoredFlag(LANE_TOTALS_KEY, false);
-  const totals = useVisibleTotals(props.cards, props.hiddenIds, config);
+  const unified = useMemo(() => unifiedColumnIds(config), [config]);
+  const totals = useVisibleTotals(props.cards, props.hiddenIds, config, unified);
   const laneWidth = lanesOpen ? LANE_GUTTER.expanded : LANE_GUTTER.compact;
+  const boardWidth = columnsOpen ? LANE_GUTTER.expanded : LANE_GUTTER.compact;
+  const unifiedCols = config.columns.filter((col) => unified.has(col.id));
+  const laneCols = config.columns.filter((col) => !unified.has(col.id));
+  const heads = { config, cards: props.cards, hiddenIds: props.hiddenIds, focusedColumn: props.focusedColumn,
+    collapsedCols: props.collapsedCols, byColumn: totals.byColumn, totalsOpen: columnsOpen,
+    onFocus: props.onFocusColumn, onToggleCollapse: props.onToggleColumnCollapse };
   return (
     <div
       className="board"
       style={{
-        gridTemplateColumns: columnTemplate(config.columns, props.focusedColumn, props.collapsedCols, laneWidth),
+        gridTemplateColumns: columnTemplate(config.columns, props.focusedColumn, props.collapsedCols, laneWidth, unified, boardWidth),
         gridTemplateRows: rowTemplate(config.lanes, props.collapsedLanes),
       }}
     >
       <div className="corner">
-        <TotalsToggles columnsOpen={columnsOpen} lanesOpen={lanesOpen}
-          onToggleColumns={toggleColumns} onToggleLanes={toggleLanes} />
+        <TotalsToggle open={columnsOpen} onToggle={toggleColumns} what="colonne" />
+        {unified.size === 0 && <TotalsToggle open={lanesOpen} onToggle={toggleLanes} what="canal" />}
       </div>
-      <ColumnHeads config={config} cards={props.cards} hiddenIds={props.hiddenIds}
-        focusedColumn={props.focusedColumn} collapsedCols={props.collapsedCols}
-        byColumn={totals.byColumn} totalsOpen={columnsOpen}
-        onFocus={props.onFocusColumn} onToggleCollapse={props.onToggleColumnCollapse} />
+      <ColumnHeads {...heads} columns={unifiedCols} />
+      {unified.size > 0 && <LaneCorner open={lanesOpen} onToggle={toggleLanes} />}
+      <ColumnHeads {...heads} columns={laneCols} />
+      {unified.size > 0 && <BoardGutter totals={totals.board} config={config} open={columnsOpen} rows={config.lanes.length} />}
+      <UnifiedCells columns={unifiedCols} props={props} rows={config.lanes.length} />
       {config.lanes.map((lane) => (
-        <LaneRow key={lane.id} lane={lane} props={props}
+        <LaneRow key={lane.id} lane={lane} columns={laneCols} props={props}
           totals={totals.byLane[lane.id] ?? emptyTotals()} totalsOpen={lanesOpen} />
       ))}
     </div>
