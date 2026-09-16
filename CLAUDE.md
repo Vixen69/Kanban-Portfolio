@@ -475,3 +475,8 @@ run on the platform). Every internal design decision is the author's.
 
 - Aging step values and andon threshold are defaults; confirm with the PMO users.
 - Sciforma field mapping for financials (budget, consumed, remaining).
+- **Projets vendus** (2026-09-15, author investigating — do not decide): a
+  domain of their own (as the PDSI macro does), a constraint tag, or
+  outside the perimeter? Until settled they resolve through their
+  « Projet.Portefeuille » path like any project, and the audit report says
+  which rule fired for each path.
