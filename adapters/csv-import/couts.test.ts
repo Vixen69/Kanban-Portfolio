@@ -49,7 +49,7 @@ test("the perimeter: unique projects on the exercise year, retained state, confi
       type: new Map([["Achat", 1], ["Evolution - TMA", 1], ["RUN", 1]]),
       arbitrage: 1, noMe: 1,
     },
-    inactive: 1, nonPe: 1, domainResolved: 4, domainUnknown: 1,
+    inactive: 1, nonPe: 1, domainResolved: 5, domainUnknown: 0,
   });
   assert.equal(excludedSummary(table.stats.excluded, 2026),
     "hors 2026 1 · état hors liste 5 (Annulé 1, Budget présenté 1, Reporté 1, Fusionné 1, Nouveau 1)" +
@@ -72,7 +72,7 @@ test("each retained project: title without its code, type through the aliases, d
       ["Refonte portail interne", "etude", "ad", "developpements_rapides"],
       ["Montée de version calcul", "atlas", "ing", null],
       ["Étude connectivité site B", "obsolescence", "corporate", "achats"],
-      ["Outil vendu Y", "etude", null, null],
+      ["Outil vendu Y", "etude", "vendus", null],
     ],
   );
   assert.deepEqual([...table.typeCounts.entries()], [["mise_en_oeuvre", 1], ["etude", 2], ["atlas", 1], ["obsolescence", 1]]);
@@ -99,7 +99,7 @@ test("the ME test: a project whose four ME cells are empty or zero on every row 
 test("unknown portfolios and non-PE codes are questioned, never dropped; no state list = every state kept, said", () => {
   const { report } = couts();
   const questions = report.doubtful.map((d) => d.question);
-  assert.ok(questions.some((q) => /portefeuille sans domaine : « PROJETS VENDUS » \(1 projet\(s\)\)/.test(q)));
+  assert.ok(!questions.some((q) => /portefeuille sans domaine/.test(q)), "ADR 036: PROJETS VENDUS resolves to the failsafe domain");
   assert.ok(questions.some((q) => /codes retenus hors PE : 1 \(MEWTBN7Q\)/.test(q)));
   assert.ok(!questions.some((q) => /type hors/.test(q)), "types outside the config are excluded, not questioned");
   const { table, report: noList } = couts({ ...CONFIG, exercise: { year: 2026 } });
@@ -130,6 +130,6 @@ test("the report names the projects excluded for having no ME figure, and says w
     "portefeuille « DSI NEXTER.GROUPE : Développements rapides » : 1 projet(s) → A&D / DEVELOPPEMENTS RAPIDES — dernier segment · « DEVELOPPEMENTS RAPIDES »",
     "portefeuille « DSI NEXTER.INFRASTRUCTURE OPE » : 1 projet(s) → INFRA — dernier segment · « INFRASTRUCTURE »",
     "portefeuille « DSI NEXTER.INGENIERIE SYSTEMES » : 1 projet(s) → ING — dernier segment · « INGENIERIE SYSTEMES »",
-    "portefeuille « DSI NEXTER.PROJETS VENDUS » : 1 projet(s) → sans domaine — aucun mot connu (nom, code, alias de domaine, sous-domaine)",
+    "portefeuille « DSI NEXTER.PROJETS VENDUS » : 1 projet(s) → PROJETS VENDUS — dernier segment · « PROJETS VENDUS »",
   ]);
 });

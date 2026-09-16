@@ -49,7 +49,8 @@ l'auteur doit ré-importer sans rien casser de ce qu'il a placé.
    garde-fou, jamais une devinette sur du texte libre (« Reporting business
    unit » ne matche pas ; « [Business] », « [BUSINESS-2026] » matchent).
    Deux domaines marqués = ambigu = rien.
-5. **Domaine « PROJETS VENDUS »** (`vendus`, short « VENDU ») : mots de
+5. **Domaine « PROJETS VENDUS »** (`vendus`, short « VDU » — trois lettres
+   comme les autres) : mots de
    portefeuille « PROJET VENDU », « PROJETS VENDUS » ; marqueur « BUSINESS ».
    Le failsafe de l'auteur tant que la logique des portefeuilles vendus
    n'est pas comprise (question de fond toujours ouverte, CLAUDE.md §12).

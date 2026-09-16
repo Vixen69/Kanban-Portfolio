@@ -20,7 +20,8 @@ test("the repository's config/board.json is valid", () => {
   const config = validateBoardConfig(raw);
   assert.equal(config.lanes.length, 3);
   assert.equal(config.columns.length, 8);
-  assert.equal(config.domains.length, 10);
+  assert.equal(config.domains.length, 11, "ADR 036: PROJETS VENDUS, the author's failsafe domain");
+
   assert.equal(config.types.length, 5);
   assert.deepEqual(config.types.find((t) => t.id === "atlas")?.aliases, ["Projet ATLAS [Hors PDSI]", "ATLAS"], "ADR 030: the author's fifth type");
   assert.equal(config.types.find((t) => t.id === "obsolescence")?.name, "Obsolescence");
@@ -31,11 +32,12 @@ test("the repository's config/board.json is valid", () => {
   // ADR 030: the Sciforma portfolio words of the domains.
   assert.deepEqual(config.domains.filter((d) => d.aliases !== undefined).map((d) => [d.id, d.aliases]), [
     ["ad", ["GROUPE"]], ["industrie", ["PRODUCTION"]], ["infra", ["INFRASTRUCTURE"]],
-    ["ing", ["INGENIERIE SYSTEMES", "INGENIERIE MUNITIONS"]],
+    ["ing", ["INGENIERIE SYSTEMES", "INGENIERIE MUNITIONS"]], ["vendus", ["PROJET VENDU", "PROJETS VENDUS"]],
   ]);
-  // ADR 022: only A&D and CORPORATE are detailed into sub-domains.
+  assert.deepEqual(config.domains.find((d) => d.id === "vendus")?.nameMarkers, ["BUSINESS"], "ADR 036: the bracketed marker");
+  // ADR 022: only A&D and CORPORATE are detailed into sub-domains (ADR 036: Architecture applicative is gone).
   const detailed = config.domains.filter((d) => d.subDomains !== undefined).map((d) => [d.id, d.subDomains?.length]);
-  assert.deepEqual(detailed, [["ad", 4], ["corporate", 9]]);
+  assert.deepEqual(detailed, [["ad", 3], ["corporate", 9]]);
   assert.equal(config.fields.length, 0);
   assert.equal(config.columns.find((c) => c.id === "prets")?.gate, "DoR");
   assert.equal(config.columns.find((c) => c.id === "done")?.gate, "DoD");

@@ -182,7 +182,7 @@ test("the COUT PREV export is the perimeter when present; the Projets onglet onl
   assert.equal(byLabel.get("périmètre · lecture COUT PREV"),
     "18 ligne(s) · 16 projet(s) distinct(s) · retenus 5 (1 hors PE) · écartés : hors 2026 1" +
     " · état hors liste 5 (Annulé 1, Budget présenté 1, Reporté 1, Fusionné 1, Nouveau 1) · type hors config 3 (Achat 1, Evolution - TMA 1, RUN 1)" +
-    " · arbitrage 1 · sans ME 1 · « Projet.Actif » faux gardés 1 · domaine via portefeuille 4/5");
+    " · arbitrage 1 · sans ME 1 · « Projet.Actif » faux gardés 1 · domaine via portefeuille 5/5");
   assert.equal(byLabel.get("périmètre · recoupement"),
     "5 projet(s) dans « Couts.csv » (COUT PREV, fait foi) · 6 dans « Projets.csv » · 4 commun(s)" +
     " · seulement COUT PREV : 1 (PE10017) · seulement Projets : 2 (PE10007, PE10008)");
@@ -191,8 +191,9 @@ test("the COUT PREV export is the perimeter when present; the Projets onglet onl
   const byCode = new Map(cards?.cards.map((c) => [c.codename, c]));
   const atelier = byCode.get("PE10001");
   assert.deepEqual([atelier?.domainId, atelier?.domainSource, atelier?.columnId, atelier?.budgetEstimated], ["infra", "param", "done", 120.5]);
-  assert.deepEqual([byCode.get("PE10017")?.columnId, byCode.get("PE10017")?.typeId, byCode.get("PE10017")?.domainId], ["demandes", "etude", null],
-    "no jalon, PROJETS VENDUS resolves to no domain");
+  assert.deepEqual([byCode.get("PE10017")?.columnId, byCode.get("PE10017")?.typeId, byCode.get("PE10017")?.domainId], ["demandes", "etude", "vendus"],
+    "no jalon; PROJETS VENDUS resolves to the author's failsafe domain (ADR 036)");
+
   assert.equal(byCode.has("PE10009"), false, "« Budget présenté » is outside the retained states");
   assert.equal(byCode.get("PE10003")?.typeId, "atlas", "the author's fifth type, read through its alias");
   assert.ok(report.doubtful.some((d) => /codes retenus hors PE : 1 \(MEWTBN7Q\)/.test(d.question)));

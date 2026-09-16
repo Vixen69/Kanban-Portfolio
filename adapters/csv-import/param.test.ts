@@ -47,7 +47,7 @@ test("the four-table layout is recognized despite empty header cells and repeate
 
 test("leads, organisation paths and sub-domains are read from their own tables", () => {
   const { table, report } = run([
-    "A&D;BERGER Paul;;DSI NEXTER.AAD.GROUPE : Architecture;A&D;ARCHITECTURE APPLICATIVE;BERGER Paul;;A&D;FORGE LOGICIELS;BERGER Paul",
+    "A&D;BERGER Paul;;DSI NEXTER.AAD.GROUPE : Architecture;A&D;DATA WAREHOUSE & BI;BERGER Paul;;A&D;FORGE LOGICIELS;BERGER Paul",
     "CORPORATE;BARBIER Anne;;DSI NEXTER.CORPORATE.ACHATS;CORPORATE;ACHATS;BARBIER Anne;;;;",
     "INFRA OPE;LAMBERT Luc;;DSI NEXTER.INFRA;INFRA;INFRA BUILD;LAMBERT Luc;;;;",
     ";;;;CORPORATE;QUALITE;BARBIER Anne;;;;",
@@ -60,7 +60,8 @@ test("leads, organisation paths and sub-domains are read from their own tables",
   assert.equal(infra?.domainId, "infra");
   assert.equal(infra?.subDomainId, null, "INFRA is not detailed: its sub-domain folds");
   assert.equal(table.byPath.get("dsi nexter.corporate.achats")?.subDomainId, "achats");
-  assert.equal(table.byPath.get("dsi nexter.aad.groupe : architecture")?.subDomainId, "architecture_applicative");
+  assert.equal(table.byPath.get("dsi nexter.aad.groupe : architecture")?.subDomainId, "data_warehouse_bi");
+
   assert.ok(isDomainLead(table.leadWords, "Paul BERGER 9100001"));
   assert.ok(isDomainLead(table.leadWords, "BERGER, Paul"));
   assert.ok(!isDomainLead(table.leadWords, "BERGERON Paul"), "whole words only");

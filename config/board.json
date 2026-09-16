@@ -91,10 +91,6 @@
       "color": "#14b8a6",
       "subDomains": [
         {
-          "id": "architecture_applicative",
-          "name": "ARCHITECTURE APPLICATIVE"
-        },
-        {
           "id": "data_warehouse_bi",
           "name": "DATA WAREHOUSE & BI"
         },
@@ -203,6 +199,14 @@
       "name": "SUPPORT OFFICE",
       "short": "SUP",
       "color": "#64748b"
+    },
+    {
+      "id": "vendus",
+      "name": "PROJETS VENDUS",
+      "short": "VDU",
+      "color": "#b45309",
+      "aliases": ["PROJET VENDU", "PROJETS VENDUS"],
+      "nameMarkers": ["BUSINESS"]
     }
   ],
   "types": [

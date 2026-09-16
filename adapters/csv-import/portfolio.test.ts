@@ -25,7 +25,7 @@ test("portfolios resolve through the domain aliases and the sub-domain names of 
     ["DSI NEXTER.INGENIERIE SYSTEMES", ["ing", null]],
     ["DSI NEXTER.PRODUCTION MUNITIONS", ["industrie", null]],
     ["DSI NEXTER.ING & PLM", null],
-    ["DSI NEXTER.PROJETS VENDUS", null],
+    ["DSI NEXTER.PROJETS VENDUS", ["vendus", null]],
     ["", null],
   ];
   for (const [portfolio, expected] of cases) {
@@ -44,14 +44,16 @@ test("a hit says which rule fired: the last segment, or the whole path as a fall
   const resolve = createPortfolioResolver(CONFIG);
   assert.deepEqual(resolve("DSI NEXTER.INFRASTRUCTURE OPE"),
     { domainId: "infra", subDomainId: null, via: "domain", scope: "last", label: "INFRASTRUCTURE" });
-  assert.deepEqual(resolve("DSI NEXTER.GROUPE : Forge Logiciels.PROJETS VENDUS"),
+  assert.deepEqual(resolve("DSI NEXTER.GROUPE : Forge Logiciels.Projets"),
     { domainId: "ad", subDomainId: "forge_logiciels", via: "subdomain", scope: "path", label: "FORGE LOGICIELS" },
-    "a sold-projects leaf under a GROUPE branch falls back on the whole path - and lands in A&D");
+    "a leaf no rule knows falls back on the whole path - and lands where the branch says");
+  assert.deepEqual(resolve("DSI NEXTER.GROUPE : Forge Logiciels.PROJETS VENDUS"),
+    { domainId: "vendus", subDomainId: null, via: "domain", scope: "last", label: "PROJETS VENDUS" },
+    "ADR 036: the sold-projects leaf now resolves on its own, before the GROUPE branch is even read");
 });
 
 test("ADR 036: a bracketed name marker forces its domain; free text, unknown brackets and two marked domains do not", () => {
-  const vendus = { id: "vendus", name: "PROJETS VENDUS", short: "VENDU", color: "#000", nameMarkers: ["BUSINESS"] };
-  const resolve = createNameMarkerResolver({ ...CONFIG, domains: [...CONFIG.domains, vendus] });
+  const resolve = createNameMarkerResolver(CONFIG); // board.json carries « BUSINESS » on PROJETS VENDUS
   assert.deepEqual(resolve("PE123 Refonte portail [Business]"),
     { domainId: "vendus", subDomainId: null, via: "domain", scope: "name", label: "BUSINESS" });
   assert.equal(resolve("PE123 [BUSINESS-2026] Portail client")?.domainId, "vendus", "whole word inside the brackets");
@@ -59,8 +61,9 @@ test("ADR 036: a bracketed name marker forces its domain; free text, unknown bra
   assert.equal(resolve("Portail [Businessman]"), null, "whole word only");
   assert.equal(resolve("Portail [Data] [Business]")?.domainId, "vendus", "any bracket group");
   const twice = { id: "x", name: "X", short: "X", color: "#000", nameMarkers: ["BUSINESS"] };
-  assert.equal(createNameMarkerResolver({ ...CONFIG, domains: [...CONFIG.domains, vendus, twice] })("[business]"), null, "ambiguous");
-  assert.equal(createNameMarkerResolver(CONFIG)("[Business]"), null, "no marker configured");
+  assert.equal(createNameMarkerResolver({ ...CONFIG, domains: [...CONFIG.domains, twice] })("[business]"), null, "ambiguous");
+  const unmarked = { ...CONFIG, domains: CONFIG.domains.filter((d) => d.id !== "vendus") };
+  assert.equal(createNameMarkerResolver(unmarked)("[Business]"), null, "no marker configured");
   assert.equal(ruleLabel({ domainId: "vendus", subDomainId: null, via: "domain", scope: "name", label: "BUSINESS" }),
     "marqueur « [business] » dans le nom");
   assert.equal(ruleLabel({ domainId: "infra", subDomainId: null, via: "domain", scope: "last", label: "INFRASTRUCTURE" }),
