@@ -637,6 +637,17 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-16 — Sous-filtres : un sous-domaine cliqué rallume son domaine avec lui seul
+
+- **Demande de l'auteur** : le comportement était bizarre — un domaine
+  éteint, un clic sur l'un de ses sous-domaines ne montrait rien. Désormais
+  (`core/filters.ts` `withSubDomainToggled`) : domaine éteint + clic sur
+  « Forge Logiciels » → A&D s'allume avec Forge **seul** (les autres
+  sous-domaines restent éteints) ; domaine allumé → la pilule bascule
+  simplement. « Tout désactiver puis ne réactiver que le bon sous-filtre »
+  marche donc. Le clic sur le domaine lui-même ne change pas (il entraîne
+  tous ses sous-domaines).
+
 ### 2026-09-15 — Entretiens RDOM : le rapport nomme les « sans ME » et explique chaque portefeuille
 
 - **Constats de l'auteur** (one-to-one avec les responsables de domaine) :

@@ -115,6 +115,29 @@ export function withDomainToggled(filters: FilterState, config: BoardConfig, dom
 }
 
 /**
+ * Flips one sub-domain pill (author, 2026-09-16): when its domain is off,
+ * the click turns the domain on with THIS sub-domain alone (the others
+ * stay off) — « tout désactiver puis ne réactiver que le bon sous-filtre »
+ * works; when the domain is on, the pill simply toggles.
+ * Inputs: the filters, the board config, the pill key (subDomainKey).
+ * Output: a new FilterState (input untouched). Failure: none — a key
+ * without domain toggles nothing but itself.
+ */
+export function withSubDomainToggled(filters: FilterState, config: BoardConfig, key: string): FilterState {
+  const slash = key.indexOf("/");
+  const domainId = slash < 0 ? "" : key.slice(0, slash);
+  if (filters.domain[domainId] !== false) {
+    return { ...filters, subDomain: { ...filters.subDomain, [key]: filters.subDomain[key] === false } };
+  }
+  const subDomain = { ...filters.subDomain };
+  for (const sub of config.domains.find((domain) => domain.id === domainId)?.subDomains ?? []) {
+    subDomain[subDomainKey(domainId, sub.id)] = false;
+  }
+  subDomain[key] = true;
+  return { ...filters, domain: { ...filters.domain, [domainId]: true }, subDomain };
+}
+
+/**
  * Sets every domain AND sub-domain pill at once (the domain group's
  * tout / rien quick actions).
  * Inputs: the filters, the value. Output: a new FilterState. Failure: none.

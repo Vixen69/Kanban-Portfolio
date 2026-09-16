@@ -266,7 +266,9 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
 - Sidebar: search (title + codename), codes-projet and types toggles, « Contrainte »
   pills (config-driven + a synthetic « Aucune »; OR-shaped — a card stays
   lit while ANY of its constraints is on), « Bloqués uniquement » toggle,
-  filters by type / criticality / domain with tout·rien; live shown/total
+  filters by type / criticality / domain with tout·rien (a sub-domain pill
+  clicked while its domain is off turns the domain on with that sub-domain
+  alone — author's call 2026-09-16); live shown/total
   counts. Filters hide (ADR 031, author's call 2026-09-11 — v12's « dim,
   never remove » is retired): only the retained cards stay on the board,
   and each column header counts them (« retenus/total » while narrowed).

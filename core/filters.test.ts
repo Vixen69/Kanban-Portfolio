@@ -8,6 +8,7 @@ import {
   portfolioCounts,
   viewCounts,
   withDomainToggled,
+  withSubDomainToggled,
   withDomainsSet,
   type FilterState,
 } from "./filters.ts";
@@ -206,4 +207,16 @@ test("portfolioCounts ignores filters: shown equals total", () => {
 test("neutral viewCounts equals portfolioCounts", () => {
   const hidden = hiddenCardIds(PORTFOLIO, defaultFilters(CONFIG));
   assert.deepEqual(viewCounts(PORTFOLIO, hidden, CONFIG, NOW), portfolioCounts(PORTFOLIO, CONFIG, NOW));
+});
+
+test("a sub-domain click on an off domain turns the domain on with that sub-domain alone (author, 2026-09-16)", () => {
+  const off = withDomainToggled(defaultFilters(CONFIG), CONFIG, "beta");
+  const one = withSubDomainToggled(off, CONFIG, "beta/b1");
+  assert.equal(one.domain["beta"], true);
+  assert.deepEqual([one.subDomain["beta/b1"], one.subDomain["beta/b2"]], [true, false]);
+  assert.equal(hiddenCardIds(PORTFOLIO, one).has("S002"), false, "S002 (beta / b1) shows again");
+  const both = withSubDomainToggled(one, CONFIG, "beta/b2");
+  assert.deepEqual([both.subDomain["beta/b1"], both.subDomain["beta/b2"]], [true, true], "on an on domain, the pill simply toggles");
+  assert.equal(withSubDomainToggled(both, CONFIG, "beta/b1").subDomain["beta/b1"], false);
+  assert.equal(off.domain["beta"], false, "inputs untouched");
 });

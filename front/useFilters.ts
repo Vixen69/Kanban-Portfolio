@@ -11,6 +11,7 @@ import {
   isFilterActive,
   subDomainKey,
   withDomainToggled,
+  withSubDomainToggled,
   withDomainsSet,
   type FilterGroup,
   type FilterState,
@@ -83,6 +84,7 @@ export function useFilters(config: BoardConfig): Filters {
   const toggle = useCallback((group: FilterGroup, key: string) => {
     setState((current) => {
       if (group === "domain") return withDomainToggled(current, config, key);
+      if (group === "subDomain") return withSubDomainToggled(current, config, key);
       const pills = groupOf(current, group);
       return { ...current, [group]: { ...pills, [key]: pills[key] === false } };
     });
