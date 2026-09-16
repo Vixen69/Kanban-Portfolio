@@ -56,10 +56,10 @@ portefeuille : retiré.
    de l'instrument et le mot de la transformation, plutôt que l'objet
    « Portefeuille DSI » ; l'outil servira aussi à la revue de portefeuille.
 6. **Config** : domaine `support_office` retiré (aucun alias ajouté
-
    ailleurs — le « SUP » n'était pas Supply chain, malentendu levé par
    l'auteur). Les cinq cartes de fixtures qu'il portait passent en
-   SOUTIEN. Titre de la page : « Portefeuille DSI — Kanban ».
+   SOUTIEN.
+
 
 ## Conséquences
 
