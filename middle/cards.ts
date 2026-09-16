@@ -17,6 +17,8 @@ interface NewCardInput {
   typeId: string;
   criticality: Criticality;
   owner: string;
+  /** The exercise the card is created in (ADR 035); defaults to the current one. */
+  exercise: number;
 }
 
 /**
@@ -25,8 +27,9 @@ interface NewCardInput {
  * event (toColumn = first column, payload { laneId }) in one atomic
  * storage batch: the card can never exist without its audit trace.
  * Inputs: the storage, the runtime board config, the parsed JSON body
- * ({ title, domain, laneId, typeId, criticality, owner }) — the nature is
- * derived server-side from the canal (positional, ADR 018).
+ * ({ title, domain, laneId, typeId, criticality, owner, exercise? }) — the
+ * nature is derived server-side from the canal (positional, ADR 018); the
+ * exercise defaults to the current one (ADR 035).
  * Output: 201 with { card, event }.
  * Failure: throws BadRequest (→ 400) on invalid input; propagates storage
  * errors, including a duplicate id (→ 500) — nothing is persisted then.
@@ -76,7 +79,11 @@ function validateCardInput(config: BoardConfig, body: Record<string, unknown>): 
   if (owner.trim().length > 120) {
     throw new BadRequest("Chef de projet trop long (120 caractères max).");
   }
-  return { title, domain, laneId, typeId, criticality, owner: owner.trim() };
+  const exercise = body["exercise"] === undefined ? config.exercise.year : body["exercise"];
+  if (typeof exercise !== "number" || !Number.isInteger(exercise) || exercise < 2000 || exercise > 2100) {
+    throw new BadRequest("Exercice invalide.");
+  }
+  return { title, domain, laneId, typeId, criticality, owner: owner.trim(), exercise };
 }
 
 // Next free "S"-prefixed id: max numeric suffix over existing base cards + 1,
@@ -122,6 +129,7 @@ function buildCard(config: BoardConfig, existing: Card[], input: NewCardInput, t
     laneId: input.laneId,
     columnId: firstColumn.id,
     owner: input.owner,
+    exercise: input.exercise,
     criticality: input.criticality,
     typeId: input.typeId,
     codename: `PX${Math.floor(1000000 + Math.random() * 9000000)}`,

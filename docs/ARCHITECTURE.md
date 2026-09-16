@@ -637,6 +637,25 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-16 — Exercices, séance A : la carte porte son année, l'horloge gèle en préparation (ADR 035)
+
+- **Plan de l'auteur** : l'année en cours comme tableau principal, les
+  autres années ouvrables (importer 2027 tôt, archiver l'année passée),
+  préparer une année **sans que le décompte ne parte**, un bouton
+  « changer d'année en cours ». Trois séances : A modèle (faite), B import
+  par exercice, C front + bascule.
+- **Modèle** : `Card.exercise` facultatif (absent = année en cours, aucune
+  migration — jsonb) ; `core/exercise.ts` déduit le statut d'une année de la
+  seule config (`exercise.year` = en cours ; en dessous = close ; au-dessus
+  = préparation) ; `isStale` rend faux pour une carte en préparation ;
+  nouvel évènement **`activated`** (le fold repart de sa date, position
+  inchangée) écrit par le serveur seul à la bascule ; l'exercice se
+  **reporte** par patch `edited` (entier 2000–2100) ; la création accepte
+  un `exercise` (défaut : en cours). 7 tests ; 521 tests, 0 échec.
+- **Questions laissées à l'auteur** (CLAUDE.md §12) : année close visible
+  pour toujours ? archiver = lecture seule ou `archived` par carte ?
+  report 2026 → 2027 permis ?
+
 ### 2026-09-16 — Sous-filtres : un sous-domaine cliqué rallume son domaine avec lui seul
 
 - **Demande de l'auteur** : le comportement était bizarre — un domaine

@@ -90,3 +90,10 @@ test("isAndon: blocked strictly beyond the threshold", () => {
   assert.equal(isAndon(blocked(null), CONFIG, NOW), false);
   assert.equal(isAndon(blocked(daysAgo(10), false), CONFIG, NOW), false);
 });
+
+test("isStale: a card whose exercise is in preparation never ages (ADR 035)", () => {
+  const year = CONFIG.exercise.year;
+  assert.equal(isStale(state({ exercise: year + 1 }, 61), CONFIG, NOW), false);
+  assert.equal(isStale(state({ exercise: year }, 61), CONFIG, NOW), true);
+  assert.equal(isStale(state({ exercise: year - 1 }, 61), CONFIG, NOW), true, "a closed year keeps its ages");
+});

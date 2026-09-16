@@ -179,11 +179,16 @@ fields, append-only enforced by table grants/triggers):
   contention_note, charge_by_profile (jsonb, j.h per DSI profile), alerts,
   date_rdr, budget_rdli + budget_engaged (k€). The profile/role/risk/
   constraint/severity typologies live in the board config (ADR 014), not on
-  the card.
+  the card. `exercise` (ADR 035): the budget year the card belongs to;
+  absent = the current exercise (`config.exercise.year`). A year above the
+  current one is in preparation (importable, editable, aging clock frozen);
+  a year below is closed; the switch writes one `activated` event per card
+  of the new year (the fold restarts its clock there) and pins the
+  unstamped cards on the closing year.
 - `card_events` : append-only. seq (bigint sequence, ordering), id
   (evt-<seq>), ts, actor, card_id, type (created/moved/blocked/unblocked/
   edited/commented/archived/unarchived/deleted/imported/decided/unlisted/
-  relisted), from_column,
+  relisted/activated), from_column,
   to_column, payload (jsonb). Never updated, never deleted. Comments are a
   projection of `commented` events; deletion is a `deleted` event (the fold
   excludes the card, the log keeps everything — ADR 012); archiving is a
@@ -477,6 +482,9 @@ run on the platform). Every internal design decision is the author's.
 
 - Aging step values and andon threshold are defaults; confirm with the PMO users.
 - Sciforma field mapping for financials (budget, consumed, remaining).
+- Exercises (ADR 035, to settle before S-C): does a closed year stay in the
+  selector forever? is « archiver l'année passée » read-only, or `archived`
+  card by card? may a card be carried over 2026 → 2027, and by whom?
 - **Projets vendus** (2026-09-15, author investigating — do not decide): a
   domain of their own (as the PDSI macro does), a constraint tag, or
   outside the perimeter? Until settled they resolve through their

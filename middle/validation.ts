@@ -73,6 +73,7 @@ export function patchValidators(config: BoardConfig): Record<string, (value: unk
     criticality: isCriticality,
     typeId: (v) => v === null || (typeof v === "string" && config.types.some((t) => t.id === v)),
     codename: boundedTextOrNull(40),
+    exercise: (v) => typeof v === "number" && Number.isInteger(v) && v >= 2000 && v <= 2100,
     tags: stringArray,
     effortEstimated: amountOrNull,
     effortConsumed: amountOrNull,

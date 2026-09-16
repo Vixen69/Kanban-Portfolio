@@ -84,6 +84,7 @@ test("postCard builds the whole card server-side and appends created", async () 
   assert.match(card.codename ?? "", /^PX\d{7}$/);
   assert.equal(card.blocked, false);
   assert.deepEqual(card.custom, {});
+  assert.equal(card.exercise, config.exercise.year); // the current exercise by default (ADR 035)
   assert.equal(event.type, "created");
   assert.equal(event.cardId, "S002");
   assert.equal(event.toColumn, "col1");
@@ -116,6 +117,8 @@ test("postCard rejects every invalid creation field in French", async () => {
     [{ ...VALID_CARD_BODY, criticality: "mega" }, /Criticité invalide/],
     [{ ...VALID_CARD_BODY, owner: 42 }, /Chef de projet invalide/],
     [{ ...VALID_CARD_BODY, owner: "x".repeat(121) }, /Chef de projet trop long/],
+    [{ ...VALID_CARD_BODY, exercise: "2027" }, /Exercice invalide/],
+    [{ ...VALID_CARD_BODY, exercise: 1999 }, /Exercice invalide/],
     ["pas un objet", /Corps JSON/],
   ];
   const storage = stubStorage();

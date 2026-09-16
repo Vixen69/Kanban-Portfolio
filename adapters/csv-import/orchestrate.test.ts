@@ -42,7 +42,7 @@ test("a July RDOM file is inventoried as a retired contract, never parsed", () =
 });
 
 test("the five fixture files assemble the full deck", () => {
-  const { report, cards, projets, jalons, sp, chargeStats, capacity } = audit(ALL.map(fixture));
+  const { report, cards, projets, jalons, sp, chargeStats } = audit(ALL.map(fixture));
   assert.deepEqual(report.inventory.map((f) => [f.name, f.status]), [
     ["PARAM.csv", "recognized-with-deviations"], ["Projets.csv", "recognized"], ["ProjetsCdP.csv", "recognized"],
     ["ProjetsJalons.csv", "recognized"], ["Ress.Profils.csv", "recognized"], ["Ressources_PdC.csv", "recognized-with-deviations"], ["SP_2026.csv", "recognized"],

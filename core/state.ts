@@ -73,6 +73,9 @@ const EDITABLE: Record<string, (value: unknown) => boolean> = {
   alerts: isStringArray,
   dateRdr: isStringOrNull,
   custom: isCustomMap,
+  // The card's exercise (ADR 035): stamped at import or creation, pinned on
+  // legacy cards when a year is activated, moved by a « reporter » edit.
+  exercise: (value) => typeof value === "number" && Number.isInteger(value),
 };
 
 /** The field names an "edited" event may patch (callers validate against this). */
@@ -192,19 +195,20 @@ function applyEvent(state: CardState, event: CardEvent): void {
       applyCommented(state, event);
       break;
     case "archived":
-      state.archived = true;
-      break;
     case "unarchived":
-      state.archived = false;
+      state.archived = event.type === "archived";
       break;
     case "decided":
       applyDecided(state, event);
       break;
     case "unlisted":
-      state.absentFromLastImport = event.ts;
-      break;
     case "relisted":
-      state.absentFromLastImport = null;
+      state.absentFromLastImport = event.type === "unlisted" ? event.ts : null;
+      break;
+    // The card's exercise became the current one (ADR 035): the aging
+    // clock starts here — position untouched, no stage entry recorded.
+    case "activated":
+      state.enteredColumnAt = event.ts;
       break;
     // "deleted" is handled by foldEvents itself: it removes the whole card.
   }

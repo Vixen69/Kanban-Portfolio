@@ -3,6 +3,7 @@
 // config — nothing hard-coded here (design v9: AGE fresh/recent/aging/stale).
 
 import type { AgeCategory, AgeThresholds, BoardConfig, CardState } from "./types.ts";
+import { isClockFrozen } from "./exercise.ts";
 
 const DAY_MS = 86_400_000;
 
@@ -89,6 +90,7 @@ export function ageLabel(days: number): string {
  * Failure: none.
  */
 export function isStale(card: CardState, config: BoardConfig, now: Date): boolean {
+  if (isClockFrozen(card, config.exercise.year)) return false; // ADR 035: a year in preparation does not age
   return daysInColumn(card, now) > config.age.agingMaxDays;
 }
 

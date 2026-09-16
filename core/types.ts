@@ -119,6 +119,12 @@ export interface Card {
   /** ISO timestamp. */
   createdAt: string;
   source: CardSource;
+  /**
+   * The exercise (budget year) the card belongs to (ADR 035). Absent on
+   * cards stored before: they belong to the current exercise, whatever it
+   * is (core/exercise.ts exerciseOf).
+   */
+  exercise?: number;
 }
 
 /** Event types of the append-only `card_events` log. */
@@ -135,7 +141,9 @@ export type CardEventType =
   | "imported"
   | "decided"
   | "unlisted"
-  | "relisted";
+  | "relisted"
+  /** The card's exercise became the current one (ADR 035): its aging clock starts now. */
+  | "activated";
 
 /**
  * One row of the append-only `card_events` log: audit trail AND the single
@@ -229,6 +237,7 @@ export type CardPatch = Partial<
     | "alerts"
     | "dateRdr"
     | "custom"
+    | "exercise"
   >
 >;
 
