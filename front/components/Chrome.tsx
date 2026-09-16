@@ -61,7 +61,7 @@ export function Header(props: HeaderProps) {
     <header className="header">
       <div className="hd-left">
         <button className="icon-btn" onClick={props.onToggleSidebar} title="Filtres (S)">≡</button>
-        <span className="hd-title">Portefeuille DSI</span>
+        <span className="hd-title">Portfolio Kanban DSI</span>
         <YearPicker {...props.exercise} />
         {props.filtersActive && (
           <button className="filter-chip" onClick={props.onResetFilters} title="Réinitialiser les filtres (Esc)">

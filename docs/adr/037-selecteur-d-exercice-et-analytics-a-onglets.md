@@ -52,7 +52,11 @@ portefeuille : retiré.
    (`Panel` de `capacityPanels.tsx`) est un bouton ; repliés par défaut,
    l'indice reste lisible replié ; le tableau du temps par étape s'ouvre
    d'emblée.
-5. **Config** : domaine `support_office` retiré (aucun alias ajouté
+5. **Titre** : « Portfolio Kanban DSI » (auteur, fin de journée) — le nom
+   de l'instrument et le mot de la transformation, plutôt que l'objet
+   « Portefeuille DSI » ; l'outil servira aussi à la revue de portefeuille.
+6. **Config** : domaine `support_office` retiré (aucun alias ajouté
+
    ailleurs — le « SUP » n'était pas Supply chain, malentendu levé par
    l'auteur). Les cinq cartes de fixtures qu'il portait passent en
    SOUTIEN. Titre de la page : « Portefeuille DSI — Kanban ».

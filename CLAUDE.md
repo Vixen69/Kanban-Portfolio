@@ -283,7 +283,8 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
   visible with zero scrolling; never any horizontal scroll. Measured in the
   COMPACT default state (v12): unfolded totals and the 176px canal gutter
   are a deliberate zoom that may scroll.
-- Header (ADR 037): « Portefeuille DSI » then the **exercise selector** —
+- Header (ADR 037): « Portfolio Kanban DSI » (the instrument's name, the
+  transformation's word — author's call 2026-09-16) then the **exercise selector** —
   a square badge « 2026 ▾ » whose menu lists the five years before, the
   current one, the years after and every year holding cards, with status
   and card count; the year chosen bounds the board, the filters, the
