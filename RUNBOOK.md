@@ -97,6 +97,17 @@ docker cp portfolio-kanban-middle-1:/app/node_modules ./node_modules
 Sans réseau. Alternative classique : `npm ci`. Nécessaire uniquement pour le
 chargement (le pilote PostgreSQL) ; l'audit tourne sans aucune dépendance.
 
+**3 bis. Sauvegarder la base avant TOUT chargement** (ADR 036)
+
+```bash
+docker compose -f docker/compose.yaml exec -T db pg_dump -U kanban kanban > sauvegarde-$(date +%F).sql
+```
+
+Le chargement n'efface jamais une carte et chaque changement de domaine est
+un évènement réversible depuis la fiche, mais la sauvegarde datée est le
+filet : elle se restaure avec `psql -U kanban kanban < sauvegarde-….sql`
+dans le conteneur `db`.
+
 **4. Charger dans le tableau**
 
 ```bash
@@ -112,6 +123,16 @@ node sync/import.ts imports --charger
 > avec son budget) ; une année close est refusée, de même qu'un lot de
 > fichiers sans projet sur l'année demandée. Dans l'outil : le sélecteur
 > « Exercice » de l'importeur.
+
+> **Conflits de domaine** (ADR 036) : une carte déjà présente dont le
+> domaine diffère de ce que l'export propose n'est jamais remplacée sans
+> décision. Dans l'outil, l'audit les présente **un par un** (Garder /
+> Remplacer, « Tout remplacer » en raccourci) et le chargement attend que
+> tout soit tranché. En ligne de commande, le chargement refuse tant qu'il
+> reste un conflit, sauf `--domaines garder` ou `--domaines remplacer`
+> (tout tranché pareil). Chaque décision est visible dans l'Historique de
+> la carte.
+
 
 
 > **Attendu** : `destination : PostgreSQL (…)` puis

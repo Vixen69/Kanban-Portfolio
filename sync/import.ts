@@ -5,7 +5,7 @@
 // Unlike scripts/seed.ts, the board config is read through the runtime
 // store so an admin override applied on the client platform is honored.
 //
-// Usage: node sync/import.ts <dossier> [--out <rapport>] [--charger] [--exercice <année>]
+// Usage: node sync/import.ts <dossier> [--out <rapport>] [--charger] [--exercice <année>] [--domaines garder|remplacer]
 // Exit codes: 0 = audit produced (even with doubtful findings),
 //             1 = the run itself was impossible (args, folder, config,
 //                 storage).
@@ -17,11 +17,12 @@ import { loadServerConfig } from "../middle/config.ts";
 import { createConfigStore } from "../middle/config-store.ts";
 import { planLoad, renderReport, runImportAudit, withLegacyIds } from "../adapters/csv-import/index.ts";
 import type { CardAssembly } from "../adapters/csv-import/index.ts";
+import type { DomainDecision } from "../core/import-types.ts";
 import type { InputFile, LoadPlan } from "../adapters/csv-import/index.ts";
 import type { CapacityBuild, EnrichedCard } from "../adapters/csv-import/index.ts";
-import type { BoardConfig } from "../core/types.ts";
+import type { BoardConfig, Card, CardEvent } from "../core/types.ts";
 
-const USAGE = "usage : node sync/import.ts <dossier> [--out <rapport>] [--charger] [--exercice <année>]";
+const USAGE = "usage : node sync/import.ts <dossier> [--out <rapport>] [--charger] [--exercice <année>] [--domaines garder|remplacer]";
 
 interface Args {
   folder: string;
@@ -29,6 +30,8 @@ interface Args {
   charger: boolean;
   /** The exercise year read and loaded (ADR 035); null = the config's current one. */
   exercice: number | null;
+  /** One decision for EVERY domain conflict (ADR 036); null = refuse to load while one exists. */
+  domaines: DomainDecision | null;
 }
 
 // Positional folder + optional flags; anything else is a usage error.
@@ -37,6 +40,7 @@ function parseArgs(argv: string[]): Args | null {
   let out: string | null = null;
   let charger = false;
   let exercice: number | null = null;
+  let domaines: DomainDecision | null = null;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i] ?? "";
     if (arg === "--out") {
@@ -51,13 +55,18 @@ function parseArgs(argv: string[]): Args | null {
       if (value === undefined || !/^\d{4}$/.test(value)) return null;
       exercice = Number(value);
       i++;
+    } else if (arg === "--domaines") {
+      const value = argv[i + 1];
+      if (value !== "garder" && value !== "remplacer") return null;
+      domaines = value;
+      i++;
     } else if (arg.startsWith("--") || folder !== null) {
       return null;
     } else {
       folder = arg;
     }
   }
-  return folder === null ? null : { folder, out, charger, exercice };
+  return folder === null ? null : { folder, out, charger, exercice, domaines };
 }
 
 // The config the board actually serves: defaults + admin runtime override.
@@ -85,7 +94,9 @@ function readInputFiles(folder: string): InputFile[] {
 // cards and their events in one atomic batch. The storage module is loaded
 // LAZILY: audit mode must keep running with no node_modules at all (the
 // parser is dependency-free by design; only the pg driver needs an install).
-async function load(deck: EnrichedCard[], config: BoardConfig, capacity: CapacityBuild | null, year: number): Promise<LoadPlan> {
+async function load(
+  deck: EnrichedCard[], config: BoardConfig, capacity: CapacityBuild | null, year: number, domaines: DomainDecision | null,
+): Promise<LoadPlan> {
   const cfg = loadServerConfig(process.env);
   mkdirSync(dirname(cfg.dataPath), { recursive: true });
   // Say the destination BEFORE writing: the driver defaults to jsonl, so a
@@ -95,13 +106,33 @@ async function load(deck: EnrichedCard[], config: BoardConfig, capacity: Capacit
   const storage = await createStorage(cfg.storageDriver, cfg.dataPath);
   try {
     const [events, baseCards] = await Promise.all([storage.listEvents(), storage.listBaseCards()]);
-    const plan = planLoad(deck, config, baseCards, events, new Date(), year);
+    const plan = planWithDecisions(deck, config, baseCards, events, year, domaines);
     await storage.importCards(plan.cards, plan.events);
     if (capacity !== null) await storage.importCapacity(withLegacyIds(capacity.snapshot, plan.aliases));
     return plan;
   } finally {
     await storage.close();
   }
+}
+
+// The plan with every domain conflict decided the same way when --domaines
+// says so; refused otherwise — the tool decides one by one (ADR 036).
+function planWithDecisions(
+  deck: EnrichedCard[], config: BoardConfig, baseCards: Card[], events: CardEvent[], year: number,
+  domaines: DomainDecision | null,
+): LoadPlan {
+  const dry = planLoad(deck, config, baseCards, events, new Date(), year);
+  if (dry.domainConflicts.length === 0) return dry;
+  if (domaines === null) {
+    const lines = dry.domainConflicts.slice(0, 8)
+      .map((c) => `\n  · « ${c.title} » : tableau ${c.board.domain} / export ${c.proposed.domain} (${c.rule})`).join("");
+    throw new Error(
+      `${dry.domainConflicts.length} conflit(s) de domaine à trancher — dans l'outil (un par un), ` +
+        `ou --domaines garder|remplacer pour tout trancher pareil.${lines}`,
+    );
+  }
+  const decisions = new Map(dry.domainConflicts.map((c): [string, DomainDecision] => [c.cardId, domaines]));
+  return planLoad(deck, config, baseCards, events, new Date(), year, decisions);
 }
 
 // Why a load is refused, in plain French (ADR 026/035).
@@ -134,7 +165,8 @@ function loadSummary(plan: LoadPlan): string {
   return `chargement : ${plan.created} carte(s) créée(s) · ${plan.updated} mise(s) à jour` +
     ` · ${plan.moved} déplacée(s) par l'export` +
     ` · ${plan.unlisted} absente(s) de l'export (marquées, jamais supprimées) · ${plan.relisted} de retour` +
-    ` · ${plan.kept} position(s) conservée(s) (export sans jalon)${divergences}`;
+    ` · ${plan.kept} position(s) conservée(s) (export sans jalon)` +
+    ` · domaines : ${plan.domainReplaced} remplacé(s), ${plan.domainKept} gardé(s)${divergences}`;
 }
 
 const args = parseArgs(process.argv.slice(2));
@@ -166,7 +198,8 @@ try {
       console.error(refusal(cards, year, boardConfig.exercise.year));
       process.exit(1);
     }
-    console.log(loadSummary(await load(cards.cards, boardConfig, capacity, year)));
+    console.log(loadSummary(await load(cards.cards, boardConfig, capacity, year, args.domaines)));
+
     if (capacity !== null) {
       const { persons, assignments } = capacity.snapshot;
       console.log(`capacité ${capacity.snapshot.exerciseYear} : ${persons.length} personne(s), ${assignments.length} affectation(s) enregistrées.`);

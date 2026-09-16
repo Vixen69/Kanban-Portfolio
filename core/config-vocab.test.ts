@@ -37,3 +37,16 @@ test("domains: aliases are kept when present, absent otherwise; a non-list or em
   raw.domains[0].aliases = [""];
   assert.throws(() => validateBoardConfig(raw), ConfigError);
 });
+
+test("domains: nameMarkers are kept when present, absent otherwise; a non-list or empty marker fails (ADR 036)", () => {
+  const raw = rawConfig();
+  raw.domains[0].nameMarkers = ["BUSINESS"];
+  const config = validateBoardConfig(raw);
+  assert.deepEqual(config.domains[0]?.nameMarkers, ["BUSINESS"]);
+  assert.equal("nameMarkers" in (config.domains[1] ?? {}), false);
+  raw.domains[0].nameMarkers = "BUSINESS";
+  assert.throws(() => validateBoardConfig(raw), ConfigError);
+  raw.domains[0].nameMarkers = [""];
+  assert.throws(() => validateBoardConfig(raw), ConfigError);
+});
+

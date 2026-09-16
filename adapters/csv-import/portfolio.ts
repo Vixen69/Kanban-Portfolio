@@ -19,8 +19,8 @@ export interface PortfolioHit {
   domainId: string;
   subDomainId: string | null;
   via: "domain" | "subdomain";
-  /** Which part of the path matched: its last segment, or the whole path (fallback). */
-  scope: "last" | "path";
+  /** Which part matched: the path's last segment, the whole path (fallback), or a bracketed marker in the NAME (ADR 036). */
+  scope: "last" | "path" | "name";
   /** The config label that matched (domain name / short / alias, or a sub-domain name). */
   label: string;
 }
@@ -68,6 +68,39 @@ export function createPortfolioResolver(config: BoardConfig): (portfolio: string
     const last = segments[segments.length - 1] ?? "";
     return matchIn(rules, last, "last") ?? matchIn(rules, normalizeLabel(portfolio), "path");
   };
+}
+
+/**
+ * Compiles the config's bracketed name markers (domains[].nameMarkers,
+ * ADR 036) and resolves a project NAME: a marker found as whole words
+ * inside « [ … ] » forces its domain, before the portfolio is even read —
+ * the portfolio of a sold project is not trustworthy. Two domains marked
+ * = ambiguous = null; no bracket, no marker = null.
+ * Inputs: the board config. Output: name -> hit (scope "name") or null.
+ * Failure modes: none.
+ */
+export function createNameMarkerResolver(config: BoardConfig): (name: string) => PortfolioHit | null {
+  const rules = config.domains.flatMap((domain) =>
+    (domain.nameMarkers ?? []).map((marker) => ({ re: keywordPattern(marker), domainId: domain.id, label: marker })));
+  return (name) => {
+    if (rules.length === 0) return null;
+    const insides = [...name.matchAll(/\[([^\]]*)\]/g)].map((m) => normalizeLabel(m[1] ?? ""));
+    const hits = rules.filter((rule) => insides.some((inside) => rule.re.test(inside)));
+    const first = hits[0];
+    if (first === undefined || new Set(hits.map((hit) => hit.domainId)).size !== 1) return null;
+    return { domainId: first.domainId, subDomainId: null, via: "domain", scope: "name", label: first.label };
+  };
+}
+
+/**
+ * How a hit was obtained, worded for the report and the conflict panel
+ * (« dernier segment · « INFRASTRUCTURE » », « chemin entier (repli) · « GROUPE » »,
+ * « marqueur « [business] » dans le nom »).
+ * Input: the hit. Output: the wording. Failure modes: none.
+ */
+export function ruleLabel(hit: PortfolioHit): string {
+  if (hit.scope === "name") return `marqueur « [${hit.label.toLowerCase()}] » dans le nom`;
+  return `${hit.scope === "last" ? "dernier segment" : "chemin entier (repli)"} · « ${hit.label} »`;
 }
 
 /**

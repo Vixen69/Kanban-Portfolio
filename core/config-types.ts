@@ -66,6 +66,13 @@ export interface Domain {
    * or a Sciforma portfolio segment (ADR 030).
    */
   aliases?: string[];
+  /**
+   * Markers in a project NAME that force this domain, matched as whole
+   * words INSIDE square brackets only — « [Business] » = a sold project
+   * whatever its portfolio says (author, 2026-09-16, ADR 036). A guard
+   * rail, never a guess on free text.
+   */
+  nameMarkers?: string[];
 }
 
 /** A project type ("Achat", "Étude"…) — more visible than the domain on cards. */

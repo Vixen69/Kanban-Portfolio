@@ -20,6 +20,34 @@ export interface ImportSummary {
   missing: string[];
 }
 
+/** A domain + sub-domain pair, by config ids. */
+export interface DomainRef {
+  domain: string;
+  subDomain: string | null;
+}
+
+/** What the PMO decides on one domain conflict (ADR 036). */
+export type DomainDecision = "garder" | "remplacer";
+
+/**
+ * One card the board holds under a domain the export disagrees with
+ * (ADR 036). The domain is what the responsables de domaine arbitrate on:
+ * it is never overwritten silently — the PMO decides, one by one.
+ */
+export interface DomainConflict {
+  cardId: string;
+  title: string;
+  codename: string | null;
+  /** The board's value (a sub-domain the config no longer declares counts as none). */
+  board: DomainRef;
+  /** What the export and the rules propose. */
+  proposed: DomainRef;
+  /** The rule that proposed it, worded as in the report. */
+  rule: string;
+  /** The last decision the log holds on this card's domain: set by hand in the fiche, or an earlier import decision. */
+  prior: { kind: "main" | "garder" | "remplacer"; ts: string } | null;
+}
+
 /** What an audit returns: the French report (Markdown) and its counts. */
 export interface ImportAuditResult {
   /** The exercise year the files were read for and the load writes into (ADR 035). */
@@ -28,6 +56,8 @@ export interface ImportAuditResult {
   summary: ImportSummary;
   /** True when the perimeter assembled — a load would write cards. */
   loadable: boolean;
+  /** The domain conflicts a load would raise (ADR 036) — each needs a decision before the load. */
+  conflicts: DomainConflict[];
 }
 
 /** What a load wrote, on top of the audit it re-ran. */
@@ -43,6 +73,10 @@ export interface ImportLoadResult extends ImportAuditResult {
     /** Existing cards the export carried no position for (left in place). */
     kept: number;
     chargesWithoutProfile: number;
+    /** Domain conflicts decided on this load (ADR 036): replaced / kept, and silenced by an earlier « garder ». */
+    domainReplaced: number;
+    domainKept: number;
+    domainKeptByPrior: number;
     /** The capacity snapshot stored with the load, when the files carried one. */
     capacity: { persons: number; assignments: number } | null;
   };

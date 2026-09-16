@@ -190,7 +190,15 @@ fields, append-only enforced by table grants/triggers):
   aging clock frozen); a year below is closed (its load is refused; its
   cards get archived at the switch); the switch writes one `activated`
   event per card of the new year (the fold restarts its clock there) and
-  pins the unstamped cards on the closing year.
+  pins the unstamped cards on the closing year. The DOMAIN is not a fact
+  the export may overwrite (ADR 036, author 2026-09-16 — it is what the
+  responsables de domaine arbitrate on): a stored card whose domain
+  differs from the export's proposal is a conflict the PMO decides one by
+  one at import (« garder » / « remplacer »), each decision an `edited`
+  event of the import actor (a « garder » is not asked again for the same
+  proposal); a bracketed name marker (`domains[].nameMarkers`,
+  « [Business] ») forces a domain before the portfolio is read. Type and
+  owner stay facts the export refreshes silently.
 - `card_events` : append-only. seq (bigint sequence, ordering), id
   (evt-<seq>), ts, actor, card_id, type (created/moved/blocked/unblocked/
   edited/commented/archived/unarchived/deleted/imported/decided/unlisted/
@@ -495,8 +503,9 @@ run on the platform). Every internal design decision is the author's.
   archived at the switch; leftovers are NOT carried over by hand — they
   come back re-budgeted through the next year's import as new instances.
 
-- **Projets vendus** (2026-09-15, author investigating — do not decide): a
-  domain of their own (as the PDSI macro does), a constraint tag, or
-  outside the perimeter? Until settled they resolve through their
-  « Projet.Portefeuille » path like any project, and the audit report says
-  which rule fired for each path.
+- **Projets vendus** (2026-09-15, author investigating): the portfolio
+  logic of sold projects is still not understood. Failsafe in place since
+  2026-09-16 (ADR 036): a domain « PROJETS VENDUS » read from the
+  portfolio words « Projet vendu » and from the bracketed name marker
+  « [Business] »; every other case still resolves through
+  « Projet.Portefeuille », and the audit report says which rule fired.

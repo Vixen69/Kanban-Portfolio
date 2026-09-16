@@ -3,7 +3,7 @@
 // reading this one file. The server owns event id/ts/actor and every
 // validation — the client posts intents, never stored shapes.
 
-import type { ImportAuditResult, ImportFilePayload, ImportLoadResult } from "../core/import-types.ts";
+import type { DomainDecision, ImportAuditResult, ImportFilePayload, ImportLoadResult } from "../core/import-types.ts";
 import type {
   CapacitySnapshot,
   BoardConfig,
@@ -199,12 +199,15 @@ export function postImportAudit(files: ImportFilePayload[], exercise: number): P
 
 /**
  * POST /api/import/load — audits then loads the files into ONE exercise's
- * board (ADR 035). Inputs: the files, the exercise year. Output: the report
- * plus what the load wrote. Failure: throws ApiError (400 on a closed year
- * or a file set with no project on that year).
+ * board (ADR 035), with the PMO's domain decisions by card id (ADR 036).
+ * Inputs: the files, the exercise year, the decisions. Output: the report
+ * plus what the load wrote. Failure: throws ApiError (400 on a closed
+ * year, a file set with no project on that year, or an undecided conflict).
  */
-export function postImportLoad(files: ImportFilePayload[], exercise: number): Promise<ImportLoadResult> {
-  return request<ImportLoadResult>("/api/import/load", jsonInit("POST", { files, exercise }));
+export function postImportLoad(
+  files: ImportFilePayload[], exercise: number, decisions: Readonly<Record<string, DomainDecision>>,
+): Promise<ImportLoadResult> {
+  return request<ImportLoadResult>("/api/import/load", jsonInit("POST", { files, exercise, decisions }));
 }
 
 

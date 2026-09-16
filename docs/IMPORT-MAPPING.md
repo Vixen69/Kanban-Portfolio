@@ -963,3 +963,23 @@ office de vérification sur site.
 déjà tranchée (canal « Projets ») ; Q15 se reporte sur les colonnes
 « franchi » de `ProjetsJalons` (Q21). Nouvelles questions Q21–Q23 en tête
 de document.
+
+## Compléments du 2026-09-16 (ADR 035 / 036)
+
+- **Une carte par projet et par exercice** : l'identifiant d'une carte
+  importée est `<code>@<année>` ; un import ne lit et ne touche que les
+  cartes de l'exercice choisi (sélecteur « Exercice » de l'importeur, CLI
+  `--exercice`). Les reliquats reviennent par l'import de l'année suivante,
+  rebudgétés : même code PE, autre carte.
+- **R4 bis — marqueur dans le nom** : un mot de `domains[].nameMarkers`
+  trouvé en mot entier **entre crochets** dans le nom du projet
+  (« [Business] ») force son domaine, avant le portefeuille. Garde-fou des
+  projets vendus (domaine « PROJETS VENDUS », mots de portefeuille « Projet
+  vendu »). Le rapport dit « marqueur « [business] » dans le nom ».
+- **Le domaine ne s'écrase plus au ré-import** : une carte déjà présente
+  dont le domaine diffère de la proposition de l'export est un **conflit**
+  que l'audit liste (règle qui a joué, ce que le journal dit) et que le
+  PMO tranche **un par un** avant le chargement (Garder / Remplacer) ;
+  chaque décision est un évènement `edited` signé `import-csv`. Type et
+  chef de projet restent des faits mis à jour sans demander.
+

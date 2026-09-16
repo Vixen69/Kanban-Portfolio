@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { testConfig } from "../core/test-helpers.ts";
 import { BadRequest } from "./errors.ts";
-import { parseExercise } from "./import.ts";
+import { parseDecisions, parseExercise } from "./import.ts";
 import { exerciseOrCurrent } from "./validation.ts";
 
 const config = testConfig();
@@ -25,3 +25,12 @@ test("parseExercise reads the body's exercise field, defaulting to the current o
   assert.equal(parseExercise("pas un objet", config), config.exercise.year);
   assert.throws(() => parseExercise({ exercise: "bientôt" }, config), /Exercice invalide/);
 });
+
+test("parseDecisions reads the body's decisions by card id (ADR 036): garder / remplacer only", () => {
+  assert.deepEqual([...parseDecisions({ files: [] })], []);
+  assert.deepEqual([...parseDecisions({ decisions: { "PE1@2026": "garder", "PE2@2026": "remplacer" } })],
+    [["PE1@2026", "garder"], ["PE2@2026", "remplacer"]]);
+  assert.throws(() => parseDecisions({ decisions: ["garder"] }), /Décisions de domaine invalides/);
+  assert.throws(() => parseDecisions({ decisions: { "PE1@2026": "peut-être" } }), /Décision invalide pour « PE1@2026 »/);
+});
+

@@ -54,15 +54,53 @@ test("parseFiles screens the body: list, count, names, content", () => {
   assert.equal(Buffer.from(file?.bytes ?? []).toString("utf8"), "Id;Nom\n");
 });
 
-test("auditImport over the synthetic fixtures renders the CLI's report and its counts", () => {
-  const result = auditImport(CONFIG, fixtureFiles(), NOW);
-  assert.deepEqual([result.summary.received, result.summary.recognized, result.summary.missing, result.loadable],
-    [8, 8, [], true], "the fixture folder carries Couts.csv — COUT PREV is the perimeter (ADR 030)");
-  assert.equal(result.summary.taken, 5);
-  assert.match(result.report, /capacité : 3 personne\(s\)/);
-  const partial = auditImport(CONFIG, fixtureFiles(["PARAM.csv"]), NOW);
-  assert.equal(partial.loadable, false);
-  assert.ok(partial.summary.missing.includes("Projets"));
+test("auditImport over the synthetic fixtures renders the CLI's report and its counts", async () => {
+  await withTempDir(async (dir) => {
+    const storage = createJsonlStorage(join(dir, "board.jsonl"));
+    try {
+      const result = await auditImport(storage, CONFIG, fixtureFiles(), NOW);
+      assert.deepEqual([result.summary.received, result.summary.recognized, result.summary.missing, result.loadable],
+        [8, 8, [], true], "the fixture folder carries Couts.csv — COUT PREV is the perimeter (ADR 030)");
+      assert.equal(result.summary.taken, 5);
+      assert.match(result.report, /capacité : 3 personne\(s\)/);
+      assert.deepEqual(result.conflicts, [], "an empty board raises no domain conflict (ADR 036)");
+      const partial = await auditImport(storage, CONFIG, fixtureFiles(["PARAM.csv"]), NOW);
+      assert.equal(partial.loadable, false);
+      assert.ok(partial.summary.missing.includes("Projets"));
+    } finally {
+      await storage.close();
+    }
+  });
+});
+
+test("ADR 036: a domain set by hand becomes a conflict at the next audit; the load needs a decision and traces it", async () => {
+  await withTempDir(async (dir) => {
+    const storage = createJsonlStorage(join(dir, "board.jsonl"));
+    try {
+      await loadImport(storage, CONFIG, fixtureFiles(), NOW);
+      const card = (await storage.listBaseCards())[0]!;
+      const other = CONFIG.domains.find((d) => d.id !== card.domain)!.id;
+      await storage.appendEvent({
+        ts: "2026-09-10T10:00:00.000Z", actor: "pmo", cardId: card.id, type: "edited", fromColumn: null, toColumn: null,
+        payload: { patch: { domain: other, subDomain: null } },
+      });
+      const audit = await auditImport(storage, CONFIG, fixtureFiles(), NOW);
+      const conflict = audit.conflicts[0];
+      assert.deepEqual(
+        [audit.conflicts.length, conflict?.cardId, conflict?.board.domain, conflict?.proposed.domain, conflict?.prior?.kind],
+        [1, card.id, other, card.domain, "main"],
+      );
+      await assert.rejects(() => loadImport(storage, CONFIG, fixtureFiles(), NOW), /1 conflit\(s\) de domaine sans décision/);
+      const kept = await loadImport(storage, CONFIG, fixtureFiles(), NOW, 2026, new Map([[card.id, "garder"]]));
+      assert.deepEqual([kept.load.domainKept, kept.load.domainReplaced], [1, 0]);
+      const trace = (await storage.listEvents()).filter((e) => e.type === "edited" && e.actor === "import-csv");
+      assert.deepEqual([trace.length, trace[0]?.payload["decision"]], [1, "garder"]);
+      const again = await auditImport(storage, CONFIG, fixtureFiles(), NOW);
+      assert.deepEqual(again.conflicts, [], "kept against this very proposal: not asked again");
+    } finally {
+      await storage.close();
+    }
+  });
 });
 
 test("loadImport writes the deck and the capacity; a second load updates; no perimeter refuses", async () => {
@@ -81,7 +119,7 @@ test("loadImport writes the deck and the capacity; a second load updates; no per
       await assert.rejects(() => loadImport(storage, CONFIG, fixtureFiles(), NOW, 2027), /aucun projet retenu pour l’exercice 2027/);
       await assert.rejects(() => loadImport(storage, CONFIG, fixtureFiles(), NOW, 2025), /Exercice 2025 clos/);
       assert.equal((await storage.listBaseCards()).length, 5, "a refused load writes nothing");
-      assert.equal(auditImport(CONFIG, fixtureFiles(), NOW, 2027).exercise, 2027);
+      assert.equal((await auditImport(storage, CONFIG, fixtureFiles(), NOW, 2027)).exercise, 2027);
     } finally {
       await storage.close();
     }

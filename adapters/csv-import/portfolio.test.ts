@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import type { BoardConfig } from "../../core/types.ts";
-import { createPortfolioResolver, lastSegment } from "./portfolio.ts";
+import { createNameMarkerResolver, createPortfolioResolver, lastSegment, ruleLabel } from "./portfolio.ts";
 
 const CONFIG = JSON.parse(
   readFileSync(new URL("../../config/board.json", import.meta.url), "utf8"),
@@ -47,4 +47,22 @@ test("a hit says which rule fired: the last segment, or the whole path as a fall
   assert.deepEqual(resolve("DSI NEXTER.GROUPE : Forge Logiciels.PROJETS VENDUS"),
     { domainId: "ad", subDomainId: "forge_logiciels", via: "subdomain", scope: "path", label: "FORGE LOGICIELS" },
     "a sold-projects leaf under a GROUPE branch falls back on the whole path - and lands in A&D");
+});
+
+test("ADR 036: a bracketed name marker forces its domain; free text, unknown brackets and two marked domains do not", () => {
+  const vendus = { id: "vendus", name: "PROJETS VENDUS", short: "VENDU", color: "#000", nameMarkers: ["BUSINESS"] };
+  const resolve = createNameMarkerResolver({ ...CONFIG, domains: [...CONFIG.domains, vendus] });
+  assert.deepEqual(resolve("PE123 Refonte portail [Business]"),
+    { domainId: "vendus", subDomainId: null, via: "domain", scope: "name", label: "BUSINESS" });
+  assert.equal(resolve("PE123 [BUSINESS-2026] Portail client")?.domainId, "vendus", "whole word inside the brackets");
+  assert.equal(resolve("Reporting business unit"), null, "no bracket: no marker");
+  assert.equal(resolve("Portail [Businessman]"), null, "whole word only");
+  assert.equal(resolve("Portail [Data] [Business]")?.domainId, "vendus", "any bracket group");
+  const twice = { id: "x", name: "X", short: "X", color: "#000", nameMarkers: ["BUSINESS"] };
+  assert.equal(createNameMarkerResolver({ ...CONFIG, domains: [...CONFIG.domains, vendus, twice] })("[business]"), null, "ambiguous");
+  assert.equal(createNameMarkerResolver(CONFIG)("[Business]"), null, "no marker configured");
+  assert.equal(ruleLabel({ domainId: "vendus", subDomainId: null, via: "domain", scope: "name", label: "BUSINESS" }),
+    "marqueur « [business] » dans le nom");
+  assert.equal(ruleLabel({ domainId: "infra", subDomainId: null, via: "domain", scope: "last", label: "INFRASTRUCTURE" }),
+    "dernier segment · « INFRASTRUCTURE »");
 });

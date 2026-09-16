@@ -637,6 +637,34 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-16 — Le domaine ne s'écrase plus : conflits tranchés un par un, marqueur « [Business] », PROJETS VENDUS (ADR 036)
+
+- **Pourquoi** : le domaine est l'axe d'arbitrage des responsables de
+  domaine (« c'est mon portefeuille ou pas »). Des projets vendus ont été
+  chargés en A&D par le repli sur le chemin entier ; l'auteur doit
+  ré-importer sans casser ce qu'il a placé. Le chef de projet et le type
+  restent des faits (« un non-sujet »).
+- **Conflits** (`domain-conflicts.ts`) : l'audit lit désormais le tableau
+  de l'exercice et liste chaque carte dont le domaine stocké diffère de la
+  proposition de l'export (règle qui a joué, ce que le journal dit :
+  « posé à la main le … », « gardé le … »). Panneau `ImportConflicts.tsx`
+  : **un conflit à la fois**, « Garder » / « Remplacer », récapitulatif
+  modifiable, « Tout remplacer » / « Tout garder » en raccourcis, pas de
+  défaut — le chargement est refusé tant qu'un conflit est ouvert (CLI :
+  `--domaines garder|remplacer`). Chaque décision = un évènement `edited`
+  signé `import-csv` ; un « garder » n'est pas reposé tant que l'export
+  propose la même chose. Un export sans domaine ne fait pas de conflit ;
+  un sous-domaine disparu de la config compte comme « aucun ».
+- **Marqueur dans le nom** (`domains[].nameMarkers`) : un mot entier entre
+  crochets force son domaine avant le portefeuille — garde-fou, jamais une
+  devinette sur du texte libre. Le rapport dit « marqueur « [business] »
+  dans le nom ».
+- **Config** : domaine **PROJETS VENDUS** (« Projet vendu » en portefeuille,
+  « BUSINESS » entre crochets) ; sous-domaine **Architecture applicative**
+  retiré d'A&D. RUNBOOK : `pg_dump` obligatoire avant tout chargement.
+- 536 tests, 0 échec. La question de fond sur les portefeuilles vendus
+  reste ouverte (§12) ; ce domaine est le failsafe de l'auteur.
+
 ### 2026-09-16 — Exercices, séance B : une carte par projet ET par année, l'import ne touche que son exercice (ADR 035)
 
 - **L'auteur précise le modèle** : les codes PE disent l'année de départ,

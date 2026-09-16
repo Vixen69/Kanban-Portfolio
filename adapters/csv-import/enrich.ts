@@ -15,6 +15,8 @@ import type { SpEntry, SpTable } from "./sp.ts";
 import type { CardCharge } from "./charges.ts";
 import { take, warn } from "./report.ts";
 import type { ImportReport, RowRef } from "./report.ts";
+import { createNameMarkerResolver, ruleLabel } from "./portfolio.ts";
+import type { PortfolioHit } from "./portfolio.ts";
 
 /** One card, fully enriched — what the real import will load. */
 export interface EnrichedCard {
@@ -26,7 +28,10 @@ export interface EnrichedCard {
   laneId: string;
   domainId: string | null;
   subDomainId: string | null;
-  domainSource: "orga" | "param" | null;
+  /** How the domain came: Orga columns, PARAM / the portfolio, or a bracketed name marker (ADR 036). */
+  domainSource: "orga" | "param" | "marker" | null;
+  /** The rule that gave the domain, worded for the report and the conflicts; null when none. */
+  domainRule: string | null;
   owner: string | null;
   typeId: string | null;
   columnId: string;
@@ -62,6 +67,8 @@ export interface CardStats {
   spOutside: number;
   withDomain: number;
   withSubDomain: number;
+  /** Cards whose domain a bracketed name marker forced (ADR 036). */
+  withMarker: number;
   withOwner: number;
   withType: number;
 }
@@ -83,6 +90,8 @@ interface JoinContext {
   consumedSp: Set<SpEntry>;
   stats: CardStats;
   tallies: Map<string, Tally>;
+  /** The bracketed name markers of the config (ADR 036). */
+  marker: (name: string) => PortfolioHit | null;
 }
 
 /**
@@ -120,10 +129,26 @@ function createContext(
     stats: {
       total: 0, positioned: 0, stageCounts: new Map(), withoutJalons: 0, jalonsOutside: 0,
       spById: 0, spByName: 0, spByCode: 0, withoutSp: 0, spOutside: 0,
-      withDomain: 0, withSubDomain: 0, withOwner: 0, withType: 0,
+      withDomain: 0, withSubDomain: 0, withMarker: 0, withOwner: 0, withType: 0,
     },
     tallies: new Map(),
+    marker: createNameMarkerResolver(config),
   };
+}
+
+type DomainPart = Pick<EnrichedCard, "domainId" | "subDomainId" | "domainSource" | "domainRule">;
+
+// The domain a card lands in (ADR 036): a bracketed marker in the project
+// NAME forces its domain — the portfolio of a sold project is not to be
+// trusted — else what the perimeter reader resolved.
+function domainOf(ctx: JoinContext, entry: ProjetEntry): DomainPart {
+  const marker = ctx.marker(entry.name);
+  if (marker === null) {
+    return { domainId: entry.domainId, subDomainId: entry.subDomainId, domainSource: entry.domainSource, domainRule: entry.domainRule };
+  }
+  ctx.stats.withMarker++;
+  tallyInto(ctx.tallies, `${ruleLabel(marker)} → ${marker.domainId} (prime sur le portefeuille, ADR 036)`, entry.ref.line);
+  return { domainId: marker.domainId, subDomainId: null, domainSource: "marker", domainRule: ruleLabel(marker) };
 }
 
 // One perimeter row -> one card. The pris line names the column and the
@@ -132,14 +157,15 @@ function buildCard(ctx: JoinContext, entry: ProjetEntry): EnrichedCard {
   const jalon = joinJalons(ctx, entry);
   const spEntry = joinSp(ctx, entry);
   const s = ctx.stats;
-  if (entry.domainId !== null) s.withDomain++;
-  if (entry.subDomainId !== null) s.withSubDomain++;
+  const domainPart = domainOf(ctx, entry);
+  if (domainPart.domainId !== null) s.withDomain++;
+  if (domainPart.subDomainId !== null) s.withSubDomain++;
   if (entry.owner !== null) s.withOwner++;
   if (entry.typeId !== null) s.withType++;
   const card: EnrichedCard = {
     title: entry.title, normalizedName: entry.normalizedName, codename: entry.codename,
     laneId: ctx.laneId,
-    domainId: entry.domainId, subDomainId: entry.subDomainId, domainSource: entry.domainSource,
+    ...domainPart,
     owner: entry.owner, typeId: entry.typeId,
     columnId: jalon?.columnId ?? ctx.entryColumnId, positioned: jalon !== null,
     createdAt: entry.createdAt, dateRdr: entry.dateRdr,
@@ -154,8 +180,8 @@ function buildCard(ctx: JoinContext, entry: ProjetEntry): EnrichedCard {
     charges: [], pdcKey: null, ref: entry.ref,
   };
   const columnName = ctx.columnNames.get(card.columnId) ?? card.columnId;
-  const domain = entry.domainId === null ? "sans domaine"
-    : `${entry.domainId}${entry.subDomainId === null ? "" : ` / ${entry.subDomainId}`}`;
+  const domain = domainPart.domainId === null ? "sans domaine"
+    : `${domainPart.domainId}${domainPart.subDomainId === null ? "" : ` / ${domainPart.subDomainId}`}`;
   take(ctx.report, card.ref, card.title, `carte → colonne « ${columnName} » · ${domain}`, card.codename ?? undefined);
   return card;
 }

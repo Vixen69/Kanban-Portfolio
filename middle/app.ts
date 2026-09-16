@@ -18,7 +18,7 @@ import { BadRequest, getBoard,
 import { postCard } from "./cards.ts";
 import type { ConfigStore } from "./config-store.ts";
 import { logError, logRequest } from "./log.ts";
-import { auditImport, loadImport, parseExercise, parseFiles } from "./import.ts";
+import { auditImport, loadImport, parseDecisions, parseExercise, parseFiles } from "./import.ts";
 import { exerciseOrCurrent } from "./validation.ts";
 
 const SECURITY_HEADERS: Record<string, string> = {
@@ -84,13 +84,16 @@ function errorHandler(err: unknown, req: Request, res: Response, _next: NextFunc
 // parser carries the larger cap.
 function mountImportRoutes(app: Express, deps: MiddleDeps): void {
   const body = express.json({ limit: IMPORT_MAX_BODY });
-  app.post("/api/import/audit", body, (req: Request, res: Response) => {
+  app.post("/api/import/audit", body, async (req: Request, res: Response) => {
     const config = deps.configStore.getRuntime();
-    res.status(200).json(auditImport(config, parseFiles(req.body), new Date(), parseExercise(req.body, config)));
+    const result = await auditImport(deps.storage, config, parseFiles(req.body), new Date(), parseExercise(req.body, config));
+    res.status(200).json(result);
   });
   app.post("/api/import/load", body, async (req: Request, res: Response) => {
     const config = deps.configStore.getRuntime();
-    const result = await loadImport(deps.storage, config, parseFiles(req.body), new Date(), parseExercise(req.body, config));
+    const result = await loadImport(
+      deps.storage, config, parseFiles(req.body), new Date(), parseExercise(req.body, config), parseDecisions(req.body),
+    );
     res.status(200).json(result);
   });
 }

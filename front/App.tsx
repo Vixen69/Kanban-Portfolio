@@ -166,7 +166,7 @@ function ShellModals({ ctx }: { ctx: Ctx }) {
         <CapacityView cards={ctx.cards} config={config} now={ctx.nowMs} onClose={() => ui.setMetrics(false)} />
       )}
       {ui.importing && (
-        <ImportView onClose={() => ui.setImporting(false)} onLoaded={() => void store.reload()} currentYear={config.exercise.year} />
+        <ImportView onClose={() => ui.setImporting(false)} onLoaded={() => void store.reload()} config={config} />
       )}
       {ui.archive && (
         <ArchiveView cards={ctx.archivedCards} config={config}

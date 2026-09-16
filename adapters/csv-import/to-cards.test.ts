@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import type { BoardConfig, Card, CardEvent } from "../../core/types.ts";
 import { IMPORT_ACTOR, cardId, planLoad, withLegacyIds } from "./to-cards.ts";
+import type { DomainDecision } from "../../core/import-types.ts";
 
 import type { EnrichedCard } from "./enrich.ts";
 
@@ -25,6 +26,7 @@ function card(over: Partial<EnrichedCard> = {}): EnrichedCard {
     domainId: "infra",
     subDomainId: null,
     domainSource: "orga",
+    domainRule: "colonne « Domaine (Orga) »",
     owner: "Alice MERLE",
     typeId: "etude",
     columnId: "actifs",
@@ -173,4 +175,45 @@ test("ADR 035: a load of 2027 creates that year's instances and never touches th
   const absent = planLoad([], CONFIG, cards, events, new Date("2027-01-10T09:00:00.000Z"), 2027);
   assert.deepEqual(absent.events.map((e) => [e.type, e.cardId]), [["unlisted", "PE10001@2027"]]);
   assert.deepEqual(planLoad([], CONFIG, cards, events, NOW, 2026).events.map((e) => e.cardId), ["PE10001@2026"]);
+});
+
+// ADR 036: the domain is what the responsables de domaine arbitrate on —
+// the export never overwrites it silently on a stored card.
+test("ADR 036: a stored card's domain is a conflict, listed and undecided by default; each decision is traced", () => {
+  const before = stored("actifs"); // the stored card sits in « infra »
+  const deck = [card({ domainId: "ad", subDomainId: "forge_logiciels", domainRule: "dernier segment · « FORGE LOGICIELS »" })];
+  const undecided = planLoad(deck, CONFIG, before.cards, before.events, NOW);
+  assert.deepEqual([undecided.domainUndecided, undecided.domainConflicts.length, undecided.events.length], [1, 1, 0]);
+  assert.deepEqual([undecided.cards[0]?.domain, undecided.cards[0]?.subDomain], ["infra", null], "the board's domain stands");
+  assert.deepEqual(undecided.domainConflicts[0], {
+    cardId: "PE10001@2026", title: "Modernisation atelier", codename: "PE10001",
+    board: { domain: "infra", subDomain: null }, proposed: { domain: "ad", subDomain: "forge_logiciels" },
+    rule: "dernier segment · « FORGE LOGICIELS »", prior: null, decision: null,
+  });
+  const decide = (decision: DomainDecision) =>
+    planLoad(deck, CONFIG, before.cards, before.events, NOW, 2026, new Map([["PE10001@2026", decision]]));
+  const replaced = decide("remplacer");
+  assert.deepEqual([replaced.domainReplaced, replaced.cards[0]?.domain, replaced.cards[0]?.subDomain], [1, "ad", "forge_logiciels"]);
+  const trace = replaced.events.find((e) => e.type === "edited");
+  assert.deepEqual([trace?.actor, trace?.payload["decision"], trace?.payload["patch"]],
+    [IMPORT_ACTOR, "remplacer", { domain: "ad", subDomain: "forge_logiciels" }]);
+  const kept = decide("garder");
+  assert.deepEqual([kept.domainKept, kept.cards[0]?.domain], [1, "infra"]);
+  const keptEvent = kept.events.find((e) => e.type === "edited");
+  assert.deepEqual(keptEvent?.payload["proposed"], { domain: "ad", subDomain: "forge_logiciels" });
+  // With that « garder » in the log, the same proposal is not asked again; a new one is, flagged.
+  const log: CardEvent[] = [...before.events, { ...keptEvent!, id: "evt-9" } as CardEvent];
+  const silent = planLoad(deck, CONFIG, before.cards, log, NOW);
+  assert.deepEqual([silent.domainConflicts.length, silent.domainKeptByPrior], [0, 1]);
+  const fresh = planLoad([card({ domainId: "erp", domainRule: "dernier segment · « ERP »" })], CONFIG, before.cards, log, NOW);
+  assert.deepEqual([fresh.domainConflicts.length, fresh.domainConflicts[0]?.prior?.kind], [1, "garder"]);
+});
+
+test("ADR 036: no conflict when the export resolved no domain — the board's value stands, not the first configured domain", () => {
+  const before = stored("actifs");
+  const blank = card({ domainId: null, subDomainId: null, domainRule: null });
+  const plan = planLoad([blank], CONFIG, before.cards, before.events, NOW);
+  assert.deepEqual([plan.domainConflicts.length, plan.cards[0]?.domain], [0, "infra"]);
+  const fresh = planLoad([blank], CONFIG, [], [], NOW);
+  assert.equal(fresh.cards[0]?.domain, CONFIG.domains[0]?.id, "a new card without domain takes the first configured one");
 });

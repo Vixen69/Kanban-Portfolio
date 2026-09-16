@@ -5,6 +5,10 @@
 // owner, dates, type — Sciforma truths), the board wins on POSITION as
 // soon as a human moved the card there (the arbitration is the PMO's), the
 // divergence being reported instead of overwritten.
+// ADR 036 (author, 2026-09-16): the DOMAIN is not a fact the export may
+// overwrite — a stored card whose domain differs from the export's proposal
+// is a conflict the PMO decides one by one (domain-conflicts.ts); the
+// refreshed snapshot keeps the board's domain unless « remplacer » was taken.
 // ADR 035 (author, 2026-09-16): a card is one project's instance in ONE
 // exercise — id « code@année », re-budgeted next year as another card. A
 // load targets one exercise and reads or touches only that year's cards;
@@ -12,16 +16,19 @@
 // current one, and keep their id (the capacity snapshot is remapped).
 // Pure: no storage, no clock of its own — the caller passes both.
 
-import type { BoardConfig, CapacitySnapshot, Card, CardEvent, CardState, ChargeEntry } from "../../core/types.ts";
+import type { BoardConfig, Card, CardEvent, CardState, ChargeEntry } from "../../core/types.ts";
 import type { CardEventInput } from "../../core/events.ts";
 import { lifecycleEvent, movedEvent } from "../../core/events.ts";
 import { laneNature } from "../../core/config.ts";
 import { foldEvents } from "../../core/state.ts";
-import { cardsOfExercise, hasExerciseSuffix, instanceId } from "../../core/exercise.ts";
+import { cardsOfExercise, hasExerciseSuffix } from "../../core/exercise.ts";
+import type { DomainConflict, DomainDecision, DomainRef } from "../../core/import-types.ts";
 import type { EnrichedCard } from "./enrich.ts";
+import { IMPORT_ACTOR, domainConflict, domainDecisionEvent, priorDomainDecisions } from "./domain-conflicts.ts";
+import type { PriorDecision } from "./domain-conflicts.ts";
+import { baseCardId, cardId, withLegacyIds } from "./card-identity.ts";
 
-/** Actor written on every event this loader produces. */
-export const IMPORT_ACTOR = "import-csv";
+export { IMPORT_ACTOR, baseCardId, cardId, withLegacyIds };
 
 /** What a load would write, and what it deliberately would not. */
 export interface LoadPlan {
@@ -46,6 +53,17 @@ export interface LoadPlan {
   /** The exercise the load writes into (ADR 035). */
   exercise: number;
   /**
+   * The domain conflicts of the exercise's stored cards (ADR 036), each
+   * with the decision applied — null = undecided: the board's value stands
+   * and the load is refused by the middle / the CLI.
+   */
+  domainConflicts: Array<DomainConflict & { decision: DomainDecision | null }>;
+  domainReplaced: number;
+  domainKept: number;
+  domainUndecided: number;
+  /** Conflicts silenced by an earlier « garder » against the same proposal. */
+  domainKeptByPrior: number;
+  /**
    * Instance ids (cardId) the load mapped onto cards stored before ADR 035
    * (bare ids): instance id → stored id. The capacity snapshot, built with
    * instance ids, is remapped with it (withLegacyIds).
@@ -58,8 +76,9 @@ export interface LoadPlan {
  * of ONE exercise (ADR 035): only that year's cards are read, refreshed,
  * moved or marked absent — the other years' boards stand.
  * Inputs: the enriched cards, the board config, the cards and events
- * already stored (empty arrays on a first load), `now` (injected), and the
- * exercise year loaded (default: the config's current one).
+ * already stored (empty arrays on a first load), `now` (injected), the
+ * exercise year loaded (default: the config's current one), and the PMO's
+ * domain decisions by card id (ADR 036; none = every conflict undecided).
  * Outputs: the LoadPlan — nothing is written here.
  * Failure modes: none; cards whose identity cannot be derived keep a
  * name-based id, so a renamed project creates a new card (the code
@@ -68,36 +87,75 @@ export interface LoadPlan {
 export function planLoad(
   deck: EnrichedCard[], config: BoardConfig,
   existingCards: Card[], existingEvents: CardEvent[], now: Date, year: number = config.exercise.year,
+  decisions: ReadonlyMap<string, DomainDecision> = new Map(),
 ): LoadPlan {
   const folded = cardsOfExercise(foldEvents(existingCards, existingEvents), year, config.exercise.year);
   const current = new Map(folded.map((c) => [c.id, c]));
   const legacy = new Map(folded.filter((c) => !hasExerciseSuffix(c.id)).map((c) => [c.id, c]));
   const movedByHand = handMovedIds(existingEvents);
+  const priors = priorDomainDecisions(existingEvents);
   const plan = emptyPlan(year);
   const deckIds = new Set<string>();
   for (const card of deck) {
     const id = resolveId(card, year, legacy, plan);
     deckIds.add(id);
     const existing = current.get(id);
-    plan.cards.push(toCard(id, card, config, plan, year, existing?.createdAt));
     if (existing === undefined) {
+      plan.cards.push(toCard(id, card, config, plan, year));
       pushCreated(plan, id, card, now);
       continue;
     }
     plan.updated++;
-    if (!card.positioned) {
-      plan.kept++; // no position in the export: the board's own stands (ADR 026)
-      continue;
-    }
-    if (existing.columnId === card.columnId && existing.laneId === card.laneId) continue;
-    if (movedByHand.has(id)) {
-      plan.divergences.push({ title: card.title, fromColumn: existing.columnId, toColumn: card.columnId });
-      continue;
-    }
-    pushMoved(plan, id, existing, card, now);
+    const domain = settleDomain(plan, existing, card, config, priors.get(id), decisions.get(id), now);
+    plan.cards.push(toCard(id, card, config, plan, year, existing.createdAt, domain));
+    refreshPosition(plan, id, existing, card, movedByHand, now);
   }
   markAbsences(plan, current, deckIds, now);
   return plan;
+}
+
+// The domain the refreshed snapshot carries (ADR 036): the board's own,
+// unless the PMO decided « remplacer » on this load — never the export's
+// by default. Each decision becomes an event; an undecided conflict keeps
+// the board's value and is counted (the load is refused upstream).
+function settleDomain(
+  plan: LoadPlan, existing: CardState, card: EnrichedCard, config: BoardConfig,
+  prior: PriorDecision | undefined, decision: DomainDecision | undefined, now: Date,
+): DomainRef {
+  const board: DomainRef = { domain: existing.domain, subDomain: existing.subDomain };
+  const check = domainConflict(existing, card, config, prior);
+  if (check.kind === "kept-by-prior") plan.domainKeptByPrior++;
+  if (check.kind !== "conflict") return board;
+  plan.domainConflicts.push({ ...check.conflict, decision: decision ?? null });
+  if (decision === undefined) {
+    plan.domainUndecided++;
+    return board;
+  }
+  plan.events.push(domainDecisionEvent(check.conflict, decision, now.toISOString()));
+  if (decision === "garder") {
+    plan.domainKept++;
+    return check.conflict.board;
+  }
+  plan.domainReplaced++;
+  return check.conflict.proposed;
+}
+
+// The position rule (ADR 026): no position in the export = the board's own
+// stands; a hand-moved card keeps its column (divergence reported); else
+// the export moves the card.
+function refreshPosition(
+  plan: LoadPlan, id: string, existing: CardState, card: EnrichedCard, movedByHand: ReadonlySet<string>, now: Date,
+): void {
+  if (!card.positioned) {
+    plan.kept++;
+    return;
+  }
+  if (existing.columnId === card.columnId && existing.laneId === card.laneId) return;
+  if (movedByHand.has(id)) {
+    plan.divergences.push({ title: card.title, fromColumn: existing.columnId, toColumn: card.columnId });
+    return;
+  }
+  pushMoved(plan, id, existing, card, now);
 }
 
 // The board id of a deck card in this exercise — or the id of the card
@@ -153,6 +211,7 @@ function emptyPlan(year: number): LoadPlan {
   return {
     cards: [], events: [], created: 0, updated: 0, moved: 0, unlisted: 0, relisted: 0, kept: 0,
     divergences: [], chargesWithoutProfile: 0, exercise: year, aliases: new Map(),
+    domainConflicts: [], domainReplaced: 0, domainKept: 0, domainUndecided: 0, domainKeptByPrior: 0,
   };
 }
 
@@ -165,28 +224,6 @@ function handMovedIds(events: CardEvent[]): Set<string> {
   return ids;
 }
 
-/**
- * Stable board id of an imported card in one exercise (ADR 035): its base
- * id suffixed with the year — a re-import of the same year lands on the
- * same card, and next year's instance of the project is another card.
- * Inputs: the enriched card, the exercise year. Outputs: the id.
- * Failure modes: none.
- */
-export function cardId(card: EnrichedCard, year: number): string {
-  return instanceId(baseCardId(card), year);
-}
-
-/**
- * The year-less part of a card id: the PE code when the project has one,
- * else « IMP-<slug of the normalized name> ». Cards stored before ADR 035
- * carry exactly this as their id.
- * Inputs: the enriched card. Outputs: the base id. Failure modes: none.
- */
-export function baseCardId(card: EnrichedCard): string {
-  if (card.codename !== null) return card.codename;
-  const slug = card.normalizedName.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48);
-  return `IMP-${slug === "" ? "sans-nom" : slug}`;
-}
 
 // The aging clock starts at the project start date (author, 2026-08-01);
 // no start date falls back to the run instant.
@@ -195,15 +232,19 @@ function entryTs(card: EnrichedCard, now: Date): string {
 }
 
 // The import-time snapshot row. Fields the exports never carry (tags,
-// risks, blocage, notes...) stay empty: they are lived in the tool.
+// risks, blocage, notes...) stay empty: they are lived in the tool. An
+// existing card passes the domain it keeps (settleDomain, ADR 036); a new
+// one takes the export's, else the first configured domain.
 function toCard(
-  id: string, card: EnrichedCard, config: BoardConfig, plan: LoadPlan, year: number, keepCreatedAt?: string,
+  id: string, card: EnrichedCard, config: BoardConfig, plan: LoadPlan, year: number,
+  keepCreatedAt?: string, domain?: DomainRef,
 ): Card {
   return {
     id,
     title: card.title,
-    domain: card.domainId ?? config.domains[0]?.id ?? "",
-    subDomain: card.subDomainId,
+    domain: domain?.domain ?? card.domainId ?? config.domains[0]?.id ?? "",
+    subDomain: domain === undefined ? card.subDomainId : domain.subDomain,
+
     laneId: card.laneId, columnId: card.columnId,
     owner: card.owner ?? "",
     criticality: "normal",
@@ -241,23 +282,4 @@ function chargesOf(card: EnrichedCard, plan: LoadPlan): ChargeEntry[] {
     }
     return [{ profileId: charge.profileId, jh: charge.jh, done: charge.done }];
   });
-}
-
-/**
- * The capacity snapshot with its card ids mapped onto the cards the load
-
- * actually refreshed (plan.aliases: instance id → stored bare id).
- * Inputs: the snapshot, the aliases. Output: a new snapshot (the input is
- * untouched) — the same object when there is nothing to map. Failure: none.
- */
-export function withLegacyIds(snapshot: CapacitySnapshot, aliases: Map<string, string>): CapacitySnapshot {
-  if (aliases.size === 0) return snapshot;
-  const map = <T extends { cardId: string | null }>(rows: T[]): T[] =>
-    rows.map((row) => ({ ...row, cardId: row.cardId === null ? null : aliases.get(row.cardId) ?? row.cardId }));
-  return {
-    ...snapshot,
-    assignments: map(snapshot.assignments),
-    ...(snapshot.generic === undefined ? {} : { generic: map(snapshot.generic) }),
-    ...(snapshot.coutsDemand === undefined ? {} : { coutsDemand: map(snapshot.coutsDemand) }),
-  };
 }

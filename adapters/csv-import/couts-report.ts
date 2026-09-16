@@ -8,6 +8,7 @@
 // be a missing entry, not a cancellation).
 
 import type { BoardConfig } from "../../core/types.ts";
+import { ruleLabel } from "./portfolio.ts";
 import { tallyLabel } from "./tallies.ts";
 import type { Tally } from "./tallies.ts";
 import { doubt, warn } from "./report.ts";
@@ -63,9 +64,7 @@ function emitPortfolios(r: CoutsReading): void {
   const rows = [...r.portfolios.entries()].sort((a, b) => b[1].count - a[1].count || a[0].localeCompare(b[0], "fr"));
   for (const [path, { count, hit }] of rows) {
     const target = hit === null ? "sans domaine" : domainLabel(r.config, hit);
-    const how = hit === null
-      ? "aucun mot connu (nom, code, alias de domaine, sous-domaine)"
-      : `${hit.scope === "last" ? "dernier segment" : "chemin entier (repli)"} · « ${hit.label} »`;
+    const how = hit === null ? "aucun mot connu (nom, code, alias de domaine, sous-domaine)" : ruleLabel(hit);
     warn(r.report, `portefeuille « ${path || "(vide)"} » : ${count} projet(s) → ${target} — ${how}`, r.fileName);
   }
 }

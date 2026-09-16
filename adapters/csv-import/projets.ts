@@ -43,6 +43,7 @@ export interface ProjetEntry {
   domainId: string | null;
   subDomainId: string | null;
   domainSource: "orga" | "param" | null;
+  domainRule: string | null; // how the domain came, worded for report and conflicts (ADR 036)
   owner: string | null;
   budgetRdli: number | null;
   effortEstimated: number | null;
@@ -216,11 +217,11 @@ function deriveType(ctx: ProjetsContext, row: CsvRow): string | null {
   return hit?.id ?? null;
 }
 
-type DomainPart = Pick<ProjetEntry, "domainId" | "subDomainId" | "domainSource">;
+type DomainPart = Pick<ProjetEntry, "domainId" | "subDomainId" | "domainSource" | "domainRule">;
 
 // Orga columns first (direct), else the organisation path through PARAM.
 function deriveDomain(ctx: ProjetsContext, row: CsvRow): DomainPart {
-  const none: DomainPart = { domainId: null, subDomainId: null, domainSource: null };
+  const none: DomainPart = { domainId: null, subDomainId: null, domainSource: null, domainRule: null };
   if (ctx.shape === "orga") {
     const label = cell(ctx, row, "Domaine (Orga)");
     const domainId = label === "" ? null : (ctx.domainLookup(label)?.id ?? null);
@@ -230,7 +231,7 @@ function deriveDomain(ctx: ProjetsContext, row: CsvRow): DomainPart {
       return none;
     }
     ctx.counts.domainDirect++;
-    return { domainId, subDomainId: resolveSub(ctx, domainId, cell(ctx, row, "Ss-Daine (Orga)"), row.line), domainSource: "orga" };
+    return { domainId, subDomainId: resolveSub(ctx, domainId, cell(ctx, row, "Ss-Daine (Orga)"), row.line), domainSource: "orga", domainRule: "colonne « Domaine (Orga) »" };
   }
   const path = ctx.shape === "path" ? cell(ctx, row, "Domaine") : "";
   const hit = path === "" || ctx.param === null ? undefined : ctx.param.byPath.get(normalizeLabel(path));
@@ -241,7 +242,7 @@ function deriveDomain(ctx: ProjetsContext, row: CsvRow): DomainPart {
   }
   ctx.counts.domainViaParam++;
   if (hit.subDomainId !== null) ctx.counts.subDetailed++;
-  return { domainId: hit.domainId, subDomainId: hit.subDomainId, domainSource: "param" };
+  return { domainId: hit.domainId, subDomainId: hit.subDomainId, domainSource: "param", domainRule: "chemin d'organisation traduit par PARAM" };
 }
 
 // A sub-domain resolves only inside a detailed domain (ADR 022); elsewhere

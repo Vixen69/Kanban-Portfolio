@@ -17,7 +17,7 @@ import type { BoardConfig } from "../../core/types.ts";
 import { createTolerantLookup, normalizeLabel } from "./normalize.ts";
 import { createTypeLookup, typeBaseLabel } from "./domains.ts";
 import type { Lookup } from "./domains.ts";
-import { createPortfolioResolver, lastSegment } from "./portfolio.ts";
+import { createPortfolioResolver, lastSegment, ruleLabel } from "./portfolio.ts";
 import type { PortfolioHit } from "./portfolio.ts";
 import { parseFrenchAmount } from "./values.ts";
 import { splitSubjectName } from "./subject-name.ts";
@@ -266,6 +266,7 @@ function buildEntry(ctx: CoutsContext, seen: Seen, typeId: string): ProjetEntry 
     normalizedName: normalizeLabel(seen.name), normalizedTitle: normalizeLabel(split.title),
     codename: seen.id, typeId, createdAt: null, dateRdr: null,
     domainId: hit?.domainId ?? null, subDomainId: hit?.subDomainId ?? null, domainSource: hit === null ? null : "param",
+    domainRule: hit === null ? null : ruleLabel(hit),
     owner: null, budgetRdli: null, effortEstimated: null, effortConsumed: null, ref: seen.ref,
   };
 }

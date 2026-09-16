@@ -4,11 +4,16 @@
 // before « Charger », and a load never deletes a card (absentes are marked
 // — ADR 026). The import targets ONE exercise (ADR 035): the current year
 // by default, or a year in preparation; it never touches another year's
-// cards. No authentication until RP3, like the rest of the write API.
+// cards. The audit's domain conflicts are decided one by one before the
+// load (ADR 036, ./ImportConflicts.tsx). No authentication until RP3.
 
 import { useState } from "react";
+import type { BoardConfig } from "../../core/types.ts";
 import type { ImportAuditResult, ImportFilePayload, ImportLoadResult } from "../../core/import-types.ts";
+
 import { ApiError, postImportAudit, postImportLoad } from "../api.ts";
+import { ImportConflicts } from "./ImportConflicts.tsx";
+import type { Decisions } from "./ImportConflicts.tsx";
 
 interface Picked {
   name: string;
@@ -50,10 +55,12 @@ function messageOf(cause: unknown): string {
 }
 
 // The audit / load cycle: one request at a time, the last audit kept when
-// a load fails so the report stays on screen with the error.
+// a load fails so the report stays on screen with the error. The domain
+// decisions travel with the load and are wiped by every new audit.
 function useImport(files: Picked[], exercise: number, onLoaded: () => void) {
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const [error, setError] = useState<string | null>(null);
+  const [decisions, setDecisions] = useState<Decisions>({});
   const audited = phase.kind === "audited" ? phase.result : phase.kind === "busy" ? phase.previous : null;
   const run = async (what: "audit" | "load") => {
     const payload: ImportFilePayload[] = files.map(({ name, base64 }) => ({ name, base64 }));
@@ -61,9 +68,10 @@ function useImport(files: Picked[], exercise: number, onLoaded: () => void) {
     setPhase({ kind: "busy", what, previous: audited });
     try {
       if (what === "audit") {
+        setDecisions({});
         setPhase({ kind: "audited", result: await postImportAudit(payload, exercise) });
       } else {
-        setPhase({ kind: "loaded", result: await postImportLoad(payload, exercise) });
+        setPhase({ kind: "loaded", result: await postImportLoad(payload, exercise, decisions) });
         onLoaded();
       }
     } catch (cause) {
@@ -71,7 +79,8 @@ function useImport(files: Picked[], exercise: number, onLoaded: () => void) {
       setPhase(audited === null ? { kind: "idle" } : { kind: "audited", result: audited });
     }
   };
-  return { phase, error, audited, run, reset: () => setPhase({ kind: "idle" }) };
+  const reset = () => { setPhase({ kind: "idle" }); setDecisions({}); };
+  return { phase, error, audited, decisions, setDecisions, run, reset };
 }
 
 function ExerciseSelect({ exercise, currentYear, onChange }: {
@@ -132,14 +141,16 @@ function LoadSummary({ result }: { result: ImportLoadResult }) {
     <div className="import-summary ok">
       Chargé dans l’exercice {result.exercise} : {l.created} créée(s) · {l.updated} mise(s) à jour · {l.moved} déplacée(s) ·
       {" "}{l.unlisted} absente(s) marquée(s) · {l.relisted} de retour · {l.divergences} divergence(s) conservée(s) ·
-      {" "}{l.kept} position(s) conservée(s) (sans jalon)
+      {" "}{l.kept} position(s) conservée(s) (sans jalon) · domaines : {l.domainReplaced} remplacé(s), {l.domainKept} gardé(s)
+      {l.domainKeptByPrior > 0 && <>, {l.domainKeptByPrior} déjà tranché(s)</>}
       {l.capacity !== null && <> · capacité : {l.capacity.persons} personne(s), {l.capacity.assignments} affectation(s)</>}
     </div>
   );
 }
 
-function LoadControls({ result, acknowledged, setAcknowledged, busy, onLoad }: {
-  result: ImportAuditResult; acknowledged: boolean; setAcknowledged: (v: boolean) => void; busy: boolean; onLoad: () => void;
+function LoadControls({ result, pending, acknowledged, setAcknowledged, busy, onLoad }: {
+  result: ImportAuditResult; pending: number; acknowledged: boolean; setAcknowledged: (v: boolean) => void;
+  busy: boolean; onLoad: () => void;
 }) {
   if (!result.loadable) return null;
   return (
@@ -148,19 +159,24 @@ function LoadControls({ result, acknowledged, setAcknowledged, busy, onLoad }: {
         <input type="checkbox" checked={acknowledged} onChange={(e) => setAcknowledged(e.target.checked)} />
         J’ai lu le rapport
       </label>
-      <button className="btn" disabled={busy || !acknowledged} onClick={onLoad}>Charger dans le tableau {result.exercise}</button>
-      <span className="m2-note">Cartes et évènements en un lot ; rien n’est supprimé ; les autres exercices ne sont pas touchés.</span>
+      <button className="btn" disabled={busy || !acknowledged || pending > 0} onClick={onLoad}>Charger dans le tableau {result.exercise}</button>
+      <span className="m2-note">
+        {pending > 0 ? `${pending} conflit(s) de domaine à trancher avant de charger.` : "Cartes et évènements en un lot ; rien n’est supprimé ; les autres exercices ne sont pas touchés."}
+      </span>
     </div>
   );
 }
 
 // Everything under the form: the error, the busy note, the load and audit
-// summaries, the load controls and the report itself.
-function Outcome({ phase, error, shown, acknowledged, setAcknowledged, onLoad }: {
-  phase: Phase; error: string | null; shown: ImportAuditResult | null;
+// summaries, the conflicts to decide, the load controls and the report.
+function Outcome({ phase, error, shown, config, decisions, setDecisions, acknowledged, setAcknowledged, onLoad }: {
+  phase: Phase; error: string | null; shown: ImportAuditResult | null; config: BoardConfig;
+  decisions: Decisions; setDecisions: (d: Decisions) => void;
   acknowledged: boolean; setAcknowledged: (v: boolean) => void; onLoad: () => void;
 }) {
   const busy = phase.kind === "busy";
+  const conflicts = phase.kind === "audited" ? phase.result.conflicts : [];
+  const pending = conflicts.filter((c) => decisions[c.cardId] === undefined).length;
   return (
     <>
       {error !== null && <div className="import-error">{error}</div>}
@@ -168,7 +184,13 @@ function Outcome({ phase, error, shown, acknowledged, setAcknowledged, onLoad }:
       {phase.kind === "loaded" && <LoadSummary result={phase.result} />}
       {shown !== null && <Summary result={shown} />}
       {phase.kind === "audited" && (
-        <LoadControls result={phase.result} acknowledged={acknowledged} setAcknowledged={setAcknowledged} busy={busy} onLoad={onLoad} />
+        <ImportConflicts conflicts={conflicts} decisions={decisions} config={config}
+          onDecide={(cardId, decision) => setDecisions({ ...decisions, [cardId]: decision })}
+          onDecideAll={(decision) => setDecisions(Object.fromEntries(conflicts.map((c) => [c.cardId, decision])))} />
+      )}
+      {phase.kind === "audited" && (
+        <LoadControls result={phase.result} pending={pending} acknowledged={acknowledged} setAcknowledged={setAcknowledged}
+          busy={busy} onLoad={onLoad} />
       )}
       {shown !== null && <pre className="import-report">{shown.report}</pre>}
     </>
@@ -178,17 +200,19 @@ function Outcome({ phase, error, shown, acknowledged, setAcknowledged, onLoad }:
 /**
  * The import overlay (header ⬆).
  * Inputs: the close callback, onLoaded (the board refetches after a load),
- * the current exercise year (the selector's default). Output: the modal
- * DOM. Failure modes: none — API refusals (400 files, wrong-year files,
- * closed year, 500) show their French message and keep the form.
+ * the runtime config (the current exercise, the domain labels). Output:
+ * the modal DOM. Failure modes: none — API refusals (400 files, wrong-year
+ * files, closed year, undecided conflict, 500) show their French message
+ * and keep the form.
  */
-export function ImportView({ onClose, onLoaded, currentYear }: {
-  onClose: () => void; onLoaded: () => void; currentYear: number;
+export function ImportView({ onClose, onLoaded, config }: {
+  onClose: () => void; onLoaded: () => void; config: BoardConfig;
 }) {
+  const currentYear = config.exercise.year;
   const [files, setFiles] = useState<Picked[]>([]);
   const [exercise, setExercise] = useState(currentYear);
   const [acknowledged, setAcknowledged] = useState(false);
-  const { phase, error, audited, run, reset } = useImport(files, exercise, onLoaded);
+  const { phase, error, audited, decisions, setDecisions, run, reset } = useImport(files, exercise, onLoaded);
   const shown = phase.kind === "loaded" ? phase.result : audited;
   return (
     <div className="overlay" onClick={onClose}>
@@ -203,14 +227,15 @@ export function ImportView({ onClose, onLoaded, currentYear }: {
             Déposer les CSV (Coût — l’export COUT PREV, le périmètre —, PARAM, Projets, ProjetsCdP, ProjetsJalons, SP,
             Ressources_PdC — reconnus par leurs en-têtes, pas par leur nom ; Ress.Profils facultatif). L’audit ne modifie
             rien ; le chargement n’efface jamais une carte. L’import ne touche que l’exercice choisi : un import 2027
-            ne lit ni n’écrit une carte 2026 ; un même code PE y est une autre carte, avec son budget.
+            ne lit ni n’écrit une carte 2026 ; un même code PE y est une autre carte, avec son budget. Le domaine d’une
+            carte déjà là n’est jamais remplacé sans votre décision, conflit par conflit.
           </div>
           <ImportForm files={files} busy={phase.kind === "busy"} exercise={exercise} currentYear={currentYear}
             onYear={(year) => { setExercise(year); reset(); }}
             onPick={(list) => { void readFiles(list).then((picked) => { setFiles(picked); reset(); }); }}
             onAudit={() => { setAcknowledged(false); void run("audit"); }} />
-          <Outcome phase={phase} error={error} shown={shown} acknowledged={acknowledged}
-            setAcknowledged={setAcknowledged} onLoad={() => void run("load")} />
+          <Outcome phase={phase} error={error} shown={shown} config={config} decisions={decisions} setDecisions={setDecisions}
+            acknowledged={acknowledged} setAcknowledged={setAcknowledged} onLoad={() => void run("load")} />
         </div>
       </div>
     </div>
