@@ -10,9 +10,10 @@ import { win32 } from "node:path";
 import type { BoardStorage } from "../core/ports.ts";
 import type { BoardConfig } from "../core/types.ts";
 import type { ImportAuditResult, ImportLoadResult, ImportSummary } from "../core/import-types.ts";
-import { planLoad, renderReport, runImportAudit } from "../adapters/csv-import/index.ts";
-import type { AuditResult, InputFile } from "../adapters/csv-import/index.ts";
+import { planLoad, renderReport, runImportAudit, withLegacyIds } from "../adapters/csv-import/index.ts";
+import type { AuditResult, EnrichedCard, InputFile } from "../adapters/csv-import/index.ts";
 import { BadRequest } from "./errors.ts";
+import { exerciseOrCurrent } from "./validation.ts";
 
 const MAX_FILES = 12;
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
@@ -49,6 +50,30 @@ export function parseFiles(body: unknown): InputFile[] {
   return files.map(parseFile);
 }
 
+/**
+ * The exercise year an import request names (`exercise` in the body), or
+ * the current one when absent (ADR 035).
+ * Inputs: the JSON body, the runtime config. Output: the year.
+ * Failure: BadRequest (French) when the value is not a whole year.
+ */
+export function parseExercise(body: unknown, config: BoardConfig): number {
+  const raw = typeof body === "object" && body !== null ? (body as { exercise?: unknown }).exercise : undefined;
+  return exerciseOrCurrent(raw, config);
+}
+
+// The cards a load may write. Refuses an empty deck BEFORE anything could
+// be marked absent: no perimeter at all, or a file set with no project on
+// the requested year — the files of another exercise (ADR 035).
+function loadableDeck(audit: AuditResult, year: number): EnrichedCard[] {
+  if (audit.cards === null) {
+    throw new BadRequest("Chargement refusé : aucune carte assemblée (le fichier « projets » manque ?).");
+  }
+  if (audit.cards.cards.length === 0) {
+    throw new BadRequest(`Chargement refusé : aucun projet retenu pour l’exercice ${year} (fichiers d’une autre année ?).`);
+  }
+  return audit.cards.cards;
+}
+
 function summarize(audit: AuditResult): ImportSummary {
   const { report } = audit;
   return {
@@ -64,40 +89,49 @@ function summarize(audit: AuditResult): ImportSummary {
 
 /**
  * Runs the audit over the received files — nothing is written.
- * Inputs: the runtime config, the files, now. Output: the rendered report
+ * Inputs: the runtime config, the files, now, the exercise year read
+ * (default: the current one, ADR 035). Output: the rendered report
  * (Markdown, French), its counts, and whether a load would write cards.
  * Failure: none — every anomaly lands in the report.
  */
-export function auditImport(config: BoardConfig, files: InputFile[], now: Date): ImportAuditResult {
-  const audit = runImportAudit(files, config, now);
-  return { report: renderReport(audit.report, now), summary: summarize(audit), loadable: audit.cards !== null };
+export function auditImport(
+  config: BoardConfig, files: InputFile[], now: Date, year: number = config.exercise.year,
+): ImportAuditResult {
+  const audit = runImportAudit(files, config, now, year);
+  return { exercise: year, report: renderReport(audit.report, now), summary: summarize(audit), loadable: audit.cards !== null };
 }
 
 /**
- * Re-runs the audit and loads the assembled deck: cards and events in one
- * batch, then the capacity snapshot when the files carried one.
- * Inputs: the storage, the runtime config, the files, now.
+ * Re-runs the audit and loads the assembled deck into ONE exercise's
+ * board: cards and events in one batch, then that year's capacity
+ * snapshot when the files carried one. The other years' cards are never
+ * read nor written (ADR 035).
+ * Inputs: the storage, the runtime config, the files, now, the exercise
+ * year (default: the current one).
  * Output: the audit result plus what the load wrote.
- * Failure: BadRequest when no card assembled (no `projets` file);
- * storage errors propagate (→ 500), nothing partially written for cards.
+ * Failure: BadRequest on a closed year (below the current one), when no
+ * card assembled (no `projets` file) or when no project is retained on
+ * that year (the files of another exercise); storage errors propagate
+ * (→ 500), nothing partially written for cards.
  */
 export async function loadImport(
-  storage: BoardStorage, config: BoardConfig, files: InputFile[], now: Date,
+  storage: BoardStorage, config: BoardConfig, files: InputFile[], now: Date, year: number = config.exercise.year,
 ): Promise<ImportLoadResult> {
-  const audit = runImportAudit(files, config, now);
-  if (audit.cards === null) {
-    throw new BadRequest("Chargement refusé : aucune carte assemblée (le fichier « projets » manque ?).");
-  }
+  if (year < config.exercise.year) throw new BadRequest(`Exercice ${year} clos : chargement refusé.`);
+  const audit = runImportAudit(files, config, now, year);
+  const deck = loadableDeck(audit, year);
   const [events, baseCards] = await Promise.all([storage.listEvents(), storage.listBaseCards()]);
-  const plan = planLoad(audit.cards.cards, config, baseCards, events, now);
+  const plan = planLoad(deck, config, baseCards, events, now, year);
   await storage.importCards(plan.cards, plan.events);
-  if (audit.capacity !== null) await storage.importCapacity(audit.capacity.snapshot);
+  if (audit.capacity !== null) await storage.importCapacity(withLegacyIds(audit.capacity.snapshot, plan.aliases));
   console.log(
-    `${now.toISOString()} import (outil) : ${plan.created} créée(s), ${plan.updated} mise(s) à jour, ` +
+    `${now.toISOString()} import (outil, exercice ${year}) : ${plan.created} créée(s), ${plan.updated} mise(s) à jour, ` +
       `${plan.moved} déplacée(s), ${plan.unlisted} absente(s), ${plan.relisted} de retour`,
   );
   return {
+    exercise: year,
     report: renderReport(audit.report, now),
+
     summary: summarize(audit),
     loadable: true,
     load: {

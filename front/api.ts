@@ -128,12 +128,13 @@ export function fetchBoard(): Promise<BoardData> {
 }
 
 /**
- * GET /api/capacity — the last imported capacity snapshot (ADR 024).
- * Output: the CapacitySnapshot, or null when no import carried one yet.
+ * GET /api/capacity?exercise=YYYY — the capacity snapshot of one exercise
+ * year (ADR 024/035). Input: the year. Output: the CapacitySnapshot, or
+ * null when no import carried one for that year.
  * Failure: throws ApiError (unreachable or non-2xx).
  */
-export function fetchCapacity(): Promise<CapacitySnapshot | null> {
-  return request<{ capacity: CapacitySnapshot | null }>("/api/capacity").then((body) => body.capacity);
+export function fetchCapacity(exercise: number): Promise<CapacitySnapshot | null> {
+  return request<{ capacity: CapacitySnapshot | null }>(`/api/capacity?exercise=${exercise}`).then((body) => body.capacity);
 }
 
 /**
@@ -188,21 +189,24 @@ export interface DecisionInput {
 
 /**
  * POST /api/import/audit — audits a set of PPM export files (ADR 027);
- * nothing is written. Input: the files (base64). Output: the report and
- * its counts. Failure: throws ApiError (400 on bad files).
+ * nothing is written. Inputs: the files (base64), the exercise year read
+ * (ADR 035). Output: the report and its counts. Failure: throws ApiError
+ * (400 on bad files or year).
  */
-export function postImportAudit(files: ImportFilePayload[]): Promise<ImportAuditResult> {
-  return request<ImportAuditResult>("/api/import/audit", jsonInit("POST", { files }));
+export function postImportAudit(files: ImportFilePayload[], exercise: number): Promise<ImportAuditResult> {
+  return request<ImportAuditResult>("/api/import/audit", jsonInit("POST", { files, exercise }));
 }
 
 /**
- * POST /api/import/load — audits then loads the files into the board.
- * Input: the files. Output: the report plus what the load wrote.
- * Failure: throws ApiError.
+ * POST /api/import/load — audits then loads the files into ONE exercise's
+ * board (ADR 035). Inputs: the files, the exercise year. Output: the report
+ * plus what the load wrote. Failure: throws ApiError (400 on a closed year
+ * or a file set with no project on that year).
  */
-export function postImportLoad(files: ImportFilePayload[]): Promise<ImportLoadResult> {
-  return request<ImportLoadResult>("/api/import/load", jsonInit("POST", { files }));
+export function postImportLoad(files: ImportFilePayload[], exercise: number): Promise<ImportLoadResult> {
+  return request<ImportLoadResult>("/api/import/load", jsonInit("POST", { files, exercise }));
 }
+
 
 /** POST a decision intent. Inputs: card id, the DecisionInput. Output: the stored event. Failure: throws ApiError. */
 export function postDecision(cardId: string, input: DecisionInput): Promise<CardEvent> {

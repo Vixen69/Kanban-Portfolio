@@ -5,7 +5,7 @@
 // Unlike scripts/seed.ts, the board config is read through the runtime
 // store so an admin override applied on the client platform is honored.
 //
-// Usage: node sync/import.ts <dossier> [--out <rapport>] [--charger]
+// Usage: node sync/import.ts <dossier> [--out <rapport>] [--charger] [--exercice <année>]
 // Exit codes: 0 = audit produced (even with doubtful findings),
 //             1 = the run itself was impossible (args, folder, config,
 //                 storage).
@@ -15,17 +15,20 @@ import { dirname, join, resolve } from "node:path";
 import { validateBoardConfig } from "../core/config.ts";
 import { loadServerConfig } from "../middle/config.ts";
 import { createConfigStore } from "../middle/config-store.ts";
-import { planLoad, renderReport, runImportAudit } from "../adapters/csv-import/index.ts";
+import { planLoad, renderReport, runImportAudit, withLegacyIds } from "../adapters/csv-import/index.ts";
+import type { CardAssembly } from "../adapters/csv-import/index.ts";
 import type { InputFile, LoadPlan } from "../adapters/csv-import/index.ts";
 import type { CapacityBuild, EnrichedCard } from "../adapters/csv-import/index.ts";
 import type { BoardConfig } from "../core/types.ts";
 
-const USAGE = "usage : node sync/import.ts <dossier> [--out <rapport>] [--charger]";
+const USAGE = "usage : node sync/import.ts <dossier> [--out <rapport>] [--charger] [--exercice <année>]";
 
 interface Args {
   folder: string;
   out: string | null;
   charger: boolean;
+  /** The exercise year read and loaded (ADR 035); null = the config's current one. */
+  exercice: number | null;
 }
 
 // Positional folder + optional flags; anything else is a usage error.
@@ -33,6 +36,7 @@ function parseArgs(argv: string[]): Args | null {
   let folder: string | null = null;
   let out: string | null = null;
   let charger = false;
+  let exercice: number | null = null;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i] ?? "";
     if (arg === "--out") {
@@ -42,13 +46,18 @@ function parseArgs(argv: string[]): Args | null {
       i++;
     } else if (arg === "--charger") {
       charger = true;
+    } else if (arg === "--exercice") {
+      const value = argv[i + 1];
+      if (value === undefined || !/^\d{4}$/.test(value)) return null;
+      exercice = Number(value);
+      i++;
     } else if (arg.startsWith("--") || folder !== null) {
       return null;
     } else {
       folder = arg;
     }
   }
-  return folder === null ? null : { folder, out, charger };
+  return folder === null ? null : { folder, out, charger, exercice };
 }
 
 // The config the board actually serves: defaults + admin runtime override.
@@ -76,7 +85,7 @@ function readInputFiles(folder: string): InputFile[] {
 // cards and their events in one atomic batch. The storage module is loaded
 // LAZILY: audit mode must keep running with no node_modules at all (the
 // parser is dependency-free by design; only the pg driver needs an install).
-async function load(deck: EnrichedCard[], config: BoardConfig, capacity: CapacityBuild | null): Promise<LoadPlan> {
+async function load(deck: EnrichedCard[], config: BoardConfig, capacity: CapacityBuild | null, year: number): Promise<LoadPlan> {
   const cfg = loadServerConfig(process.env);
   mkdirSync(dirname(cfg.dataPath), { recursive: true });
   // Say the destination BEFORE writing: the driver defaults to jsonl, so a
@@ -86,13 +95,20 @@ async function load(deck: EnrichedCard[], config: BoardConfig, capacity: Capacit
   const storage = await createStorage(cfg.storageDriver, cfg.dataPath);
   try {
     const [events, baseCards] = await Promise.all([storage.listEvents(), storage.listBaseCards()]);
-    const plan = planLoad(deck, config, baseCards, events, new Date());
+    const plan = planLoad(deck, config, baseCards, events, new Date(), year);
     await storage.importCards(plan.cards, plan.events);
-    if (capacity !== null) await storage.importCapacity(capacity.snapshot);
+    if (capacity !== null) await storage.importCapacity(withLegacyIds(capacity.snapshot, plan.aliases));
     return plan;
   } finally {
     await storage.close();
   }
+}
+
+// Why a load is refused, in plain French (ADR 026/035).
+function refusal(cards: CardAssembly | null, year: number, currentYear: number): string {
+  if (year < currentYear) return `chargement refusé : exercice ${year} clos.`;
+  if (cards === null) return "chargement refusé : aucune carte assemblée (le fichier `projets` manque ?).";
+  return `chargement refusé : aucun projet retenu pour l'exercice ${year} (fichiers d'une autre année ?).`;
 }
 
 // Where the cards are about to land, in plain French.
@@ -129,8 +145,9 @@ if (args === null) {
 
 try {
   const boardConfig = loadRuntimeBoardConfig();
+  const year = args.exercice ?? boardConfig.exercise.year;
   const files = readInputFiles(args.folder);
-  const { report, cards, capacity } = runImportAudit(files, boardConfig, new Date());
+  const { report, cards, capacity } = runImportAudit(files, boardConfig, new Date(), year);
   const outPath = resolve(args.out ?? join(args.folder, "rapport-import.md"));
   mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, renderReport(report, new Date()), "utf8");
@@ -138,18 +155,18 @@ try {
     (f) => f.status === "recognized" || f.status === "recognized-with-deviations",
   ).length;
   console.log(
-    `import (${args.charger ? "chargement" : "audit"}) : ${report.inventory.length} fichier(s) reçu(s)` +
+    `import (${args.charger ? "chargement" : "audit"}, exercice ${year}) : ${report.inventory.length} fichier(s) reçu(s)` +
       `, ${recognized} reconnu(s).\n` +
       `Pris : ${report.taken.length} · Écartés : ${report.discarded.length}` +
       ` · Douteux : ${report.doubtful.length} · Signalements : ${report.warnings.length}\n` +
       `Rapport : ${outPath}`,
   );
   if (args.charger) {
-    if (cards === null) {
-      console.error("chargement refusé : aucune carte assemblée (le fichier `projets` manque ?).");
+    if (cards === null || cards.cards.length === 0 || year < boardConfig.exercise.year) {
+      console.error(refusal(cards, year, boardConfig.exercise.year));
       process.exit(1);
     }
-    console.log(loadSummary(await load(cards.cards, boardConfig, capacity)));
+    console.log(loadSummary(await load(cards.cards, boardConfig, capacity, year)));
     if (capacity !== null) {
       const { persons, assignments } = capacity.snapshot;
       console.log(`capacité ${capacity.snapshot.exerciseYear} : ${persons.length} personne(s), ${assignments.length} affectation(s) enregistrées.`);

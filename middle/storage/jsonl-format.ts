@@ -16,7 +16,8 @@ const VERSION = 2;
 
 type CardRecord = { kind: "card"; card: Card };
 type EventRecord = { kind: "event"; seq: number; event: CardEvent };
-// The capacity snapshot (ADR 024): appended whole at each import, last wins.
+// The capacity snapshot (ADR 024): appended whole at each import; the last
+// record of each exercise year wins (ADR 035).
 export type CapacityRecord = { kind: "capacity"; snapshot: CapacitySnapshot };
 
 /** The in-memory projection of one JSONL file. */
@@ -24,7 +25,8 @@ export interface State {
   cards: Map<string, Card>;
   events: CardEvent[];
   maxSeq: number;
-  capacity: CapacitySnapshot | null;
+  /** One snapshot per exercise year (snapshot.exerciseYear). */
+  capacity: Map<number, CapacitySnapshot>;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -118,7 +120,8 @@ function applyRecord(state: State, rec: unknown, lineNo: number): void {
     const seq = typeof rec["seq"] === "number" ? (rec["seq"] as number) : idSequence(event.id);
     if (Number.isFinite(seq) && seq > state.maxSeq) state.maxSeq = seq;
   } else if (rec["kind"] === "capacity") {
-    state.capacity = rec["snapshot"] as CapacitySnapshot;
+    const snapshot = rec["snapshot"] as CapacitySnapshot;
+    state.capacity.set(snapshot.exerciseYear, snapshot);
   } else {
     throw new Error(`Stockage JSONL corrompu : ligne ${lineNo}, type inconnu.`);
   }
@@ -140,7 +143,7 @@ export function loadState(content: string): {
   validBytes: number;
   endsClean: boolean;
 } {
-  const state: State = { cards: new Map(), events: [], maxSeq: 0, capacity: null };
+  const state: State = { cards: new Map(), events: [], maxSeq: 0, capacity: new Map() };
   const lines = content.split("\n");
   let hasHeader = false;
   let validBytes = 0;

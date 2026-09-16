@@ -180,11 +180,17 @@ fields, append-only enforced by table grants/triggers):
   date_rdr, budget_rdli + budget_engaged (k€). The profile/role/risk/
   constraint/severity typologies live in the board config (ADR 014), not on
   the card. `exercise` (ADR 035): the budget year the card belongs to;
-  absent = the current exercise (`config.exercise.year`). A year above the
-  current one is in preparation (importable, editable, aging clock frozen);
-  a year below is closed; the switch writes one `activated` event per card
-  of the new year (the fold restarts its clock there) and pins the
-  unstamped cards on the closing year.
+  absent = the current exercise (`config.exercise.year`). A card is one
+  project's instance in ONE exercise (author, 2026-09-16): imported ids
+  are `<code>@<year>`, the same PE code lives again next year as another
+  card, re-budgeted (leftovers come back through the next year's import,
+  never by hand); ids stored before ADR 035 stay bare and are the current
+  exercise's. An import reads and touches only its exercise's cards. A
+  year above the current one is in preparation (importable, editable,
+  aging clock frozen); a year below is closed (its load is refused; its
+  cards get archived at the switch); the switch writes one `activated`
+  event per card of the new year (the fold restarts its clock there) and
+  pins the unstamped cards on the closing year.
 - `card_events` : append-only. seq (bigint sequence, ordering), id
   (evt-<seq>), ts, actor, card_id, type (created/moved/blocked/unblocked/
   edited/commented/archived/unarchived/deleted/imported/decided/unlisted/
@@ -198,11 +204,12 @@ fields, append-only enforced by table grants/triggers):
   never count as stage entries, ADR 019).
 - `users`: id, login, scrypt_hash, role (viewer/editor/admin), created_at,
   disabled.
-- `capacity` (ADR 024/028): one row, the last imported `CapacitySnapshot`
-  (exerciseYear, persons with opaque ids + capacity + planned/done over the
-  WHOLE plan de charge, assignments person × card = the board's demand),
-  replaced whole at each import — a fact table beside the log, not an
-  event stream. Names never enter `card_events`.
+- `capacity` (ADR 024/028/035): one row PER EXERCISE YEAR (id = the
+  year), the last imported `CapacitySnapshot` of that year (exerciseYear,
+  persons with opaque ids + capacity + planned/done over the WHOLE plan de
+  charge, assignments person × card = the board's demand), replaced whole
+  at each import of that year — a fact table beside the log, not an event
+  stream. Names never enter `card_events`.
 
 `card_events` is both the audit trail and the single source for all flow
 metrics. Do not create a separate metrics store. Metrics are queries on
@@ -483,8 +490,11 @@ run on the platform). Every internal design decision is the author's.
 - Aging step values and andon threshold are defaults; confirm with the PMO users.
 - Sciforma field mapping for financials (budget, consumed, remaining).
 - Exercises (ADR 035, to settle before S-C): does a closed year stay in the
-  selector forever? is « archiver l'année passée » read-only, or `archived`
-  card by card? may a card be carried over 2026 → 2027, and by whom?
+  selector forever? who may still edit a closing year (strict read-only, or
+  admin correction)? Settled 2026-09-16: the closing year's cards are
+  archived at the switch; leftovers are NOT carried over by hand — they
+  come back re-budgeted through the next year's import as new instances.
+
 - **Projets vendus** (2026-09-15, author investigating — do not decide): a
   domain of their own (as the PDSI macro does), a constraint tag, or
   outside the perimeter? Until settled they resolve through their

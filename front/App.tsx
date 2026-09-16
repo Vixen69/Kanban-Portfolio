@@ -7,6 +7,7 @@ import type { BoardConfig, CardPatch, CardState } from "../core/types.ts";
 import { portfolioStats } from "../core/board.ts";
 import { laneNature, reconcileCardRefs } from "../core/config.ts";
 import { hiddenCardIds, portfolioCounts, viewCounts } from "../core/filters.ts";
+import { cardsOfExercise } from "../core/exercise.ts";
 import { flowTimes, resolveFlowAnchors } from "../core/flow.ts";
 import { cardHistory } from "../core/history.ts";
 import type { DecisionInput, MoveTarget } from "./api.ts";
@@ -57,11 +58,9 @@ interface Ctx {
 // whole portfolio stays visible. Never writes an event — the fold keeps the
 // original references (reconcileCardRefs is display-only). The nature is
 // derived from the (remapped) canal here (ADR 018: nature is positional —
-// a card requalifies by moving lanes, so the stored snapshot never wins).
+// a card requalifies by moving lanes). One exercise shown (ADR 035; S-C: selector).
 function useDisplayCards(cards: CardState[], config: BoardConfig): CardState[] {
-  return useMemo(
-    () =>
-      cards.map((card) => {
+  return useMemo(() => cardsOfExercise(cards, config.exercise.year, config.exercise.year).map((card) => {
         const refs = reconcileCardRefs(card, config);
         const nature = laneNature(config, refs.laneId);
         const unchanged =
@@ -167,7 +166,7 @@ function ShellModals({ ctx }: { ctx: Ctx }) {
         <CapacityView cards={ctx.cards} config={config} now={ctx.nowMs} onClose={() => ui.setMetrics(false)} />
       )}
       {ui.importing && (
-        <ImportView onClose={() => ui.setImporting(false)} onLoaded={() => void store.reload()} />
+        <ImportView onClose={() => ui.setImporting(false)} onLoaded={() => void store.reload()} currentYear={config.exercise.year} />
       )}
       {ui.archive && (
         <ArchiveView cards={ctx.archivedCards} config={config}
@@ -251,6 +250,7 @@ function Shell({ store, config }: { store: BoardStore; config: BoardConfig }) {
   // lookup searches ALL cards so an archived fiche opens from the archive.
   const cards = useMemo(() => allCards.filter((card) => !card.archived), [allCards]);
   const archivedCards = useMemo(() => allCards.filter((card) => card.archived), [allCards]);
+
   const derived = useDerived(cards, config, filters, now);
   const detailCard = allCards.find((card) => card.id === ui.detailId) ?? null;
   // A card removed from the fold (deleted elsewhere) leaves detailId

@@ -34,7 +34,7 @@ for (const driver of DRIVERS) {
     await withTempDir(async (dir) => {
       const first = driver.open(dir);
       try {
-        assert.equal(await first.getCapacity(), null);
+        assert.equal(await first.getCapacity(2026), null);
         const snapshot = {
           exerciseYear: 2026,
           persons: [{ id: "p-1", name: "Un", domain: "alpha", subDomain: null, profileId: "pA", metier: "A", external: false, capacityJh: 200, plannedJh: 260, doneJh: 90, source: "profils" as const }],
@@ -42,16 +42,17 @@ for (const driver of DRIVERS) {
         };
         await first.importCapacity(snapshot);
         snapshot.assignments[0]!.jh = 999; // the caller's object is not the store's
-        const read = await first.getCapacity();
+        const read = await first.getCapacity(2026);
         assert.equal(read?.assignments[0]?.jh, 40);
         await first.importCapacity({ exerciseYear: 2027, persons: [], assignments: [] });
-        assert.deepEqual(await first.getCapacity(), { exerciseYear: 2027, persons: [], assignments: [] });
+        assert.deepEqual(await first.getCapacity(2027), { exerciseYear: 2027, persons: [], assignments: [] });
+        assert.equal((await first.getCapacity(2026))?.assignments[0]?.jh, 40, "one snapshot per exercise year (ADR 035)");
       } finally {
         await first.close();
       }
       const again = driver.open(dir);
       try {
-        assert.deepEqual(await again.getCapacity(), { exerciseYear: 2027, persons: [], assignments: [] });
+        assert.deepEqual(await again.getCapacity(2027), { exerciseYear: 2027, persons: [], assignments: [] });
       } finally {
         await again.close();
       }

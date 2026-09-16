@@ -74,16 +74,17 @@ export interface BoardStorage {
    */
   listBaseCards(): Promise<Card[]>;
   /**
-   * Replaces the capacity snapshot (persons + assignments, ADR 024) as a
-   * whole, atomically — a fact table refreshed by each import, never
-   * event-sourced. Failure: rejects on storage errors; nothing partial.
+   * Replaces the capacity snapshot of ITS exercise year (snapshot
+   * .exerciseYear, ADR 035) as a whole, atomically — a fact table refreshed
+   * by each import of that year, never event-sourced (ADR 024). The other
+   * years' snapshots stand. Failure: rejects on storage errors; nothing partial.
    */
   importCapacity(snapshot: CapacitySnapshot): Promise<void>;
   /**
-   * Returns the last capacity snapshot, or null when none was imported.
-   * Failure: rejects on storage errors.
+   * Returns the capacity snapshot of one exercise year, or null when no
+   * import carried one for that year. Failure: rejects on storage errors.
    */
-  getCapacity(): Promise<CapacitySnapshot | null>;
+  getCapacity(year: number): Promise<CapacitySnapshot | null>;
   /** Releases the underlying resources. Idempotent. Failure: none. */
   close(): Promise<void>;
 }

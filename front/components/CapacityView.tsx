@@ -32,20 +32,21 @@ type Fetch =
   | { status: "ready"; snapshot: CapacitySnapshot | null }
   | { status: "error"; message: string };
 
-// The snapshot is fetched when the view opens: it only changes at import
-// time, so it stays out of the per-action board refetch.
-function useCapacitySnapshot(): Fetch {
+// The snapshot of the exercise shown is fetched when the view opens: it
+// only changes at import time, so it stays out of the per-action board
+// refetch.
+function useCapacitySnapshot(year: number): Fetch {
   const [state, setState] = useState<Fetch>({ status: "loading" });
   useEffect(() => {
     let active = true;
-    fetchCapacity()
+    fetchCapacity(year)
       .then((snapshot) => { if (active) setState({ status: "ready", snapshot }); })
       .catch((cause: unknown) => {
         if (!active) return;
         setState({ status: "error", message: cause instanceof Error ? cause.message : "Erreur inconnue." });
       });
     return () => { active = false; };
-  }, []);
+  }, [year]);
   return state;
 }
 
@@ -162,7 +163,7 @@ function subtitle(fetch: Fetch): string {
  * unreachable API shows the French message.
  */
 export function CapacityView(props: CapacityViewProps) {
-  const fetch = useCapacitySnapshot();
+  const fetch = useCapacitySnapshot(props.config.exercise.year);
   return (
     <div className="metrics-view m2">
       <div className="metrics-head">

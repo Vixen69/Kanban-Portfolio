@@ -62,8 +62,65 @@ reste-t-elle visible pour toujours dans le sélecteur ? « archiver l'année
 passée » = lecture seule, ou `archived` carte par carte ? le report d'une
 carte 2026 → 2027 est-il permis (et à qui) ?
 
+## Complément du 2026-09-16 (après-midi) — le modèle de l'auteur, séance B réalisée
+
+L'auteur précise le modèle, et il tranche deux des trois questions :
+
+- **Les codes PE disent l'année de départ du projet ; les projets
+  pluriannuels sont normaux.** Une carte est **l'instance d'un projet dans
+  UN exercice** : « PE machin, mais de cette année », avec le budget de cette
+  année. Les cartes de l'année suivante sont d'autres cartes — **deux
+  tableaux différents**.
+- **Les reliquats** d'une année sur l'autre ne se reportent pas à la main :
+  « on va les chercher » dans l'export de l'année suivante, où ils sont
+  **rebudgétés**. Même code PE, autre carte, autre budget. Le patch
+  `exercise` reste un outil de correction, pas le chemin normal.
+- **À la clôture**, la carte de l'année passée **est archivée**.
+
+Ce que la séance B en fait :
+
+1. **Identité par exercice** : l'identifiant d'une carte importée est
+   `<code>@<année>` (`core/exercise.ts` `instanceId`, `to-cards.ts`
+   `cardId`). Les cartes stockées avant cet ADR gardent leur identifiant nu
+   (le journal les référence) : au ré-import de l'année en cours, la carte
+   nue est rafraîchie en place et estampillée ; le snapshot de capacité,
+   construit avec les identifiants suffixés, est remis sur les identifiants
+   stockés (`withLegacyIds`, `LoadPlan.aliases`).
+2. **Un import ne touche que son exercice** : `planLoad(…, year)` ne lit,
+   ne rafraîchit, ne déplace et ne marque « absente » que les cartes de
+   l'année importée (`cardsOfExercise`). Un import 2027 ne lit ni n'écrit
+   une carte 2026 ; les placements à la main restent protégés comme avant
+   (ADR 026).
+3. **L'audit lit l'exercice demandé** (`runImportAudit(…, year)` :
+   contrats de l'année, année COUT PREV, capacité) ; le rapport et le
+   résultat portent `exercise`.
+4. **Garde-fous du chargement** (`middle/import.ts`, CLI `--exercice`) :
+   refusé pour une année **close** (inférieure à l'année en cours) ; refusé
+   quand **aucun projet n'est retenu** sur l'année demandée (« fichiers
+   d'une autre année ? ») — avant que quoi que ce soit ne soit marqué
+   absent.
+5. **Capacité par année** : `BoardStorage.getCapacity(year)`, une ligne
+   par exercice (`capacity.id` = l'année ; l'ancienne ligne `current` est
+   lue en repli pour sa propre année). `GET /api/capacity?exercise=YYYY`.
+6. **Front** : sélecteur « Exercice » dans l'importeur (année en cours,
+   +1, +2 « en préparation »), corps `exercise` ; le tableau, les archives
+   et la vue capacité ne montrent que **l'exercice en cours** (le sélecteur
+   d'en-tête vient en séance C).
+
+Reste ouvert pour la séance C : une année close reste-t-elle visible dans
+le sélecteur pour toujours ? et qui peut encore éditer une année qui se
+clôt (lecture seule stricte, ou correction admin) ?
+
 ## Conséquences
 
+- Séance B : `adapters/csv-import/to-cards.ts` (`cardId(card, year)`,
+  `baseCardId`, `resolveId`, `withLegacyIds`), `capacity.ts` (identifiants
+  suffixés), `orchestrate.ts` (`year`), `middle/import.ts`
+  (`parseExercise`, `loadableDeck`), `middle/validation.ts`
+  (`exerciseOrCurrent`), `middle/app.ts`, `core/ports.ts`, les deux
+  pilotes de stockage, `core/import-types.ts` (`exercise`), `sync/import.ts`
+  (`--exercice`), `front/api.ts`, `ImportView.tsx`, `CapacityView.tsx`,
+  `App.tsx` (`useDisplayCards` scopé).
 - `core/types.ts` (`Card.exercise`, `CardEventType` `activated`,
   `CardPatch` `exercise`), `core/exercise.ts` (+ tests), `core/state.ts`
   (`EDITABLE.exercise`, cas `activated`), `core/aging.ts` (`isStale` gelé),

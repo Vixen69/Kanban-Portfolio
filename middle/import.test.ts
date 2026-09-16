@@ -73,10 +73,15 @@ test("loadImport writes the deck and the capacity; a second load updates; no per
       assert.deepEqual([first.load.created, first.load.updated, first.load.unlisted], [5, 0, 0], "the COUT PREV fixture is the perimeter (ADR 030)");
       assert.deepEqual(first.load.capacity, { persons: 3, assignments: 3 });
       assert.equal((await storage.listBaseCards()).length, 5);
-      assert.equal((await storage.getCapacity())?.persons.length, 3);
+      assert.equal((await storage.getCapacity(2026))?.persons.length, 3);
+      assert.ok((await storage.listBaseCards()).every((c) => c.id.endsWith("@2026") && c.exercise === 2026), "instances of 2026 (ADR 035)");
       const second = await loadImport(storage, CONFIG, fixtureFiles(), new Date("2026-09-09T09:00:00.000Z"));
       assert.deepEqual([second.load.created, second.load.updated], [0, 5]);
       await assert.rejects(() => loadImport(storage, CONFIG, fixtureFiles(["PARAM.csv"]), NOW), /aucune carte assemblée/);
+      await assert.rejects(() => loadImport(storage, CONFIG, fixtureFiles(), NOW, 2027), /aucun projet retenu pour l’exercice 2027/);
+      await assert.rejects(() => loadImport(storage, CONFIG, fixtureFiles(), NOW, 2025), /Exercice 2025 clos/);
+      assert.equal((await storage.listBaseCards()).length, 5, "a refused load writes nothing");
+      assert.equal(auditImport(CONFIG, fixtureFiles(), NOW, 2027).exercise, 2027);
     } finally {
       await storage.close();
     }

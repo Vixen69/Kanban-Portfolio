@@ -94,19 +94,25 @@ async function pgListEvents(pool: Pool): Promise<CardEvent[]> {
 }
 
 // The capacity snapshot (ADR 024) lives in one row, replaced whole.
+// One row per exercise year (id = the year, ADR 035). Rows written before
+// ADR 035 sit under id 'current': read as a fallback for their own year.
 const UPSERT_CAPACITY =
-  "INSERT INTO capacity (id, data) VALUES ('current', $1) ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data";
+  "INSERT INTO capacity (id, data) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data";
+const LEGACY_CAPACITY_ID = "current";
 
 async function pgImportCapacity(runTx: Tx, snapshot: CapacitySnapshot): Promise<void> {
   await runTx(async (client) => {
-    await client.query(UPSERT_CAPACITY, [snapshot]);
+    await client.query(UPSERT_CAPACITY, [String(snapshot.exerciseYear), snapshot]);
   });
 }
 
-async function pgGetCapacity(pool: Pool): Promise<CapacitySnapshot | null> {
-  const res = await pool.query<{ data: CapacitySnapshot }>("SELECT data FROM capacity WHERE id = 'current'");
+async function pgGetCapacity(pool: Pool, year: number): Promise<CapacitySnapshot | null> {
+  const res = await pool.query<{ data: CapacitySnapshot }>("SELECT data FROM capacity WHERE id = $1", [String(year)]);
   const row = res.rows[0];
-  return row === undefined ? null : row.data;
+  if (row !== undefined) return row.data;
+  const legacy = await pool.query<{ data: CapacitySnapshot }>("SELECT data FROM capacity WHERE id = $1", [LEGACY_CAPACITY_ID]);
+  const old = legacy.rows[0];
+  return old !== undefined && old.data.exerciseYear === year ? old.data : null;
 }
 
 async function pgListBaseCards(pool: Pool): Promise<Card[]> {
@@ -144,9 +150,9 @@ function pgReaders(pool: Pool, assertOpen: () => void): Pick<BoardStorage, "list
       assertOpen();
       return pgListBaseCards(pool);
     },
-    async getCapacity() {
+    async getCapacity(year) {
       assertOpen();
-      return pgGetCapacity(pool);
+      return pgGetCapacity(pool, year);
     },
   };
 }

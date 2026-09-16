@@ -5,7 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { CardState } from "./types.ts";
-import { cardsOfExercise, exerciseOf, exerciseStatus, exerciseYears, isClockFrozen } from "./exercise.ts";
+import { cardsOfExercise, exerciseOf, exerciseStatus, exerciseYears, hasExerciseSuffix, instanceId, isClockFrozen } from "./exercise.ts";
 import { testCard } from "./test-helpers.ts";
 
 function state(overrides: Parameters<typeof testCard>[0] = {}): CardState {
@@ -40,3 +40,11 @@ test("the known years and the cards of one exercise", () => {
   // activation pins every unstamped card to the closing year first (ADR 035).
   assert.deepEqual(cardsOfExercise(cards, 2027, 2027).map((c) => c.id), ["A", "B"]);
 });
+
+test("instance ids carry their exercise; ids stored before ADR 035 do not", () => {
+  assert.equal(instanceId("PE10001", 2027), "PE10001@2027");
+  assert.equal(hasExerciseSuffix("PE10001@2027"), true);
+  assert.equal(hasExerciseSuffix("PE10001"), false);
+  assert.equal(hasExerciseSuffix("IMP-etude-b"), false);
+});
+

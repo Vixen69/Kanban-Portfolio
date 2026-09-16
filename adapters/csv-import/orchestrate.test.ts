@@ -200,7 +200,7 @@ test("the COUT PREV export is the perimeter when present; the Projets onglet onl
 
 test("ADR 034: the COUT PREV « Charge » rows reach the snapshot as demand by cost centre, on the cards", () => {
   const { report, capacity, cards } = audit([...ALL, "Couts.csv"].map(fixture));
-  const codeOf = new Map(cards?.cards.map((c) => [cardId(c), c.codename]));
+  const codeOf = new Map(cards?.cards.map((c) => [cardId(c, 2026), c.codename]));
   assert.deepEqual(capacity?.snapshot.coutsDemand?.map((d) => [d.centre, codeOf.get(d.cardId ?? ""), d.jh, d.done]), [
     ["CdP INFRA BUILD", "PE10001", 40, 25], ["Concept.Dév.", "PE10002", 30, 10], ["Architecte", "PE10003", 15, 18], ["Concept.Dév.", "PE10017", 3, 0],
   ]);
@@ -225,4 +225,11 @@ test("a second full Projets export lends its chefs de projet when no ProjetsCdP 
   const byLabel = new Map(report.assembly.map((a) => [a.subject, a.status]));
   assert.equal(byLabel.get("chef de projet"),
     "5/6 (dont 0 via ProjetsCdP · 0 ligne(s) ProjetsCdP hors périmètre) · responsables de domaine exclus : 4");
+});
+
+test("ADR 035: the audit reads the exercise it is given — the 2026 COUT PREV carries no project on 2027", () => {
+  const other = runImportAudit([...ALL, "Couts.csv"].map(fixture), CONFIG, NOW, 2027);
+  assert.equal(other.exercise, 2027);
+  assert.equal(other.cards?.cards.length ?? 0, 0, "nothing retained: a load would be refused, nothing marked absent");
+  assert.equal(audit(ALL.map(fixture)).exercise, 2026);
 });

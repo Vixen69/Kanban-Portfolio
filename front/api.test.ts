@@ -93,15 +93,16 @@ test("fetchBoard returns the parsed body as-is", async () => {
   });
 });
 
-test("fetchCapacity GETs /api/capacity and unwraps the snapshot (null when none)", async () => {
+test("fetchCapacity GETs /api/capacity for one exercise and unwraps the snapshot (null when none)", async () => {
   await withFetch({ ok: true, status: 200, json: { capacity: null } }, async (calls) => {
-    assert.equal(await fetchCapacity(), null);
-    assert.equal(calls[0]?.url, "/api/capacity");
+    assert.equal(await fetchCapacity(2026), null);
+    assert.equal(calls[0]?.url, "/api/capacity?exercise=2026");
     assert.equal(calls[0]?.method, "GET");
   });
   const snapshot = { exerciseYear: 2026, persons: [], assignments: [] };
   await withFetch({ ok: true, status: 200, json: { capacity: snapshot } }, async () => {
-    assert.deepEqual(await fetchCapacity(), snapshot);
+    assert.deepEqual(await fetchCapacity(2026), snapshot);
+
   });
 });
 

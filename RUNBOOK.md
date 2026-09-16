@@ -105,6 +105,15 @@ export DATABASE_URL=postgres://kanban:thuglife@localhost:5432/kanban
 node sync/import.ts imports --charger
 ```
 
+> **Exercice** (ADR 035) : par défaut l'année en cours (`exercise.year` de
+> la config). Pour préparer l'année suivante : `node sync/import.ts
+> imports-2027 --charger --exercice 2027`. Un import ne lit et ne touche
+> que les cartes de SON exercice (un même code PE y est une autre carte,
+> avec son budget) ; une année close est refusée, de même qu'un lot de
+> fichiers sans projet sur l'année demandée. Dans l'outil : le sélecteur
+> « Exercice » de l'importeur.
+
+
 > **Attendu** : `destination : PostgreSQL (…)` puis
 > `chargement : N créée(s) · M mise(s) à jour`
 

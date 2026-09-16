@@ -92,14 +92,15 @@ export async function getBoard(storage: BoardStorage): Promise<ApiResult> {
 }
 
 /**
- * GET /api/capacity — the last imported capacity snapshot (persons +
- * assignments, ADR 024), or null when no import carried one yet. The
- * read-outs are derived client-side by core/capacity.ts.
- * Inputs: the storage. Output: 200 with { capacity }.
+ * GET /api/capacity?exercise=YYYY — the capacity snapshot of one exercise
+ * year (persons + assignments, ADR 024/035), or null when no import
+ * carried one for that year. The read-outs are derived client-side by
+ * core/capacity.ts.
+ * Inputs: the storage, the year. Output: 200 with { capacity }.
  * Failure: propagates storage errors (→ 500).
  */
-export async function getCapacity(storage: BoardStorage): Promise<ApiResult> {
-  return { status: 200, body: { capacity: await storage.getCapacity() } };
+export async function getCapacity(storage: BoardStorage, year: number): Promise<ApiResult> {
+  return { status: 200, body: { capacity: await storage.getCapacity(year) } };
 }
 
 /**

@@ -54,12 +54,14 @@ function doInsert(fd: number, state: State, card: Card, created: CardEventInput)
   return builtEvent.event;
 }
 
-// Appends the whole capacity snapshot as one record; read-back is the
-// stored clone, never the caller's object.
+// Appends the whole capacity snapshot as one record, keyed in memory by its
+// exercise year (ADR 035); read-back is the stored clone, never the
+// caller's object.
 function doImportCapacity(fd: number, state: State, snapshot: CapacitySnapshot): void {
   const line = JSON.stringify({ kind: "capacity", snapshot });
   appendLines(fd, [line]);
-  state.capacity = (JSON.parse(line) as CapacityRecord).snapshot;
+  const stored = (JSON.parse(line) as CapacityRecord).snapshot;
+  state.capacity.set(stored.exerciseYear, stored);
 }
 
 function doAppend(fd: number, state: State, input: CardEventInput): CardEvent {
@@ -82,9 +84,10 @@ function readers(state: State, assertOpen: () => void): Pick<BoardStorage, "list
       assertOpen();
       return [...state.cards.values()];
     },
-    async getCapacity() {
+    async getCapacity(year) {
       assertOpen();
-      return state.capacity === null ? null : structuredClone(state.capacity);
+      const snapshot = state.capacity.get(year);
+      return snapshot === undefined ? null : structuredClone(snapshot);
     },
   };
 }

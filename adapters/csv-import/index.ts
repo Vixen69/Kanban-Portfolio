@@ -16,5 +16,5 @@ export type { CdpTable } from "./cdp.ts";
 export type { OwnerStats } from "./owners.ts";
 export type { CapacityBuild, CapacityStats } from "./capacity.ts";
 export type { CardCharge, ChargeStats } from "./charges.ts";
-export { IMPORT_ACTOR, planLoad } from "./to-cards.ts";
+export { IMPORT_ACTOR, baseCardId, cardId, planLoad, withLegacyIds } from "./to-cards.ts";
 export type { LoadPlan } from "./to-cards.ts";

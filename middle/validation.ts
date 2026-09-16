@@ -5,6 +5,7 @@
 // (core/state.ts), so this layer only keeps junk out of the permanent log.
 
 import type { BoardConfig, Criticality, CustomValue } from "../core/types.ts";
+import { BadRequest } from "./errors.ts";
 
 /**
  * True when the value is one of the fixed criticality keys.
@@ -87,4 +88,20 @@ export function patchValidators(config: BoardConfig): Record<string, (value: unk
       typeof v === "object" && v !== null && !Array.isArray(v) &&
       Object.values(v).every(customValue),
   };
+}
+
+/**
+ * The exercise year a request names (body field or query string), or the
+ * current one when absent (ADR 035).
+ * Inputs: the raw value (number, numeric string, or undefined/empty), the
+ * runtime config. Output: the year. Failure: BadRequest (French) when the
+ * value is not a whole year between 2000 and 2100.
+ */
+export function exerciseOrCurrent(raw: unknown, config: BoardConfig): number {
+  if (raw === undefined || raw === null || raw === "") return config.exercise.year;
+  const year = typeof raw === "string" && /^\d{4}$/.test(raw) ? Number(raw) : raw;
+  if (typeof year !== "number" || !Number.isInteger(year) || year < 2000 || year > 2100) {
+    throw new BadRequest("Exercice invalide.");
+  }
+  return year;
 }

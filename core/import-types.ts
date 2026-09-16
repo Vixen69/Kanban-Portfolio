@@ -22,6 +22,8 @@ export interface ImportSummary {
 
 /** What an audit returns: the French report (Markdown) and its counts. */
 export interface ImportAuditResult {
+  /** The exercise year the files were read for and the load writes into (ADR 035). */
+  exercise: number;
   report: string;
   summary: ImportSummary;
   /** True when the perimeter assembled — a load would write cards. */

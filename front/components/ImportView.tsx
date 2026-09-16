@@ -2,7 +2,9 @@
 // report, load. The files are read in the browser and sent base64 to the
 // middle, which runs the same audit and load as the CLI. Nothing is written
 // before « Charger », and a load never deletes a card (absentes are marked
-// — ADR 026). No authentication until RP3, like the rest of the write API.
+// — ADR 026). The import targets ONE exercise (ADR 035): the current year
+// by default, or a year in preparation; it never touches another year's
+// cards. No authentication until RP3, like the rest of the write API.
 
 import { useState } from "react";
 import type { ImportAuditResult, ImportFilePayload, ImportLoadResult } from "../../core/import-types.ts";
@@ -21,6 +23,8 @@ type Phase =
   | { kind: "loaded"; result: ImportLoadResult };
 
 const CHUNK = 0x8000;
+/** Years offered by the selector: the current exercise and the next two. */
+const YEARS_AHEAD = 2;
 
 function toBase64(bytes: ArrayBuffer): string {
   const view = new Uint8Array(bytes);
@@ -47,7 +51,7 @@ function messageOf(cause: unknown): string {
 
 // The audit / load cycle: one request at a time, the last audit kept when
 // a load fails so the report stays on screen with the error.
-function useImport(files: Picked[], onLoaded: () => void) {
+function useImport(files: Picked[], exercise: number, onLoaded: () => void) {
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const [error, setError] = useState<string | null>(null);
   const audited = phase.kind === "audited" ? phase.result : phase.kind === "busy" ? phase.previous : null;
@@ -57,9 +61,9 @@ function useImport(files: Picked[], onLoaded: () => void) {
     setPhase({ kind: "busy", what, previous: audited });
     try {
       if (what === "audit") {
-        setPhase({ kind: "audited", result: await postImportAudit(payload) });
+        setPhase({ kind: "audited", result: await postImportAudit(payload, exercise) });
       } else {
-        setPhase({ kind: "loaded", result: await postImportLoad(payload) });
+        setPhase({ kind: "loaded", result: await postImportLoad(payload, exercise) });
         onLoaded();
       }
     } catch (cause) {
@@ -70,11 +74,29 @@ function useImport(files: Picked[], onLoaded: () => void) {
   return { phase, error, audited, run, reset: () => setPhase({ kind: "idle" }) };
 }
 
-function ImportForm({ files, onPick, busy, onAudit }: {
+function ExerciseSelect({ exercise, currentYear, onChange }: {
+  exercise: number; currentYear: number; onChange: (year: number) => void;
+}) {
+  const years = Array.from({ length: YEARS_AHEAD + 1 }, (_, i) => currentYear + i);
+  return (
+    <label className="import-row">
+      <span className="field-label">Exercice</span>
+      <select className="inp" value={exercise} onChange={(e) => onChange(Number(e.target.value))}>
+        {years.map((year) => (
+          <option key={year} value={year}>{year}{year === currentYear ? " — en cours" : " — en préparation"}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function ImportForm({ files, onPick, busy, onAudit, exercise, currentYear, onYear }: {
   files: Picked[]; onPick: (list: FileList) => void; busy: boolean; onAudit: () => void;
+  exercise: number; currentYear: number; onYear: (year: number) => void;
 }) {
   return (
     <div className="import-form">
+      <ExerciseSelect exercise={exercise} currentYear={currentYear} onChange={onYear} />
       <label className="import-row">
         <span className="field-label">Fichiers CSV du classeur</span>
         <input className="inp" type="file" multiple accept=".csv,text/csv" onChange={(e) => { if (e.target.files) onPick(e.target.files); }} />
@@ -96,8 +118,8 @@ function Summary({ result }: { result: ImportAuditResult }) {
   const s = result.summary;
   return (
     <div className="import-summary">
-      <b>{s.received}</b> fichier(s) reçu(s), <b>{s.recognized}</b> reconnu(s) · pris {s.taken} · écartés {s.discarded} ·
-      douteux {s.doubtful} · signalements {s.warnings}
+      Exercice <b>{result.exercise}</b> · <b>{s.received}</b> fichier(s) reçu(s), <b>{s.recognized}</b> reconnu(s) · pris {s.taken} ·
+      écartés {s.discarded} · douteux {s.doubtful} · signalements {s.warnings}
       {s.missing.length > 0 && <> · manquants : {s.missing.join(", ")}</>}
       {" · "}{result.loadable ? "périmètre assemblé — chargement possible" : "périmètre non assemblé — chargement impossible"}
     </div>
@@ -108,8 +130,9 @@ function LoadSummary({ result }: { result: ImportLoadResult }) {
   const l = result.load;
   return (
     <div className="import-summary ok">
-      Chargé : {l.created} créée(s) · {l.updated} mise(s) à jour · {l.moved} déplacée(s) · {l.unlisted} absente(s) marquée(s) ·
-      {" "}{l.relisted} de retour · {l.divergences} divergence(s) conservée(s) · {l.kept} position(s) conservée(s) (sans jalon)
+      Chargé dans l’exercice {result.exercise} : {l.created} créée(s) · {l.updated} mise(s) à jour · {l.moved} déplacée(s) ·
+      {" "}{l.unlisted} absente(s) marquée(s) · {l.relisted} de retour · {l.divergences} divergence(s) conservée(s) ·
+      {" "}{l.kept} position(s) conservée(s) (sans jalon)
       {l.capacity !== null && <> · capacité : {l.capacity.persons} personne(s), {l.capacity.assignments} affectation(s)</>}
     </div>
   );
@@ -125,8 +148,8 @@ function LoadControls({ result, acknowledged, setAcknowledged, busy, onLoad }: {
         <input type="checkbox" checked={acknowledged} onChange={(e) => setAcknowledged(e.target.checked)} />
         J’ai lu le rapport
       </label>
-      <button className="btn" disabled={busy || !acknowledged} onClick={onLoad}>Charger dans le tableau</button>
-      <span className="m2-note">Cartes et évènements en un lot ; rien n’est supprimé.</span>
+      <button className="btn" disabled={busy || !acknowledged} onClick={onLoad}>Charger dans le tableau {result.exercise}</button>
+      <span className="m2-note">Cartes et évènements en un lot ; rien n’est supprimé ; les autres exercices ne sont pas touchés.</span>
     </div>
   );
 }
@@ -154,14 +177,18 @@ function Outcome({ phase, error, shown, acknowledged, setAcknowledged, onLoad }:
 
 /**
  * The import overlay (header ⬆).
- * Inputs: the close callback, and onLoaded (the board refetches after a
- * load). Output: the modal DOM. Failure modes: none — API refusals (400
- * files, 500) show their French message and keep the form.
+ * Inputs: the close callback, onLoaded (the board refetches after a load),
+ * the current exercise year (the selector's default). Output: the modal
+ * DOM. Failure modes: none — API refusals (400 files, wrong-year files,
+ * closed year, 500) show their French message and keep the form.
  */
-export function ImportView({ onClose, onLoaded }: { onClose: () => void; onLoaded: () => void }) {
+export function ImportView({ onClose, onLoaded, currentYear }: {
+  onClose: () => void; onLoaded: () => void; currentYear: number;
+}) {
   const [files, setFiles] = useState<Picked[]>([]);
+  const [exercise, setExercise] = useState(currentYear);
   const [acknowledged, setAcknowledged] = useState(false);
-  const { phase, error, audited, run, reset } = useImport(files, onLoaded);
+  const { phase, error, audited, run, reset } = useImport(files, exercise, onLoaded);
   const shown = phase.kind === "loaded" ? phase.result : audited;
   return (
     <div className="overlay" onClick={onClose}>
@@ -175,9 +202,11 @@ export function ImportView({ onClose, onLoaded }: { onClose: () => void; onLoade
           <div className="import-note">
             Déposer les CSV (Coût — l’export COUT PREV, le périmètre —, PARAM, Projets, ProjetsCdP, ProjetsJalons, SP,
             Ressources_PdC — reconnus par leurs en-têtes, pas par leur nom ; Ress.Profils facultatif). L’audit ne modifie
-            rien ; le chargement n’efface jamais une carte.
+            rien ; le chargement n’efface jamais une carte. L’import ne touche que l’exercice choisi : un import 2027
+            ne lit ni n’écrit une carte 2026 ; un même code PE y est une autre carte, avec son budget.
           </div>
-          <ImportForm files={files} busy={phase.kind === "busy"}
+          <ImportForm files={files} busy={phase.kind === "busy"} exercise={exercise} currentYear={currentYear}
+            onYear={(year) => { setExercise(year); reset(); }}
             onPick={(list) => { void readFiles(list).then((picked) => { setFiles(picked); reset(); }); }}
             onAudit={() => { setAcknowledged(false); void run("audit"); }} />
           <Outcome phase={phase} error={error} shown={shown} acknowledged={acknowledged}

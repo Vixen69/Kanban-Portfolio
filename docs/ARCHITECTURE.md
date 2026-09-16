@@ -637,6 +637,36 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-16 — Exercices, séance B : une carte par projet ET par année, l'import ne touche que son exercice (ADR 035)
+
+- **L'auteur précise le modèle** : les codes PE disent l'année de départ,
+  les projets pluriannuels sont normaux ; une carte est l'instance d'un
+  projet dans UN exercice, avec le budget de cette année ; les reliquats
+  reviennent par l'import de l'année suivante, rebudgétés (même code PE,
+  autre carte) ; à la clôture, la carte de l'année passée est archivée.
+  « Deux tableaux différents. » Sa crainte : qu'un import 2027 casse les
+  placements faits aux RDOM.
+- **Vérifié avant de coder** : les placements à la main sont des `moved`
+  d'acteur humain, que l'import ne réécrit jamais (ADR 026 — divergence
+  signalée) ; rien n'est jamais effacé. Mais l'import ne connaissait pas
+  l'année : même code PE = même carte, et des fichiers 2027 lus en 2026
+  auraient marqué toutes les cartes 2026 « absentes ».
+- **Séance B** : identifiant `<code>@<année>` (`instanceId`) ; les cartes
+  d'avant gardent leur identifiant nu, rafraîchies en place et estampillées
+  au ré-import de l'année en cours (le snapshot de capacité suit par
+  `withLegacyIds`) ; `planLoad(…, year)` ne lit/touche que les cartes de
+  l'exercice importé ; `runImportAudit(…, year)` lit l'exercice demandé ;
+  chargement **refusé** pour une année close ou quand aucun projet n'est
+  retenu sur l'année (fichiers d'une autre année) ; capacité **par année**
+  (`getCapacity(year)`, `capacity.id` = l'année, repli sur l'ancienne ligne
+  `current`) ; sélecteur « Exercice » dans l'importeur (en cours, +1, +2) ;
+  tableau, archives et vue capacité limités à l'exercice en cours ;
+  CLI `--exercice`. 527 tests, 0 échec.
+- Reste pour la séance C : sélecteur d'exercice en en-tête, bandeau
+  « préparation », bascule « changer d'année en cours » (épingler, archiver
+  l'année close, `activated`), et deux questions : années closes visibles
+  pour toujours ? qui édite encore une année qui se clôt ?
+
 ### 2026-09-16 — Exercices, séance A : la carte porte son année, l'horloge gèle en préparation (ADR 035)
 
 - **Plan de l'auteur** : l'année en cours comme tableau principal, les

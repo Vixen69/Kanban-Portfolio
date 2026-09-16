@@ -236,8 +236,9 @@ test("[pg] reopening with the default RESTORES the append-only guard after a dem
 
 test("[pg] capacity snapshot: null until imported, replaced whole", { skip: SKIP }, () =>
   withStore(async (s) => {
-    assert.equal(await s.getCapacity(), null);
+    assert.equal(await s.getCapacity(2026), null);
     await s.importCapacity({ exerciseYear: 2026, persons: [], assignments: [{ personId: "p-1", cardId: "S001", jh: 1, done: 0 }] });
     await s.importCapacity({ exerciseYear: 2027, persons: [], assignments: [] });
-    assert.deepEqual(await s.getCapacity(), { exerciseYear: 2027, persons: [], assignments: [] });
+    assert.deepEqual(await s.getCapacity(2027), { exerciseYear: 2027, persons: [], assignments: [] });
+    assert.equal((await s.getCapacity(2026))?.assignments.length, 1, "one row per exercise year (ADR 035)");
   }));

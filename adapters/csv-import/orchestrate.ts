@@ -48,6 +48,8 @@ export type { InputFile } from "./identify.ts";
 
 /** The audit outcome: the report, the parsed tables, the assembled deck. */
 export interface AuditResult {
+  /** The exercise year the files were read for (ADR 035). */
+  exercise: number;
   report: ImportReport;
   param: ParamTable | null;
   /** The COUT PREV export when it came — then it IS `projets` (ADR 030). */
@@ -77,48 +79,52 @@ export interface AuditResult {
  * douteux. The perimeter is the COUT PREV export when one came (ADR 030);
  * else, among the Projets-shaped files, the one without Responsable
  * columns (election.ts).
+ * `year` (default: the config's exercise) is the exercise read — its
+ * contracts, COUT PREV year, capacity (ADR 035).
  * Outputs: the report, the parsed tables and the assembled cards (non-null
  * when a perimeter is present). Deterministic for identical inputs and
  * `now`.
  * Failure modes: none — unreadable or alien files land in the inventory
  * with a reason, nothing throws.
  */
-export function runImportAudit(files: InputFile[], config: BoardConfig, now: Date): AuditResult {
+export function runImportAudit(files: InputFile[], config: BoardConfig, now: Date, year: number = config.exercise.year): AuditResult {
+  // The exercise read: the current one, or another year the caller names (ADR 035).
+  const cfg = year === config.exercise.year ? config : { ...config, exercise: { ...config.exercise, year } };
   const report = createReport();
-  const byContract = classifyFiles(files, report, contractsFor(config.exercise.year));
+  const byContract = classifyFiles(files, report, contractsFor(cfg.exercise.year));
   const pick = (id: string): Candidate | null => elect(byContract.get(id) ?? [], report);
   const paramBest = pick(PARAM_CONTRACT.id);
   const param = paramBest === null ? null
-    : parseParam(paramBest.dataRows, paramBest.match, paramBest.headerCells, config, report, paramBest.file.name);
-  const perimeter = readPerimeter(byContract, config, param, report);
+    : parseParam(paramBest.dataRows, paramBest.match, paramBest.headerCells, cfg, report, paramBest.file.name);
+  const perimeter = readPerimeter(byContract, cfg, param, report);
   const projets = perimeter.projets;
   const jalonsBest = pick(JALONS_CONTRACT.id);
   const jalons = jalonsBest === null ? null
-    : parseJalons(jalonsBest.dataRows, jalonsBest.match, config, report, jalonsBest.file.name, now);
+    : parseJalons(jalonsBest.dataRows, jalonsBest.match, cfg, report, jalonsBest.file.name, now);
   const spBest = pick(SP_CONTRACT.id);
   const sp = spBest === null ? null : parseSp(spBest.dataRows, spBest.match, report, spBest.file.name);
   const pdcBest = pick(PDC_CONTRACT.id);
   const pdc = pdcBest === null ? null
-    : parsePdc(pdcBest.dataRows, pdcBest.match, config, report, pdcBest.file.name);
+    : parsePdc(pdcBest.dataRows, pdcBest.match, cfg, report, pdcBest.file.name);
   const profilsBest = pick(PROFILS_CONTRACT.id);
   const profils = profilsBest === null ? null
-    : parseProfils(profilsBest.dataRows, profilsBest.match, config, report, profilsBest.file.name);
+    : parseProfils(profilsBest.dataRows, profilsBest.match, cfg, report, profilsBest.file.name);
   const cdpBest = pick(CDP_CONTRACT.id)
     ?? secondProjets(byContract.get(PROJETS_CONTRACT.id) ?? [], perimeter.ongletBest, report) ?? lentOnglet(perimeter, report);
   const cdp = cdpBest === null ? null : parseCdp(cdpBest.dataRows, cdpBest.match, param, report, cdpBest.file.name);
-  const cards = assembleCards(projets, jalons, sp, config, report);
+  const cards = assembleCards(projets, jalons, sp, cfg, report);
   const ownerStats = attachOwners(cards, cdp, report);
-  const chargeStats = attachCharges(cards?.cards ?? [], pdc, report, config.exercise.year);
-  const capacity = buildCapacity(profils, pdc, cards?.cards ?? [], config, report, param, perimeter.couts);
+  const chargeStats = attachCharges(cards?.cards ?? [], pdc, report, cfg.exercise.year);
+  const capacity = buildCapacity(profils, pdc, cards?.cards ?? [], cfg, report, param, perimeter.couts);
   emitMissing(report, {
     param: param !== null, couts: perimeter.couts !== null, projets: perimeter.onglet !== null, jalons: jalons !== null,
     sp: sp !== null, pdc: pdc !== null, profils: profils !== null, cdp: cdp !== null,
-  }, config.exercise.year);
+  }, cfg.exercise.year);
   const result: AuditResult = {
-    report, param, couts: perimeter.couts, projets, perimeterCheck: perimeter.check, jalons, sp, pdc, profils, cdp,
+    exercise: year, report, param, couts: perimeter.couts, projets, perimeterCheck: perimeter.check, jalons, sp, pdc, profils, cdp,
     cards, ownerStats, chargeStats, capacity,
   };
-  emitAssembly(report, result, config);
+  emitAssembly(report, result, cfg);
   return result;
 }
 

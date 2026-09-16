@@ -42,6 +42,26 @@ export function isClockFrozen(card: Card, currentYear: number): boolean {
 }
 
 /**
+ * The board id of one project's instance in one exercise (author,
+ * 2026-09-16): the same PE code lives again next year as ANOTHER card,
+ * re-budgeted — « code@année ». Cards stored before ADR 035 keep their
+ * bare id (hasExerciseSuffix says which).
+ * Inputs: the base id (PE code or slug), the year. Output: the id. Failure: none.
+ */
+export function instanceId(base: string, year: number): string {
+  return `${base}@${year}`;
+}
+
+/**
+ * True when a card id carries its exercise suffix (instanceId); ids stored
+ * before ADR 035 do not and belong to the current exercise.
+ * Input: the id. Output: boolean. Failure: none.
+ */
+export function hasExerciseSuffix(id: string): boolean {
+  return /@\d{4}$/.test(id);
+}
+
+/**
  * Every exercise year the board knows: the current one and every year a
  * card carries, ascending.
  * Inputs: the cards, the current exercise year. Output: the years. Failure: none.

@@ -134,20 +134,21 @@ export function buildCapacity(
     persons.push(personOf(entry, id, hit));
     idByMatricule.set(normalizeLabel(entry.matricule), id);
   }
-  const assignments = collectAssignments(pdc, cards, idByMatricule, report);
-  const generic = collectGeneric(pdc, cards, param, domainLookup, profils);
-  const coutsDemand = collectCoutsDemand(couts, cards);
-  const snapshot: CapacitySnapshot = { exerciseYear: config.exercise.year, persons, assignments, generic, coutsDemand };
+  const year = config.exercise.year;
+  const assignments = collectAssignments(pdc, cards, idByMatricule, report, year);
+  const generic = collectGeneric(pdc, cards, param, domainLookup, profils, year);
+  const coutsDemand = collectCoutsDemand(couts, cards, year);
+  const snapshot: CapacitySnapshot = { exerciseYear: year, persons, assignments, generic, coutsDemand };
   return { snapshot, stats: statsOf(snapshot, cards, pdc, via) };
 }
 
 // The COUT PREV « Charge » rows of the retained projects as demand by cost
 // centre, on the card the project became (ADR 034).
-function collectCoutsDemand(couts: CoutsTable | null, cards: readonly EnrichedCard[]): CoutsDemand[] {
+function collectCoutsDemand(couts: CoutsTable | null, cards: readonly EnrichedCard[], year: number): CoutsDemand[] {
   if (couts === null) return [];
   const cardByCode = new Map<string, string>();
   for (const card of cards) {
-    if (card.codename !== null) cardByCode.set(normalizeLabel(card.codename), cardId(card));
+    if (card.codename !== null) cardByCode.set(normalizeLabel(card.codename), cardId(card, year));
   }
   return couts.charges.map((c): CoutsDemand => ({
     centre: c.centre, cardId: cardByCode.get(normalizeLabel(c.projectId)) ?? null, jh: c.jh, done: c.done,
@@ -159,10 +160,11 @@ function collectCoutsDemand(couts: CoutsTable | null, cards: readonly EnrichedCa
 // joined (null when the project is outside the board).
 function collectGeneric(
   pdc: PdcTable, cards: readonly EnrichedCard[], param: ParamTable | null, domainLookup: Lookup, profils: ProfilsTable | null,
+  year: number,
 ): GenericDemand[] {
   const cardByPdcKey = new Map<string, string>();
   for (const card of cards) {
-    if (card.pdcKey !== null) cardByPdcKey.set(card.pdcKey, cardId(card));
+    if (card.pdcKey !== null) cardByPdcKey.set(card.pdcKey, cardId(card, year));
   }
   return pdc.generic.map((row): GenericDemand => ({
     metier: row.metier, domain: domainOf(row.organisation, "", param, domainLookup, profils).domain,
@@ -173,7 +175,7 @@ function collectGeneric(
 // One assignment per (PdC person, card): the PdC project a card joined
 // carries its nominative persons.
 function collectAssignments(
-  pdc: PdcTable, cards: readonly EnrichedCard[], idByMatricule: Map<string, string>, report: ImportReport,
+  pdc: PdcTable, cards: readonly EnrichedCard[], idByMatricule: Map<string, string>, report: ImportReport, year: number,
 ): Assignment[] {
   const assignments: Assignment[] = [];
   let unknown = 0;
@@ -186,7 +188,7 @@ function collectAssignments(
         unknown++;
         continue;
       }
-      assignments.push({ personId, cardId: cardId(card), jh: load.jh, done: load.done });
+      assignments.push({ personId, cardId: cardId(card, year), jh: load.jh, done: load.done });
     }
   }
   if (unknown > 0) warn(report, `${unknown} affectation(s) sur un matricule absent des personnes du plan de charge — ignorée(s)`, "capacité");
@@ -213,7 +215,7 @@ function statsOf(
     withoutCapacity: snapshot.persons.filter((p) => p.capacityJh === null).length,
     domainViaPath: via.path, domainViaProfils: via.profils, domainUnknown: via.none,
     assignments: snapshot.assignments.length,
-    cardsCovered: cards.filter((card) => covered.has(cardId(card))).length,
+    cardsCovered: cards.filter((card) => covered.has(cardId(card, snapshot.exerciseYear))).length,
     genericRows: pdc.excluded.generic + pdc.excluded.zz + pdc.excluded.roles,
     genericJh: pdc.excluded.jh,
     coutsRows: snapshot.coutsDemand?.length ?? 0,
