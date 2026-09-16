@@ -195,12 +195,6 @@
       "color": "#6366f1"
     },
     {
-      "id": "support_office",
-      "name": "SUPPORT OFFICE",
-      "short": "SUP",
-      "color": "#64748b"
-    },
-    {
       "id": "vendus",
       "name": "PROJETS VENDUS",
       "short": "VDU",

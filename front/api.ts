@@ -34,6 +34,8 @@ export interface NewCardInput {
   typeId: string;
   criticality: Criticality;
   owner: string;
+  /** The exercise the card is created in (ADR 035); the server defaults to the current one. */
+  exercise?: number;
 }
 
 /** A target cell for a move intent; beforeId = insert just before that

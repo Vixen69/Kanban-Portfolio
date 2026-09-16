@@ -5,14 +5,13 @@
 import { useEffect, useMemo, useRef } from "react";
 import type { BoardConfig, CardPatch, CardState } from "../core/types.ts";
 import { portfolioStats } from "../core/board.ts";
-import { laneNature, reconcileCardRefs } from "../core/config.ts";
 import { hiddenCardIds, portfolioCounts, viewCounts } from "../core/filters.ts";
-import { cardsOfExercise } from "../core/exercise.ts";
 import { flowTimes, resolveFlowAnchors } from "../core/flow.ts";
 import { cardHistory } from "../core/history.ts";
 import type { DecisionInput, MoveTarget } from "./api.ts";
 import { columnById } from "./lookup.ts";
 import { useBoardStore, type BoardStore } from "./useBoardStore.ts";
+import { useDisplayCards, useExerciseShown } from "./useDisplayCards.ts";
 import { useFilters, type Filters } from "./useFilters.ts";
 import {
   useBoardHandlers,
@@ -30,7 +29,8 @@ import { CardEdit } from "./components/CardEdit.tsx";
 import { Header } from "./components/Chrome.tsx";
 import { EmptyOverlay } from "./components/EmptyOverlay.tsx";
 import { ImportView } from "./components/ImportView.tsx";
-import { CapacityView } from "./components/CapacityView.tsx";
+import { AnalyticsView } from "./components/AnalyticsView.tsx";
+import type { YearPickerProps } from "./components/YearPicker.tsx";
 import { QuickAdd } from "./components/QuickAdd.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
 
@@ -51,26 +51,9 @@ interface Ctx {
   searchRef: React.RefObject<HTMLInputElement>;
   detailCard: CardState | null;
   focusLabel: string | null;
-}
-
-// Display-level remap (ADR 013): a card whose lane/column/domain/type was
-// removed by an admin edit is shown against the first config entry, so the
-// whole portfolio stays visible. Never writes an event — the fold keeps the
-// original references (reconcileCardRefs is display-only). The nature is
-// derived from the (remapped) canal here (ADR 018: nature is positional —
-// a card requalifies by moving lanes). One exercise shown (ADR 035; S-C: selector).
-function useDisplayCards(cards: CardState[], config: BoardConfig): CardState[] {
-  return useMemo(() => cardsOfExercise(cards, config.exercise.year, config.exercise.year).map((card) => {
-        const refs = reconcileCardRefs(card, config);
-        const nature = laneNature(config, refs.laneId);
-        const unchanged =
-          refs.laneId === card.laneId && refs.columnId === card.columnId &&
-          refs.domain === card.domain && refs.typeId === card.typeId &&
-          refs.subDomain === card.subDomain && nature === card.nature;
-        return unchanged ? card : { ...card, ...refs, nature };
-      }),
-    [cards, config],
-  );
+  /** The exercise shown (ADR 035) and the header selector's data. */
+  viewYear: number;
+  exercise: YearPickerProps;
 }
 
 // Filter/count projections over the folded cards (all from core/).
@@ -146,7 +129,7 @@ function ShellModals({ ctx }: { ctx: Ctx }) {
     <>
       {ui.adding && (
         <QuickAdd config={config} onClose={() => ui.setAdding(false)}
-          onCreate={(input) => { void store.createCard(input); ui.setAdding(false); }} />
+          onCreate={(input) => { void store.createCard({ ...input, exercise: ctx.viewYear }); ui.setAdding(false); }} />
       )}
       {ui.admin && (
         <AdminPanel config={config}
@@ -163,10 +146,12 @@ function ShellModals({ ctx }: { ctx: Ctx }) {
           onClose={() => ui.setAdmin(false)} />
       )}
       {ui.metrics && (
-        <CapacityView cards={ctx.cards} config={config} now={ctx.nowMs} onClose={() => ui.setMetrics(false)} />
+        <AnalyticsView cards={ctx.cards} events={store.events} config={config} now={ctx.nowMs} year={ctx.viewYear}
+          onClose={() => ui.setMetrics(false)} />
       )}
       {ui.importing && (
-        <ImportView onClose={() => ui.setImporting(false)} onLoaded={() => void store.reload()} config={config} />
+        <ImportView onClose={() => ui.setImporting(false)} onLoaded={() => void store.reload()} config={config}
+          defaultYear={ctx.viewYear} />
       )}
       {ui.archive && (
         <ArchiveView cards={ctx.archivedCards} config={config}
@@ -204,7 +189,7 @@ function Screen({ ctx }: { ctx: Ctx }) {
   return (
     <div className={"app" + (ui.sidebar ? " sidebar-open" : "")}
       style={{ gridTemplateColumns: ui.sidebar ? "214px 1fr" : "0 1fr" }}>
-      <Header config={config} stats={derived.stats} view={derived.view}
+      <Header config={config} stats={derived.stats} view={derived.view} exercise={ctx.exercise}
         filtersActive={filters.active} focusLabel={ctx.focusLabel}
         onResetFilters={filters.reset} onClearFocus={() => ui.setFocusCol(null)}
         onToggleSidebar={() => ui.setSidebar((open) => !open)}
@@ -244,7 +229,8 @@ function Shell({ store, config }: { store: BoardStore; config: BoardConfig }) {
   const drag = useDragHandlers(store, ui);
   const handlers = useBoardHandlers(ui, config.lanes);
   useShortcuts(ui, searchRef);
-  const allCards = useDisplayCards(store.cards, config);
+  const { viewYear, exercise } = useExerciseShown(store.cards, config.exercise.year); // ADR 035: the year shown
+  const allCards = useDisplayCards(store.cards, config, viewYear);
   // Archived subjects leave the board and every count entirely; they are
   // listed only by the Archives view (design v11, ADR 017). The detail
   // lookup searches ALL cards so an archived fiche opens from the archive.
@@ -265,8 +251,9 @@ function Shell({ store, config }: { store: BoardStore; config: BoardConfig }) {
   const focusLabel = ui.focusCol ? (columnById(config)[ui.focusCol]?.name ?? null) : null;
   const ctx: Ctx = {
     store, config, ui, nowMs, filters, cards, archivedCards, derived, drag,
-    handlers, searchRef, detailCard, focusLabel,
+    handlers, searchRef, detailCard, focusLabel, viewYear, exercise,
   };
+
   return <Screen ctx={ctx} />;
 }
 

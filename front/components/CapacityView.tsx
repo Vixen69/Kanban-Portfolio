@@ -1,10 +1,10 @@
-// Capacity view (☷, ADR 024/025/028): the arbitration read-out between
-// domain owners — where the exercise year's planned load lands against the
-// people's declared capacity, what the board weighs in it, with the
-// transverse domains (A&D, INFRA) singled out. Every figure comes from
-// core/capacity-view.ts; this file fetches the snapshot when the view
-// opens, memoises the computation and lays out the panels of
-// ./capacityPanels.tsx and ./capacityTables.tsx.
+// Capacity tab of the analytics (☷, ADR 024/025/028): the arbitration
+// read-out between domain owners — where the exercise's planned load lands
+// against the people's declared capacity, what the board weighs in it,
+// with the transverse domains (A&D, INFRA) singled out. Every figure comes
+// from core/capacity-view.ts; this file fetches the snapshot of the
+// exercise shown when the tab opens, memoises the computation and lays out
+// the panels of ./capacityPanels.tsx and ./capacityTables.tsx (which fold).
 
 import { useEffect, useMemo, useState } from "react";
 import type { BoardConfig, CapacitySnapshot, CardState } from "../../core/types.ts";
@@ -17,14 +17,15 @@ import { TransversePanel, WeighingPanel } from "./capacityTables.tsx";
 
 const DAY_MS = 86_400_000;
 
-/** Props of the full-screen capacity view. */
-export interface CapacityViewProps {
-  /** The active (non-archived) cards shown on the board. */
+/** Props of the capacity tab. */
+export interface CapacityTabProps {
+  /** The active (non-archived) cards of the exercise shown. */
   cards: CardState[];
   config: BoardConfig;
   /** Current time, epoch milliseconds (App's ticker) — the elapsed share of the year. */
   now: number;
-  onClose: () => void;
+  /** The exercise shown (its capacity snapshot is fetched). */
+  year: number;
 }
 
 type Fetch =
@@ -156,24 +157,18 @@ function subtitle(fetch: Fetch): string {
 }
 
 /**
- * Full-screen capacity view (☷).
- * Inputs: CapacityViewProps — the active cards, the runtime config, now,
- * the close callback. Output: the overlay DOM.
+ * The capacity tab (☷ › Capacité).
+ * Inputs: CapacityTabProps — the active cards, the runtime config, now,
+ * the exercise shown. Output: the subtitle, the KPIs and the panels.
  * Failure modes: none — a missing snapshot shows how to import one, an
  * unreachable API shows the French message.
  */
-export function CapacityView(props: CapacityViewProps) {
-  const fetch = useCapacitySnapshot(props.config.exercise.year);
+export function CapacityTab(props: CapacityTabProps) {
+  const fetch = useCapacitySnapshot(props.year);
   return (
-    <div className="metrics-view m2">
-      <div className="metrics-head">
-        <div>
-          <h2 className="metrics-title">Capacité</h2>
-          <span className="metrics-sub">{subtitle(fetch)}</span>
-        </div>
-        <button className="btn ghost" onClick={props.onClose}>Fermer ✕</button>
-      </div>
+    <>
+      <div className="an-sub">{subtitle(fetch)}</div>
       <Body fetch={fetch} cards={props.cards} config={props.config} now={props.now} />
-    </div>
+    </>
   );
 }

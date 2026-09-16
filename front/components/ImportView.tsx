@@ -86,7 +86,8 @@ function useImport(files: Picked[], exercise: number, onLoaded: () => void) {
 function ExerciseSelect({ exercise, currentYear, onChange }: {
   exercise: number; currentYear: number; onChange: (year: number) => void;
 }) {
-  const years = Array.from({ length: YEARS_AHEAD + 1 }, (_, i) => currentYear + i);
+  const span = Math.max(YEARS_AHEAD, exercise - currentYear);
+  const years = Array.from({ length: span + 1 }, (_, i) => currentYear + i);
   return (
     <label className="import-row">
       <span className="field-label">Exercice</span>
@@ -205,12 +206,14 @@ function Outcome({ phase, error, shown, config, decisions, setDecisions, acknowl
  * files, closed year, undecided conflict, 500) show their French message
  * and keep the form.
  */
-export function ImportView({ onClose, onLoaded, config }: {
+export function ImportView({ onClose, onLoaded, config, defaultYear }: {
   onClose: () => void; onLoaded: () => void; config: BoardConfig;
+  /** The exercise the header shows: preselected when it is not closed (ADR 035). */
+  defaultYear?: number;
 }) {
   const currentYear = config.exercise.year;
   const [files, setFiles] = useState<Picked[]>([]);
-  const [exercise, setExercise] = useState(currentYear);
+  const [exercise, setExercise] = useState(defaultYear !== undefined && defaultYear >= currentYear ? defaultYear : currentYear);
   const [acknowledged, setAcknowledged] = useState(false);
   const { phase, error, audited, decisions, setDecisions, run, reset } = useImport(files, exercise, onLoaded);
   const shown = phase.kind === "loaded" ? phase.result : audited;

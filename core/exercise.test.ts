@@ -5,7 +5,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { CardState } from "./types.ts";
-import { cardsOfExercise, exerciseOf, exerciseStatus, exerciseYears, hasExerciseSuffix, instanceId, isClockFrozen } from "./exercise.ts";
+import {
+  cardCountsByYear, cardsOfExercise, exerciseOf, exerciseStatus, exerciseYears, hasExerciseSuffix, instanceId, isClockFrozen,
+  selectableYears,
+} from "./exercise.ts";
 import { testCard } from "./test-helpers.ts";
 
 function state(overrides: Parameters<typeof testCard>[0] = {}): CardState {
@@ -48,3 +51,10 @@ test("instance ids carry their exercise; ids stored before ADR 035 do not", () =
   assert.equal(hasExerciseSuffix("IMP-etude-b"), false);
 });
 
+
+test("the selector offers the years around the current one plus every year holding cards, and counts them", () => {
+  const cards = [testCard({ id: "A" }), testCard({ id: "B", exercise: 2027 }), testCard({ id: "C", exercise: 2019 })];
+  assert.deepEqual(selectableYears(cards, 2026, 2, 2), [2019, 2024, 2025, 2026, 2027, 2028]);
+  assert.deepEqual(selectableYears([], 2026), [2021, 2022, 2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030, 2031]);
+  assert.deepEqual([...cardCountsByYear(cards, 2026)], [[2026, 1], [2027, 1], [2019, 1]]);
+});

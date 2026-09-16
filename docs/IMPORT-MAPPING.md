@@ -86,6 +86,8 @@ choix silencieux (2026-09-10 : 34 lignes « hors des quatre retenus »
 **R4 — Domaine et sous-domaine : le vocabulaire Orga.** Le domaine de la
 carte = **« Domaine (Orga) »** (10 valeurs : A&D, CORPORATE, ERP,
 INDUSTRIE, INFRA, ING, IT4IT, PLM, SOUTIEN, SUPPORT OFFICE — la config
+(2026-09-16 : SUPPORT OFFICE retiré — rien dans le portefeuille n'y
+correspond ; PROJETS VENDUS ajouté, ADR 036)
 `domains` devient cette liste). Le sous-domaine = **« Sous-domaine
 (Orga) »** (écrit « Ss-Daine (Orga) » dans l'onglet consolidé) ; il n'est
 **retenu que pour A&D** (ARCHITECTURE APPLICATIVE, DATA WAREHOUSE & BI,

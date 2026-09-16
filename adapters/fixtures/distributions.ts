@@ -30,7 +30,7 @@ export const COLUMN_FILL: [string, number][] = [
 /** Domain fills over the client's Orga vocabulary (ADR 022; sum 150). */
 export const DOMAIN_FILL: [string, number][] = [
   ["ad", 20], ["corporate", 24], ["erp", 16], ["industrie", 15], ["infra", 20],
-  ["ing", 16], ["it4it", 10], ["plm", 13], ["soutien", 11], ["support_office", 5],
+  ["ing", 16], ["it4it", 10], ["plm", 13], ["soutien", 16],
 ];
 
 /** Project-type fills over the four retained types (ADR 022; sum 150). */

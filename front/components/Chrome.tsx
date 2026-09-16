@@ -4,6 +4,8 @@
 
 import type { BoardConfig } from "../../core/types.ts";
 import type { ViewCounts } from "../../core/filters.ts";
+import { YearPicker } from "./YearPicker.tsx";
+import type { YearPickerProps } from "./YearPicker.tsx";
 
 /** Props of the app header. All data flows down from App — no context. */
 export interface HeaderProps {
@@ -27,6 +29,8 @@ export interface HeaderProps {
   /** Opens the import overlay (ADR 027). */
   onImport: () => void;
   onAdd: () => void;
+  /** The exercise shown and the selector's data (ADR 035). */
+  exercise: YearPickerProps;
 }
 
 // Domain legend: one colored dot + short code per RDOM, full name on hover.
@@ -44,9 +48,10 @@ function Legend({ config }: { config: BoardConfig }) {
 }
 
 /**
- * App header: sidebar toggle, title, the "Filtré"/"Focus" chips, subject
- * and blocked counts, the domain legend, and the capacity (☷), admin (⚙)
- * and "+ Sujet" actions.
+ * App header: sidebar toggle, title, the exercise selector (ADR 035), the
+ * "Filtré"/"Focus" chips, subject and blocked counts, the domain legend,
+ * and the analytics (☷), archives, import (⬆), admin (⚙) and "+ Sujet"
+ * actions.
  * Inputs: HeaderProps (config, counts, chip state, callbacks).
  * Output: the header element. Failure: none.
  */
@@ -57,7 +62,7 @@ export function Header(props: HeaderProps) {
       <div className="hd-left">
         <button className="icon-btn" onClick={props.onToggleSidebar} title="Filtres (S)">≡</button>
         <span className="hd-title">Portefeuille DSI</span>
-        <span className="hd-ghost">NMO · Portfolio Sync</span>
+        <YearPicker {...props.exercise} />
         {props.filtersActive && (
           <button className="filter-chip" onClick={props.onResetFilters} title="Réinitialiser les filtres (Esc)">
             Filtré : {view.shown}/{stats.total} ✕
@@ -75,7 +80,7 @@ export function Header(props: HeaderProps) {
           <span className="blk-dot-static" /> <b>{stats.blocked}</b> bloqués
         </div>
         <Legend config={props.config} />
-        <button className="icon-btn" onClick={props.onMetrics} title="Capacité de l’exercice">☷</button>
+        <button className="icon-btn" onClick={props.onMetrics} title="Analytics : capacité, flux">☷</button>
         <button className="icon-btn arch-btn" onClick={props.onArchive} title="Archives">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3" y="4" width="18" height="4" rx="1" /><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8" /><path d="M10 12h4" />

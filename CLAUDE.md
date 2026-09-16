@@ -283,6 +283,13 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
   visible with zero scrolling; never any horizontal scroll. Measured in the
   COMPACT default state (v12): unfolded totals and the 176px canal gutter
   are a deliberate zoom that may scroll.
+- Header (ADR 037): « Portefeuille DSI » then the **exercise selector** —
+  a square badge « 2026 ▾ » whose menu lists the five years before, the
+  current one, the years after and every year holding cards, with status
+  and card count; the year chosen bounds the board, the filters, the
+  counts, the archives, the analytics, card creation and the importer's
+  preselected exercise; away from the current year a chip says
+  « Préparation · horloge gelée » or « Exercice clos ». No « NMO » label.
 - Sidebar: search (title + codename), codes-projet and types toggles, « Contrainte »
   pills (config-driven + a synthetic « Aucune »; OR-shaped — a card stays
   lit while ANY of its constraints is on), « Bloqués uniquement » toggle,
@@ -310,8 +317,17 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
 - QuickAdd (« + Sujet », touche N): always enters the first column; the
   canal confers the nature.
 - Admin panel (⚙): topology/vocabulary only (ADR 013), incl. per-lane
-  natureKey. Capacity view (☷, ADR 024/025/029 — replaces the v12 Metrics
+  natureKey. **Analytics** (☷, ADR 037): one view, a tab bar « Capacité »
+  · « Flux »; every panel folds (closed by default, hint readable folded).
+  The Flux tab (ADR 037) brings the flow diagnostics back: six KPIs
+  (en cours, bloqués, livrés 30 j / 90 j, lead and cycle time), the
+  « Temps par étape » table (`core/stage-dwell.ts`: current occupants and
+  their average age, completed stays and their average length, from the
+  position events alone; the slowest stage highlighted), encours vs
+  limites, blocages — queries on the event log, never a store. The
+  Capacity tab (ADR 024/025/029 — replaces the v12 Metrics
   read-out, author's call 2026-09-07): the arbitration read-out computed
+
   from the imported capacity snapshot + the active cards by
   `core/capacity-view.ts` — 9 KPIs, then demande sur les domaines
   transverses (matrix domain × consumer domain), charge par domaine, charge

@@ -20,7 +20,7 @@ test("the repository's config/board.json is valid", () => {
   const config = validateBoardConfig(raw);
   assert.equal(config.lanes.length, 3);
   assert.equal(config.columns.length, 8);
-  assert.equal(config.domains.length, 11, "ADR 036: PROJETS VENDUS, the author's failsafe domain");
+  assert.equal(config.domains.length, 10, "ADR 036: PROJETS VENDUS in, SUPPORT OFFICE out (author, 2026-09-16)");
 
   assert.equal(config.types.length, 5);
   assert.deepEqual(config.types.find((t) => t.id === "atlas")?.aliases, ["Projet ATLAS [Hors PDSI]", "ATLAS"], "ADR 030: the author's fifth type");

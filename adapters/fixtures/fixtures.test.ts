@@ -84,7 +84,7 @@ test("domain and type fills match the design", () => {
   const domains = countBy(PORTFOLIO.subjects.map((subject) => subject.domain));
   const domainFill: [string, number][] = [
     ["ad", 20], ["corporate", 24], ["erp", 16], ["industrie", 15], ["infra", 20],
-    ["ing", 16], ["it4it", 10], ["plm", 13], ["soutien", 11], ["support_office", 5],
+    ["ing", 16], ["it4it", 10], ["plm", 13], ["soutien", 16],
   ];
   for (const [id, count] of domainFill) assert.equal(domains.get(id) ?? 0, count, id);
   const types = countBy(PORTFOLIO.subjects.map((subject) => subject.typeId));

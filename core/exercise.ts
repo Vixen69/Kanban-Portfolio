@@ -73,6 +73,33 @@ export function exerciseYears(cards: readonly Card[], currentYear: number): numb
 }
 
 /**
+ * The years the header's selector offers (author, 2026-09-16): the years
+ * before the current one, the current one, the years after, plus every
+ * year a card carries — ascending, without duplicates.
+ * Inputs: the cards, the current exercise year, how many years before and
+ * after. Output: the years. Failure: none.
+ */
+export function selectableYears(cards: readonly Card[], currentYear: number, before = 5, after = 5): number[] {
+  const years = new Set<number>(exerciseYears(cards, currentYear));
+  for (let year = currentYear - before; year <= currentYear + after; year++) years.add(year);
+  return [...years].sort((a, b) => a - b);
+}
+
+/**
+ * How many cards each exercise holds (the selector's hint).
+ * Inputs: the cards, the current exercise year. Output: year -> count.
+ * Failure: none.
+ */
+export function cardCountsByYear(cards: readonly Card[], currentYear: number): Map<number, number> {
+  const counts = new Map<number, number>();
+  for (const card of cards) {
+    const year = exerciseOf(card, currentYear);
+    counts.set(year, (counts.get(year) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/**
  * The cards of one exercise — what that year's board shows.
  * Inputs: the folded cards, the year, the current exercise year.
  * Output: the cards whose exercise is that year, in input order. Failure: none.

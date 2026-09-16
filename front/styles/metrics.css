@@ -17,6 +17,26 @@
 .metrics-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; }
 .metrics-title { font-family: 'DM Serif Display', serif; font-size: 22px; color: var(--tx-1); }
 .metrics-sub { font-size: 11px; color: var(--tx-3); }
+/* Onglets des analytics (auteur, 2026-09-16) : Capacité · Flux. */
+.an-tabs { display: flex; gap: 4px; align-self: center; background: #eef1f6; border-radius: 6px; padding: 3px; }
+.an-tab { border: 0; background: none; border-radius: 4px; padding: 5px 14px; font-size: 11px; font-weight: 600; color: var(--tx-3); cursor: pointer; }
+.an-tab:hover { color: var(--tx-1); }
+.an-tab.on { background: #fff; color: var(--tx-1); box-shadow: 0 1px 2px rgba(15, 23, 42, .08); }
+.an-sub { font-size: 11px; color: var(--tx-3); margin: -6px 0 12px; }
+/* Panneaux repliables : la barre de titre est un bouton, le chevron dit l'état. */
+.m2-fold { width: 100%; background: none; border: 0; padding: 0; cursor: pointer; font: inherit; text-align: left; color: inherit; }
+.m2-fold:hover span:first-child { color: var(--accent); }
+.m2-chev { margin-left: auto; font-size: 10px; color: var(--tx-4); }
+.m2-panel.folded { padding-bottom: 10px; }
+.m2-panel.folded .m2-title { margin-bottom: 0; }
+/* Tableau du temps par étape. */
+.an-table { width: 100%; border-collapse: collapse; font-size: 11px; font-variant-numeric: tabular-nums; }
+.an-table th { text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: .05em; color: var(--tx-4); padding: 4px 6px; border-bottom: 1px solid var(--bd); }
+.an-table td { padding: 5px 6px; border-bottom: 1px solid var(--bd-sub); color: var(--tx-2); }
+.an-table td:first-child { color: var(--tx-1); font-weight: 600; }
+.an-table th:not(:first-child), .an-table td:not(:first-child) { text-align: right; }
+.an-table tr.slowest td { background: #fffbeb; }
+
 
 /* ---------- Bar primitives (shared by every panel) ---------- */
 .lg-sw { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-left: 6px; }

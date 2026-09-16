@@ -637,6 +637,28 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-16 — Sélecteur d'exercice en en-tête ; analytics à onglets Capacité · Flux, panneaux repliables ; SUP retiré (ADR 037)
+
+- **Demandes de l'auteur** : afficher les années importées — « Portefeuille
+  DSI » puis un carré « 2026 ▾ » qui déroule les cinq années passées et
+  les suivantes ; filtres et analytics sur l'année affichée ; enlever
+  « NMO · Portfolio Sync » (ne veut rien dire dans le temps). Analytics :
+  une barre d'onglets Capacité · Flux, le tableau des métriques de flux
+  de retour, des panneaux qui se replient (la page était longue). Le
+  filtre « SUP » (SUPPORT OFFICE) ne correspond à rien : retiré, sans
+  alias ailleurs (le malentendu « Supply chain » est levé).
+- **Fait** : `YearPicker.tsx` + `useExerciseShown` (l'année choisie borne
+  tableau, filtres, compteurs, archives, analytics, création de carte et
+  exercice préselectionné de l'importeur ; puce « Préparation · horloge
+  gelée » / « Exercice clos ») ; `AnalyticsView.tsx` (onglets),
+  `FlowView.tsx` (six KPI, **temps par étape** via `core/stage-dwell.ts`
+  — séjours terminés depuis les évènements de position, goulot
+  surligné —, encours vs limites, blocages), `Panel` repliable ;
+  `useDisplayCards.ts` sorti d'App.tsx. 539 tests, 0 échec ; vérifié dans
+  le navigateur (menu des années, 2027 vide avec sa puce, onglets, table).
+- **Reste** : la bascule « Changer d'année en cours », le verrouillage
+  éventuel d'une année close (question ouverte §12).
+
 ### 2026-09-16 — Le domaine ne s'écrase plus : conflits tranchés un par un, marqueur « [Business] », PROJETS VENDUS (ADR 036)
 
 - **Pourquoi** : le domaine est l'axe d'arbitrage des responsables de

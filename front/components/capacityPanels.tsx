@@ -5,6 +5,7 @@
 // the whole-plan engagement against the capacity, the full fill the
 // board's own share, both capped at 100 % and turned red beyond it.
 
+import { useState } from "react";
 import type { ReactNode } from "react";
 import type { GroupLoad, PersonLoad } from "../../core/capacity.ts";
 import { loadLevel } from "../../core/capacity.ts";
@@ -20,12 +21,22 @@ function shareOf(part: number, whole: number): string {
   return whole > 0 ? pct(part / whole) : "—";
 }
 
-/** Panel frame shared by the capacity panels; `wide` spans the grid. */
-export function Panel({ title, hint, wide, children }: { title: string; hint: string; wide?: boolean; children: ReactNode }) {
+/**
+ * Panel frame shared by the analytics panels; `wide` spans the grid. The
+ * panel FOLDS (author, 2026-09-16: the page was long to scroll — the
+ * tables open one after another): closed by default unless `open`, the
+ * title bar shows the hint either way.
+ */
+export function Panel({ title, hint, wide, open, children }: {
+  title: string; hint: string; wide?: boolean; open?: boolean; children: ReactNode;
+}) {
+  const [shown, setShown] = useState(open === true);
   return (
-    <div className={"m2-panel" + (wide === true ? " wide" : "")}>
-      <div className="m2-title">{title}<span className="m2-hint">{hint}</span></div>
-      {children}
+    <div className={"m2-panel" + (wide === true ? " wide" : "") + (shown ? "" : " folded")}>
+      <button type="button" className="m2-title m2-fold" aria-expanded={shown} onClick={() => setShown((s) => !s)}>
+        <span>{title}</span><span className="m2-hint">{hint}</span><span className="m2-chev">{shown ? "▾" : "▸"}</span>
+      </button>
+      {shown && children}
     </div>
   );
 }
