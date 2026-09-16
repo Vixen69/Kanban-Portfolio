@@ -335,7 +335,9 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
 - Archives (header icon + count badge): searchable list, « Désarchiver »,
   open-the-fiche (ADR 017).
 - QuickAdd (« + Sujet », touche N): always enters the first column; the
-  canal confers the nature.
+  canal confers the nature. When the intake column has no canal (ADR 039)
+  the form asks for none — the server defaults to the « complicated »
+  canal, hidden until the qualification drag picks the real one.
 - Admin panel (⚙): topology/vocabulary only (ADR 013), incl. per-lane
   natureKey, plus the **Exercice** tab (ADR 038): the year switch — pins
   the unstamped cards on the closing year, archives its active cards,

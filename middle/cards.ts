@@ -27,9 +27,10 @@ interface NewCardInput {
  * event (toColumn = first column, payload { laneId }) in one atomic
  * storage batch: the card can never exist without its audit trace.
  * Inputs: the storage, the runtime board config, the parsed JSON body
- * ({ title, domain, laneId, typeId, criticality, owner, exercise? }) — the
+ * ({ title, domain, laneId?, typeId, criticality, owner, exercise? }) — the
  * nature is derived server-side from the canal (positional, ADR 018); the
- * exercise defaults to the current one (ADR 035).
+ * canal defaults to the « complicated » one when the intent names none
+ * (ADR 039); the exercise defaults to the current one (ADR 035).
  * Output: 201 with { card, event }.
  * Failure: throws BadRequest (→ 400) on invalid input; propagates storage
  * errors, including a duplicate id (→ 500) — nothing is persisted then.
@@ -64,7 +65,9 @@ function validateCardInput(config: BoardConfig, body: Record<string, unknown>): 
   if (typeof domain !== "string" || !config.domains.some((d) => d.id === domain)) {
     throw new BadRequest("Domaine inconnu.");
   }
-  const laneId = body["laneId"];
+  // No canal named (ADR 039: before the RDO the intake has none to choose):
+  // the same default as the import — the « complicated » canal, else the first.
+  const laneId = body["laneId"] === undefined ? defaultLaneId(config) : body["laneId"];
   if (typeof laneId !== "string" || !config.lanes.some((lane) => lane.id === laneId)) {
     throw new BadRequest("Canal inconnu.");
   }
@@ -84,6 +87,10 @@ function validateCardInput(config: BoardConfig, body: Record<string, unknown>): 
     throw new BadRequest("Exercice invalide.");
   }
   return { title, domain, laneId, typeId, criticality, owner: owner.trim(), exercise };
+}
+
+function defaultLaneId(config: BoardConfig): string {
+  return config.lanes.find((lane) => lane.natureKey === "complicated")?.id ?? config.lanes[0]?.id ?? "";
 }
 
 // Next free "S"-prefixed id: max numeric suffix over existing base cards + 1,

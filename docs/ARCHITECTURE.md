@@ -652,7 +652,10 @@ de son ADR.
   changement de modèle : la carte garde son `laneId`, l'affichage l'ignore
   avant la RDO ; **glisser vers un canal d'Études qualifie** ; un dépôt
   dans une cellule unifiée conserve le canal (`UNIFIED_LANE`), y compris
-  sur une autre carte. 547 tests, 0 échec.
+  sur une autre carte. « + Sujet » ne demande plus de canal quand la
+  colonne d'entrée n'en a pas (serveur : canal « compliqué » par défaut,
+  comme l'import). 548 tests, 0 échec.
+
 
 ### 2026-09-16 — Le modèle versionné passe devant la config appliquée ; exercise.json ; la bascule d'année ; menu « ⋯ » (ADR 038)
 

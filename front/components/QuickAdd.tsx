@@ -1,9 +1,12 @@
 // QuickAdd modal (« + Sujet », touche N) — design/modals.jsx QuickAdd.
 // Every new subject enters the FIRST column (pull flow: all intake arrives
 // on the left); the server assigns id, codename, column and timestamps.
+// ADR 039: when the intake column has no canal (it sits before the RDO),
+// the form asks for none — the canal is chosen by the qualification drag.
 
 import { useState } from "react";
 import type { BoardConfig, Criticality } from "../../core/types.ts";
+import { unifiedColumnIds } from "../../core/layout.ts";
 import { CRITICALITY_KEYS, Field, SelectField } from "./modalParts.tsx";
 
 /** Creation intent sent to POST /api/cards (through App/useBoardStore). The
@@ -11,7 +14,8 @@ import { CRITICALITY_KEYS, Field, SelectField } from "./modalParts.tsx";
 export interface QuickAddInput {
   title: string;
   domain: string;
-  laneId: string;
+  /** Absent when the intake column has no canal (ADR 039). */
+  laneId?: string;
   typeId: string;
   criticality: Criticality;
   owner: string;
@@ -24,20 +28,22 @@ export interface QuickAddProps {
   onCreate: (input: QuickAddInput) => void;
 }
 
-// Design defaults: first domain/lane, « Mise en œuvre » type when present,
-// criticality normal. No nature choice — the canal carries it (design v11).
+// Design defaults: first domain, « Mise en œuvre » type when present,
+// criticality normal, and the first lane only when the intake column has
+// canals. No nature choice — the canal carries it (design v11).
 function initialInput(config: BoardConfig): QuickAddInput {
-  return {
+  const base: QuickAddInput = {
     title: "",
     domain: config.domains[0]!.id,
-    laneId: config.lanes[0]!.id,
     typeId: config.types.find((type) => type.id === "mise_en_oeuvre")?.id ?? config.types[0]!.id,
     criticality: "normal",
     owner: "",
   };
+  return unifiedColumnIds(config).size > 0 ? base : { ...base, laneId: config.lanes[0]!.id };
 }
 
-// The four vocabulary selects of the creation form (design order).
+// The vocabulary selects of the creation form (design order); the canal
+// select only when the intake column has canals (ADR 039).
 function SelectGrid({ draft, config, set }: {
   draft: QuickAddInput;
   config: BoardConfig;
@@ -47,7 +53,9 @@ function SelectGrid({ draft, config, set }: {
     <div className="field-2col">
       <SelectField label="Type de projet" value={draft.typeId} options={config.types.map((t) => ({ value: t.id, label: t.name }))} onChange={(v) => set({ typeId: v })} />
       <SelectField label="Domaine" value={draft.domain} options={config.domains.map((d) => ({ value: d.id, label: d.name }))} onChange={(v) => set({ domain: v })} />
-      <SelectField label="Canal" value={draft.laneId} options={config.lanes.map((l) => ({ value: l.id, label: l.name }))} onChange={(v) => set({ laneId: v })} />
+      {draft.laneId !== undefined && (
+        <SelectField label="Canal" value={draft.laneId} options={config.lanes.map((l) => ({ value: l.id, label: l.name }))} onChange={(v) => set({ laneId: v })} />
+      )}
       <SelectField label="Criticité" value={draft.criticality} options={CRITICALITY_KEYS.map((k) => ({ value: k, label: config.criticalities[k].label }))} onChange={(v) => set({ criticality: v as Criticality })} />
     </div>
   );

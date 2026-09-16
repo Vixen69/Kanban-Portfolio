@@ -30,7 +30,8 @@ export interface CreatedCard {
 export interface NewCardInput {
   title: string;
   domain: string;
-  laneId: string;
+  /** The canal; omitted when the intake column has none (ADR 039) — the server picks the « complicated » one. */
+  laneId?: string;
   typeId: string;
   criticality: Criticality;
   owner: string;

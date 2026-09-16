@@ -64,6 +64,7 @@ Actifs, découpée en canaux.
   cellule unifiée = canal conservé), `board.css`.
 - Le critère « une seule page » se mesure comme avant ; la hauteur d'une
   cellule unifiée est la somme des lignes de canaux.
-- Ouvert : si une carte est créée (« + Sujet ») elle entre en Demandes avec
-  le canal choisi dans le formulaire, qui n'est simplement pas montré avant
-  la RDO — le formulaire pourrait perdre ce choix plus tard.
+- « + Sujet » ne demande plus de canal quand la colonne d'entrée n'en a pas
+  (nettoyage demandé par l'auteur le soir même) : l'intent part sans
+  `laneId`, le serveur prend le canal « compliqué » comme l'import, et la
+  qualification choisira le vrai canal par le geste.
