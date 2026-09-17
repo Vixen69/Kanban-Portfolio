@@ -146,7 +146,9 @@ PortfolioDataSource           (read-only PPM access — adapters/)
   getFinancials(subjectId): { budget, consumed, remaining } | null
 
 BoardStorage                  (persistence — Postgres adapter behind it)
-  importCards / insertCard / appendEvent / listEvents / listBaseCards / close
+  importCards / insertCard / appendEvent / listEvents(filter?) / listBaseCards / close
+  (filter = afterSeq | cardIds, ADR 040: the incremental refresh and the
+   per-action validation fold never read the whole log)
 ```
 
 `PortfolioDataSource` adapters, in order: `fixtures` (synthetic, 150
@@ -221,7 +223,12 @@ fields, append-only enforced by table grants/triggers):
 
 `card_events` is both the audit trail and the single source for all flow
 metrics. Do not create a separate metrics store. Metrics are queries on
-events. The event-sourced model (append-only log + fold-on-read) is retained —
+events. The front folds the log itself (ADR 002) and, after its OWN
+writes, fetches only the events appended since (`GET /api/events?after=N`,
+ADR 040) — import, config, the year switch and a page load reload in full;
+the server stays the truth, nothing is appended locally before it was
+read from the log.
+ The event-sourced model (append-only log + fold-on-read) is retained —
 it is the product's core (§1) and maps to a plain Postgres append-only table;
 to the platform the middle is a standard Express+Postgres service doing
 INSERT/SELECT. Courtesy heads-up to the tech lead: the schema is append-only

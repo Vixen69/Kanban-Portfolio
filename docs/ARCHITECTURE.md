@@ -637,6 +637,29 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-17 — Sprint de perf : mesures, journal incrémental, validation ciblée, tickets mémoïsés (ADR 040)
+
+- **Mesuré avant de coder** (`npm run bench`, `scripts/bench-perf.ts`) :
+  sur 155 cartes le cœur est négligeable (repli 0,9 ms ; une frappe de
+  filtre 0,2 ms ; totaux 0,2 ms) et le reste à l'échelle (à 50 000
+  évènements : repli 8,5 ms, temps par étape 44 ms). Navigateur, build de
+  prod : 33–50 ms par frappe, 67 ms pour remonter 155 cartes, 274 ms de
+  chargement. Audit d'import sur 10 800 lignes COUT PREV : 250–450 ms. Le
+  seul coût qui grossit sans limite : la **charge utile du journal**,
+  renvoyée entière à chaque action (157 Ko aujourd'hui, 10 Mo à 50 000
+  évènements) et repliée entière par le serveur pour chaque intent.
+- **Fait** : `GET /api/events?after=N` et `useRefresh` — après ses
+  propres écritures le front ne lit que la suite du journal (import,
+  config, bascule et ouverture rechargent tout ; un échec retombe sur le
+  rechargement complet) ; `listEvents(filter)` sur le port (`afterSeq`,
+  `cardIds` ; JSONL en mémoire, Postgres en `WHERE` + index) et `postEvent`
+  ne replie que les cartes concernées ; `MiniCard` / `FocusCard`
+  mémoïsés. `getEvents` / `getCapacity` déplacés dans `middle/reads.ts`.
+  554 tests, 0 échec.
+- **Non fait, à surveiller** : le chargement initial transmet toujours le
+  journal entier (le front replie, ADR 002) ; repli côté serveur le jour
+  où le journal le demande.
+
 ### 2026-09-16 — Demandes et Qualification sans canal ; la qualification, c'est le geste (ADR 039)
 
 - **Demande de l'auteur** : avant la RDO un projet n'est ni petit ni

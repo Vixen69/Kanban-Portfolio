@@ -5,7 +5,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { BoardConfig, CardEvent, CardPatch, CardState } from "../core/types.ts";
-import { foldEvents } from "../core/state.ts";
+import { eventSequence, foldEvents } from "../core/state.ts";
+
 import {
   ApiError,
   fetchBoard,
@@ -13,6 +14,7 @@ import {
   fetchDefaultConfig,
   postArchive,
   postBlock,
+  fetchEventsAfter,
   postCard,
   postExerciseSwitch,
   postComment,
@@ -137,7 +139,28 @@ function useReload(
   }, [setBoard, setLastError]);
 }
 
-// The card actions: await the API call, then refetch the board. A
+// The refetch after the front's OWN writes (ADR 040): only the events
+// appended since the last one held — the log only grows, and the card
+// snapshots change at import alone, which reloads in full. A failed fetch
+// or an empty store falls back to the full reload.
+function useRefresh(
+  board: BoardData | null,
+  setBoard: (board: BoardData) => void,
+  reload: () => Promise<void>,
+): () => Promise<void> {
+  return useCallback(async () => {
+    if (board === null) return reload();
+    const last = board.events[board.events.length - 1];
+    try {
+      const more = await fetchEventsAfter(last === undefined ? 0 : eventSequence(last.id));
+      if (more.length > 0) setBoard({ cards: board.cards, events: [...board.events, ...more] });
+    } catch {
+      await reload();
+    }
+  }, [board, setBoard, reload]);
+}
+
+// The card actions: await the API call, then refresh the log. A
 // failed write simply did not happen (logged, ids only — no titles) — the
 // French message lands in lastError so the shell can show it.
 function useCardActions(reload: () => Promise<void>, setLastError: (m: string | null) => void) {
@@ -248,7 +271,8 @@ export function useBoardStore(): BoardStore {
   const load = useInitialLoad();
   const [lastError, setLastError] = useState<string | null>(null);
   const reload = useReload(load.setBoard, setLastError);
-  const cardActions = useCardActions(reload, setLastError);
+  const refresh = useRefresh(load.board, load.setBoard, reload);
+  const cardActions = useCardActions(refresh, setLastError);
   const configWrites = useConfigWrites(load.setConfig, load.defaults, reload);
   const switchExercise = useExerciseSwitch(load.setConfig, reload);
   const dismissError = useCallback(() => setLastError(null), []);

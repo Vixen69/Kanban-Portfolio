@@ -151,6 +151,16 @@ export function fetchBoard(): Promise<BoardData> {
 }
 
 /**
+ * GET /api/events?after=N — the events appended after sequence N (ADR 040:
+ * the refresh after the front's own writes; the snapshots only change at
+ * import, which reloads in full). Input: the last sequence held.
+ * Output: the new events in append order. Failure: throws ApiError.
+ */
+export function fetchEventsAfter(after: number): Promise<CardEvent[]> {
+  return request<{ events: CardEvent[] }>(`/api/events?after=${after}`).then((body) => body.events);
+}
+
+/**
  * GET /api/capacity?exercise=YYYY — the capacity snapshot of one exercise
  * year (ADR 024/035). Input: the year. Output: the CapacitySnapshot, or
  * null when no import carried one for that year.

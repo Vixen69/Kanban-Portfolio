@@ -14,7 +14,8 @@ import express, {
 } from "express";
 import type { BoardStorage } from "../core/ports.ts";
 import { BadRequest, getBoard,
-  getCapacity, getConfig, postEvent, putConfig } from "./api.ts";
+  getConfig, postEvent, putConfig } from "./api.ts";
+import { getCapacity, getEvents } from "./reads.ts";
 import { postCard } from "./cards.ts";
 import type { ConfigStore } from "./config-store.ts";
 import { logError, logRequest } from "./log.ts";
@@ -122,6 +123,10 @@ function mountRoutes(app: Express, deps: MiddleDeps): void {
   });
   app.get("/api/board", async (_req: Request, res: Response) => {
     const result = await getBoard(deps.storage);
+    res.status(result.status).json(result.body);
+  });
+  app.get("/api/events", async (req: Request, res: Response) => {
+    const result = await getEvents(deps.storage, req.query["after"]);
     res.status(result.status).json(result.body);
   });
   app.get("/api/capacity", async (req: Request, res: Response) => {

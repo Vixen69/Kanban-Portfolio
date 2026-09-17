@@ -3,6 +3,7 @@
 // and time-in-column are all derived here, never stored elsewhere.
 
 import type { Card, CardEvent, CardState, Financials } from "./types.ts";
+
 import type { Subject } from "./ports.ts";
 import { isReorder } from "./events.ts";
 
@@ -214,12 +215,17 @@ function applyEvent(state: CardState, event: CardEvent): void {
   }
 }
 
-// Numeric suffix of an event id ("evt-12" -> 12). Lexicographic comparison
-// would order "evt-10" before "evt-9" and break insertion-order replays.
-function eventSequence(id: string): number {
+/**
+ * Numeric suffix of an event id ("evt-12" -> 12) — the log's sequence
+ * number. Lexicographic comparison would order "evt-10" before "evt-9"
+ * and break insertion-order replays.
+ * Input: the event id. Output: the sequence, 0 when unreadable. Failure: none.
+ */
+export function eventSequence(id: string): number {
   const sequence = Number(id.slice(id.lastIndexOf("-") + 1));
   return Number.isNaN(sequence) ? 0 : sequence;
 }
+
 
 // Manual ordering (ADR 019): a "moved" event may carry payload.beforeId —
 // the card is re-inserted just before that card in the global fold order

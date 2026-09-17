@@ -6,7 +6,7 @@
 // Same observable contract as the JSONL driver (storage/conformance).
 
 import { Pool, type PoolClient } from "pg";
-import type { BoardStorage } from "../../core/ports.ts";
+import type { BoardStorage, EventFilter } from "../../core/ports.ts";
 import type { CardEventInput } from "../../core/events.ts";
 import type { CapacitySnapshot, Card, CardEvent } from "../../core/types.ts";
 import { logError } from "../log.ts";
@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS card_events (
   seq  bigint PRIMARY KEY,
   data jsonb NOT NULL
 );
+CREATE INDEX IF NOT EXISTS card_events_card_id ON card_events ((data->>'cardId'));
 CREATE TABLE IF NOT EXISTS capacity (
   id   text PRIMARY KEY,
   data jsonb NOT NULL
@@ -88,8 +89,21 @@ async function pgInsert(runTx: Tx, card: Card, created: CardEventInput): Promise
   });
 }
 
-async function pgListEvents(pool: Pool): Promise<CardEvent[]> {
-  const res = await pool.query<{ data: CardEvent }>("SELECT data FROM card_events ORDER BY seq ASC");
+// The optional filter (ADR 040) becomes a WHERE clause: strictly after a
+// sequence, and/or the events of some cards (indexed expression).
+async function pgListEvents(pool: Pool, filter: EventFilter = {}): Promise<CardEvent[]> {
+  const where: string[] = [];
+  const params: unknown[] = [];
+  if (filter.afterSeq !== undefined) {
+    params.push(filter.afterSeq);
+    where.push(`seq > $${params.length}`);
+  }
+  if (filter.cardIds !== undefined) {
+    params.push([...filter.cardIds]);
+    where.push(`data->>'cardId' = ANY($${params.length})`);
+  }
+  const clause = where.length === 0 ? "" : ` WHERE ${where.join(" AND ")}`;
+  const res = await pool.query<{ data: CardEvent }>(`SELECT data FROM card_events${clause} ORDER BY seq ASC`, params);
   return res.rows.map((row) => (row as { data: CardEvent }).data);
 }
 
@@ -142,9 +156,9 @@ function makeTx(pool: Pool): Tx {
 // The read side of the port: plain queries on the pool, no transaction.
 function pgReaders(pool: Pool, assertOpen: () => void): Pick<BoardStorage, "listEvents" | "listBaseCards" | "getCapacity"> {
   return {
-    async listEvents() {
+    async listEvents(filter = {}) {
       assertOpen();
-      return pgListEvents(pool);
+      return pgListEvents(pool, filter);
     },
     async listBaseCards() {
       assertOpen();

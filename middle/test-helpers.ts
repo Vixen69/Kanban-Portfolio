@@ -1,6 +1,7 @@
 // Shared middle test scaffolding (test-only module, mirrors core/test-helpers).
 
 import type { BoardStorage } from "../core/ports.ts";
+import { filterEvents } from "../core/event-filter.ts";
 import type { BoardConfig } from "../core/types.ts";
 import type { ConfigStore } from "./config-store.ts";
 import type { CardEventInput } from "../core/events.ts";
@@ -36,8 +37,8 @@ export function stubStorage(cards: Card[] = [testCard({ id: "S001" })]): BoardSt
     async appendEvent(input: CardEventInput): Promise<CardEvent> {
       return append(input);
     },
-    async listEvents() {
-      return events.slice();
+    async listEvents(filter = {}) {
+      return filterEvents(events, filter);
     },
     async importCapacity(snapshot: CapacitySnapshot) {
       capacity = structuredClone(snapshot);

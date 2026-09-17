@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { CardEvent } from "./types.ts";
-import { EDITABLE_FIELDS, foldEvents, toCard } from "./state.ts";
+import { EDITABLE_FIELDS, eventSequence, foldEvents, toCard } from "./state.ts";
+import { filterEvents } from "./event-filter.ts";
 import { testCard } from "./test-helpers.ts";
 
 function event(partial: Partial<CardEvent> & Pick<CardEvent, "id" | "ts" | "type" | "cardId">): CardEvent {
@@ -277,4 +278,18 @@ test("deletion mid-stream: earlier events apply, later ones are ignored", () => 
     ],
   );
   assert.deepEqual(states, []);
+});
+
+test("eventSequence reads the numeric suffix; filterEvents keeps what a storage filter asks (ADR 040)", () => {
+  assert.deepEqual(["evt-12", "evt-9", "evt-x", "12"].map(eventSequence), [12, 9, 0, 12]);
+  const log = [
+    event({ id: "evt-1", ts: "2026-01-01T00:00:00.000Z", type: "created", cardId: "A" }),
+    event({ id: "evt-2", ts: "2026-01-02T00:00:00.000Z", type: "created", cardId: "B" }),
+    event({ id: "evt-3", ts: "2026-01-03T00:00:00.000Z", type: "commented", cardId: "A" }),
+  ];
+  assert.deepEqual(filterEvents(log, {}).map((e) => e.id), ["evt-1", "evt-2", "evt-3"]);
+  assert.deepEqual(filterEvents(log, { afterSeq: 1 }).map((e) => e.id), ["evt-2", "evt-3"]);
+  assert.deepEqual(filterEvents(log, { cardIds: ["A"] }).map((e) => e.id), ["evt-1", "evt-3"]);
+  assert.deepEqual(filterEvents(log, { cardIds: ["A"], afterSeq: 2 }).map((e) => e.id), ["evt-3"]);
+  assert.deepEqual(filterEvents(log, { cardIds: [] }), []);
 });

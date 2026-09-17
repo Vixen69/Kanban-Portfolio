@@ -3,6 +3,7 @@
 // of a focused column. Blocked wins over the domain accent; age is worn as
 // a text pill only (validated design — no background darkening).
 
+import { memo } from "react";
 import type { CSSProperties, DragEvent } from "react";
 import type { BoardConfig, CardState } from "../../core/types.ts";
 import { daysInColumn } from "../../core/aging.ts";
@@ -67,7 +68,7 @@ function domPillStyle(color: string): CSSProperties {
  * Failure modes: unknown domain/type ids degrade to a neutral accent and
  * no tag — the display never crashes after an admin topology edit.
  */
-export function MiniCard(props: CardItemProps) {
+function MiniCardBody(props: CardItemProps) {
   const { card, config } = props;
   const days = daysInColumn(card, new Date(props.now));
   const acc = cardAccent(card, config);
@@ -110,7 +111,7 @@ export function MiniCard(props: CardItemProps) {
  * Failure modes: unknown domain/type ids degrade to a neutral accent and
  * missing pills — the display never crashes after an admin topology edit.
  */
-export function FocusCard(props: CardItemProps) {
+function FocusCardBody(props: CardItemProps) {
   const { card, config } = props;
   const days = daysInColumn(card, new Date(props.now));
   const acc = cardAccent(card, config);
@@ -174,3 +175,13 @@ function FocusMeta({
     </div>
   );
 }
+
+/**
+ * The radiator ticket, memoised (ADR 040): a filter keystroke or a now tick
+ * re-renders only the tickets whose props changed — the card object keeps
+ * its identity between folds, the callbacks are stable hooks.
+ */
+export const MiniCard = memo(MiniCardBody);
+
+/** The expanded card of a focused column, memoised likewise (ADR 040). */
+export const FocusCard = memo(FocusCardBody);

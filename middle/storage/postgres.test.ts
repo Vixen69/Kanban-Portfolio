@@ -242,3 +242,20 @@ test("[pg] capacity snapshot: null until imported, replaced whole", { skip: SKIP
     assert.deepEqual(await s.getCapacity(2027), { exerciseYear: 2027, persons: [], assignments: [] });
     assert.equal((await s.getCapacity(2026))?.assignments.length, 1, "one row per exercise year (ADR 035)");
   }));
+
+test("[pg] listEvents honours the filter: after a sequence, of some cards, both (ADR 040)", { skip: SKIP }, () =>
+  withStore(async (s) => {
+    const cards = [testCard({ id: "A" }), testCard({ id: "B" })];
+    await s.importCards(cards, [
+      lifecycleEvent("created", "A", "t", "2026-01-01T00:00:00.000Z"),
+      lifecycleEvent("created", "B", "t", "2026-01-02T00:00:00.000Z"),
+      lifecycleEvent("commented", "A", "t", "2026-01-03T00:00:00.000Z", { text: "x" }),
+    ]);
+    const all = await s.listEvents();
+    const first = Number(all[0]!.id.slice(4));
+    assert.deepEqual((await s.listEvents({ afterSeq: first })).map((e) => e.cardId), ["B", "A"]);
+    assert.deepEqual((await s.listEvents({ cardIds: ["A"] })).map((e) => e.type), ["created", "commented"]);
+    assert.deepEqual((await s.listEvents({ cardIds: ["A"], afterSeq: first })).map((e) => e.type), ["commented"]);
+    assert.deepEqual(await s.listEvents({ cardIds: [] }), []);
+  }));
+

@@ -9,6 +9,7 @@ import {
   ApiError,
   fetchBoard,
   fetchCapacity,
+  fetchEventsAfter,
   postDecision,
   fetchConfig,
   fetchDefaultConfig,
@@ -103,6 +104,15 @@ test("fetchCapacity GETs /api/capacity for one exercise and unwraps the snapshot
   await withFetch({ ok: true, status: 200, json: { capacity: snapshot } }, async () => {
     assert.deepEqual(await fetchCapacity(2026), snapshot);
 
+  });
+});
+
+test("fetchEventsAfter GETs /api/events?after=N and unwraps the events (ADR 040)", async () => {
+  const events = [{ id: "evt-13", ts: "t", actor: "a", cardId: "S1", type: "commented", fromColumn: null, toColumn: null, payload: {} }];
+  await withFetch({ ok: true, status: 200, json: { events } }, async (calls) => {
+    assert.deepEqual(await fetchEventsAfter(12), events);
+    assert.equal(calls[0]?.url, "/api/events?after=12");
+    assert.equal(calls[0]?.method, "GET");
   });
 });
 

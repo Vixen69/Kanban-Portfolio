@@ -35,6 +35,14 @@ export interface PortfolioDataSource {
  * updated, never deleted. Timestamps, actor attribution and topology
  * validation belong to the caller, never to the storage.
  */
+/** What a listEvents call may restrict itself to (ADR 040). */
+export interface EventFilter {
+  /** Only the events whose sequence number is strictly greater. */
+  afterSeq?: number;
+  /** Only the events of these cards. */
+  cardIds?: readonly string[];
+}
+
 export interface BoardStorage {
   /**
    * Upserts base cards (by id) and appends their events in one atomic
@@ -63,10 +71,12 @@ export interface BoardStorage {
    */
   appendEvent(input: CardEventInput): Promise<CardEvent>;
   /**
-   * Returns all events in append order (seq ascending).
+   * Returns the events in append order (seq ascending): all of them, or
+   * the ones a filter keeps (ADR 040 — `afterSeq` for the incremental
+   * refresh, `cardIds` for the per-action validation fold).
    * Failure: rejects on storage errors or an unreadable stored payload.
    */
-  listEvents(): Promise<CardEvent[]>;
+  listEvents(filter?: EventFilter): Promise<CardEvent[]>;
   /**
    * Returns the base card snapshots as imported — never event-derived
    * state: the current board is folded on read (ADR 002).

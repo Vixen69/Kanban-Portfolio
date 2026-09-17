@@ -13,6 +13,7 @@
 
 import { closeSync, existsSync, fsyncSync, openSync, readFileSync, truncateSync, writeSync } from "node:fs";
 import type { BoardStorage } from "../../core/ports.ts";
+import { filterEvents } from "../../core/event-filter.ts";
 import type { CardEventInput } from "../../core/events.ts";
 import type { CapacitySnapshot, Card, CardEvent } from "../../core/types.ts";
 import { appendLines, buildCard, buildEvent, headerLine, loadState } from "./jsonl-format.ts";
@@ -76,9 +77,9 @@ function doAppend(fd: number, state: State, input: CardEventInput): CardEvent {
 // The read side of the port: copies of the projection, never the live state.
 function readers(state: State, assertOpen: () => void): Pick<BoardStorage, "listEvents" | "listBaseCards" | "getCapacity"> {
   return {
-    async listEvents() {
+    async listEvents(filter = {}) {
       assertOpen();
-      return state.events.slice();
+      return filterEvents(state.events, filter);
     },
     async listBaseCards() {
       assertOpen();

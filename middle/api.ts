@@ -91,17 +91,7 @@ export async function getBoard(storage: BoardStorage): Promise<ApiResult> {
   return { status: 200, body: { cards, events } };
 }
 
-/**
- * GET /api/capacity?exercise=YYYY — the capacity snapshot of one exercise
- * year (persons + assignments, ADR 024/035), or null when no import
- * carried one for that year. The read-outs are derived client-side by
- * core/capacity.ts.
- * Inputs: the storage, the year. Output: 200 with { capacity }.
- * Failure: propagates storage errors (→ 500).
- */
-export async function getCapacity(storage: BoardStorage, year: number): Promise<ApiResult> {
-  return { status: 200, body: { capacity: await storage.getCapacity(year) } };
-}
+
 
 /**
  * POST /api/events — validates an event intent against the live (folded)
@@ -116,12 +106,24 @@ export async function getCapacity(storage: BoardStorage, year: number): Promise<
  */
 export function postEvent(storage: BoardStorage, config: BoardConfig, raw: unknown): Promise<ApiResult> {
   return serializedWrite(async () => {
-    const [cards, events] = await Promise.all([storage.listBaseCards(), storage.listEvents()]);
-    const states = foldEvents(cards, events);
+    const cardIds = involvedCardIds(raw);
+    const [cards, events] = await Promise.all([storage.listBaseCards(), storage.listEvents({ cardIds })]);
+    const states = foldEvents(cards.filter((card) => cardIds.includes(card.id)), events);
     const input = buildValidatedEvent(config, states, raw);
     return { status: 201, body: await storage.appendEvent(input) };
   });
 }
+
+// The cards an intent involves — its own and, for a drop onto another
+// card, the insertion target: the validation folds those alone (ADR 040),
+// never the whole log.
+function involvedCardIds(raw: unknown): string[] {
+  if (typeof raw !== "object" || raw === null) return [];
+  const { cardId, beforeId } = raw as { cardId?: unknown; beforeId?: unknown };
+  return [cardId, beforeId].filter((id): id is string => typeof id === "string");
+}
+
+
 
 /**
  * Guards a JSON body into a plain object (arrays and scalars rejected).
