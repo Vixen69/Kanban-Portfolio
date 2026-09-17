@@ -8,6 +8,7 @@ import type { BoardStorage } from "../core/ports.ts";
 import type { CardEventInput } from "../core/events.ts";
 import { lifecycleEvent, movedEvent } from "../core/events.ts";
 import { EDITABLE_FIELDS, foldEvents } from "../core/state.ts";
+import { RESTORE_CARD_ID } from "../core/restore.ts";
 import { validateBoardConfig } from "../core/config.ts";
 import type { BoardConfig, CardEventType, CardState } from "../core/types.ts";
 import type { ConfigStore } from "./config-store.ts";
@@ -116,11 +117,13 @@ export function postEvent(storage: BoardStorage, config: BoardConfig, raw: unkno
 
 // The cards an intent involves — its own and, for a drop onto another
 // card, the insertion target: the validation folds those alone (ADR 040),
-// never the whole log.
+// never the whole log. The board-wide restore events (ADR 042) are read
+// with them: they decide which of the cards' events still count.
 function involvedCardIds(raw: unknown): string[] {
-  if (typeof raw !== "object" || raw === null) return [];
+  if (typeof raw !== "object" || raw === null) return [RESTORE_CARD_ID];
   const { cardId, beforeId } = raw as { cardId?: unknown; beforeId?: unknown };
-  return [cardId, beforeId].filter((id): id is string => typeof id === "string");
+  const ids = [cardId, beforeId].filter((id): id is string => typeof id === "string");
+  return [...ids, RESTORE_CARD_ID];
 }
 
 

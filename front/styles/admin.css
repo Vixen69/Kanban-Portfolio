@@ -66,3 +66,15 @@
 .a-ex-row { display: flex; align-items: baseline; gap: 10px; font-size: 12px; }
 .a-ex-row b { font-size: 16px; font-variant-numeric: tabular-nums; }
 .a-exercise .import-note b { color: var(--tx-1); }
+
+/* ---------- Onglet Instantanés (ADR 042) ---------- */
+.snap-take { display: flex; align-items: center; gap: 8px; }
+.snap-label { flex: 1; min-width: 0; font: inherit; font-size: 12px; padding: 5px 8px; border: 1px solid var(--bd); border-radius: 4px; color: var(--tx-1); background: #fff; }
+.snap-list { display: flex; flex-direction: column; gap: 4px; max-height: 320px; overflow-y: auto; }
+.snap-row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border: 1px solid var(--bd-sub); border-radius: 4px; font-size: 12px; }
+.snap-row.armed { border-color: var(--danger); }
+.snap-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.snap-meta { font-size: 10.5px; color: var(--tx-3); }
+.snap-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.snap-error { font-size: 11px; color: var(--danger-strong); }
+

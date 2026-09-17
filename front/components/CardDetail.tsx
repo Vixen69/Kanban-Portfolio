@@ -26,6 +26,8 @@ export interface CardDetailProps {
   now: number;
   /** History of this card (movements + blockages), most recent first. */
   history: HistoryEntry[];
+  /** How many events of this card a snapshot restore undid (ADR 042): a line in the Historique. */
+  undone: number;
   /** Flow times of this card, projected from the event log (core/flow). */
   flow: FlowTimes;
   /** Stage anchors resolved from the config (labels of the Délais grid). */
@@ -243,7 +245,7 @@ export function CardDetail(props: CardDetailProps) {
           <DecisionSection key={"dc" + card.id} card={card} config={config} now={props.now} onDecide={props.onDecide} />
           <CommentList key={card.id} comments={card.comments} onAdd={props.onComment} />
           <DelaysSection key={"dl" + card.id} flow={props.flow} anchors={props.anchors} />
-          <HistoryList key={"hi" + card.id} entries={props.history} />
+          <HistoryList key={"hi" + card.id} entries={props.history} undone={props.undone} />
           {card.sciformaId && <div className="scf">Réf. Sciforma : {card.sciformaId}</div>}
           <Actions archived={card.archived} onArchive={props.onArchive} onUnarchive={props.onUnarchive}
             onClose={props.onClose} onEdit={props.onEdit} />

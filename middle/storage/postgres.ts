@@ -9,6 +9,7 @@ import { Pool, type PoolClient } from "pg";
 import type { BoardStorage, EventFilter } from "../../core/ports.ts";
 import type { CardEventInput } from "../../core/events.ts";
 import type { CapacitySnapshot, Card, CardEvent } from "../../core/types.ts";
+import { summarizeSnapshot, type BoardSnapshot, type SnapshotSummary } from "../../core/snapshot.ts";
 import { logError } from "../log.ts";
 
 const SCHEMA = `
@@ -26,6 +27,11 @@ CREATE INDEX IF NOT EXISTS card_events_card_id ON card_events ((data->>'cardId')
 CREATE TABLE IF NOT EXISTS capacity (
   id   text PRIMARY KEY,
   data jsonb NOT NULL
+);
+CREATE TABLE IF NOT EXISTS snapshots (
+  id      text PRIMARY KEY,
+  summary jsonb NOT NULL,
+  data    jsonb NOT NULL
 );
 `;
 
@@ -129,6 +135,41 @@ async function pgGetCapacity(pool: Pool, year: number): Promise<CapacitySnapshot
   return old !== undefined && old.data.exerciseYear === year ? old.data : null;
 }
 
+// Board snapshots (ADR 042): one row each, the summary stored beside the
+// whole so the list never reads the cards. Kept for good.
+async function pgSaveSnapshot(runTx: Tx, snapshot: BoardSnapshot): Promise<void> {
+  await runTx(async (client) => {
+    await client.query("INSERT INTO snapshots (id, summary, data) VALUES ($1, $2, $3)", [
+      snapshot.id, summarizeSnapshot(snapshot), snapshot,
+    ]);
+  });
+}
+
+async function pgListSnapshots(pool: Pool): Promise<SnapshotSummary[]> {
+  const res = await pool.query<{ summary: SnapshotSummary }>("SELECT summary FROM snapshots ORDER BY summary->>'ts' DESC, id DESC");
+  return res.rows.map((row) => (row as { summary: SnapshotSummary }).summary);
+}
+
+async function pgLoadSnapshot(pool: Pool, id: string): Promise<BoardSnapshot | null> {
+  const res = await pool.query<{ data: BoardSnapshot }>("SELECT data FROM snapshots WHERE id = $1", [id]);
+  const row = res.rows[0];
+  return row === undefined ? null : row.data;
+}
+
+// The restore of the base cards (ADR 042): the table replaced whole in one
+// transaction, insertion order kept by the identity column.
+async function pgRestoreCards(runTx: Tx, cards: Card[]): Promise<void> {
+  await runTx(async (client) => {
+    await client.query("DELETE FROM cards");
+    for (const card of cards) await client.query(UPSERT_CARD, [card.id, card]);
+  });
+}
+
+async function pgLastSeq(pool: Pool): Promise<number> {
+  const res = await pool.query<{ seq: string }>("SELECT COALESCE(MAX(seq), 0) AS seq FROM card_events");
+  return Number((res.rows[0] as { seq: string }).seq);
+}
+
 async function pgListBaseCards(pool: Pool): Promise<Card[]> {
   const res = await pool.query<{ data: Card }>("SELECT data FROM cards ORDER BY ord ASC");
   return res.rows.map((row) => (row as { data: Card }).data);
@@ -171,6 +212,34 @@ function pgReaders(pool: Pool, assertOpen: () => void): Pick<BoardStorage, "list
   };
 }
 
+// The snapshot side of the port (ADR 042).
+function pgSnapshots(
+  pool: Pool, runTx: Tx, assertOpen: () => void,
+): Pick<BoardStorage, "saveSnapshot" | "listSnapshots" | "loadSnapshot" | "restoreCards" | "lastSeq"> {
+  return {
+    async saveSnapshot(snapshot) {
+      assertOpen();
+      await pgSaveSnapshot(runTx, snapshot);
+    },
+    async listSnapshots() {
+      assertOpen();
+      return pgListSnapshots(pool);
+    },
+    async loadSnapshot(id) {
+      assertOpen();
+      return pgLoadSnapshot(pool, id);
+    },
+    async restoreCards(cards) {
+      assertOpen();
+      await pgRestoreCards(runTx, cards);
+    },
+    async lastSeq() {
+      assertOpen();
+      return pgLastSeq(pool);
+    },
+  };
+}
+
 // The BoardStorage object over an open pool; `open` guards use-after-close.
 function buildStorage(pool: Pool, runTx: Tx): BoardStorage {
   let open = true;
@@ -191,7 +260,9 @@ function buildStorage(pool: Pool, runTx: Tx): BoardStorage {
       return runTx((client) => insertEvent(client, input));
     },
     ...pgReaders(pool, assertOpen),
+    ...pgSnapshots(pool, runTx, assertOpen),
     async importCapacity(snapshot) {
+
       assertOpen();
       await pgImportCapacity(runTx, snapshot);
     },

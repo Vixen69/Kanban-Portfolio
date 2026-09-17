@@ -5,12 +5,12 @@
 import { useEffect, useMemo, useRef } from "react";
 import type { BoardConfig, CardPatch, CardState } from "../core/types.ts";
 import type { ResourceDraw } from "../core/filters.ts";
-import { flowTimes, resolveFlowAnchors } from "../core/flow.ts";
-import { cardHistory } from "../core/history.ts";
 import type { DecisionInput, MoveTarget } from "./api.ts";
 import { columnById } from "./lookup.ts";
+import { adminWrites } from "./adminWrites.ts";
 import { useBoardStore, type BoardStore } from "./useBoardStore.ts";
 import { useDerived, useDisplayCards, useExerciseShown } from "./useDisplayCards.ts";
+import { useDetailProjection } from "./useDetailProjection.ts";
 import { useResourceDraw, type CapacityFetch } from "./useCapacity.ts";
 import { useFilters, type Filters } from "./useFilters.ts";
 import {
@@ -79,16 +79,9 @@ async function saveEdit(
 
 function CardModals({ ctx }: { ctx: Ctx }) {
   const { store, config, ui, detailCard } = ctx;
-  const history = useMemo(
-    () => (detailCard ? cardHistory(store.events, detailCard.id, config) : []),
-    [store.events, detailCard, config],
-  );
-  const flow = useMemo(
-    () => flowTimes(store.events, detailCard?.id ?? "", config, new Date(ctx.nowMs)),
-    [store.events, detailCard, config, ctx.nowMs],
-  );
-  const anchors = useMemo(() => resolveFlowAnchors(config), [config]);
+  const { history, flow, anchors, undone } = useDetailProjection(store, config, detailCard, ctx.nowMs);
   if (!detailCard) return null;
+
   const closeAll = () => { ui.setDetailId(null); ui.setEditing(false); };
   if (ui.editing) {
     return (
@@ -103,7 +96,7 @@ function CardModals({ ctx }: { ctx: Ctx }) {
     );
   }
   return (
-    <CardDetail card={detailCard} config={config} now={ctx.nowMs} history={history}
+    <CardDetail card={detailCard} config={config} now={ctx.nowMs} history={history} undone={undone}
       flow={flow} anchors={anchors}
       onClose={closeAll}
       onEdit={() => ui.setEditing(true)}
@@ -117,19 +110,6 @@ function CardModals({ ctx }: { ctx: Ctx }) {
   );
 }
 
-// The admin panel's writes: each closes the panel on success and hands the
-// French failure back to it otherwise (the panel stays open with its draft).
-function adminWrites(store: BoardStore, ui: UiState) {
-  const closing = (write: Promise<string | null>) => write.then((failure) => {
-    if (failure === null) ui.setAdmin(false);
-    return failure;
-  });
-  return {
-    onApply: (next: BoardConfig) => closing(store.saveConfig(next)),
-    onReset: () => closing(store.resetConfig()),
-    onSwitch: (year: number) => closing(store.switchExercise(year)),
-  };
-}
 
 function ShellModals({ ctx }: { ctx: Ctx }) {
   const { store, config, ui } = ctx;
@@ -140,7 +120,7 @@ function ShellModals({ ctx }: { ctx: Ctx }) {
           onCreate={(input) => { void store.createCard({ ...input, exercise: ctx.viewYear }); ui.setAdding(false); }} />
       )}
       {ui.admin && (
-        <AdminPanel config={config} cards={store.cards} {...adminWrites(store, ui)} onClose={() => ui.setAdmin(false)} />
+        <AdminPanel config={config} cards={store.cards} {...adminWrites(store, ui, ctx.bumpCapacity)} onClose={() => ui.setAdmin(false)} />
       )}
       {ui.metrics && (
         <AnalyticsView cards={ctx.cards} events={store.events} config={config} now={ctx.nowMs} year={ctx.viewYear} capacity={ctx.capacity}

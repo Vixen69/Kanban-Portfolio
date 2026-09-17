@@ -146,17 +146,26 @@ function HistRow({ entry }: { entry: HistoryEntry }) {
  * Historique (design v11): collapsible, closed by default — one line per
  * movement or blockage of the card (core/history projection, most recent
  * first; block lines carry the motif, red dot; unblock lines a green dot).
- * Input: the history entries. Output: the div.history list.
- * Failure modes: none.
+ * When a snapshot restore undid events of the card (ADR 042), a first
+ * line says how many — they stay in the log, out of the reading.
+ * Input: the history entries, the count of undone events. Output: the
+ * div.history list. Failure modes: none.
  */
-export function HistoryList({ entries }: { entries: HistoryEntry[] }) {
+export function HistoryList({ entries, undone }: { entries: HistoryEntry[]; undone: number }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="history">
       <SectionToggle label="Historique" what="l’historique" open={open} onToggle={() => setOpen((o) => !o)} />
       {open && (
         <div className="hist-list">
+          {undone > 0 && (
+            <div className="hist">
+              <span className="hist-dot abs" />
+              <span className="hist-move"><b>Instantané restauré</b> — {undone} geste(s) sur cette carte annulé(s), gardé(s) dans le journal</span>
+            </div>
+          )}
           {entries.map((entry, index) => <HistRow key={index} entry={entry} />)}
+
         </div>
       )}
     </div>

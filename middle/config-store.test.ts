@@ -139,3 +139,25 @@ test("the current exercise year lives in exercise.json: served over any config, 
   });
 });
 
+
+test("the override is exposed and restored (ADR 042): put back or removed, each a noted history line, persisted", () => {
+  withDataDir((dir) => {
+    const defaults = testConfig();
+    const store = createConfigStore(dir, defaults);
+    assert.equal(store.getOverride(), null, "the versioned model runs");
+    const applied = modifiedConfig();
+    store.setRuntime(applied, "admin");
+    assert.deepEqual(store.getOverride(), applied);
+    store.restoreOverride(null, "pmo");
+    assert.equal(store.getOverride(), null);
+    assert.deepEqual(store.getRuntime(), defaults);
+    assert.equal(existsSync(join(dir, "config.json")), false, "the override file is gone");
+    store.restoreOverride(applied, "pmo");
+    assert.deepEqual(store.getRuntime(), applied);
+    assert.deepEqual(createConfigStore(dir, defaults).getOverride(), applied, "the restored override survives a restart");
+    const history = readFileSync(join(dir, "config-history.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l) as { actor: string; note?: string; config: unknown });
+    assert.deepEqual(history.map((entry) => [entry.actor, entry.note ?? null, entry.config === null]), [
+      ["admin", null, false], ["pmo", "restauration d’instantané (ADR 042)", true], ["pmo", "restauration d’instantané (ADR 042)", false],
+    ]);
+  });
+});

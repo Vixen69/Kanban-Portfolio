@@ -8,6 +8,7 @@
 import { fsyncSync, writeSync } from "node:fs";
 import type { CardEventInput } from "../../core/events.ts";
 import type { CapacitySnapshot, Card, CardEvent } from "../../core/types.ts";
+import type { BoardSnapshot } from "../../core/snapshot.ts";
 
 const FORMAT = "kanban-board-storage";
 // Version 2 = design-v9 card model (ADR 012). Files written under version 1
@@ -19,6 +20,12 @@ type EventRecord = { kind: "event"; seq: number; event: CardEvent };
 // The capacity snapshot (ADR 024): appended whole at each import; the last
 // record of each exercise year wins (ADR 035).
 export type CapacityRecord = { kind: "capacity"; snapshot: CapacitySnapshot };
+// A board snapshot (ADR 042): appended whole, kept for good.
+export type SnapshotRecord = { kind: "snapshot"; snapshot: BoardSnapshot };
+// The base cards replaced as a whole (a restore, ADR 042): the record
+// after which only these cards exist — the earlier "card" records are
+// superseded, the log records stand.
+export type CardsRecord = { kind: "cards"; cards: Card[] };
 
 /** The in-memory projection of one JSONL file. */
 export interface State {
@@ -27,6 +34,8 @@ export interface State {
   maxSeq: number;
   /** One snapshot per exercise year (snapshot.exerciseYear). */
   capacity: Map<number, CapacitySnapshot>;
+  /** The board snapshots by id (ADR 042). */
+  snapshots: Map<string, BoardSnapshot>;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -122,6 +131,12 @@ function applyRecord(state: State, rec: unknown, lineNo: number): void {
   } else if (rec["kind"] === "capacity") {
     const snapshot = rec["snapshot"] as CapacitySnapshot;
     state.capacity.set(snapshot.exerciseYear, snapshot);
+  } else if (rec["kind"] === "snapshot") {
+    const snapshot = rec["snapshot"] as BoardSnapshot;
+    state.snapshots.set(snapshot.id, snapshot);
+  } else if (rec["kind"] === "cards") {
+    state.cards.clear();
+    for (const card of rec["cards"] as Card[]) state.cards.set(card.id, card);
   } else {
     throw new Error(`Stockage JSONL corrompu : ligne ${lineNo}, type inconnu.`);
   }
@@ -143,7 +158,7 @@ export function loadState(content: string): {
   validBytes: number;
   endsClean: boolean;
 } {
-  const state: State = { cards: new Map(), events: [], maxSeq: 0, capacity: new Map() };
+  const state: State = { cards: new Map(), events: [], maxSeq: 0, capacity: new Map(), snapshots: new Map() };
   const lines = content.split("\n");
   let hasHeader = false;
   let validBytes = 0;

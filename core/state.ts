@@ -6,6 +6,8 @@ import type { Card, CardEvent, CardState, Financials } from "./types.ts";
 
 import type { Subject } from "./ports.ts";
 import { isReorder } from "./events.ts";
+import { eventSequence } from "./event-sequence.ts";
+import { effectiveEvents } from "./restore.ts";
 
 // Validators of the fields an "edited" event may patch (CardPatch, v2).
 // Anything else in the payload is silently ignored — replays must never
@@ -215,16 +217,7 @@ function applyEvent(state: CardState, event: CardEvent): void {
   }
 }
 
-/**
- * Numeric suffix of an event id ("evt-12" -> 12) — the log's sequence
- * number. Lexicographic comparison would order "evt-10" before "evt-9"
- * and break insertion-order replays.
- * Input: the event id. Output: the sequence, 0 when unreadable. Failure: none.
- */
-export function eventSequence(id: string): number {
-  const sequence = Number(id.slice(id.lastIndexOf("-") + 1));
-  return Number.isNaN(sequence) ? 0 : sequence;
-}
+export { eventSequence };
 
 
 // Manual ordering (ADR 019): a "moved" event may carry payload.beforeId —
@@ -253,6 +246,8 @@ function applyReorder(order: string[], event: CardEvent): void {
  * and its later events are ignored, like events for unknown card ids (a
  * sync may reference retired cards). An archived card STAYS in the output
  * with archived=true — the archive view lists it; the board excludes it.
+ * The log is read through the restore filter first (ADR 042): the events
+ * a `restored` event undid are skipped, the restore events themselves too.
  * Failure: none — folding is total.
  */
 export function foldEvents(cards: Card[], events: CardEvent[]): CardState[] {
@@ -266,8 +261,7 @@ export function foldEvents(cards: Card[], events: CardEvent[]): CardState[] {
     });
   }
   const order = cards.map((card) => card.id);
-  const ordered = events
-    .slice()
+  const ordered = effectiveEvents(events)
     .sort((a, b) =>
       a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : eventSequence(a.id) - eventSequence(b.id),
     );

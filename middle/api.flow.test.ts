@@ -9,6 +9,7 @@ import type { BoardStorage } from "../core/ports.ts";
 import type { CardEventInput } from "../core/events.ts";
 import type { Card, CardEvent } from "../core/types.ts";
 import { testCard, testConfig } from "../core/test-helpers.ts";
+import { stubSnapshots } from "./test-helpers.ts";
 import { BadRequest, postEvent } from "./api.ts";
 import { postCard } from "./cards.ts";
 
@@ -49,7 +50,9 @@ function stubStorage(cards: Card[] = [testCard({ id: "S001" })]): BoardStorage {
     async getCapacity() {
       return null;
     },
+    ...stubSnapshots(baseCards, () => seq),
     async close() {},
+
   };
 }
 

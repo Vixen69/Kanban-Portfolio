@@ -637,6 +637,23 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-17 — Instantanés : figer le tableau avant un réimport, le restaurer sans rien effacer (ADR 042)
+
+- **Demande de l'auteur** : « prendre un snapshot parce qu'on sait qu'on
+  va faire des réimports… pouvoir réimporter exactement ces états-là…
+  un garde-fou pour les personnes qui vont le reprendre ».
+- **Fait** : un instantané fige ce que le journal ne porte pas (cartes de
+  base, capacité par exercice, config appliquée, année en cours) avec la
+  position du journal ; gardé pour de bon. Restaurer remet ces faits et
+  **ajoute un évènement `restored`** (tableau entier) : le repli relit le
+  journal depuis la position notée (`core/restore.ts`), les gestes faits
+  entre-temps restent dans le journal, annulés — la fiche le dit dans son
+  Historique. Instantané automatique avant chaque chargement d'import et
+  chaque bascule d'année. Port étendu (`saveSnapshot`, `listSnapshots`,
+  `loadSnapshot`, `restoreCards`, `lastSeq`), table Postgres `snapshots`,
+  routes `/api/snapshots`, ⚙ › onglet « Instantanés » avec confirmation
+  explicite. 572 tests, 0 échec.
+
 ### 2026-09-17 — Filtre « Ressources embarquées » : les projets qui prennent des jours à A&D ou INFRA (ADR 041)
 
 - **Demande de l'auteur** : « un filtre dans les filtres pour les projets

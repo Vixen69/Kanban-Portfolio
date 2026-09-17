@@ -18,6 +18,12 @@ import type { AuditResult, EnrichedCard, InputFile, LoadPlan } from "../adapters
 import { BadRequest } from "./errors.ts";
 import { exerciseOrCurrent } from "./validation.ts";
 
+/** What a load lets the caller do around its write. */
+export interface LoadHooks {
+  /** Runs once the load is accepted (audit read, conflicts decided), right before anything is written — the automatic snapshot (ADR 042). */
+  beforeWrite?: () => Promise<void>;
+}
+
 const MAX_FILES = 12;
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
 const MAX_NAME = 200;
@@ -168,6 +174,7 @@ function loadFigures(plan: LoadPlan, audit: AuditResult): ImportLoadResult["load
 export async function loadImport(
   storage: BoardStorage, config: BoardConfig, files: InputFile[], now: Date,
   year: number = config.exercise.year, decisions: ReadonlyMap<string, DomainDecision> = new Map(),
+  hooks: LoadHooks = {},
 ): Promise<ImportLoadResult> {
   if (year < config.exercise.year) throw new BadRequest(`Exercice ${year} clos : chargement refusé.`);
   const audit = runImportAudit(files, config, now, year);
@@ -177,6 +184,7 @@ export async function loadImport(
   if (plan.domainUndecided > 0) {
     throw new BadRequest(`Chargement refusé : ${plan.domainUndecided} conflit(s) de domaine sans décision (garder ou remplacer).`);
   }
+  if (hooks.beforeWrite !== undefined) await hooks.beforeWrite();
   await storage.importCards(plan.cards, plan.events);
   if (audit.capacity !== null) await storage.importCapacity(withLegacyIds(audit.capacity.snapshot, plan.aliases));
   console.log(

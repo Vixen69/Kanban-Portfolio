@@ -16,8 +16,9 @@ import type { BoardStorage } from "../../core/ports.ts";
 import { filterEvents } from "../../core/event-filter.ts";
 import type { CardEventInput } from "../../core/events.ts";
 import type { CapacitySnapshot, Card, CardEvent } from "../../core/types.ts";
+import { summarizeSnapshot, type BoardSnapshot } from "../../core/snapshot.ts";
 import { appendLines, buildCard, buildEvent, headerLine, loadState } from "./jsonl-format.ts";
-import type { CapacityRecord, State } from "./jsonl-format.ts";
+import type { CapacityRecord, CardsRecord, SnapshotRecord, State } from "./jsonl-format.ts";
 
 function doImport(fd: number, state: State, cards: Card[], events: CardEventInput[]): void {
   const built = cards.map(buildCard);
@@ -65,6 +66,26 @@ function doImportCapacity(fd: number, state: State, snapshot: CapacitySnapshot):
   state.capacity.set(stored.exerciseYear, stored);
 }
 
+// A board snapshot (ADR 042): one record, kept for good.
+function doSaveSnapshot(fd: number, state: State, snapshot: BoardSnapshot): void {
+  if (state.snapshots.has(snapshot.id)) {
+    throw new Error(`Stockage JSONL : un instantané « ${snapshot.id} » existe déjà.`);
+  }
+  const line = JSON.stringify({ kind: "snapshot", snapshot });
+  appendLines(fd, [line]);
+  const stored = (JSON.parse(line) as SnapshotRecord).snapshot;
+  state.snapshots.set(stored.id, stored);
+}
+
+// The base cards replaced as a whole (a restore, ADR 042): one record that
+// supersedes every earlier card record — the file stays append-only.
+function doRestoreCards(fd: number, state: State, cards: Card[]): void {
+  const line = JSON.stringify({ kind: "cards", cards });
+  appendLines(fd, [line]);
+  state.cards.clear();
+  for (const card of (JSON.parse(line) as CardsRecord).cards) state.cards.set(card.id, card);
+}
+
 function doAppend(fd: number, state: State, input: CardEventInput): CardEvent {
   const seq = state.maxSeq + 1;
   const { line, event } = buildEvent(seq, input);
@@ -93,6 +114,45 @@ function readers(state: State, assertOpen: () => void): Pick<BoardStorage, "list
   };
 }
 
+// The snapshot reads (ADR 042): summaries newest first, one whole snapshot
+// as a copy, the log's position.
+function snapshotReaders(state: State, assertOpen: () => void): Pick<BoardStorage, "listSnapshots" | "loadSnapshot" | "lastSeq"> {
+  return {
+    async listSnapshots() {
+      assertOpen();
+      return [...state.snapshots.values()].map(summarizeSnapshot).sort((a, b) => (a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0));
+    },
+    async loadSnapshot(id) {
+      assertOpen();
+      const snapshot = state.snapshots.get(id);
+      return snapshot === undefined ? null : structuredClone(snapshot);
+    },
+    async lastSeq() {
+      assertOpen();
+      return state.maxSeq;
+    },
+  };
+}
+
+// The fact-table writes: the capacity of one year, a snapshot, the base
+// cards replaced (ADR 024/042).
+function writers(fd: number, state: State, assertOpen: () => void): Pick<BoardStorage, "importCapacity" | "saveSnapshot" | "restoreCards"> {
+  return {
+    async importCapacity(snapshot) {
+      assertOpen();
+      doImportCapacity(fd, state, snapshot);
+    },
+    async saveSnapshot(snapshot) {
+      assertOpen();
+      doSaveSnapshot(fd, state, snapshot);
+    },
+    async restoreCards(cards) {
+      assertOpen();
+      doRestoreCards(fd, state, cards);
+    },
+  };
+}
+
 function buildStorage(fd: number, state: State): BoardStorage {
   let open = true;
   const assertOpen = (): void => {
@@ -114,10 +174,8 @@ function buildStorage(fd: number, state: State): BoardStorage {
       return doAppend(fd, state, input);
     },
     ...readers(state, assertOpen),
-    async importCapacity(snapshot) {
-      assertOpen();
-      doImportCapacity(fd, state, snapshot);
-    },
+    ...snapshotReaders(state, assertOpen),
+    ...writers(fd, state, assertOpen),
     async close() {
       if (!open) return;
       open = false;

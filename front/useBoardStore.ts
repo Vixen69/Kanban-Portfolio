@@ -6,17 +6,18 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { BoardConfig, CardEvent, CardPatch, CardState } from "../core/types.ts";
 import { eventSequence, foldEvents } from "../core/state.ts";
+import { effectiveEvents, undoneEvents } from "../core/restore.ts";
+import { useExerciseSwitch, useSnapshotWrites } from "./useAdminWrites.ts";
 
 import {
-  ApiError,
   fetchBoard,
   fetchConfig,
   fetchDefaultConfig,
   postArchive,
   postBlock,
   fetchEventsAfter,
+  messageOf,
   postCard,
-  postExerciseSwitch,
   postComment,
   postDecision,
   postDelete,
@@ -51,7 +52,10 @@ export interface BoardStore {
   /** The default model (« Réinitialiser »), null when its fetch failed. */
   defaults: BoardConfig | null;
   cards: CardState[];
+  /** The events the board is read from: the log minus what a restore undid (ADR 042). */
   events: CardEvent[];
+  /** The events a snapshot restore undid: in the log, no longer read (ADR 042). */
+  undone: CardEvent[];
   reload(): Promise<void>;
   /** Card actions resolve true when persisted, false when refused. */
   createCard(input: NewCardInput): Promise<boolean>;
@@ -70,15 +74,12 @@ export interface BoardStore {
   resetConfig(): Promise<string | null>;
   /** The year switch (ADR 035/038): resolves null on success, the French message on failure. */
   switchExercise(year: number): Promise<string | null>;
+  /** Snapshot writes (ADR 042): resolve null on success, the French message on failure. */
+  takeSnapshot(label: string): Promise<string | null>;
+  restoreSnapshot(id: string): Promise<string | null>;
 }
 
 const NO_EVENTS: CardEvent[] = [];
-
-function messageOf(cause: unknown): string {
-  if (cause instanceof ApiError) return cause.message;
-  if (cause instanceof Error && cause.message) return cause.message;
-  return "Erreur inconnue.";
-}
 
 interface InitialLoad {
   status: BoardStatus;
@@ -142,7 +143,8 @@ function useReload(
 // The refetch after the front's OWN writes (ADR 040): only the events
 // appended since the last one held — the log only grows, and the card
 // snapshots change at import alone, which reloads in full. A failed fetch
-// or an empty store falls back to the full reload.
+// or an empty store falls back to the full reload; so does a `restored`
+// event among the new ones (ADR 042: the base cards changed with it).
 function useRefresh(
   board: BoardData | null,
   setBoard: (board: BoardData) => void,
@@ -153,6 +155,7 @@ function useRefresh(
     const last = board.events[board.events.length - 1];
     try {
       const more = await fetchEventsAfter(last === undefined ? 0 : eventSequence(last.id));
+      if (more.some((event) => event.type === "restored")) return reload();
       if (more.length > 0) setBoard({ cards: board.cards, events: [...board.events, ...more] });
     } catch {
       await reload();
@@ -241,22 +244,6 @@ function useConfigWrites(
   return { saveConfig, resetConfig };
 }
 
-// The year switch: POST it, refetch the runtime config (its exercise year
-// changed) then the board (its events changed) — same rule as config writes.
-function useExerciseSwitch(setConfig: (config: BoardConfig) => void, reload: () => Promise<void>) {
-  return useCallback(async (year: number): Promise<string | null> => {
-    try {
-      await postExerciseSwitch(year);
-      setConfig(await fetchConfig());
-      await reload();
-      return null;
-    } catch (cause) {
-      const message = messageOf(cause);
-      console.error("bascule refusée :", message);
-      return message;
-    }
-  }, [setConfig, reload]);
-}
 
 /**
  * Loads the runtime config and the board from the API, folds the event log
@@ -275,11 +262,17 @@ export function useBoardStore(): BoardStore {
   const cardActions = useCardActions(refresh, setLastError);
   const configWrites = useConfigWrites(load.setConfig, load.defaults, reload);
   const switchExercise = useExerciseSwitch(load.setConfig, reload);
+  const snapshots = useSnapshotWrites(load.setConfig, reload);
   const dismissError = useCallback(() => setLastError(null), []);
   const cards = useMemo(
     () => (load.board ? foldEvents(load.board.cards, load.board.events) : []),
     [load.board],
   );
+  // The log as read (ADR 042): restores applied once here for every reader.
+  const log = useMemo(() => {
+    const raw = load.board?.events ?? NO_EVENTS;
+    return { events: effectiveEvents(raw), undone: undoneEvents(raw) };
+  }, [load.board]);
   return {
     status: load.status,
     error: load.error,
@@ -288,10 +281,12 @@ export function useBoardStore(): BoardStore {
     config: load.config,
     defaults: load.defaults,
     cards,
-    events: load.board?.events ?? NO_EVENTS,
+    events: log.events,
+    undone: log.undone,
     reload,
     ...cardActions,
     ...configWrites,
     switchExercise,
+    ...snapshots,
   };
 }

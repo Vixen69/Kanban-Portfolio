@@ -143,7 +143,9 @@ export type CardEventType =
   | "unlisted"
   | "relisted"
   /** The card's exercise became the current one (ADR 035): its aging clock starts now. */
-  | "activated";
+  | "activated"
+  /** Board-wide (cardId "*", ADR 042): the log is read again from payload.toSeq — a snapshot was restored. */
+  | "restored";
 
 /**
  * One row of the append-only `card_events` log: audit trail AND the single

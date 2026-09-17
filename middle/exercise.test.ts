@@ -35,6 +35,8 @@ test("postExerciseSwitch: next year only; pins, archives, activates; the new yea
     const types = (await storage.listEvents()).filter((e) => e.type !== "imported").map((e) => [e.type, e.cardId]);
     assert.deepEqual(types, [["edited", "legacy"], ["archived", "legacy"], ["archived", "old"], ["activated", "next"]]);
     assert.equal(createConfigStore(dir, config).getExerciseYear(), current + 1, "exercise.json survives a restart");
+    const snapshots = await storage.listSnapshots();
+    assert.deepEqual(snapshots.map((s) => [s.label, s.cardCount, s.exerciseYear]), [[`avant bascule vers ${current + 1}`, 3, current]], "the automatic snapshot (ADR 042), taken before the switch wrote");
   } finally {
     await storage.close();
     rmSync(dir, { recursive: true, force: true, maxRetries: 5 });

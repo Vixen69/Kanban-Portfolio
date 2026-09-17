@@ -7,6 +7,7 @@
 
 import type { CapacitySnapshot, Card, CardEvent, Financials } from "./types.ts";
 import type { CardEventInput } from "./events.ts";
+import type { BoardSnapshot, SnapshotSummary } from "./snapshot.ts";
 
 /**
  * A subject as delivered by a portfolio data source, before the event log
@@ -95,6 +96,24 @@ export interface BoardStorage {
    * import carried one for that year. Failure: rejects on storage errors.
    */
   getCapacity(year: number): Promise<CapacitySnapshot | null>;
+  /**
+   * Stores one board snapshot (ADR 042) — kept for good, never replaced.
+   * Failure: rejects on storage errors or a duplicate id.
+   */
+  saveSnapshot(snapshot: BoardSnapshot): Promise<void>;
+  /** The stored snapshots' summaries, newest first. Failure: rejects on storage errors. */
+  listSnapshots(): Promise<SnapshotSummary[]>;
+  /** One whole snapshot by id, or null when unknown. Failure: rejects on storage errors. */
+  loadSnapshot(id: string): Promise<BoardSnapshot | null>;
+  /**
+   * Replaces the base cards as a whole, atomically — the restore of a
+   * snapshot (ADR 042): the cards absent from the list are gone, the
+   * others take the given values. The log is untouched.
+   * Failure: rejects on storage errors; nothing partial.
+   */
+  restoreCards(cards: Card[]): Promise<void>;
+  /** The sequence number of the last event, 0 when the log is empty. Failure: rejects on storage errors. */
+  lastSeq(): Promise<number>;
   /** Releases the underlying resources. Idempotent. Failure: none. */
   close(): Promise<void>;
 }

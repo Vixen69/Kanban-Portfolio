@@ -108,6 +108,19 @@ un évènement réversible depuis la fiche, mais la sauvegarde datée est le
 filet : elle se restaure avec `psql -U kanban kanban < sauvegarde-….sql`
 dans le conteneur `db`.
 
+> **Instantanés** (ADR 042) : le filet DANS l'outil. ⚙ › onglet
+> **Instantanés** › un libellé (le pourquoi) › « Prendre un instantané ».
+> Un instantané est pris tout seul avant chaque chargement d'import et
+> avant chaque bascule d'année (« avant chargement 2026 », « avant bascule
+> vers 2027 »). Pour revenir en arrière : « Restaurer… » › « Confirmer :
+> revenir à cet état ». Rien n'est effacé : les cartes, la capacité, la
+> configuration appliquée et l'année en cours sont remises telles qu'elles
+> étaient, et le journal reçoit un évènement de restauration — les gestes
+> faits entre-temps y restent, annulés (la fiche le dit dans son
+> Historique). Le `pg_dump` garde sa place : c'est la sauvegarde hors de
+> l'outil, pour une VM perdue ou une base corrompue.
+
+
 **4. Charger dans le tableau**
 
 ```bash

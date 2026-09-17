@@ -34,6 +34,15 @@ export interface ConfigStore {
    * change on failure.
    */
   setRuntime(config: BoardConfig, actor: string): BoardConfig;
+  /** The applied override as adopted, null when the versioned model runs. */
+  getOverride(): BoardConfig | null;
+  /**
+   * Puts an override back — or removes it (null) — the restore of a
+   * snapshot (ADR 042): one history line either way, noted as a restore.
+   * Inputs: the override to run with (already validated when applied), the
+   * acting user. Output: the runtime config. Failure: throws on I/O errors.
+   */
+  restoreOverride(config: BoardConfig | null, actor: string): BoardConfig;
   /** The current exercise year: exercise.json when present, else the defaults'. */
   getExerciseYear(): number;
   /**
@@ -114,34 +123,71 @@ function adopt(found: OverrideFile | null, defaults: BoardConfig, defaultsHash: 
  * file is unreadable or invalid — fix or delete the file, then restart.
  */
 export function createConfigStore(dataDir: string, defaults: BoardConfig): ConfigStore {
-  const paths = {
+  const paths: Paths = {
     override: join(dataDir, "config.json"), history: join(dataDir, "config-history.jsonl"),
     exercise: join(dataDir, "exercise.json"), exerciseHistory: join(dataDir, "exercise-history.jsonl"),
   };
   const defaultsHash = hashOf(defaults);
-  let base = adopt(loadOverride(paths.override), defaults, defaultsHash, paths);
+  const adopted = adopt(loadOverride(paths.override), defaults, defaultsHash, paths);
+  let override: BoardConfig | null = adopted === defaults ? null : adopted;
   let year = loadExerciseYear(paths.exercise) ?? defaults.exercise.year;
-  const runtime = (): BoardConfig => (base.exercise.year === year ? base : { ...base, exercise: { ...base.exercise, year } });
+  const runtime = (): BoardConfig => {
+    const base = override ?? defaults;
+    return base.exercise.year === year ? base : { ...base, exercise: { ...base.exercise, year } };
+  };
   return {
     getRuntime: runtime,
     getDefaults: () => defaults,
     setRuntime: (config, actor) => {
-      mkdirSync(dataDir, { recursive: true });
-      // History first: a failure between the two writes leaves an extra
-      // audit line, never an unaudited override that a restart would adopt.
-      appendFileSync(paths.history, `${JSON.stringify({ ts: new Date().toISOString(), actor, config })}\n`, "utf8");
-      writeFileSync(paths.override, `${JSON.stringify({ defaultsHash, config }, null, 2)}\n`, "utf8");
-      base = config;
+      persistOverride(dataDir, paths, defaultsHash, config, actor);
+      override = config;
+      return runtime();
+    },
+    getOverride: () => override,
+    restoreOverride: (config, actor) => {
+      persistOverride(dataDir, paths, defaultsHash, config, actor, RESTORE_NOTE);
+      override = config;
       return runtime();
     },
     getExerciseYear: () => year,
     setExerciseYear: (next, actor) => {
-      mkdirSync(dataDir, { recursive: true });
-      const ts = new Date().toISOString();
-      appendFileSync(paths.exerciseHistory, `${JSON.stringify({ ts, actor, from: year, year: next })}\n`, "utf8");
-      writeFileSync(paths.exercise, `${JSON.stringify({ year: next, actor, ts }, null, 2)}\n`, "utf8");
+      persistExerciseYear(dataDir, paths, year, next, actor);
       year = next;
       return runtime();
     },
   };
+}
+
+interface Paths {
+  override: string;
+  history: string;
+  exercise: string;
+  exerciseHistory: string;
+}
+
+const RESTORE_NOTE = "restauration d’instantané (ADR 042)";
+
+// Persists an override — or its removal (config null). The history line
+// comes FIRST: a failure between the two writes leaves an extra audit
+// line, never an unaudited override that a restart would adopt.
+function persistOverride(
+  dataDir: string, paths: Paths, defaultsHash: string, config: BoardConfig | null, actor: string, note?: string,
+): void {
+  mkdirSync(dataDir, { recursive: true });
+  const ts = new Date().toISOString();
+  const entry = note === undefined ? { ts, actor, config } : { ts, actor, note, config };
+  appendFileSync(paths.history, `${JSON.stringify(entry)}\n`, "utf8");
+  if (config === null) {
+    if (existsSync(paths.override)) rmSync(paths.override);
+  } else {
+    writeFileSync(paths.override, `${JSON.stringify({ defaultsHash, config }, null, 2)}\n`, "utf8");
+  }
+}
+
+// Records the switch: one history line, then exercise.json.
+function persistExerciseYear(dataDir: string, paths: Paths, from: number, next: number, actor: string): void {
+  mkdirSync(dataDir, { recursive: true });
+  const ts = new Date().toISOString();
+  appendFileSync(paths.exerciseHistory, `${JSON.stringify({ ts, actor, from, year: next })}\n`, "utf8");
+  writeFileSync(paths.exercise, `${JSON.stringify({ year: next, actor, ts }, null, 2)}\n`, "utf8");
 }

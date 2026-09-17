@@ -72,7 +72,24 @@ async function failureMessage(res: Response, path: string): Promise<string> {
 
 // One place doing fetch: same-origin path in, parsed JSON out, ApiError on
 // network failure (status 0) or any non-2xx response.
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+/**
+ * The French message of a failed call: the ApiError's, else the Error's,
+ * else « Erreur inconnue. ».
+ * Input: whatever was thrown. Output: the message. Failure: none.
+ */
+export function messageOf(cause: unknown): string {
+  if (cause instanceof ApiError) return cause.message;
+  if (cause instanceof Error && cause.message) return cause.message;
+  return "Erreur inconnue.";
+}
+
+/**
+ * One JSON call: a network failure becomes ApiError 0 « Serveur
+ * injoignable. », a non-2xx status an ApiError with the server's message.
+ * Inputs: the path, the fetch init (GET with accept: json by default).
+ * Output: the parsed body. Failure: rejects with ApiError.
+ */
+export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
   try {
     res = await fetch(path, init ?? { headers: { accept: "application/json" } });
@@ -83,7 +100,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
-function jsonInit(method: "POST" | "PUT", body: unknown): RequestInit {
+/** The fetch init of a JSON write. Inputs: the method, the body. Output: the RequestInit. Failure: none. */
+export function jsonInit(method: "POST" | "PUT", body: unknown): RequestInit {
   return {
     method,
     headers: { "content-type": "application/json" },

@@ -149,6 +149,9 @@ BoardStorage                  (persistence — Postgres adapter behind it)
   importCards / insertCard / appendEvent / listEvents(filter?) / listBaseCards / close
   (filter = afterSeq | cardIds, ADR 040: the incremental refresh and the
    per-action validation fold never read the whole log)
+  importCapacity / getCapacity(year)                      (ADR 024/035)
+  saveSnapshot / listSnapshots / loadSnapshot / restoreCards / lastSeq
+  (ADR 042: the snapshots and the restore of the base cards)
 ```
 
 `PortfolioDataSource` adapters, in order: `fixtures` (synthetic, 150
@@ -204,7 +207,7 @@ fields, append-only enforced by table grants/triggers):
 - `card_events` : append-only. seq (bigint sequence, ordering), id
   (evt-<seq>), ts, actor, card_id, type (created/moved/blocked/unblocked/
   edited/commented/archived/unarchived/deleted/imported/decided/unlisted/
-  relisted/activated), from_column,
+  relisted/activated/restored), from_column,
   to_column, payload (jsonb). Never updated, never deleted. Comments are a
   projection of `commented` events; deletion is a `deleted` event (the fold
   excludes the card, the log keeps everything — ADR 012); archiving is a
@@ -228,6 +231,18 @@ writes, fetches only the events appended since (`GET /api/events?after=N`,
 ADR 040) — import, config, the year switch and a page load reload in full;
 the server stays the truth, nothing is appended locally before it was
 read from the log.
+- `snapshots` (ADR 042): one row per instantané — the facts the log does
+  not carry (base cards, the capacity of each exercise, the applied
+  config override or null, the current exercise year) plus `logSeq`, the
+  last event's sequence at the take; a label (why) and the actor; kept
+  for good. A restore puts the facts back (`restoreCards` replaces the
+  base cards whole, capacity re-imported, override restored or removed,
+  year set) and appends ONE `restored` event (card_id `*`, payload
+  `toSeq`): the fold reads the log through `core/restore.ts` — the
+  events between `toSeq` and the restore are UNDONE (kept, no longer
+  read), the later ones apply; restores nest. Nothing is ever deleted.
+  One snapshot is taken automatically before each import load and each
+  year switch.
  The event-sourced model (append-only log + fold-on-read) is retained —
 it is the product's core (§1) and maps to a plain Postgres append-only table;
 to the platform the middle is a standard Express+Postgres service doing
@@ -353,7 +368,12 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
   natureKey, plus the **Exercice** tab (ADR 038): the year switch — pins
   the unstamped cards on the closing year, archives its active cards,
   activates the next year's (clock starts), then records the new current
-  exercise; next year only, explicit confirmation. **Analytics** (ADR 037): one view, a tab bar « Capacité »
+  exercise; next year only, explicit confirmation. The **Instantanés**
+  tab (ADR 042): « Prendre un instantané » with a mandatory label, the
+  list (date, label, cards, exercise, log position, applied config or
+  versioned model), « Restaurer… » then an explicit confirmation — the
+  panel closes, config, board and capacity reload; the fiche's Historique
+  says how many of the card's events a restore undid. **Analytics** (ADR 037): one view, a tab bar « Capacité »
   · « Flux »; every panel folds (closed by default, hint readable folded).
   The Flux tab (ADR 037) brings the flow diagnostics back: six KPIs
   (en cours, bloqués, livrés 30 j / 90 j, lead and cycle time), the

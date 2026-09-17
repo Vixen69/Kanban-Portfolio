@@ -21,6 +21,8 @@ import type { ConfigStore } from "./config-store.ts";
 import { logError, logRequest } from "./log.ts";
 import { auditImport, loadImport, parseDecisions, parseExercise, parseFiles } from "./import.ts";
 import { postExerciseSwitch } from "./exercise.ts";
+import { getSnapshots, postRestore, postSnapshot, takeSnapshot } from "./snapshots.ts";
+import { IMPORT_ACTOR } from "../adapters/csv-import/index.ts";
 import { exerciseOrCurrent } from "./validation.ts";
 
 const SECURITY_HEADERS: Record<string, string> = {
@@ -93,10 +95,28 @@ function mountImportRoutes(app: Express, deps: MiddleDeps): void {
   });
   app.post("/api/import/load", body, async (req: Request, res: Response) => {
     const config = deps.configStore.getRuntime();
-    const result = await loadImport(
-      deps.storage, config, parseFiles(req.body), new Date(), parseExercise(req.body, config), parseDecisions(req.body),
-    );
+    const year = parseExercise(req.body, config);
+    const now = new Date();
+    // The automatic snapshot (ADR 042): once the load is accepted, before it writes.
+    const beforeWrite = async (): Promise<void> => { await takeSnapshot(deps, `avant chargement ${year}`, IMPORT_ACTOR, now); };
+    const result = await loadImport(deps.storage, config, parseFiles(req.body), now, year, parseDecisions(req.body), { beforeWrite });
     res.status(200).json(result);
+  });
+}
+
+// The snapshot routes (ADR 042): take, list, restore.
+function mountSnapshotRoutes(app: Express, deps: MiddleDeps): void {
+  app.get("/api/snapshots", async (_req: Request, res: Response) => {
+    const result = await getSnapshots(deps);
+    res.status(result.status).json(result.body);
+  });
+  app.post("/api/snapshots", async (req: Request, res: Response) => {
+    const result = await postSnapshot(deps, req.body);
+    res.status(result.status).json(result.body);
+  });
+  app.post("/api/snapshots/:id/restore", async (req: Request, res: Response) => {
+    const result = await postRestore(deps, req.params["id"]);
+    res.status(result.status).json(result.body);
   });
 }
 
@@ -169,6 +189,8 @@ export function createApp(deps: MiddleDeps): Express {
   });
   mountRoutes(app, deps);
   mountImportRoutes(app, deps);
+  mountSnapshotRoutes(app, deps);
+
   app.use((_req: Request, res: Response) => {
     res.status(404).json({ error: "Ressource introuvable." });
   });

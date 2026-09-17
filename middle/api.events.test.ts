@@ -25,7 +25,7 @@ test("getEvents: every event after the sequence; absent = all; a bad value is re
   for (const bad of ["x", "-1", "1.5", ["1"]]) await assert.rejects(() => getEvents(storage, bad), BadRequest);
 });
 
-test("postEvent folds the involved cards only: the storage receives their ids, not a full-log request", async () => {
+test("postEvent folds the involved cards only (plus the board-wide restore events, ADR 042): the storage receives their ids, not a full-log request", async () => {
   const storage = stubStorage([testCard({ id: "S001" }), testCard({ id: "S002" })]);
   const asked: EventFilter[] = [];
   const spied = {
@@ -34,7 +34,7 @@ test("postEvent folds the involved cards only: the storage receives their ids, n
   };
   const result = await postEvent(spied, config, { type: "commented", cardId: "S001", text: "bonjour" });
   assert.equal(result.status, 201);
-  assert.deepEqual(asked, [{ cardIds: ["S001"] }]);
+  assert.deepEqual(asked, [{ cardIds: ["S001", "*"] }]);
   await assert.rejects(() => postEvent(spied, config, { type: "commented", cardId: "ghost", text: "x" }), /Carte inconnue/);
-  assert.deepEqual(asked[1], { cardIds: ["ghost"] });
+  assert.deepEqual(asked[1], { cardIds: ["ghost", "*"] });
 });

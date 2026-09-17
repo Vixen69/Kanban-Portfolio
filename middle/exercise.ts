@@ -12,6 +12,7 @@ import type { ConfigStore } from "./config-store.ts";
 import { BadRequest } from "./errors.ts";
 import { SERVER_ACTOR } from "./api.ts";
 import type { ApiResult } from "./api.ts";
+import { takeSnapshot } from "./snapshots.ts";
 
 /**
  * POST /api/exercise/switch — makes the next year the current exercise.
@@ -19,7 +20,8 @@ import type { ApiResult } from "./api.ts";
  * Output: 200 with { year, pinned, archived, activated, config }.
  * Failure: BadRequest (→ 400) when `year` is not the year after the current
  * exercise; storage errors propagate (→ 500) — nothing partially written
- * for the events, and the year is not changed then.
+ * for the events, and the year is not changed then. A snapshot is taken
+ * first (ADR 042): « avant bascule vers N+1 ».
  */
 export async function postExerciseSwitch(storage: BoardStorage, store: ConfigStore, raw: unknown): Promise<ApiResult> {
   const current = store.getExerciseYear();
@@ -30,6 +32,7 @@ export async function postExerciseSwitch(storage: BoardStorage, store: ConfigSto
   const [events, baseCards] = await Promise.all([storage.listEvents(), storage.listBaseCards()]);
   const ts = new Date().toISOString();
   const plan = switchPlan(foldEvents(baseCards, events), current, year, SERVER_ACTOR, ts);
+  await takeSnapshot({ storage, configStore: store }, `avant bascule vers ${year}`, SERVER_ACTOR, new Date(ts));
   await storage.importCards([], plan.events);
   const config = store.setExerciseYear(year, SERVER_ACTOR);
   console.log(

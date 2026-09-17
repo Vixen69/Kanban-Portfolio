@@ -15,6 +15,7 @@ import type { BoardStorage } from "../core/ports.ts";
 import type { CardEventInput } from "../core/events.ts";
 import type { BoardConfig, CapacitySnapshot, Card, CardEvent } from "../core/types.ts";
 import { testCard, testConfig } from "../core/test-helpers.ts";
+import { stubSnapshots } from "./test-helpers.ts";
 import { createConfigStore } from "./config-store.ts";
 import { createApp } from "./app.ts";
 
@@ -50,6 +51,7 @@ function stubStorage(cards: Card[] = [testCard({ id: "S001" })]): BoardStorage {
     },
     async importCapacity(snapshot: CapacitySnapshot) { capacity = structuredClone(snapshot); },
     async getCapacity(year: number) { return capacity === null || capacity.exerciseYear !== year ? null : structuredClone(capacity); },
+    ...stubSnapshots(baseCards, () => seq),
     async close() {},
   };
 }
