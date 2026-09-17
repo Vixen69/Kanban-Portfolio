@@ -8,6 +8,7 @@ import { useState } from "react";
 import type { BoardConfig, CardEvent, CardState } from "../../core/types.ts";
 import { CapacityTab } from "./CapacityView.tsx";
 import { FlowTab } from "./FlowView.tsx";
+import type { CapacityFetch } from "../useCapacity.ts";
 
 type Tab = "capacite" | "flux";
 
@@ -22,6 +23,8 @@ export interface AnalyticsViewProps {
   now: number;
   /** The exercise shown. */
   year: number;
+  /** The capacity snapshot of that exercise, fetched by the app (ADR 041). */
+  capacity: CapacityFetch;
   onClose: () => void;
 }
 
@@ -56,7 +59,7 @@ export function AnalyticsView(props: AnalyticsViewProps) {
         <button className="btn ghost" onClick={props.onClose}>Fermer ✕</button>
       </div>
       {tab === "capacite"
-        ? <CapacityTab cards={props.cards} config={props.config} now={props.now} year={props.year} />
+        ? <CapacityTab cards={props.cards} config={props.config} now={props.now} fetch={props.capacity} />
         : <FlowTab cards={props.cards} events={props.events} config={props.config} now={props.now} />}
     </div>
   );

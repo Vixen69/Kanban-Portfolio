@@ -319,7 +319,11 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
   ADR 038).
 - Sidebar: search (title + codename), codes-projet and types toggles, « Contrainte »
   pills (config-driven + a synthetic « Aucune »; OR-shaped — a card stays
-  lit while ANY of its constraints is on), « Bloqués uniquement » toggle,
+  lit while ANY of its constraints is on), « Ressources embarquées » pills
+  (ADR 041: one per transverse domain, OPT-IN — off by default, lit = only
+  the cards drawing days from that domain's people through the capacity
+  snapshot, OR across lit pills, count shown), « Bloqués uniquement » toggle,
+
   filters by type / criticality / domain with tout·rien (a sub-domain pill
   clicked while its domain is off turns the domain on with that sub-domain
   alone — author's call 2026-09-16); live shown/total

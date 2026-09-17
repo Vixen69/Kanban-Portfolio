@@ -4,7 +4,8 @@
 // section that binds them to one FilterState group.
 
 import type { ReactNode } from "react";
-import type { FilterGroup, FilterState } from "../../core/filters.ts";
+import type { BoardConfig } from "../../core/types.ts";
+import type { FilterGroup, FilterState, ResourceDraw } from "../../core/filters.ts";
 
 /**
  * One filter pill: optional colored dot + label, lit when active. `partial`
@@ -74,5 +75,34 @@ export function GroupSection(props: {
       />
       <div className={"pill-row" + (props.wrap ? " wrap" : "")}>{props.children}</div>
     </div>
+  );
+}
+
+/**
+ * « Ressources embarquées » (ADR 041): one opt-in pill per transverse
+ * domain — lit, it keeps only the cards drawing days from that domain's
+ * people (OR across lit pills); the count is the cards of the exercise
+ * drawing on it. Nothing when the config declares no transverse domain.
+ * Inputs: the config, the filters, the resource draw, the toggle and
+ * setGroup callbacks. Output: the section, or null. Failure modes: none.
+ */
+export function ResourceSection(props: {
+  config: BoardConfig;
+  filters: FilterState;
+  draw: ResourceDraw;
+  onToggle: (group: FilterGroup, key: string) => void;
+  onSetGroup: (group: FilterGroup, value: boolean) => void;
+}) {
+  const domains = props.config.domains.filter((domain) => domain.transverse === true);
+  if (domains.length === 0) return null;
+  return (
+    <GroupSection label="Ressources embarquées" group="resource" wrap filters={props.filters} onSetGroup={props.onSetGroup}>
+      {domains.map((domain) => (
+        <Pill key={domain.id} active={props.filters.resource[domain.id] === true}
+          onClick={() => props.onToggle("resource", domain.id)} color={domain.color}>
+          {domain.short}<small>{props.draw.get(domain.id)?.size ?? 0}</small>
+        </Pill>
+      ))}
+    </GroupSection>
   );
 }

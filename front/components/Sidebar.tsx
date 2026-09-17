@@ -8,8 +8,9 @@
 
 import type { Ref } from "react";
 import type { BoardConfig } from "../../core/types.ts";
-import type { FilterGroup, FilterState, ViewCounts } from "../../core/filters.ts";
-import { GroupSection, Pill } from "./sidebarParts.tsx";
+import type { FilterGroup, FilterState, ResourceDraw, ViewCounts } from "../../core/filters.ts";
+import { GroupSection, Pill, ResourceSection } from "./sidebarParts.tsx";
+
 import { DomainSection } from "./SidebarDomains.tsx";
 
 /** Props of the sidebar. All state and callbacks are owned by App. */
@@ -36,6 +37,8 @@ export interface SidebarProps {
   setShowCodes: (value: boolean) => void;
   showTypes: boolean;
   setShowTypes: (value: boolean) => void;
+  /** The cards drawing on each transverse domain (ADR 041), for the « Ressources embarquées » pills. */
+  draw: ResourceDraw;
 }
 
 // One stat row. When filtering, the visible count leads; total trails muted.
@@ -231,6 +234,7 @@ export function Sidebar(props: SidebarProps) {
       <ResultRow {...props} />
       <CodesSection {...props} />
       <ConstraintSection {...props} />
+      <ResourceSection config={props.config} filters={props.filters} draw={props.draw} onToggle={props.onToggle} onSetGroup={props.onSetGroup} />
       <BlocageSection {...props} />
       <TypeSection {...props} />
       <CritSection {...props} />

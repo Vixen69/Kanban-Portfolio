@@ -58,3 +58,6 @@ kbd { font-family: inherit; font-size: 8px; font-weight: 700; color: var(--tx-2)
 .switch.on .knob { left: 16px; }
 .code-hint { font-size: 9px; color: var(--tx-4); margin-top: 7px; line-height: 1.4; }
 .code-hint + .code-toggle { margin-top: 9px; }
+
+/* Pilule avec compte (Ressources embarquées, ADR 041). */
+.pill small { margin-left: 4px; font-size: 9px; opacity: .75; }

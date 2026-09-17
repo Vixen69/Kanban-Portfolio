@@ -220,3 +220,21 @@ test("a sub-domain click on an off domain turns the domain on with that sub-doma
   assert.equal(withSubDomainToggled(both, CONFIG, "beta/b1").subDomain["beta/b1"], false);
   assert.equal(off.domain["beta"], false, "inputs untouched");
 });
+
+// ADR 041: the resource group is opt-in and reads the capacity draw.
+test("resource pills: off by default and inactive; on, only the cards drawing on that domain pass (OR across pills)", () => {
+  const config = { ...CONFIG, domains: [...CONFIG.domains, { id: "ad", name: "A&D", short: "A&D", color: "#000", transverse: true }, { id: "infra", name: "INFRA", short: "INF", color: "#000", transverse: true }] };
+  const neutral = defaultFilters(config);
+  assert.deepEqual(neutral.resource, { beta: false, ad: false, infra: false }, "the test config's beta is transverse too");
+  assert.equal(isFilterActive(neutral), false);
+  const cards = [state({ id: "S1" }), state({ id: "S2" }), state({ id: "S3" })];
+  const draw = new Map([["ad", new Set(["S1"])], ["infra", new Set(["S2"])]]);
+  assert.equal(hiddenCardIds(cards, neutral, draw).size, 0, "no pill on: nothing hidden");
+  const adOnly = { ...neutral, resource: { ad: true, infra: false } };
+  assert.equal(isFilterActive(adOnly), true);
+  assert.deepEqual([...hiddenCardIds(cards, adOnly, draw)], ["S2", "S3"]);
+  const both = { ...neutral, resource: { ad: true, infra: true } };
+  assert.deepEqual([...hiddenCardIds(cards, both, draw)], ["S3"], "OR across the pills on");
+  assert.deepEqual([...hiddenCardIds(cards, adOnly)], ["S1", "S2", "S3"], "no draw at all: a pill on hides everything, never guesses");
+  assert.equal(cardMatches(cards[0]!, adOnly, draw), true);
+});

@@ -637,6 +637,21 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-17 — Filtre « Ressources embarquées » : les projets qui prennent des jours à A&D ou INFRA (ADR 041)
+
+- **Demande de l'auteur** : « un filtre dans les filtres pour les projets
+  qui embarquent de la ressource A&D ou INFRA ».
+- **Fait** : `core/resource-draw.ts` lit, par domaine transverse, les
+  cartes qui lui prennent des jours (personnes nommées via le plan de
+  charge + lignes génériques du domaine, zéro jour ignoré — la lecture de
+  « cartes qui pèsent »). Groupe de filtre `resource`, **opt-in** (tout
+  éteint par défaut, une pilule allumée = seulement ces cartes, OU entre
+  pilules). Section « Ressources embarquées » dans la barre latérale, une
+  pilule par domaine transverse avec le nombre de cartes concernées. Le
+  snapshot de capacité est désormais lu une fois par l'app
+  (`useResourceDraw`) et partagé avec l'onglet Capacité ; un import le
+  rafraîchit. 557 tests, 0 échec.
+
 ### 2026-09-17 — Sprint de perf : mesures, journal incrémental, validation ciblée, tickets mémoïsés (ADR 040)
 
 - **Mesuré avant de coder** (`npm run bench`, `scripts/bench-perf.ts`) :

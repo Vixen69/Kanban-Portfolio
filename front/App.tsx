@@ -4,14 +4,14 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import type { BoardConfig, CardPatch, CardState } from "../core/types.ts";
-import { portfolioStats } from "../core/board.ts";
-import { hiddenCardIds, portfolioCounts, viewCounts } from "../core/filters.ts";
+import type { ResourceDraw } from "../core/filters.ts";
 import { flowTimes, resolveFlowAnchors } from "../core/flow.ts";
 import { cardHistory } from "../core/history.ts";
 import type { DecisionInput, MoveTarget } from "./api.ts";
 import { columnById } from "./lookup.ts";
 import { useBoardStore, type BoardStore } from "./useBoardStore.ts";
-import { useDisplayCards, useExerciseShown } from "./useDisplayCards.ts";
+import { useDerived, useDisplayCards, useExerciseShown } from "./useDisplayCards.ts";
+import { useResourceDraw, type CapacityFetch } from "./useCapacity.ts";
 import { useFilters, type Filters } from "./useFilters.ts";
 import {
   useBoardHandlers,
@@ -54,19 +54,13 @@ interface Ctx {
   /** The exercise shown (ADR 035) and the header selector's data. */
   viewYear: number;
   exercise: YearPickerProps;
+  /** The capacity snapshot of the exercise shown and the cards drawing on each transverse domain (ADR 041). */
+  capacity: CapacityFetch;
+  draw: ResourceDraw;
+  /** Refetches the snapshot (after an import). */
+  bumpCapacity: () => void;
 }
 
-// Filter/count projections over the folded cards (all from core/).
-function useDerived(cards: CardState[], config: BoardConfig, filters: Filters, now: Date) {
-  const hidden = useMemo(() => hiddenCardIds(cards, filters.state), [cards, filters.state]);
-  const view = useMemo(
-    () => viewCounts(cards, hidden, config, now),
-    [cards, hidden, config, now],
-  );
-  const all = useMemo(() => portfolioCounts(cards, config, now), [cards, config, now]);
-  const stats = useMemo(() => portfolioStats(cards), [cards]);
-  return { hidden, view, all, stats };
-}
 
 // One edit-form save, decomposed into its API intents in order: field
 // patch, then move. The sequence stops at the first refused intent so a
@@ -149,11 +143,11 @@ function ShellModals({ ctx }: { ctx: Ctx }) {
         <AdminPanel config={config} cards={store.cards} {...adminWrites(store, ui)} onClose={() => ui.setAdmin(false)} />
       )}
       {ui.metrics && (
-        <AnalyticsView cards={ctx.cards} events={store.events} config={config} now={ctx.nowMs} year={ctx.viewYear}
+        <AnalyticsView cards={ctx.cards} events={store.events} config={config} now={ctx.nowMs} year={ctx.viewYear} capacity={ctx.capacity}
           onClose={() => ui.setMetrics(false)} />
       )}
       {ui.importing && (
-        <ImportView onClose={() => ui.setImporting(false)} onLoaded={() => void store.reload()} config={config}
+        <ImportView onClose={() => ui.setImporting(false)} onLoaded={() => { void store.reload(); ctx.bumpCapacity(); }} config={config}
           defaultYear={ctx.viewYear} />
       )}
       {ui.archive && (
@@ -200,7 +194,7 @@ function Screen({ ctx }: { ctx: Ctx }) {
         onImport={() => ui.setImporting(true)}
         onArchive={() => ui.setArchive(true)} archivedCount={ctx.archivedCards.length}
         onAdd={() => ui.setAdding(true)} />
-      <Sidebar open={ui.sidebar} config={config} search={filters.state.search}
+      <Sidebar open={ui.sidebar} config={config} search={filters.state.search} draw={ctx.draw}
         setSearch={filters.setSearch} filters={filters.state} onToggle={filters.toggle}
         onToggleBlockedOnly={filters.toggleBlockedOnly}
         onToggleNoConstraint={filters.toggleNoConstraint}
@@ -242,7 +236,8 @@ function Shell({ store, config }: { store: BoardStore; config: BoardConfig }) {
   const cards = useMemo(() => (closed ? allCards : allCards.filter((card) => !card.archived)), [allCards, closed]);
   const archivedCards = useMemo(() => allCards.filter((card) => card.archived), [allCards]);
 
-  const derived = useDerived(cards, config, filters, now);
+  const { capacity, draw, bumpCapacity } = useResourceDraw(viewYear, config); // ADR 041
+  const derived = useDerived(cards, config, filters, now, draw);
   const detailCard = allCards.find((card) => card.id === ui.detailId) ?? null;
   // A card removed from the fold (deleted elsewhere) leaves detailId
   // dangling: clear it so Escape acts on the visible context again.
@@ -256,7 +251,7 @@ function Shell({ store, config }: { store: BoardStore; config: BoardConfig }) {
   const focusLabel = ui.focusCol ? (columnById(config)[ui.focusCol]?.name ?? null) : null;
   const ctx: Ctx = {
     store, config, ui, nowMs, filters, cards, archivedCards, derived, drag,
-    handlers, searchRef, detailCard, focusLabel, viewYear, exercise,
+    handlers, searchRef, detailCard, focusLabel, viewYear, exercise, capacity, draw, bumpCapacity,
   };
 
   return <Screen ctx={ctx} />;

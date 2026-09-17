@@ -51,12 +51,15 @@ function reconcile(state: FilterState, config: BoardConfig): FilterState {
     Object.fromEntries(ids.map((id) => [id, previous[id] !== false]));
   const subKeys = config.domains.flatMap((domain) =>
     (domain.subDomains ?? []).map((sub) => subDomainKey(domain.id, sub.id)));
+  // The resource group is opt-in (ADR 041): a key starts OFF.
+  const transverse = config.domains.filter((domain) => domain.transverse === true).map((domain) => domain.id);
   return {
     ...state,
     type: keep(config.types.map((type) => type.id), state.type),
     domain: keep(config.domains.map((domain) => domain.id), state.domain),
     subDomain: keep(subKeys, state.subDomain),
     constraint: keep(config.projectConstraints.map((entry) => entry.id), state.constraint),
+    resource: Object.fromEntries(transverse.map((id) => [id, state.resource[id] === true])),
   };
 }
 

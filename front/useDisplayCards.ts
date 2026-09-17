@@ -7,9 +7,28 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { BoardConfig, CardState } from "../core/types.ts";
+import { portfolioStats } from "../core/board.ts";
 import { laneNature, reconcileCardRefs } from "../core/config.ts";
 import { cardCountsByYear, cardsOfExercise, selectableYears } from "../core/exercise.ts";
+import { hiddenCardIds, portfolioCounts, viewCounts, type ResourceDraw } from "../core/filters.ts";
 import type { YearPickerProps } from "./components/YearPicker.tsx";
+import type { Filters } from "./useFilters.ts";
+
+/**
+ * The filter and count projections over the board's cards (all from
+ * core/): the hidden ids, the counts over the visible subset, the
+ * whole-portfolio counts and stats.
+ * Inputs: the active cards, the config, the filters, now, the resource
+ * draw of the exercise shown (ADR 041). Output: the projections (memoised).
+ * Failure modes: none.
+ */
+export function useDerived(cards: CardState[], config: BoardConfig, filters: Filters, now: Date, draw: ResourceDraw) {
+  const hidden = useMemo(() => hiddenCardIds(cards, filters.state, draw), [cards, filters.state, draw]);
+  const view = useMemo(() => viewCounts(cards, hidden, config, now), [cards, hidden, config, now]);
+  const all = useMemo(() => portfolioCounts(cards, config, now), [cards, config, now]);
+  const stats = useMemo(() => portfolioStats(cards), [cards]);
+  return { hidden, view, all, stats };
+}
 
 /**
  * The exercise the header points at: the current one until the selector

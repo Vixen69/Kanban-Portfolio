@@ -8,10 +8,13 @@
 
 import { reviewOverdue } from "./decisions.ts";
 import type { BoardConfig, Card, CardState, Criticality } from "./types.ts";
+import type { ResourceDraw } from "./resource-draw.ts";
 import { isStale } from "./aging.ts";
 
+export type { ResourceDraw } from "./resource-draw.ts";
+
 /** The togglable pill groups of FilterState (search/blockedOnly excluded). */
-export type FilterGroup = "type" | "crit" | "domain" | "subDomain" | "constraint";
+export type FilterGroup = "type" | "crit" | "domain" | "subDomain" | "constraint" | "resource";
 
 /**
  * The key of one sub-domain pill in FilterState.subDomain — scoped by its
@@ -58,6 +61,13 @@ export interface FilterState {
    * defined id (config vocabulary is editable, ADR 013).
    */
   noConstraint: boolean;
+  /**
+   * The « Ressources embarquées » pills (ADR 041), one per transverse
+   * domain. OPT-IN, unlike every other group: all off by default; a pill
+   * on keeps only the cards drawing days from that domain's people, OR
+   * across the pills on (the draw comes from the capacity snapshot).
+   */
+  resource: Record<string, boolean>;
 }
 
 /**
@@ -96,6 +106,7 @@ export function defaultFilters(config: BoardConfig): FilterState {
     subDomain: on(subDomainKeys(config)),
     constraint: on(config.projectConstraints.map((constraint) => constraint.id)),
     noConstraint: true,
+    resource: Object.fromEntries(config.domains.filter((domain) => domain.transverse === true).map((domain) => [domain.id, false])),
   };
 }
 
@@ -168,8 +179,18 @@ export function isFilterActive(filters: FilterState): boolean {
     groupOff(filters.domain) ||
     groupOff(filters.subDomain) ||
     groupOff(filters.constraint) ||
-    !filters.noConstraint
+    !filters.noConstraint ||
+    Object.values(filters.resource).some((on) => on)
   );
+}
+
+// The resource group is opt-in and OR-shaped (ADR 041): with no pill on
+// every card passes; else the card must draw on one of the domains on.
+// Without a draw (no snapshot), a pill on keeps nothing — said, not guessed.
+function resourcePasses(card: Card, filters: FilterState, draw: ResourceDraw | undefined): boolean {
+  const wanted = Object.entries(filters.resource).filter(([, on]) => on).map(([id]) => id);
+  if (wanted.length === 0) return true;
+  return wanted.some((id) => draw?.get(id)?.has(card.id) === true);
 }
 
 // The constraint group, unlike every other one, is OR-shaped: a card wears
@@ -186,11 +207,13 @@ function constraintPasses(card: Card, filters: FilterState): boolean {
  * every group passes. A group passes when the card's key is missing from
  * the map or mapped to true; a null typeId always passes the type group,
  * a null subDomain always passes the sub-domain group (the card follows its
- * domain alone). The constraint group is OR-shaped (see constraintPasses).
- * Inputs: a Card (CardState included), the filters.
+ * domain alone). The constraint group is OR-shaped (see constraintPasses),
+ * the resource group opt-in (see resourcePasses).
+ * Inputs: a Card (CardState included), the filters, the resource draw of
+ * the exercise shown (optional — absent, a resource pill on hides all).
  * Output: true when the card passes everything. Failure: none.
  */
-export function cardMatches(card: Card, filters: FilterState): boolean {
+export function cardMatches(card: Card, filters: FilterState, draw?: ResourceDraw): boolean {
   const query = filters.search.trim().toLowerCase();
   const matchesSearch =
     query === "" ||
@@ -205,19 +228,19 @@ export function cardMatches(card: Card, filters: FilterState): boolean {
   }
   if (card.typeId !== null && filters.type[card.typeId] === false) return false;
   if (!constraintPasses(card, filters)) return false;
-  return true;
+  return resourcePasses(card, filters, draw);
 }
 
 /**
  * Ids of the cards the filters hide (the complement of cardMatches).
- * Inputs: all card states, the filters.
+ * Inputs: all card states, the filters, the resource draw (optional).
  * Output: a Set of card ids to leave off the board (empty when neutral).
  * Failure: none.
  */
-export function hiddenCardIds(cards: CardState[], filters: FilterState): Set<string> {
+export function hiddenCardIds(cards: CardState[], filters: FilterState, draw?: ResourceDraw): Set<string> {
   const hidden = new Set<string>();
   for (const card of cards) {
-    if (!cardMatches(card, filters)) hidden.add(card.id);
+    if (!cardMatches(card, filters, draw)) hidden.add(card.id);
   }
   return hidden;
 }

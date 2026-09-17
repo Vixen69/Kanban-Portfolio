@@ -2,14 +2,14 @@
 // read-out between domain owners — where the exercise's planned load lands
 // against the people's declared capacity, what the board weighs in it,
 // with the transverse domains (A&D, INFRA) singled out. Every figure comes
-// from core/capacity-view.ts; this file fetches the snapshot of the
-// exercise shown when the tab opens, memoises the computation and lays out
+// from core/capacity-view.ts; the app fetches the snapshot of the exercise
+// shown (useCapacity.ts, ADR 041); this file memoises the computation and lays out
 // the panels of ./capacityPanels.tsx and ./capacityTables.tsx (which fold).
 
-import { useEffect, useMemo, useState } from "react";
-import type { BoardConfig, CapacitySnapshot, CardState } from "../../core/types.ts";
+import { useMemo } from "react";
+import type { BoardConfig, CardState } from "../../core/types.ts";
 import { computeCapacityReadout, type CapacityKpis, type CapacityReadout } from "../../core/capacity-view.ts";
-import { fetchCapacity } from "../api.ts";
+import type { CapacityFetch } from "../useCapacity.ts";
 import { fmtUnit } from "../format.ts";
 import { CoveragePanel, DomainsPanel, OverloadsPanel, ProfilesPanel, pct } from "./capacityPanels.tsx";
 import { MetiersPanel } from "./capacityMetiers.tsx";
@@ -24,32 +24,10 @@ export interface CapacityTabProps {
   config: BoardConfig;
   /** Current time, epoch milliseconds (App's ticker) — the elapsed share of the year. */
   now: number;
-  /** The exercise shown (its capacity snapshot is fetched). */
-  year: number;
+  /** The capacity snapshot of the exercise shown, fetched by the app (ADR 041). */
+  fetch: CapacityFetch;
 }
 
-type Fetch =
-  | { status: "loading" }
-  | { status: "ready"; snapshot: CapacitySnapshot | null }
-  | { status: "error"; message: string };
-
-// The snapshot of the exercise shown is fetched when the view opens: it
-// only changes at import time, so it stays out of the per-action board
-// refetch.
-function useCapacitySnapshot(year: number): Fetch {
-  const [state, setState] = useState<Fetch>({ status: "loading" });
-  useEffect(() => {
-    let active = true;
-    fetchCapacity(year)
-      .then((snapshot) => { if (active) setState({ status: "ready", snapshot }); })
-      .catch((cause: unknown) => {
-        if (!active) return;
-        setState({ status: "error", message: cause instanceof Error ? cause.message : "Erreur inconnue." });
-      });
-    return () => { active = false; };
-  }, [year]);
-  return state;
-}
 
 /** Accent of a KPI tile; null leaves it neutral. */
 type Tone = "alert" | "warn" | "accent" | "ok" | null;
@@ -132,7 +110,7 @@ function Empty() {
 
 // The read-out, recomputed when the data or the DAY changes (the ticker
 // beats every second; the elapsed share of the year is day-grained).
-function Body({ fetch, cards, config, now }: { fetch: Fetch; cards: CardState[]; config: BoardConfig; now: number }) {
+function Body({ fetch, cards, config, now }: { fetch: CapacityFetch; cards: CardState[]; config: BoardConfig; now: number }) {
   const snapshot = fetch.status === "ready" ? fetch.snapshot : null;
   const day = Math.floor(now / DAY_MS);
   const readout = useMemo(
@@ -150,7 +128,7 @@ function Body({ fetch, cards, config, now }: { fetch: Fetch; cards: CardState[];
   );
 }
 
-function subtitle(fetch: Fetch): string {
+function subtitle(fetch: CapacityFetch): string {
   if (fetch.status !== "ready" || fetch.snapshot === null) return "Lecture annuelle : projeté de l’exercice contre capacité déclarée";
   const { exerciseYear, persons, assignments } = fetch.snapshot;
   return `Exercice ${exerciseYear} · ${persons.length} personnes · ${assignments.length} affectations sur le tableau · projeté annuel contre capacité déclarée`;
@@ -164,7 +142,7 @@ function subtitle(fetch: Fetch): string {
  * unreachable API shows the French message.
  */
 export function CapacityTab(props: CapacityTabProps) {
-  const fetch = useCapacitySnapshot(props.year);
+  const fetch = props.fetch;
   return (
     <>
       <div className="an-sub">{subtitle(fetch)}</div>
