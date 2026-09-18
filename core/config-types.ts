@@ -176,6 +176,14 @@ export interface ExerciseConfig {
    * import says so in its report).
    */
   states?: string[];
+  /**
+   * The process states that mean the project is finished (ADR 043, author
+   * 2026-09-18: « les garder, mais en Done »): a project in one of them
+   * lands in the terminal column whatever its milestones say. Each must be
+   * one of `states` when that list is given; absent = the milestones alone
+   * position the cards.
+   */
+  doneStates?: string[];
 }
 
 /** Capacity read-out thresholds (ADR 033). */

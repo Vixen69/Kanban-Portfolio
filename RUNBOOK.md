@@ -108,6 +108,15 @@ un évènement réversible depuis la fiche, mais la sauvegarde datée est le
 filet : elle se restaure avec `psql -U kanban kanban < sauvegarde-….sql`
 dans le conteneur `db`.
 
+> **Projets terminés** (ADR 043) : un projet dont l'état Sciforma est
+> « Terminé » est gardé et placé en **Done**, quels que soient ses jalons
+> (même sans RDR approuvé, même sans ligne dans `ProjetsJalons`). Le
+> rapport d'audit le dit : « en Done par l'état du projet : N », et compte
+> les désaccords avec les jalons. Un réimport crée en Done les terminés
+> absents du tableau et y déplace ceux qui étaient ailleurs — sauf une
+> carte déplacée à la main, qui garde sa colonne et apparaît dans les
+> divergences du rapport.
+
 > **Instantanés** (ADR 042) : le filet DANS l'outil. ⚙ › onglet
 > **Instantanés** › un libellé (le pourquoi) › « Prendre un instantané ».
 > Un instantané est pris tout seul avant chaque chargement d'import et

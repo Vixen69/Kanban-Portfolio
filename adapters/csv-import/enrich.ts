@@ -1,12 +1,15 @@
 // The card assembly (R2/R7/R8): the `projets` sheet IS the deck — every
 // entry is a card (identity, type, domain, sub-domain, owner, dates come
-// from it); ProjetsJalons gives the position, SP the 2026 costs. Join
+// from it); ProjetsJalons gives the position — unless the project's process
+// state is a config done state (« Terminé »): then Done, whatever the
+// milestones (ADR 043) — SP the 2026 costs. Join
 // keys, in order of trust: Id, then full name, then the PE code embedded
 // in the name (SP only). Every miss is counted, never silent. The report's
 // « pris » lines ARE the cards.
 
 import type { BoardConfig } from "../../core/types.ts";
 import { resolveFlowAnchors } from "../../core/flow.ts";
+import { createTolerantLookup } from "./normalize.ts";
 import { tallyInto, tallyLabel } from "./tallies.ts";
 import type { Tally } from "./tallies.ts";
 import type { ProjetEntry, ProjetsTable } from "./projets.ts";
@@ -35,7 +38,7 @@ export interface EnrichedCard {
   owner: string | null;
   typeId: string | null;
   columnId: string;
-  /** True when ProjetsJalons positioned the card (else entry column). */
+  /** True when the export positioned the card — ProjetsJalons, or a done state (ADR 043); else entry column. */
   positioned: boolean;
   createdAt: string | null;
   dateRdr: string | null;
@@ -60,6 +63,8 @@ export interface CardStats {
   stageCounts: Map<Stage, number>;
   withoutJalons: number;
   jalonsOutside: number;
+  /** Cards the project's process state placed in Done (ADR 043). */
+  doneByState: number;
   spById: number;
   spByName: number;
   spByCode: number;
@@ -85,6 +90,9 @@ interface JoinContext {
   sp: SpTable | null;
   laneId: string;
   entryColumnId: string;
+  /** The terminal column and the states that send a card there (ADR 043); null = no terminal anchor. */
+  doneColumnId: string | null;
+  isDoneState: (state: string) => boolean;
   columnNames: Map<string, string>;
   consumedJalons: Set<JalonEntry>;
   consumedSp: Set<SpEntry>;
@@ -120,14 +128,18 @@ export function assembleCards(
 function createContext(
   jalons: JalonsTable | null, sp: SpTable | null, config: BoardConfig, report: ImportReport,
 ): JoinContext {
+  const anchors = resolveFlowAnchors(config);
+  const doneStates = createTolerantLookup((config.exercise.doneStates ?? []).map((s): [string, string] => [s, s]));
   return {
     report, jalons, sp,
     laneId: config.lanes.find((l) => l.natureKey === "complicated")?.id ?? config.lanes[0]?.id ?? "",
-    entryColumnId: resolveFlowAnchors(config)?.entry.id ?? config.columns[0]?.id ?? "",
+    entryColumnId: anchors?.entry.id ?? config.columns[0]?.id ?? "",
+    doneColumnId: anchors?.terminal?.id ?? null,
+    isDoneState: (state) => state.trim() !== "" && doneStates(state) !== null,
     columnNames: new Map(config.columns.map((c) => [c.id, c.name])),
     consumedJalons: new Set(), consumedSp: new Set(),
     stats: {
-      total: 0, positioned: 0, stageCounts: new Map(), withoutJalons: 0, jalonsOutside: 0,
+      total: 0, positioned: 0, stageCounts: new Map(), withoutJalons: 0, jalonsOutside: 0, doneByState: 0,
       spById: 0, spByName: 0, spByCode: 0, withoutSp: 0, spOutside: 0,
       withDomain: 0, withSubDomain: 0, withMarker: 0, withOwner: 0, withType: 0,
     },
@@ -151,6 +163,27 @@ function domainOf(ctx: JoinContext, entry: ProjetEntry): DomainPart {
   return { domainId: marker.domainId, subDomainId: null, domainSource: "marker", domainRule: ruleLabel(marker) };
 }
 
+// Where the card lands (ADR 043): a project whose process state is a done
+// state goes to the terminal column whatever its milestones — a missing or
+// unapproved RDR is said in the report, the state wins. Else the last
+// milestone passed; else the entry column, unpositioned.
+function positionOf(ctx: JoinContext, entry: ProjetEntry, jalon: JalonEntry | null): { columnId: string; positioned: boolean } {
+  if (ctx.doneColumnId !== null && isFinished(ctx, entry)) {
+    ctx.stats.doneByState++;
+    if (jalon?.stage !== "done") {
+      tallyInto(ctx.tallies, `état « ${entry.state.trim()} » sans RDR approuvé — carte placée en Done par l'état (ADR 043)`, entry.ref.line);
+    }
+    return { columnId: ctx.doneColumnId, positioned: true };
+  }
+  return { columnId: jalon?.columnId ?? ctx.entryColumnId, positioned: jalon !== null };
+}
+
+// True when the project's process state is a config done state and the
+// topology has a terminal column to send it to (ADR 043).
+function isFinished(ctx: JoinContext, entry: ProjetEntry): boolean {
+  return ctx.doneColumnId !== null && ctx.isDoneState(entry.state);
+}
+
 // One perimeter row -> one card. The pris line names the column and the
 // domain read-out so the ~20-project manual check reads in one glance.
 function buildCard(ctx: JoinContext, entry: ProjetEntry): EnrichedCard {
@@ -167,7 +200,7 @@ function buildCard(ctx: JoinContext, entry: ProjetEntry): EnrichedCard {
     laneId: ctx.laneId,
     ...domainPart,
     owner: entry.owner, typeId: entry.typeId,
-    columnId: jalon?.columnId ?? ctx.entryColumnId, positioned: jalon !== null,
+    ...positionOf(ctx, entry, jalon),
     createdAt: entry.createdAt, dateRdr: entry.dateRdr,
     // The four k€ figures come from SP alone (author, 2026-09-10): the
     // Projets « Budget RDLI Total Coût » is plurianual and no longer feeds
@@ -193,7 +226,8 @@ function joinJalons(ctx: JoinContext, entry: ProjetEntry): JalonEntry | null {
     ?? ctx.jalons.byName.get(entry.normalizedName);
   if (hit === undefined) {
     ctx.stats.withoutJalons++;
-    tallyInto(ctx.tallies, "carte sans ligne dans ProjetsJalons — colonne d'entrée", entry.ref.line);
+    const where = isFinished(ctx, entry) ? "placée par l'état du projet" : "colonne d'entrée";
+    tallyInto(ctx.tallies, `carte sans ligne dans ProjetsJalons — ${where}`, entry.ref.line);
     return null;
   }
   ctx.consumedJalons.add(hit);

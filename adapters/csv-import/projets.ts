@@ -20,60 +20,9 @@ import type { HeaderMatch } from "./contract.ts";
 import type { ParamTable } from "./param.ts";
 import { discard, doubt, warn } from "./report.ts";
 import type { ImportReport, RowRef } from "./report.ts";
+import type { DomainShape, ProjetEntry, ProjetsCounts, ProjetsTable } from "./projets-types.ts";
 
-/** How the file carries the domain: resolved Orga columns, an organisation
- * path to translate through PARAM, a Sciforma portfolio (COUT PREV, ADR
- * 030), or nothing. */
-export type DomainShape = "orga" | "path" | "portefeuille" | "none";
-
-/** One retained project (a future card). */
-export interface ProjetEntry {
-  /** « Id » as written (the stable identity); "" when the cell is empty. */
-  id: string;
-  name: string;
-  /** The name without its leading code — the card's title (author, 2026-09-09). */
-  title: string;
-  normalizedName: string;
-  normalizedTitle: string;
-  /** The Id, else a PE code embedded in the name, else null. */
-  codename: string | null;
-  typeId: string | null;
-  createdAt: string | null;
-  dateRdr: string | null;
-  domainId: string | null;
-  subDomainId: string | null;
-  domainSource: "orga" | "param" | null;
-  domainRule: string | null; // how the domain came, worded for report and conflicts (ADR 036)
-  owner: string | null;
-  budgetRdli: number | null;
-  effortEstimated: number | null;
-  effortConsumed: number | null;
-  ref: RowRef;
-}
-
-/** The parsed perimeter. */
-export interface ProjetsTable {
-  /** The elected file's name — the assembly line names the perimeter's source. */
-  fileName: string;
-  entries: ProjetEntry[];
-  byId: ReadonlyMap<string, ProjetEntry>;
-  byName: ReadonlyMap<string, ProjetEntry>;
-  shape: DomainShape;
-  /** typeId (or "?" for unknown/empty) -> count. */
-  typeCounts: ReadonlyMap<string, number>;
-  counts: ProjetsCounts;
-}
-
-/** Derivation counters for the assembly read-out. */
-export interface ProjetsCounts {
-  domainDirect: number;
-  domainViaParam: number;
-  domainMissing: number;
-  subDetailed: number;
-  subFolded: number;
-  withOwner: number;
-  leadsExcluded: number;
-}
+export type { DomainShape, ProjetEntry, ProjetsCounts, ProjetsTable } from "./projets-types.ts";
 
 interface ProjetsContext {
   match: HeaderMatch;
@@ -195,7 +144,7 @@ function buildEntry(
     typeId: deriveType(ctx, row),
     createdAt: dateCell(cell(ctx, row, "Début"), "Début", row.line, ctx.tallies),
     dateRdr: dateCell(cell(ctx, row, "Fin"), "Fin", row.line, ctx.tallies),
-    ...domain, owner,
+    ...domain, owner, state,
     budgetRdli: moneyCell(cell(ctx, row, "Budget RDLI Total Coût (Res+Trans)"), "Budget RDLI Total Coût (Res+Trans)", row.line, ctx.tallies),
     effortEstimated: amountCell(cell(ctx, row, "Charge finale ME (Res) (J)"), "Charge finale ME (Res) (J)", row.line, ctx.tallies)
       ?? amountCell(cell(ctx, row, "Charge JH"), "Charge JH", row.line, ctx.tallies),

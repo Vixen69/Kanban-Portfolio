@@ -503,7 +503,8 @@
   "andonThresholdDays": 5,
   "exercise": {
     "year": 2026,
-    "states": ["Basculé en projet", "Budget validé", "Terminé"]
+    "states": ["Basculé en projet", "Budget validé", "Terminé"],
+    "doneStates": ["Terminé"]
   },
   "capacity": {
     "tension": 0.9

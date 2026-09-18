@@ -213,15 +213,20 @@ function ownerStatus(deck: CardAssembly, projets: ProjetsTable, data: AssemblyDa
 
 function positionStatus(data: AssemblyData, deck: CardAssembly): string {
   const s = deck.stats;
-  if (data.jalons === null) return `en attente de \`ProjetsJalons\` — ${s.total} carte(s) en colonne d'entrée`;
+  const byState = s.doneByState === 0 ? "" : ` · en Done par l'état du projet : ${s.doneByState} (ADR 043)`;
+  if (data.jalons === null) {
+    return `en attente de \`ProjetsJalons\` — ${s.total - s.doneByState} carte(s) en colonne d'entrée${byState}`;
+  }
   const stages: Array<[string, string]> = [
     ["done", "Done"], ["actifs", "Actifs"], ["etudes", "Études"], ["entree", "entrée"],
   ];
   const detail = stages.map(([key, label]) => `${label} ${s.stageCounts.get(key as never) ?? 0}`).join(" · ");
   const r = data.jalons.reading;
-  return `jalons ${s.positioned}/${s.total} (${detail}) · sans jalon : ${s.withoutJalons} → colonne d'entrée` +
+  const entry = byState === "" ? "colonne d'entrée" : "colonne d'entrée, sauf projet terminé";
+  return `jalons ${s.positioned}/${s.total} (${detail}) · sans jalon : ${s.withoutJalons} → ${entry}` +
+
     ` · lignes jalons hors périmètre : ${s.jalonsOutside}` +
-    ` · cellules décidées par : statut ${r.statut} · date ${r.date} · « franchi » ${r.franchi}`;
+    ` · cellules décidées par : statut ${r.statut} · date ${r.date} · « franchi » ${r.franchi}${byState}`;
 }
 
 function spStatus(sp: SpTable | null, deck: CardAssembly, year: number): string {

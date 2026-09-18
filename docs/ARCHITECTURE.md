@@ -637,6 +637,22 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-18 — Les projets terminés sont gardés, et placés en Done par leur état (ADR 043)
+
+- **Décision de l'auteur** : « les garder, mais en Done… de manière à ce
+  que je puisse faire un réimport et récupérer les terminés que je n'ai
+  pas ».
+- **Avant** : « Terminé » était un état retenu du périmètre, mais la
+  colonne venait des seuls jalons — un projet terminé sans RDR approuvé
+  atterrissait en Actifs, en Études ou en Demandes, sans que le rapport le
+  dise.
+- **Fait** : `exercise.doneStates` (`["Terminé"]` dans le modèle) ; un
+  projet dans un de ces états va dans la colonne terminale quels que
+  soient ses jalons, même sans ligne dans `ProjetsJalons`. Le désaccord
+  est compté dans les signalements et la ligne de position du rapport dit
+  combien de cartes l'état a placées. Une carte déplacée à la main garde
+  sa colonne (ADR 026), la divergence est listée. 576 tests, 0 échec.
+
 ### 2026-09-17 — Instantanés : figer le tableau avant un réimport, le restaurer sans rien effacer (ADR 042)
 
 - **Demande de l'auteur** : « prendre un snapshot parce qu'on sait qu'on

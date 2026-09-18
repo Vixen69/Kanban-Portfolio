@@ -260,8 +260,12 @@ Sciforma portfolio of the COUT PREV export, ADR 030; a domain may be
 nature/criticality labels,
 custom field definitions, `age` thresholds (fresh/recent/aging/stale),
 `andonThresholdDays`, `exercise.year` (the year the import reads and
-the capacity is counted in, ADR 024) and `exercise.states` (the Sciforma
-process states kept in the COUT PREV perimeter, ADR 030), `decisions` / `decisionGrounds` (the
+the capacity is counted in, ADR 024), `exercise.states` (the Sciforma
+process states kept in the COUT PREV perimeter, ADR 030) and
+`exercise.doneStates` (ADR 043, author 2026-09-18: the states that mean
+« finished » — « Terminé » — send the card to the terminal column whatever
+its milestones say, the disagreement counted in the audit report; a
+hand-moved card keeps its column, ADR 026), `decisions` / `decisionGrounds` (the
 referential's D1–D6 and the arbitration grid's terms, ADR 026). `wip: null` shows the bare count and enforces nothing;
 a set WIP shows count/limit, warns at ≥ 80 %, reddens beyond 100 % (warns,
 never hard-blocks). The default model carries no WIP limit since ADR 031

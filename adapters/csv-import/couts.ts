@@ -264,7 +264,7 @@ function buildEntry(ctx: CoutsContext, seen: Seen, typeId: string): ProjetEntry 
   return {
     id: seen.id, name: seen.name, title: stripCode(split.title, seen.id),
     normalizedName: normalizeLabel(seen.name), normalizedTitle: normalizeLabel(split.title),
-    codename: seen.id, typeId, createdAt: null, dateRdr: null,
+    codename: seen.id, typeId, createdAt: null, dateRdr: null, state: seen.etat,
     domainId: hit?.domainId ?? null, subDomainId: hit?.subDomainId ?? null, domainSource: hit === null ? null : "param",
     domainRule: hit === null ? null : ruleLabel(hit),
     owner: null, budgetRdli: null, effortEstimated: null, effortConsumed: null, ref: seen.ref,
