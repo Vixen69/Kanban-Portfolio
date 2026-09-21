@@ -61,3 +61,18 @@ kbd { font-family: inherit; font-size: 8px; font-weight: 700; color: var(--tx-2)
 
 /* Pilule avec compte (Ressources embarquées, ADR 041). */
 .pill small { margin-left: 4px; font-size: 9px; opacity: .75; }
+
+/* ---------- Trier les cartes (ADR 044) ---------- */
+.sort-head { display: flex; align-items: center; gap: 6px; width: 100%; background: none; border: none; padding: 0; cursor: pointer; font-family: inherit; text-align: left; }
+.sort-current { flex: 1 1 auto; min-width: 0; font-size: 9px; color: var(--tx-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
+.sort-body { margin-top: 8px; }
+.sort-opt { display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--tx-2); padding: 2px 0; cursor: pointer; }
+.sort-opt input, .sort-met input { margin: 0; width: 11px; height: 11px; accent-color: var(--accent); flex: 0 0 auto; }
+.sort-opt .pill-chev { margin-left: auto; font-size: 11px; }
+.sort-mets { margin: 2px 0 2px 5px; padding-left: 10px; border-left: 2px solid var(--bd-sub); }
+.sort-met { display: flex; align-items: center; gap: 5px; font-size: 9.5px; color: var(--tx-3); padding: 1.5px 0; cursor: pointer; }
+.sort-met-name { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sort-met-raf { flex: 0 0 auto; font-size: 9px; color: var(--tx-4); font-variant-numeric: tabular-nums; }
+.sort-note { font-size: 9px; color: var(--tx-4); font-style: italic; padding: 2px 0; }
+.sort-order-label { margin: 9px 0 6px; }
+

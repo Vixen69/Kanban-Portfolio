@@ -310,7 +310,9 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
   (author's call, 2026-07-10).
 - Radiator bars (~16px) are THE default view; **one click on a card opens
   its detail** (v11); clicking a column header focuses that stage (2.6fr,
-  expanded cards). Lanes collapse to summary rows (the last expanded lane
+  expanded cards — each wears a stacked « RAF par métier » block, its
+  three largest per-profile restes à faire, « sans ventilation » said as
+  such, and the figure of the sort in force, ADR 044). Lanes collapse to summary rows (the last expanded lane
   refuses); columns collapse to 30px strips (Pause starts collapsed);
   collapsed cells open a one-click ticket popover. Over-WIP cells wear a
   red wash; overflowing cells a scroll-hint arrow.
@@ -336,7 +338,18 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
   No « NMO » label. On the right: a labelled « Analytics » button and a
   « ⋯ » menu (Archives with count, Importer, Configuration du tableau —
   ADR 038).
-- Sidebar: search (title + codename), codes-projet and types toggles, « Contrainte »
+- Sidebar: search (title + codename), **« Trier les cartes »** (ADR 044,
+  author 2026-09-21 — the arbitration session looks at what costs the
+  scarce métiers, all domains mixed): folded by default, one key at a time
+  — ordre du tableau / reste à faire j.h / meilleur estimé k€ / reste à
+  faire par métier (a foldable checkbox list of the profiles that still
+  have a RAF on the shown cards, largest first, totals shown) — and an
+  order, décroissant or croissant. A sort is a VIEW: nothing is written,
+  the manual order (ADR 019) stays underneath and comes back with the
+  header chip's ✕; cards without a figure go last in BOTH directions;
+  while sorted, a drop onto a card no longer reorders (plain move);
+  cards without a per-profile plan are counted on the chip. Then
+  codes-projet and types toggles, « Contrainte »
   pills (config-driven + a synthetic « Aucune »; OR-shaped — a card stays
   lit while ANY of its constraints is on), « Ressources embarquées » pills
   (ADR 041: one per transverse domain, OPT-IN — off by default, lit = only

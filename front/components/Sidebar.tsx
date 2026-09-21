@@ -12,6 +12,8 @@ import type { FilterGroup, FilterState, ResourceDraw, ViewCounts } from "../../c
 import { GroupSection, Pill, ResourceSection } from "./sidebarParts.tsx";
 
 import { DomainSection } from "./SidebarDomains.tsx";
+import { SortSection } from "./SortSection.tsx";
+import type { CardSorting, SortPanel } from "../useCardSort.ts";
 
 /** Props of the sidebar. All state and callbacks are owned by App. */
 export interface SidebarProps {
@@ -39,6 +41,9 @@ export interface SidebarProps {
   setShowTypes: (value: boolean) => void;
   /** The cards drawing on each transverse domain (ADR 041), for the « Ressources embarquées » pills. */
   draw: ResourceDraw;
+  /** The board's sort and its read-out (ADR 044), for the « Trier les cartes » section. */
+  sorting: CardSorting;
+  sortPanel: SortPanel;
 }
 
 // One stat row. When filtering, the visible count leads; total trails muted.
@@ -232,6 +237,7 @@ export function Sidebar(props: SidebarProps) {
     <aside className={"sidebar" + (props.open ? " open" : "")}>
       <SearchSection {...props} />
       <ResultRow {...props} />
+      <SortSection sorting={props.sorting} panel={props.sortPanel} />
       <CodesSection {...props} />
       <ConstraintSection {...props} />
       <ResourceSection config={props.config} filters={props.filters} draw={props.draw} onToggle={props.onToggle} onSetGroup={props.onSetGroup} />

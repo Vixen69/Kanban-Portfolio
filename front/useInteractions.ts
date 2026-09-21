@@ -135,7 +135,7 @@ export function useShortcuts(ui: UiState, searchRef: RefObject<HTMLInputElement 
  * Output: the seven handlers BoardGrid expects. Failure: a refused move is
  * logged by the store; the board simply does not change.
  */
-export function useDragHandlers(store: BoardStore, ui: UiState) {
+export function useDragHandlers(store: BoardStore, ui: UiState, reorder = true) {
   const dragId = useRef<string | null>(null);
   const { setDragOver, setDropCardId } = ui;
   const { cards, moveCard } = store;
@@ -164,7 +164,7 @@ export function useDragHandlers(store: BoardStore, ui: UiState) {
     void moveCard(id, { laneId: target, columnId });
   }, [cards, moveCard, setDragOver, setDropCardId]);
   const cellHover = useCellHoverHandlers(ui);
-  const cardLevel = useCardDropHandlers(dragId, store, ui);
+  const cardLevel = useCardDropHandlers(dragId, store, ui, reorder);
   return { onDragStart, onDragEnd, onDrop, ...cellHover, ...cardLevel };
 }
 
@@ -192,19 +192,35 @@ function useCellHoverHandlers(ui: UiState) {
 // The card-level half of the drag flow (ADR 019): hovering a card marks it
 // as the insertion target; dropping on it moves the dragged card into ITS
 // cell, inserted just before it (the move intent carries beforeId).
+// Where a card dropped ONTO another goes. In a unified cell (ADR 039) the
+// dragged card keeps its own canal — a lane change there would count as a
+// stage entry (ADR 019). With the manual order in force the move inserts
+// before the target; on a SORTED board (ADR 044) there is no insertion
+// point: the drop is a plain move into the target's cell, or nothing when
+// the card is already there.
+function cardDropMove(id: string, target: CardState, store: BoardStore, reorder: boolean): MoveTarget | null {
+  const unified = store.config === null ? new Set<string>() : unifiedColumnIds(store.config);
+  const dragged = store.cards.find((candidate) => candidate.id === id);
+  const laneId = unified.has(target.columnId) && dragged !== undefined ? dragged.laneId : target.laneId;
+  if (reorder) return { laneId, columnId: target.columnId, beforeId: target.id };
+  if (dragged === undefined || (dragged.laneId === laneId && dragged.columnId === target.columnId)) return null;
+  return { laneId, columnId: target.columnId };
+}
+
 function useCardDropHandlers(
   dragId: React.MutableRefObject<string | null>,
   store: BoardStore,
   ui: UiState,
+  reorder: boolean,
 ) {
   const { setDragOver, setDropCardId } = ui;
-  const { moveCard, cards, config } = store;
+  const { moveCard } = store;
   const onCardOver = useCallback((event: DragEvent, card: CardState) => {
     event.preventDefault();
     event.stopPropagation();
     event.dataTransfer.dropEffect = "move";
     const id = dragId.current;
-    const next = id !== null && id !== card.id ? card.id : null;
+    const next = reorder && id !== null && id !== card.id ? card.id : null; // no insertion mark on a sorted board
     setDropCardId((current) => (current === next ? current : next));
     // stopPropagation keeps onDragOverCell from firing: refresh the cell
     // highlight from the hovered card so it never lags a cell behind.
@@ -213,7 +229,7 @@ function useCardDropHandlers(
         ? current
         : { laneId: card.laneId, columnId: card.columnId },
     );
-  }, [dragId, setDragOver, setDropCardId]);
+  }, [dragId, reorder, setDragOver, setDropCardId]);
   const onCardDrop = useCallback((event: DragEvent, target: CardState) => {
     event.preventDefault();
     event.stopPropagation();
@@ -222,12 +238,8 @@ function useCardDropHandlers(
     setDragOver(null);
     setDropCardId(null);
     if (!id || id === target.id) return;
-    // Dropped onto a card of a unified cell (ADR 039): the dragged card keeps its
-    // own canal — a lane change there would count as a stage entry (ADR 019).
-    const unified = config === null ? new Set<string>() : unifiedColumnIds(config);
-    const dragged = cards.find((candidate) => candidate.id === id);
-    const laneId = unified.has(target.columnId) && dragged !== undefined ? dragged.laneId : target.laneId;
-    void moveCard(id, { laneId, columnId: target.columnId, beforeId: target.id });
-  }, [dragId, moveCard, setDragOver, setDropCardId]);
+    const move = cardDropMove(id, target, store, reorder);
+    if (move !== null) void moveCard(id, move);
+  }, [dragId, moveCard, reorder, setDragOver, setDropCardId, store]);
   return { onCardOver, onCardDrop };
 }

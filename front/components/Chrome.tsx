@@ -20,6 +20,10 @@ export interface HeaderProps {
   focusLabel: string | null;
   onResetFilters: () => void;
   onClearFocus: () => void;
+  /** « Trié par … » while a sort is active (ADR 044), else null. */
+  sortLabel: string | null;
+  /** Back to the board's own order. */
+  onClearSort: () => void;
   onToggleSidebar: () => void;
   onMetrics: () => void;
   /** Opens the archives overlay (design v11). */
@@ -72,6 +76,11 @@ export function Header(props: HeaderProps) {
         {props.focusLabel && (
           <button className="focus-chip" onClick={props.onClearFocus} title="Quitter le focus (Esc)">
             Focus : {props.focusLabel} ✕
+          </button>
+        )}
+        {props.sortLabel !== null && (
+          <button className="focus-chip" onClick={props.onClearSort} title="Revenir à l’ordre du tableau">
+            {props.sortLabel} ✕
           </button>
         )}
       </div>

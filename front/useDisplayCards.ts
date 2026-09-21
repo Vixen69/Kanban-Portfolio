@@ -8,11 +8,13 @@
 import { useEffect, useMemo, useState } from "react";
 import type { BoardConfig, CardState } from "../core/types.ts";
 import { portfolioStats } from "../core/board.ts";
+import type { CardSort } from "../core/card-sort.ts";
 import { laneNature, reconcileCardRefs } from "../core/config.ts";
 import { cardCountsByYear, cardsOfExercise, selectableYears } from "../core/exercise.ts";
 import { hiddenCardIds, portfolioCounts, viewCounts, type ResourceDraw } from "../core/filters.ts";
 import type { YearPickerProps } from "./components/YearPicker.tsx";
 import type { Filters } from "./useFilters.ts";
+import { useSortedCards } from "./useCardSort.ts";
 
 /**
  * The filter and count projections over the board's cards (all from
@@ -64,4 +66,24 @@ export function useDisplayCards(cards: CardState[], config: BoardConfig, year: n
       refs.subDomain === card.subDomain && nature === card.nature;
     return unchanged ? card : { ...card, ...refs, nature };
   }), [cards, config, year]);
+}
+
+/**
+ * The board's cards and the archived ones, from the display cards of the
+ * exercise shown. Archived subjects leave the board and every count; they
+ * are listed only by the Archives view (design v11, ADR 017). A closed
+ * year is read as it stood: its cards were archived at the switch
+ * (ADR 038), so they stay on its board. The board's cards come in the
+ * sort's order (ADR 044).
+ * Inputs: the display cards, the year shown, the current exercise year,
+ * the sort. Output: { cards, archivedCards } (memoised). Failure modes: none.
+ */
+export function useBoardCards(
+  allCards: CardState[], viewYear: number, currentYear: number, sort: CardSort,
+): { cards: CardState[]; archivedCards: CardState[] } {
+  const closed = viewYear < currentYear;
+  const active = useMemo(() => (closed ? allCards : allCards.filter((card) => !card.archived)), [allCards, closed]);
+  const cards = useSortedCards(active, sort);
+  const archivedCards = useMemo(() => allCards.filter((card) => card.archived), [allCards]);
+  return { cards, archivedCards };
 }

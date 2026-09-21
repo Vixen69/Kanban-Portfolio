@@ -75,6 +75,7 @@ function UnifiedColumn({ col, index, cards, rows, props }: {
       now={props.now}
       showCodes={props.showCodes}
       showTypes={props.showTypes}
+      sort={props.sort}
       dragOver={props.dragOver !== null && props.dragOver.columnId === col.id}
       gateDef={gateDefOf(props.config, col)}
       onOpen={props.onOpen}

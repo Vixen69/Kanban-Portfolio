@@ -637,6 +637,26 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-21 — Trier les cartes : par reste à faire, par meilleur estimé, par métier (ADR 044)
+
+- **Demande de l'auteur** : pour l'instance d'arbitrage qui gèle une
+  partie du portefeuille, regarder tous domaines mêlés ce qui coûte aux
+  métiers rares, au lieu de passer chaque responsable de domaine au grill
+  avec les filtres.
+- **Fait** : un tri d'affichage, jamais un évènement
+  (`core/card-sort.ts`). Quatre clés, une à la fois : ordre du tableau,
+  reste à faire j.h, meilleur estimé k€, reste à faire des métiers cochés
+  (charge par profil de la carte) ; décroissant ou croissant ; les cartes
+  sans chiffre toujours en bas ; tri stable. L'ordre manuel reste dessous
+  et revient avec la croix ; pendant un tri, déposer une carte sur une
+  autre ne réordonne plus. Barre latérale : section « Trier les cartes »
+  sous la recherche, liste des métiers repliable avec leurs totaux.
+  En-tête : pastille « Trié par … ». Carte étendue : bloc vertical « RAF
+  par métier » (trois plus gros, métiers du tri devant, « sans
+  ventilation » dit tel quel) et valeur du tri écrite sur la carte. Les
+  cartes sans ventilation sont comptées : la mauvaise donnée se voit.
+  582 tests, 0 échec.
+
 ### 2026-09-18 — Les projets terminés sont gardés, et placés en Done par leur état (ADR 043)
 
 - **Décision de l'auteur** : « les garder, mais en Done… de manière à ce

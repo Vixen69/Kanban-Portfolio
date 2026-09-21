@@ -7,8 +7,10 @@ import { memo } from "react";
 import type { CSSProperties, DragEvent } from "react";
 import type { BoardConfig, CardState } from "../../core/types.ts";
 import { daysInColumn } from "../../core/aging.ts";
+import type { CardSort } from "../../core/card-sort.ts";
 import { domainById, typeById } from "../lookup.ts";
 import { AgeText, CritMark, CustomBadges, EstimeBar, TypeTag } from "./cardParts.tsx";
+import { ProfileBlock, SortTag } from "./ProfileBlock.tsx";
 import { AbsentMark, DecisionMark } from "./cardMarks.tsx";
 
 /** Shared props of both card renderings (pinned build-spec contract). */
@@ -31,6 +33,8 @@ export interface CardItemProps {
   onCardDrop: (e: DragEvent, card: CardState) => void;
   /** True while this card is the insertion target of the current drag. */
   dropTarget: boolean;
+  /** The board's sort (ADR 044): the expanded card emphasises its métiers and writes its figure. */
+  sort: CardSort;
 }
 
 // Blocked cards override the domain accent with the validated red wash +
@@ -133,12 +137,15 @@ function FocusCardBody(props: CardItemProps) {
           <CritMark c={card.criticality} big />
           <DecisionMark card={card} config={config} now={props.now} />
           <AbsentMark card={card} />
-          <span className="card-fill" />
-          <AgeText days={days} age={config.age} />
         </div>
         <FocusMeta card={card} config={config} showCodes={props.showCodes} showTypes={props.showTypes} />
         {card.blocked && <div className="focus-block">{card.blockedReason}</div>}
         <EstimeBar card={card} />
+      </div>
+      <ProfileBlock card={card} config={config} sort={props.sort} />
+      <div className="focus-side">
+        <AgeText days={days} age={config.age} />
+        <SortTag card={card} sort={props.sort} />
       </div>
     </div>
   );

@@ -12,6 +12,7 @@ import type {
   ProjectType,
 } from "../../core/types.ts";
 import { ageCategory, ageLabel } from "../../core/aging.ts";
+import { cardLoad } from "../../core/card-sort.ts";
 import { fmtNum } from "../format.ts";
 
 /**
@@ -61,14 +62,7 @@ export function TypeTag({ type, big }: { type: ProjectType | null; big?: boolean
  */
 export function EstimeBar({ card }: { card: CardState }) {
   const est = card.budgetEstimated;
-  const plan = card.chargeByProfile;
-  const jh = plan.length > 0
-    ? plan.reduce((total, entry) => total + entry.jh, 0)
-    : card.effortEstimated ?? 0;
-  const done = plan.length > 0
-    ? plan.reduce((total, entry) => total + entry.done, 0)
-    : card.effortConsumed ?? 0;
-  const raf = Math.max(0, jh - done);
+  const { jh, raf } = cardLoad(card); // one rule with the sort (ADR 044)
   if (est === null && jh === 0) return null;
   const estLabel = est === null ? "non renseigné" : `${fmtNum(est)} k€`;
   return (

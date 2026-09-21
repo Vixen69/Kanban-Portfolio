@@ -51,3 +51,15 @@
 .dec-pill { font-size: 8px; font-weight: 700; color: #fff; border-radius: 3px; padding: 0 4px; line-height: 12px; flex: 0 0 auto; margin-left: 3px; }
 .dec-pill.overdue { box-shadow: 0 0 0 2px var(--danger); }
 .absent-pill { font-size: 9px; color: var(--tx-4); border: 1px dashed var(--tx-4); border-radius: 3px; padding: 0 3px; line-height: 11px; flex: 0 0 auto; margin-left: 3px; }
+
+/* ---------- Carte étendue : RAF par métier et valeur du tri (ADR 044) ---------- */
+.focus-met { flex: 0 1 178px; min-width: 0; display: flex; flex-direction: column; gap: 1px; padding-left: 9px; border-left: 1px solid var(--bd-sub); }
+.met-cap { font-size: 8px; text-transform: uppercase; letter-spacing: .08em; color: var(--tx-4); margin-bottom: 1px; white-space: nowrap; }
+.met-line { display: flex; align-items: center; gap: 5px; font-size: 9px; color: var(--tx-3); line-height: 1.35; }
+.met-line.chosen { color: var(--tx-1); font-weight: 700; }
+.met-dot { width: 6px; height: 6px; border-radius: 50%; flex: 0 0 auto; }
+.met-name { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.met-raf { flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+.met-none { font-size: 9px; color: var(--tx-4); font-style: italic; }
+.focus-side { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 5px; min-width: 34px; }
+.sort-tag { font-size: 9px; font-weight: 700; color: var(--accent); background: #e7edfb; border-radius: 3px; padding: 1px 5px; white-space: nowrap; font-variant-numeric: tabular-nums; }

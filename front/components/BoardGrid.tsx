@@ -22,6 +22,7 @@ import { useMemo } from "react";
 import type { DragEvent } from "react";
 import type { BoardConfig, CardState, Column, Lane } from "../../core/types.ts";
 import { cellCards } from "../../core/board.ts";
+import type { CardSort } from "../../core/card-sort.ts";
 import { LANE_GUTTER, columnTemplate, rowTemplate, unifiedColumnIds } from "../../core/layout.ts";
 import { columnTotals, emptyTotals, laneTotals, totalsOf, type GroupTotals } from "../../core/totals.ts";
 import { COLUMN_TOTALS_KEY, LANE_TOTALS_KEY, useStoredFlag } from "../useUiPrefs.ts";
@@ -79,6 +80,8 @@ export interface BoardGridProps {
   now: number;
   showCodes: boolean;
   showTypes: boolean;
+  /** The board's sort (ADR 044), handed down to the expanded cards. */
+  sort: CardSort;
   /** The cell a dragged card is currently over, or null. */
   dragOver: { laneId: string; columnId: string } | null;
   onFocusColumn: (id: string) => void;
@@ -110,6 +113,7 @@ function BoardCell({ lane, col, cards, props }: { lane: Lane; col: Column; cards
       now={props.now}
       showCodes={props.showCodes}
       showTypes={props.showTypes}
+      sort={props.sort}
       dragOver={over !== null && over.laneId === lane.id && over.columnId === col.id}
       gateDef={gateDefOf(props.config, col)}
       onOpen={props.onOpen}

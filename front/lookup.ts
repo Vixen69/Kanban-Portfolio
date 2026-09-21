@@ -2,7 +2,7 @@
 // by id (O(1) renders instead of a find() per card), plus the actor display
 // rule. No React, no network — pure helpers over the validated config.
 
-import type { BoardConfig, Column, Domain, Lane, ProjectType } from "../core/types.ts";
+import type { BoardConfig, Column, Domain, Lane, Profile, ProjectType } from "../core/types.ts";
 
 function byId<T extends { id: string }>(items: T[]): Record<string, T> {
   return Object.fromEntries(items.map((item) => [item.id, item]));
@@ -15,6 +15,15 @@ function byId<T extends { id: string }>(items: T[]): Record<string, T> {
  */
 export function domainById(config: BoardConfig): Record<string, Domain> {
   return byId(config.domains);
+}
+
+/**
+ * DSI profiles (métiers) of the config keyed by id.
+ * Input: the board config. Output: a fresh Record (unknown id → undefined).
+ * Failure: none.
+ */
+export function profileById(config: BoardConfig): Record<string, Profile> {
+  return byId(config.profiles);
 }
 
 /**

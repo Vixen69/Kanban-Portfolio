@@ -9,7 +9,8 @@ import type { DecisionInput, MoveTarget } from "./api.ts";
 import { columnById } from "./lookup.ts";
 import { adminWrites } from "./adminWrites.ts";
 import { useBoardStore, type BoardStore } from "./useBoardStore.ts";
-import { useDerived, useDisplayCards, useExerciseShown } from "./useDisplayCards.ts";
+import { useBoardCards, useDerived, useDisplayCards, useExerciseShown } from "./useDisplayCards.ts";
+import { useCardSort, useSortPanel, type CardSorting, type SortPanel } from "./useCardSort.ts";
 import { useDetailProjection } from "./useDetailProjection.ts";
 import { useResourceDraw, type CapacityFetch } from "./useCapacity.ts";
 import { useFilters, type Filters } from "./useFilters.ts";
@@ -59,6 +60,9 @@ interface Ctx {
   draw: ResourceDraw;
   /** Refetches the snapshot (after an import). */
   bumpCapacity: () => void;
+  /** The board's sort (ADR 044) and its read-out for the sidebar and the header. */
+  sorting: CardSorting;
+  sortPanel: SortPanel;
 }
 
 
@@ -147,6 +151,7 @@ function BoardArea({ ctx }: { ctx: Ctx }) {
       <BoardGrid config={config} cards={ctx.cards} hiddenIds={derived.hidden}
         focusedColumn={ui.focusCol} collapsedLanes={ui.collapsedLanes}
         collapsedCols={ui.collapsedCols} now={ctx.nowMs} showCodes={ui.showCodes} showTypes={ui.showTypes}
+        sort={ctx.sorting.sort}
         dragOver={ui.dragOver}
         onFocusColumn={handlers.onFocusColumn} onToggleLane={handlers.onToggleLane}
         onToggleColumnCollapse={handlers.onToggleColumnCollapse}
@@ -169,6 +174,8 @@ function Screen({ ctx }: { ctx: Ctx }) {
       <Header config={config} stats={derived.stats} view={derived.view} exercise={ctx.exercise}
         filtersActive={filters.active} focusLabel={ctx.focusLabel}
         onResetFilters={filters.reset} onClearFocus={() => ui.setFocusCol(null)}
+        sortLabel={ctx.sortPanel.chip} onClearSort={ctx.sorting.clear}
+
         onToggleSidebar={() => ui.setSidebar((open) => !open)}
         onMetrics={() => ui.setMetrics(true)} onAdmin={() => ui.setAdmin(true)}
         onImport={() => ui.setImporting(true)}
@@ -181,7 +188,8 @@ function Screen({ ctx }: { ctx: Ctx }) {
         onSetGroup={filters.setGroup} stats={derived.all} view={derived.view}
         filtersActive={filters.active} onReset={filters.reset} searchRef={ctx.searchRef}
         showCodes={ui.showCodes} setShowCodes={ui.setShowCodes}
-        showTypes={ui.showTypes} setShowTypes={ui.setShowTypes} />
+        showTypes={ui.showTypes} setShowTypes={ui.setShowTypes}
+        sorting={ctx.sorting} sortPanel={ctx.sortPanel} />
       <BoardArea ctx={ctx} />
       <CardModals ctx={ctx} />
       <ShellModals ctx={ctx} />
@@ -203,21 +211,17 @@ function Shell({ store, config }: { store: BoardStore; config: BoardConfig }) {
   const ui = useUiState();
   const searchRef = useRef<HTMLInputElement>(null);
   const filters = useFilters(config);
-  const drag = useDragHandlers(store, ui);
+  const sorting = useCardSort(); // ADR 044: a sorted board has no manual insertion point
+  const drag = useDragHandlers(store, ui, !sorting.active);
   const handlers = useBoardHandlers(ui, config.lanes);
   useShortcuts(ui, searchRef);
   const { viewYear, exercise } = useExerciseShown(store.cards, config.exercise.year); // ADR 035: the year shown
   const allCards = useDisplayCards(store.cards, config, viewYear);
-  // Archived subjects leave the board and every count entirely; they are
-  // listed only by the Archives view (design v11, ADR 017). The detail
-  // lookup searches ALL cards so an archived fiche opens from the archive.
-  // A closed year is read as it stood: its cards were archived at the switch (ADR 038).
-  const closed = viewYear < config.exercise.year;
-  const cards = useMemo(() => (closed ? allCards : allCards.filter((card) => !card.archived)), [allCards, closed]);
-  const archivedCards = useMemo(() => allCards.filter((card) => card.archived), [allCards]);
-
+  // The detail lookup searches ALL cards so an archived fiche opens from the archive.
+  const { cards, archivedCards } = useBoardCards(allCards, viewYear, config.exercise.year, sorting.sort);
   const { capacity, draw, bumpCapacity } = useResourceDraw(viewYear, config); // ADR 041
   const derived = useDerived(cards, config, filters, now, draw);
+  const sortPanel = useSortPanel(cards, derived.hidden, config, sorting.sort);
   const detailCard = allCards.find((card) => card.id === ui.detailId) ?? null;
   // A card removed from the fold (deleted elsewhere) leaves detailId
   // dangling: clear it so Escape acts on the visible context again.
@@ -231,7 +235,7 @@ function Shell({ store, config }: { store: BoardStore; config: BoardConfig }) {
   const focusLabel = ui.focusCol ? (columnById(config)[ui.focusCol]?.name ?? null) : null;
   const ctx: Ctx = {
     store, config, ui, nowMs, filters, cards, archivedCards, derived, drag,
-    handlers, searchRef, detailCard, focusLabel, viewYear, exercise, capacity, draw, bumpCapacity,
+    handlers, searchRef, detailCard, focusLabel, viewYear, exercise, capacity, draw, bumpCapacity, sorting, sortPanel,
   };
 
   return <Screen ctx={ctx} />;
