@@ -29,7 +29,7 @@ import { CardDetail } from "./components/CardDetail.tsx";
 import { CardEdit } from "./components/CardEdit.tsx";
 import { Header } from "./components/Chrome.tsx";
 import { EmptyOverlay } from "./components/EmptyOverlay.tsx";
-import { ImportView } from "./components/ImportView.tsx";
+
 import { AnalyticsView } from "./components/AnalyticsView.tsx";
 import type { YearPickerProps } from "./components/YearPicker.tsx";
 import { QuickAdd } from "./components/QuickAdd.tsx";
@@ -124,16 +124,14 @@ function ShellModals({ ctx }: { ctx: Ctx }) {
           onCreate={(input) => { void store.createCard({ ...input, exercise: ctx.viewYear }); ui.setAdding(false); }} />
       )}
       {ui.admin && (
-        <AdminPanel config={config} cards={store.cards} {...adminWrites(store, ui, ctx.bumpCapacity)} onClose={() => ui.setAdmin(false)} />
+        <AdminPanel config={config} cards={store.cards} {...adminWrites(store, ui, ctx.bumpCapacity)} onClose={() => ui.setAdmin(false)}
+          initialTab={ui.adminTab} onImported={() => { void store.reload(); ctx.bumpCapacity(); }} defaultYear={ctx.viewYear} />
       )}
       {ui.metrics && (
         <AnalyticsView cards={ctx.cards} events={store.events} config={config} now={ctx.nowMs} year={ctx.viewYear} capacity={ctx.capacity}
           onClose={() => ui.setMetrics(false)} />
       )}
-      {ui.importing && (
-        <ImportView onClose={() => ui.setImporting(false)} onLoaded={() => { void store.reload(); ctx.bumpCapacity(); }} config={config}
-          defaultYear={ctx.viewYear} />
-      )}
+
       {ui.archive && (
         <ArchiveView cards={ctx.archivedCards} config={config}
           onUnarchive={(id: string) => void store.unarchiveCard(id)}
@@ -177,8 +175,8 @@ function Screen({ ctx }: { ctx: Ctx }) {
         sortLabel={ctx.sortPanel.chip} onClearSort={ctx.sorting.clear}
 
         onToggleSidebar={() => ui.setSidebar((open) => !open)}
-        onMetrics={() => ui.setMetrics(true)} onAdmin={() => ui.setAdmin(true)}
-        onImport={() => ui.setImporting(true)}
+        onMetrics={() => ui.setMetrics(true)} onAdmin={() => ui.openAdmin("wip")}
+        onImport={() => ui.openAdmin("importer")}
         onArchive={() => ui.setArchive(true)} archivedCount={ctx.archivedCards.length}
         onAdd={() => ui.setAdding(true)} />
       <Sidebar open={ui.sidebar} config={config} search={filters.state.search} draw={ctx.draw}

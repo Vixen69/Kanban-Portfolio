@@ -16,8 +16,8 @@ export interface CellProps {
   /** The canal of the cell, or UNIFIED_LANE for a cell without canal (ADR 039). */
   laneId: string;
   column: Column;
-  /** WIP limit the read-out is measured against; defaults to the column's own. A unified cell passes the whole column's (lanes × wip). */
-  wipLimit?: number | null;
+  /** The WIP limit of THIS cell (core/wip cellWipLimit, ADR 046), null when none. */
+  wipLimit: number | null;
   /** Grid placement of the cell root (the unified cells span the lane rows). */
   style?: CSSProperties;
   /** The cards of THIS cell only (BoardGrid filters via core cellCards),
@@ -108,7 +108,7 @@ function CellCardList({ props, listRef }: { props: CellProps; listRef: React.Ref
  */
 export function Cell(props: CellProps) {
   const { laneId, column, cards, gateDef } = props;
-  const limit = props.wipLimit === undefined ? column.wip : props.wipLimit;
+  const limit = props.wipLimit;
   const wip = wipState(cards.length, limit);
   const blockedCount = cards.filter((card) => card.blocked).length;
   const scroll = useScrollHint(cards.length, props.focused);

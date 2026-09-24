@@ -54,8 +54,8 @@ information is listed under "Open decisions", ask rather than assume.
 > **« Contrainte »** sidebar filter arrives (OR-shaped, with a synthetic
 > « Aucune »). The fiche loses the canal tag and the focused card trades its
 > progress bar for « est. k€ · RAF j.h ». WIP limits stay per-column topology:
-> the cumulated limit is `lanes × column.wip`, and terminal stages are always
-> derived from the config, never hardcoded.
+> the cumulated limit is `lanes × column.wip` (per CELL since ADR 046), and
+> terminal stages are always derived from the config, never hardcoded.
 
 ## 1. What this project is
 
@@ -76,7 +76,7 @@ It is an instrument, not a platform. The product's value IS its opinion:
   recorded append-only (deletion is itself an event).
 
 These behaviors are hard-coded and non-negotiable. What IS configurable is
-topology/vocabulary only: lanes, columns (order, WIP, gates), domains, types,
+topology/vocabulary only: lanes, columns (order, gates, reviews), WIP limits per cell, domains, types,
 nature/criticality labels, custom card fields, threshold values. Defaults live
 in a versioned config file; an **admin-only configuration panel** may apply a
 runtime override, persisted with an append-only history (ADR 013). Behavior is
@@ -251,9 +251,12 @@ INSERT/SELECT. Courtesy heads-up to the tech lead: the schema is append-only
 
 Config (`config/board.json`, versioned in git — the NMO default model):
 lanes (name, nature subtitle, `natureKey` — the nature the canal confers to
-its cards, ADR 018 — detail), columns (name, `wip`, `gate` DoR/DoD,
+its cards, ADR 018 — detail), columns (name, `gate` DoR/DoD,
 `review` — the referential's review or milestone at the column's entry,
-written as-is: RDO, RDLI, Kick-off, RDR — ADR 045; note),
+written as-is: RDO, RDLI, Kick-off, RDR — ADR 045; note), `wipLimits`
+(ADR 046: column → canal, or "*" for a column without canal → limit ≥ 1;
+absent = none; `core/wip.ts` reads a cell's, and a column's only when
+every canal has one — the sum),
 domains and types (name, short, color; a type or a domain may carry
 `aliases`, the export labels it is read from — a short alias is matched as
 a whole word inside the label, and a domain's aliases also resolve the
@@ -268,8 +271,8 @@ process states kept in the COUT PREV perimeter, ADR 030) and
 « finished » — « Terminé » — send the card to the terminal column whatever
 its milestones say, the disagreement counted in the audit report; a
 hand-moved card keeps its column, ADR 026), `decisions` / `decisionGrounds` (the
-referential's D1–D6 and the arbitration grid's terms, ADR 026). `wip: null` shows the bare count and enforces nothing;
-a set WIP shows count/limit, warns at ≥ 80 %, reddens beyond 100 % (warns,
+referential's D1–D6 and the arbitration grid's terms, ADR 026). A cell without limit shows the bare count and enforces nothing;
+a set limit shows count/limit, warns at ≥ 80 %, reddens beyond 100 % (warns,
 never hard-blocks). The default model carries no WIP limit since ADR 031
 (the provisional values were removed; limits are calibrated later from real
 flow). An admin-panel override is persisted server-side with an
@@ -386,8 +389,15 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
   canal confers the nature. When the intake column has no canal (ADR 039)
   the form asks for none — the server defaults to the « complicated »
   canal, hidden until the qualification drag picks the real one.
-- Admin panel (⚙): topology/vocabulary only (ADR 013), incl. per-lane
-  natureKey, plus the **Exercice** tab (ADR 038): the year switch — pins
+- Admin panel (⚙, ADR 046 — locked to what the importer does not depend
+  on, author 2026-09-24): **Limites WIP** (one limit per cell, canal by
+  column; a column without canal has one cell; empty = none; replaces the
+  Structure pane — columns, canals, gates, reviews, domains, types, aliases
+  and sub-domains are the versioned model's), **Catégories** (rename and
+  recolour domains, types, natures, criticalities — never add or remove),
+  **Champs de carte**, **Importer** (the import pane, also reached from the
+  ⋯ menu; the panel widens there; the draft footer shows only on the three
+  editing tabs), plus the **Exercice** tab (ADR 038): the year switch — pins
   the unstamped cards on the closing year, archives its active cards,
   activates the next year's (clock starts), then records the new current
   exercise; next year only, explicit confirmation. The **Instantanés**

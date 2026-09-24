@@ -637,6 +637,24 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-24 — Limites WIP par case, panneau de configuration verrouillé (ADR 046)
+
+- **Demande de l'auteur** : la limite se lit par case mais ne se réglait
+  que par colonne — « aucun endroit où la changer » ; et le panneau
+  laissait retaper colonnes, canaux, domaines et types que l'importeur ne
+  suit pas — « si tu ne peux pas retaper la configuration de l'importeur,
+  tu ne peux pas reconfigurer le tableau ».
+- **Fait** : `config.wipLimits` colonne → canal (ou `"*"` sans canal) →
+  limite ; `columns[].wip` disparaît ; `core/wip.ts` lit la case, et la
+  colonne seulement quand toutes ses cases en ont une (Flux, encours vs
+  limites). Panneau à six onglets : **Limites WIP** (grille canal ×
+  colonne, remplace Structure), **Catégories** (renommer et recolorer,
+  ne plus ajouter ni supprimer), **Champs de carte**, **Importer** (la
+  fenêtre d'import devient un onglet ; « ⋯ » › Importer y mène),
+  **Exercice**, **Instantanés**. Le modèle livré ne porte aucune limite :
+  le PMO les posera « quand ils auront vu vivre le flux ». Les jalons
+  (ADR 045) se règlent dans le modèle versionné seulement.
+
 ### 2026-09-24 — Les jalons du référentiel en tête de colonne (ADR 045)
 
 - **Demande de l'auteur** : voir RDO, RDLI, le kick-off et RDR « au bon

@@ -15,11 +15,14 @@ const DAY_MS = 86_400_000;
 function metricsConfig(): BoardConfig {
   const config = testConfig();
   config.columns = [
-    { id: "col1", name: "Demandes", wip: null, gate: null, review: null, note: "" },
-    { id: "col2", name: "Prêts", wip: 3, gate: "DoR", review: null, note: "" },
-    { id: "col3", name: "Actifs", wip: 2, gate: null, review: null, note: "" },
-    { id: "col4", name: "Done", wip: null, gate: "DoD", review: null, note: "" },
+    { id: "col1", name: "Demandes", gate: null, review: null, note: "" },
+    { id: "col2", name: "Prêts", gate: "DoR", review: null, note: "" },
+    { id: "col3", name: "Actifs", gate: null, review: null, note: "" },
+    { id: "col4", name: "Done", gate: "DoD", review: null, note: "" },
   ];
+  // col1 and col2 have no canal (the second column is the qualification
+  // anchor): col2's limit is the column's own; col3's is per canal.
+  config.wipLimits = { col2: { "*": 6 }, col3: { laneA: 2, laneB: 2 } };
   return config;
 }
 
@@ -171,14 +174,14 @@ test("a portfolio with nothing delivered yields zeros and null averages", () => 
   assert.deepEqual(flow, { throughput30: 0, throughput90: 0, leadTimeAvg: null, cycleTimeAvg: null });
 });
 
-test("wip rows cumulate the column limit across canaux and exclude delivered work", () => {
+test("wip rows read the column limit — the unified column's own, the canals' sum — and exclude delivered work", () => {
   const rows = wipRows(CARDS.filter((card) => !card.archived), CONFIG);
   assert.deepEqual(
     rows.map((row) => [row.id, row.count, row.limit, row.over]),
     [
       ["col1", 1, 0, false], // no WIP set => limit 0, never « over »
-      ["col2", 0, 6, false], // wip 3 x 2 canaux
-      ["col3", 1, 4, false], // wip 2 x 2 canaux
+      ["col2", 0, 6, false], // a column without canal: its one limit
+      ["col3", 1, 4, false], // 2 + 2 across the two canaux
       ["col4", 0, 0, false], // terminal: delivered work is not encours
     ],
   );

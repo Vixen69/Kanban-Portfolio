@@ -15,6 +15,7 @@ import {
 import { parseColored, parseDomain, parseIdNameColor, parseProjectType } from "./config-vocab.ts";
 import { parseDecisionGrounds, parseDecisions } from "./config-decisions.ts";
 import { parseCapacity, parseExercise } from "./config-exercise.ts";
+import { parseWipLimits } from "./config-wip.ts";
 
 export { ConfigError } from "./config-parse.ts";
 export { DEFAULT_EXERCISE_YEAR, DEFAULT_TENSION } from "./config-exercise.ts";
@@ -46,13 +47,6 @@ function parseLane(value: unknown, index: number): Lane {
   };
 }
 
-function parseWip(value: unknown, path: string): number | null {
-  if (value === undefined || value === null) return null;
-  if (typeof value !== "number" || !Number.isInteger(value) || value < 1) {
-    fail(`${path} doit être null ou un entier ≥ 1`);
-  }
-  return value;
-}
 
 function parseGate(value: unknown, path: string): GateCode | null {
   if (value === undefined || value === null) return null;
@@ -79,7 +73,6 @@ function parseColumn(value: unknown, index: number): Column {
   const column: Column = {
     id: requireText(record.id, `columns[${index}].id`),
     name: requireText(record.name, `columns[${index}].name`),
-    wip: parseWip(record.wip, `columns[${index}].wip`),
     gate: parseGate(record.gate, `columns[${index}].gate`),
     review: parseReview(record.review, `columns[${index}].review`),
     note: optionalText(record.note, `columns[${index}].note`),
@@ -218,7 +211,8 @@ function parseAge(value: unknown): AgeThresholds {
  * Output: a structurally valid BoardConfig. Display strings are kept as-is
  * (diacritics and typographic apostrophes included). Normalizations: purely
  * visual text (column note, lane nature/detail) defaults to "" when absent;
- * a missing column wip or gate defaults to null; a missing fields array
+ * a missing column gate or review defaults to null, a missing wipLimits
+ * table to {} (ADR 046); a missing fields array
  * defaults to []; a missing showOnCard defaults to false; options are kept
  * only on "select" fields; a domain's subDomains is kept only when declared
  * (ADR 022); a missing exercise defaults to DEFAULT_EXERCISE_YEAR (ADR 024).
@@ -265,6 +259,7 @@ export function validateBoardConfig(raw: unknown): BoardConfig {
   return {
     lanes,
     columns,
+    wipLimits: parseWipLimits(raw.wipLimits, lanes, columns),
     domains,
     types,
     natures: parseKeyed(raw.natures, "natures", NATURE_KEYS, parseNatureStyle) as BoardConfig["natures"],

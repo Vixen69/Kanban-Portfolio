@@ -26,14 +26,12 @@
     {
       "id": "demandes",
       "name": "Demandes",
-      "wip": null,
       "gate": null,
       "note": "File d’entrée · priorité verticale"
     },
     {
       "id": "qualification",
       "name": "Qualification",
-      "wip": null,
       "gate": null,
       "review": "RDO",
       "note": "RDO · détection de nature"
@@ -41,14 +39,12 @@
     {
       "id": "etudes",
       "name": "Études",
-      "wip": null,
       "gate": null,
       "note": "DAAT · estimation · dépendances"
     },
     {
       "id": "prets",
       "name": "Prêts",
-      "wip": null,
       "gate": "DoR",
       "review": "RDLI",
       "note": "Qualifié, estimé — tiré par l’équipe"
@@ -56,14 +52,12 @@
     {
       "id": "pause",
       "name": "Pause",
-      "wip": null,
       "gate": null,
       "note": "Mise en pause — repli pour piloter le flux"
     },
     {
       "id": "actifs",
       "name": "Actifs",
-      "wip": null,
       "gate": null,
       "review": "Kick-off",
       "note": "En cours · Andon si bloqué > 5j",
@@ -72,7 +66,6 @@
     {
       "id": "done",
       "name": "Done",
-      "wip": null,
       "gate": "DoD",
       "review": "RDR",
       "note": "DoD atteinte · PV Reprise d’Exploitation"
@@ -80,11 +73,11 @@
     {
       "id": "exploitation",
       "name": "Exploitation",
-      "wip": null,
       "gate": null,
       "note": "En production · état terminal"
     }
   ],
+  "wipLimits": {},
   "domains": [
     {
       "id": "ad",

@@ -69,16 +69,16 @@ test("rejects the new typologies when malformed", () => {
   assert.throws(() => validateBoardConfig(noRiskTypes), ConfigError);
 });
 
-test("absent optional fields are normalized (wip/gate null, texts empty, fields [])", () => {
+test("absent optional fields are normalized (gate null, wipLimits {}, texts empty, fields [])", () => {
   const raw = rawConfig();
-  delete raw.columns[0].wip;
+  delete raw.wipLimits;
   delete raw.columns[0].gate;
   delete raw.columns[0].note;
   delete raw.lanes[0].nature;
   delete raw.lanes[0].detail;
   delete raw.fields;
   const config = validateBoardConfig(raw);
-  assert.equal(config.columns[0]?.wip, null);
+  assert.deepEqual(config.wipLimits, {});
   assert.equal(config.columns[0]?.gate, null);
   assert.equal(config.columns[0]?.review, null);
   assert.equal(config.columns[0]?.note, "");
@@ -111,19 +111,19 @@ test("fields: select keeps options, other types drop them, showOnCard defaults t
   assert.equal(config.fields[1] !== undefined && "options" in config.fields[1], false);
 });
 
-test("edge values: wip 1 and andonThresholdDays 1 are accepted", () => {
+test("edge values: a WIP limit of 1 (per canal, or « * » for a column without canal) and andonThresholdDays 1 are accepted", () => {
   const raw = rawConfig();
-  raw.columns[0].wip = 1;
+  raw.wipLimits = { col1: { "*": 1 }, col3: { laneA: 1 } };
   raw.andonThresholdDays = 1;
   const config = validateBoardConfig(raw);
-  assert.equal(config.columns[0]?.wip, 1);
+  assert.deepEqual(config.wipLimits, { col1: { "*": 1 }, col3: { laneA: 1 } });
   assert.equal(config.andonThresholdDays, 1);
 });
 
 test("error messages are French and name the offending field", () => {
   const badWip = rawConfig();
-  badWip.columns[1].wip = 0;
-  assert.throws(() => validateBoardConfig(badWip), /columns\[1\]\.wip doit être null ou un entier/);
+  badWip.wipLimits = { col3: { laneB: 0 } };
+  assert.throws(() => validateBoardConfig(badWip), /wipLimits\.col3\.laneB doit être un entier/);
   const extraNature = rawConfig();
   extraNature.natures.chaotic = { label: "Chaotique", bg: "#000", fg: "#fff" };
   assert.throws(() => validateBoardConfig(extraNature), /natures : clé inattendue « chaotic »/);
@@ -146,9 +146,12 @@ const INVALID_CASES: { name: string; mutate: (raw: any) => void }[] = [
   { name: "duplicate lane id", mutate: (raw) => (raw.lanes[1].id = "laneA") },
   { name: "empty columns", mutate: (raw) => (raw.columns = []) },
   { name: "duplicate column id", mutate: (raw) => (raw.columns[1].id = "col1") },
-  { name: "wip zero", mutate: (raw) => (raw.columns[0].wip = 0) },
-  { name: "wip not an integer", mutate: (raw) => (raw.columns[0].wip = 2.5) },
-  { name: "wip as string", mutate: (raw) => (raw.columns[0].wip = "3") },
+  { name: "wip limit zero", mutate: (raw) => (raw.wipLimits = { col3: { laneA: 0 } }) },
+  { name: "wip limit not an integer", mutate: (raw) => (raw.wipLimits = { col3: { laneA: 2.5 } }) },
+  { name: "wip limit as string", mutate: (raw) => (raw.wipLimits = { col3: { laneA: "3" } }) },
+  { name: "wip limit on an unknown column", mutate: (raw) => (raw.wipLimits = { nope: { laneA: 1 } }) },
+  { name: "wip limit on an unknown canal", mutate: (raw) => (raw.wipLimits = { col3: { nope: 1 } }) },
+  { name: "wip limits not an object", mutate: (raw) => (raw.wipLimits = [1]) },
   { name: "unknown gate code", mutate: (raw) => (raw.columns[0].gate = "DoX") },
   { name: "gate as number", mutate: (raw) => (raw.columns[0].gate = 5) },
   { name: "review as number", mutate: (raw) => (raw.columns[0].review = 5) },

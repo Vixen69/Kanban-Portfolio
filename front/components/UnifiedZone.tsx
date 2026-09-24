@@ -9,6 +9,7 @@
 import type { CSSProperties } from "react";
 import type { BoardConfig, CardState, Column } from "../../core/types.ts";
 import { UNIFIED_LANE } from "../../core/layout.ts";
+import { cellWipLimit } from "../../core/wip.ts";
 import type { GroupTotals } from "../../core/totals.ts";
 import type { BoardGridProps } from "./BoardGrid.tsx";
 import { LaneTotals, TotalsToggle } from "./BoardTotals.tsx";
@@ -62,7 +63,7 @@ function UnifiedColumn({ col, index, cards, rows, props }: {
   if (props.collapsedCols.has(col.id)) {
     return <CollapsedColCell cards={cards} config={props.config} onOpen={props.onOpen} style={style} />;
   }
-  const wipLimit = col.wip === null ? null : col.wip * props.config.lanes.length;
+  const wipLimit = cellWipLimit(props.config, UNIFIED_LANE, col.id);
   return (
     <Cell
       laneId={UNIFIED_LANE}

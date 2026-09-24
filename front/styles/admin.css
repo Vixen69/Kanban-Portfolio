@@ -2,6 +2,7 @@
    Ported verbatim from design/Portefeuille DSI - Kanban NMO.html (design v9). */
 
 .admin-modal { width: 620px; }
+.admin-modal.wide { width: 840px; }
 .atabs { display: flex; gap: 4px; border-bottom: 1px solid var(--bd-sub); margin-bottom: 13px; }
 .atab { font-size: 11px; font-weight: 600; color: var(--tx-3); background: none; border: none; border-bottom: 2px solid transparent; padding: 6px 11px; cursor: pointer; font-family: inherit; }
 .atab:hover { color: var(--tx-1); }
@@ -18,7 +19,7 @@
 .ainp { background: #fff; border: 1px solid var(--bd); border-radius: 4px; padding: 5px 7px; font-size: 11px; color: var(--tx-1); font-family: inherit; }
 .ainp:focus { outline: none; border-color: var(--accent); }
 .ainp.grow { flex: 1; min-width: 0; }
-.wip-inp { width: 52px; } .gate-inp { width: 72px; } .review-inp { width: 66px; } .nature-inp { width: 110px; } .short-inp { width: 48px; text-transform: uppercase; } .type-inp { width: 110px; }
+.wip-cell { width: 46px; text-align: center; padding: 4px 2px; font-variant-numeric: tabular-nums; } .nature-inp { width: 110px; } .short-inp { width: 48px; text-transform: uppercase; } .type-inp { width: 110px; }
 .acolor { width: 26px; height: 26px; padding: 1px; border: 1px solid var(--bd); border-radius: 4px; background: #fff; cursor: pointer; }
 .a-add { font-size: 10px; font-weight: 600; color: var(--accent); background: none; border: 1px dashed var(--bd); border-radius: 5px; padding: 5px 10px; cursor: pointer; font-family: inherit; margin-top: 2px; }
 .a-add:hover { border-color: var(--accent); }
@@ -32,7 +33,15 @@
 .a-error { font-size: 10px; font-weight: 600; color: var(--danger-strong); background: #fdecec; border: 1px solid #f3c4c4; border-radius: 5px; padding: 6px 9px; margin-top: 10px; }
 
 /* ---------- Import depuis l'outil (ADR 027) ---------- */
-.import-modal { width: 840px; }
+.import-pane { display: flex; flex-direction: column; gap: 6px; }
+/* Limites WIP par case (ADR 046) : la grille canal × colonne. */
+.wip-grid { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 10px; }
+.wip-grid th { font-weight: 600; color: var(--tx-3); padding: 3px 2px; text-align: center; font-size: 9px; line-height: 1.2; }
+.wip-grid th:first-child, .wip-grid td:first-child { width: 92px; }
+.wip-grid tbody th { text-align: left; color: var(--tx-2); font-size: 10px; }
+.wip-grid td { padding: 2px; text-align: center; }
+.wip-na { color: var(--tx-4); }
+.wip-sum th, .wip-sum td { color: var(--tx-4); font-size: 9px; border-top: 1px solid var(--bd-sub); padding-top: 5px; font-variant-numeric: tabular-nums; }
 .import-note { font-size: 10.5px; color: var(--tx-3); line-height: 1.45; margin-bottom: 10px; }
 .import-form { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
 .import-row { display: flex; flex-direction: column; gap: 3px; }

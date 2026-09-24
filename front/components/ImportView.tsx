@@ -199,15 +199,16 @@ function Outcome({ phase, error, shown, config, decisions, setDecisions, acknowl
 }
 
 /**
- * The import overlay (header ⬆).
- * Inputs: the close callback, onLoaded (the board refetches after a load),
- * the runtime config (the current exercise, the domain labels). Output:
- * the modal DOM. Failure modes: none — API refusals (400 files, wrong-year
+ * The import pane — ⚙ › Importer (ADR 046; the header's ⋯ menu opens the
+ * panel on it).
+ * Inputs: onLoaded (the board refetches after a load), the runtime config
+ * (the current exercise, the domain labels), the exercise shown. Output:
+ * the pane DOM. Failure modes: none — API refusals (400 files, wrong-year
  * files, closed year, undecided conflict, 500) show their French message
  * and keep the form.
  */
-export function ImportView({ onClose, onLoaded, config, defaultYear }: {
-  onClose: () => void; onLoaded: () => void; config: BoardConfig;
+export function ImportPanel({ onLoaded, config, defaultYear }: {
+  onLoaded: () => void; config: BoardConfig;
   /** The exercise the header shows: preselected when it is not closed (ADR 035). */
   defaultYear?: number;
 }) {
@@ -218,29 +219,20 @@ export function ImportView({ onClose, onLoaded, config, defaultYear }: {
   const { phase, error, audited, decisions, setDecisions, run, reset } = useImport(files, exercise, onLoaded);
   const shown = phase.kind === "loaded" ? phase.result : audited;
   return (
-    <div className="overlay" onClick={onClose}>
-      <div className="modal import-modal" onClick={(event) => event.stopPropagation()}>
-        <span className="modal-bar" style={{ background: "#0f766e" }} />
-        <div className="modal-body">
-          <div className="modal-top">
-            <h2 className="modal-name">Importer un export PPM</h2>
-            <button className="btn ghost" onClick={onClose}>Fermer ✕</button>
-          </div>
-          <div className="import-note">
-            Déposer les CSV (Coût — l’export COUT PREV, le périmètre —, PARAM, Projets, ProjetsCdP, ProjetsJalons, SP,
-            Ressources_PdC — reconnus par leurs en-têtes, pas par leur nom ; Ress.Profils facultatif). L’audit ne modifie
-            rien ; le chargement n’efface jamais une carte. L’import ne touche que l’exercice choisi : un import 2027
-            ne lit ni n’écrit une carte 2026 ; un même code PE y est une autre carte, avec son budget. Le domaine d’une
-            carte déjà là n’est jamais remplacé sans votre décision, conflit par conflit.
-          </div>
-          <ImportForm files={files} busy={phase.kind === "busy"} exercise={exercise} currentYear={currentYear}
-            onYear={(year) => { setExercise(year); reset(); }}
-            onPick={(list) => { void readFiles(list).then((picked) => { setFiles(picked); reset(); }); }}
-            onAudit={() => { setAcknowledged(false); void run("audit"); }} />
-          <Outcome phase={phase} error={error} shown={shown} config={config} decisions={decisions} setDecisions={setDecisions}
-            acknowledged={acknowledged} setAcknowledged={setAcknowledged} onLoad={() => void run("load")} />
-        </div>
+    <div className="import-pane">
+      <div className="import-note">
+        Déposer les CSV (Coût — l’export COUT PREV, le périmètre —, PARAM, Projets, ProjetsCdP, ProjetsJalons, SP,
+        Ressources_PdC — reconnus par leurs en-têtes, pas par leur nom ; Ress.Profils facultatif). L’audit ne modifie
+        rien ; le chargement n’efface jamais une carte. L’import ne touche que l’exercice choisi : un import 2027
+        ne lit ni n’écrit une carte 2026 ; un même code PE y est une autre carte, avec son budget. Le domaine d’une
+        carte déjà là n’est jamais remplacé sans votre décision, conflit par conflit.
       </div>
+      <ImportForm files={files} busy={phase.kind === "busy"} exercise={exercise} currentYear={currentYear}
+        onYear={(year) => { setExercise(year); reset(); }}
+        onPick={(list) => { void readFiles(list).then((picked) => { setFiles(picked); reset(); }); }}
+        onAudit={() => { setAcknowledged(false); void run("audit"); }} />
+      <Outcome phase={phase} error={error} shown={shown} config={config} decisions={decisions} setDecisions={setDecisions}
+        acknowledged={acknowledged} setAcknowledged={setAcknowledged} onLoad={() => void run("load")} />
     </div>
   );
 }

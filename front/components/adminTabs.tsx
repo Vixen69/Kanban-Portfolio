@@ -1,15 +1,14 @@
 // Tab panes of the board-configuration panel (design/admin.jsx). Each pane
 // edits one slice of the DRAFT config owned by AdminPanel; nothing applies
-// until « Appliquer ». Structure | Catégories | Champs de carte.
+// until « Appliquer ». Catégories | Champs de carte — the WIP grid lives in
+// adminWip.tsx (ADR 046: the Structure pane is gone, columns and canals
+// are the versioned model's).
 
 import type {
   BoardConfig,
-  Column,
   Criticality,
   FieldDef,
   FieldType,
-  GateCode,
-  Lane,
   NatureKey,
   NatureStyle,
 } from "../../core/types.ts";
@@ -48,93 +47,6 @@ function slugId(label: string): string {
   return (base || "item") + "_" + Math.random().toString(36).slice(2, 6);
 }
 
-// Move list[i] one step up/down, returning a new list.
-function moveItem<T>(list: T[], i: number, dir: number): T[] {
-  const j = i + dir;
-  if (j < 0 || j >= list.length) return list;
-  const next = list.slice();
-  const swapped = next[i] as T;
-  next[i] = next[j] as T;
-  next[j] = swapped;
-  return next;
-}
-
-// Column rows: reorder, rename, WIP limit, entry gate, delete (min 2 kept).
-function ColumnRows({ columns, onChange }: { columns: Column[]; onChange: (columns: Column[]) => void }) {
-  const upd = (i: number, part: Partial<Column>) => onChange(columns.map((c, idx) => (idx === i ? { ...c, ...part } : c)));
-  return (
-    <>
-      {columns.map((c, i) => (
-        <div className="arow" key={c.id}>
-          <span className="amove">
-            <button className="abtn" disabled={i === 0} onClick={() => onChange(moveItem(columns, i, -1))}>↑</button>
-            <button className="abtn" disabled={i === columns.length - 1} onClick={() => onChange(moveItem(columns, i, 1))}>↓</button>
-          </span>
-          <input className="ainp grow" value={c.name} onChange={(e) => upd(i, { name: e.target.value })} />
-          <input className="ainp wip-inp" type="number" min="0" placeholder="WIP" title="Limite WIP (vide = aucune)" value={c.wip ?? ""} onChange={(e) => upd(i, { wip: e.target.value === "" ? null : Number(e.target.value) })} />
-          <input className="ainp review-inp" placeholder="Jalon" maxLength={16} title="Jalon à l'entrée de la colonne (RDO, RDLI, Kick-off, RDR…)"
-            value={c.review ?? ""} onChange={(e) => upd(i, { review: e.target.value === "" ? null : e.target.value })} />
-          <select className="ainp gate-inp" title="Gate à l'entrée" value={c.gate ?? ""} onChange={(e) => upd(i, { gate: (e.target.value || null) as GateCode | null })}>
-            <option value="">— gate</option>
-            <option value="DoR">DoR</option>
-            <option value="DoD">DoD</option>
-          </select>
-          <button className="abtn del" disabled={columns.length <= 2} title="Supprimer (les sujets seront déplacés)" onClick={() => onChange(columns.filter((_, idx) => idx !== i))}>✕</button>
-        </div>
-      ))}
-      <button className="a-add" onClick={() => onChange([...columns, { id: slugId("colonne"), name: "Nouvelle colonne", wip: null, gate: null, review: null, note: "" }])}>+ Ajouter une colonne</button>
-    </>
-  );
-}
-
-// Lane rows: reorder, rename, nature subtitle + natureKey (the nature the
-// canal confers to its cards, ADR 018), delete (min 1 kept).
-function LaneRows({ lanes, natures, onChange }: {
-  lanes: Lane[];
-  natures: BoardConfig["natures"];
-  onChange: (lanes: Lane[]) => void;
-}) {
-  const upd = (i: number, part: Partial<Lane>) => onChange(lanes.map((l, idx) => (idx === i ? { ...l, ...part } : l)));
-  return (
-    <>
-      {lanes.map((l, i) => (
-        <div className="arow" key={l.id}>
-          <span className="amove">
-            <button className="abtn" disabled={i === 0} onClick={() => onChange(moveItem(lanes, i, -1))}>↑</button>
-            <button className="abtn" disabled={i === lanes.length - 1} onClick={() => onChange(moveItem(lanes, i, 1))}>↓</button>
-          </span>
-          <input className="ainp grow" value={l.name} onChange={(e) => upd(i, { name: e.target.value })} />
-          <input className="ainp nature-inp" title="Sous-titre (nature)" value={l.nature} onChange={(e) => upd(i, { nature: e.target.value })} />
-          <select className="ainp" title="Nature conférée par le canal" value={l.natureKey}
-            onChange={(e) => upd(i, { natureKey: e.target.value as NatureKey })}>
-            {NATURE_KEYS.map((key) => <option key={key} value={key}>{natures[key].label}</option>)}
-          </select>
-          <button className="abtn del" disabled={lanes.length <= 1} title="Supprimer (les sujets seront déplacés)" onClick={() => onChange(lanes.filter((_, idx) => idx !== i))}>✕</button>
-        </div>
-      ))}
-      <button className="a-add" onClick={() => onChange([...lanes, { id: slugId("canal"), name: "Nouveau canal", nature: "", natureKey: "complicated", detail: "" }])}>+ Ajouter un canal</button>
-    </>
-  );
-}
-
-/**
- * « Structure » pane: column order/name/WIP/gate rows and lane order/name/
- * nature rows, with their add buttons.
- * Inputs: TabProps (draft config + patch callback).
- * Output: the pane DOM. Failure modes: none — minimum counts (2 columns,
- * 1 lane) are enforced by disabling the delete buttons.
- */
-export function StructureTab({ draft, patch }: TabProps) {
-  return (
-    <div className="apane">
-      <div className="asection-label">Colonnes (flux, de gauche à droite)</div>
-      <ColumnRows columns={draft.columns} onChange={(columns) => patch({ columns })} />
-      <div className="asection-label">Canaux (couloirs, de haut en bas)</div>
-      <LaneRows lanes={draft.lanes} natures={draft.natures} onChange={(lanes) => patch({ lanes })} />
-    </div>
-  );
-}
-
 // Domains and project types share one row shape: color, name, short code.
 interface PaletteItem {
   id: string;
@@ -143,8 +55,10 @@ interface PaletteItem {
   color: string;
 }
 
-// Shared color+name+short rows for domains and project types (min 1 kept).
-function PaletteRows({ items, onChange, shortTitle, addLabel, makeNew }: { items: PaletteItem[]; onChange: (items: PaletteItem[]) => void; shortTitle: string; addLabel: string; makeNew: (index: number) => PaletteItem }) {
+// Shared color+name+short rows for domains and project types: renamed and
+// recoloured here, never added or removed (ADR 046 — the importer resolves
+// them through the versioned model's aliases and markers).
+function PaletteRows({ items, onChange, shortTitle }: { items: PaletteItem[]; onChange: (items: PaletteItem[]) => void; shortTitle: string }) {
   const upd = (i: number, part: Partial<PaletteItem>) => onChange(items.map((x, idx) => (idx === i ? { ...x, ...part } : x)));
   return (
     <>
@@ -153,10 +67,8 @@ function PaletteRows({ items, onChange, shortTitle, addLabel, makeNew }: { items
           <input className="acolor" type="color" value={d.color} onChange={(e) => upd(i, { color: e.target.value })} />
           <input className="ainp grow" value={d.name} onChange={(e) => upd(i, { name: e.target.value })} />
           <input className="ainp short-inp" maxLength={3} title={shortTitle} value={d.short} onChange={(e) => upd(i, { short: e.target.value.toUpperCase() })} />
-          <button className="abtn del" disabled={items.length <= 1} onClick={() => onChange(items.filter((_, idx) => idx !== i))}>✕</button>
         </div>
       ))}
-      <button className="a-add" onClick={() => onChange([...items, makeNew(items.length)])}>{addLabel}</button>
     </>
   );
 }
@@ -202,18 +114,19 @@ function CritRows({ draft, patch }: TabProps) {
 
 /**
  * « Catégories » pane: RDOM domains and project types (color/name/short
- * rows), nature labels/colors and criticality labels. Natures and
- * criticalities are renamable, never extensible (fixed keys).
+ * rows), nature labels/colors and criticality labels. Everything is
+ * renamable, nothing extensible (ADR 046): a new domain or type is the
+ * versioned model's, with the aliases the importer reads it from.
  * Inputs: TabProps (draft config + patch callback).
  * Output: the pane DOM. Failure modes: none.
  */
 export function CategoriesTab({ draft, patch }: TabProps) {
   return (
     <div className="apane">
-      <div className="asection-label">Domaines (les sous-domaines se déclarent dans config/board.json — ADR 022)</div>
-      <PaletteRows items={draft.domains} onChange={(domains) => patch({ domains })} shortTitle="Code court (3 lettres)" addLabel="+ Ajouter un domaine" makeNew={(i) => ({ id: slugId("domaine"), name: "Nouveau domaine", short: "NEW", color: paletteColor(i) })} />
-      <div className="asection-label">Types de projet (plus visibles que le domaine sur la carte)</div>
-      <PaletteRows items={draft.types} onChange={(types) => patch({ types })} shortTitle="Code court" addLabel="+ Ajouter un type" makeNew={(i) => ({ id: slugId("type"), name: "Nouveau type", short: "NEW", color: paletteColor(i) })} />
+      <div className="asection-label">Domaines — renommer, recolorer (l’ajout, les alias et les sous-domaines se déclarent dans config/board.json)</div>
+      <PaletteRows items={draft.domains} onChange={(domains) => patch({ domains })} shortTitle="Code court (3 lettres)" />
+      <div className="asection-label">Types de projet — renommer, recolorer (l’ajout se déclare dans config/board.json, avec ses alias)</div>
+      <PaletteRows items={draft.types} onChange={(types) => patch({ types })} shortTitle="Code court" />
       <div className="asection-label">Natures (détectées à la RDO — renommables, non extensibles)</div>
       <NatureRows draft={draft} patch={patch} />
       <div className="asection-label">Criticités (renommables)</div>

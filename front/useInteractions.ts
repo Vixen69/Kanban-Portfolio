@@ -10,6 +10,9 @@ import { UNIFIED_LANE, unifiedColumnIds } from "../core/layout.ts";
 import type { MoveTarget } from "./api.ts";
 import type { BoardStore } from "./useBoardStore.ts";
 
+/** The tabs of the configuration panel (ADR 046): the ⋯ menu opens it on « Importer ». */
+export type AdminTab = "wip" | "categories" | "champs" | "importer" | "exercice" | "instantanes";
+
 /**
  * The app shell's view state: sidebar, focused column, collapsed lanes and
  * columns (Pause starts collapsed, per the design), the open modal flags,
@@ -26,8 +29,10 @@ export function useUiState() {
   const [adding, setAdding] = useState(false);
   const [archive, setArchive] = useState(false);
   const [admin, setAdmin] = useState(false);
+  const [adminTab, setAdminTab] = useState<AdminTab>("wip");
   const [metrics, setMetrics] = useState(false);
-  const [importing, setImporting] = useState(false);
+  // Opens the configuration panel on a tab (the ⋯ menu's « Importer » lands on the import, ADR 046).
+  const openAdmin = useCallback((tab: AdminTab = "wip") => { setAdminTab(tab); setAdmin(true); }, []);
   const [showCodes, setShowCodes] = useState(false);
   const [showTypes, setShowTypes] = useState(true);
   const [dragOver, setDragOver] = useState<MoveTarget | null>(null);
@@ -36,7 +41,7 @@ export function useUiState() {
     sidebar, setSidebar, focusCol, setFocusCol,
     collapsedLanes, setCollapsedLanes, collapsedCols, setCollapsedCols,
     detailId, setDetailId, editing, setEditing, adding, setAdding,
-    archive, setArchive, admin, setAdmin, metrics, setMetrics, importing, setImporting,
+    archive, setArchive, admin, setAdmin, adminTab, openAdmin, metrics, setMetrics,
     showCodes, setShowCodes, showTypes, setShowTypes, dragOver, setDragOver,
     dropCardId, setDropCardId,
   };

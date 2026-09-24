@@ -22,6 +22,7 @@ import { useMemo } from "react";
 import type { DragEvent } from "react";
 import type { BoardConfig, CardState, Column, Lane } from "../../core/types.ts";
 import { cellCards } from "../../core/board.ts";
+import { cellWipLimit } from "../../core/wip.ts";
 import type { CardSort } from "../../core/card-sort.ts";
 import { LANE_GUTTER, columnTemplate, rowTemplate, unifiedColumnIds } from "../../core/layout.ts";
 import { columnTotals, emptyTotals, laneTotals, totalsOf, type GroupTotals } from "../../core/totals.ts";
@@ -108,6 +109,7 @@ function BoardCell({ lane, col, cards, props }: { lane: Lane; col: Column; cards
       laneId={lane.id}
       column={col}
       cards={cards}
+      wipLimit={cellWipLimit(props.config, lane.id, col.id)}
       focused={props.focusedColumn === col.id}
       config={props.config}
       now={props.now}

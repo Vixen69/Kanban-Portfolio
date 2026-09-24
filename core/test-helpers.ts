@@ -58,10 +58,11 @@ export function testConfig(): BoardConfig {
       { id: "laneB", name: "Lane B", nature: "Complexe", natureKey: "complex", detail: "Canal complexe" },
     ],
     columns: [
-      { id: "col1", name: "Colonne 1", wip: null, gate: null, review: null, note: "Entrée" },
-      { id: "col2", name: "Colonne 2", wip: 3, gate: "DoR", review: "RDLI", note: "Au milieu" },
-      { id: "col3", name: "Colonne 3", wip: null, gate: null, review: null, note: "Sortie" },
+      { id: "col1", name: "Colonne 1", gate: null, review: null, note: "Entrée" },
+      { id: "col2", name: "Colonne 2", gate: "DoR", review: "RDLI", note: "Au milieu" },
+      { id: "col3", name: "Colonne 3", gate: null, review: null, note: "Sortie" },
     ],
+    wipLimits: {},
     domains: [
       { id: "alpha", name: "Alpha", short: "ALP", color: "#10b981" },
       { id: "beta", name: "Beta", short: "BET", color: "#6366f1", subDomains: [{ id: "b1", name: "Beta 1" }, { id: "b2", name: "Beta 2" }], transverse: true },
@@ -80,10 +81,7 @@ export function testConfig(): BoardConfig {
       major: { label: "Majeur", badge: "MAJEUR", bg: "#475569", fg: "#e2e8f0" },
       normal: { label: "Normal", badge: null },
     },
-    gateDefs: {
-      DoR: { name: "Definition of Ready", color: "#1d4ed8" },
-      DoD: { name: "Definition of Done", color: "#047857" },
-    },
+    gateDefs: { DoR: { name: "Definition of Ready", color: "#1d4ed8" }, DoD: { name: "Definition of Done", color: "#047857" } },
     fields: [],
     ...testVocabularies(),
     age: { freshMaxDays: 7, recentMaxDays: 28, agingMaxDays: 60 },

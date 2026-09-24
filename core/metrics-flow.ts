@@ -6,6 +6,7 @@
 import type { BoardConfig, CardEvent, CardState } from "./types.ts";
 import { daysInColumn } from "./aging.ts";
 import { flowTimes, terminalColumnIds } from "./flow.ts";
+import { columnWipLimit } from "./wip.ts";
 
 const DAY_MS = 86_400_000;
 
@@ -124,7 +125,8 @@ export function flowSummary(
 }
 
 /**
- * Encours par colonne face à la limite cumulée (canaux x limite colonne).
+ * Encours par colonne face à la limite de la colonne (core/wip
+ * columnWipLimit, ADR 046 : la somme des cases quand toutes en ont une).
  * Les étapes terminales sont exclues du décompte : ce qui est livré n'est
  * plus de l'encours.
  * Inputs: the active card states, the board config.
@@ -138,10 +140,9 @@ export function wipRows(cards: readonly CardState[], config: BoardConfig): WipRo
     if (terminal.has(card.columnId)) continue;
     counts.set(card.columnId, (counts.get(card.columnId) ?? 0) + 1);
   }
-  const laneCount = config.lanes.length;
   return config.columns.map((column) => {
     const count = counts.get(column.id) ?? 0;
-    const limit = column.wip === null ? 0 : column.wip * laneCount;
+    const limit = columnWipLimit(config, column.id) ?? 0;
     return { id: column.id, name: column.name, count, limit, over: limit > 0 && count > limit };
   });
 }

@@ -23,11 +23,10 @@ export interface Lane {
   detail: string;
 }
 
-/** One column (flow stage). wip null = no limit; a set WIP warns, never blocks. */
+/** One column (flow stage). Its WIP limits live per cell in BoardConfig.wipLimits (ADR 046). */
 export interface Column {
   id: string;
   name: string;
-  wip: number | null;
   /** Gate at the entry of this column, or null. Rendered as a badge + line. */
   gate: GateCode | null;
   /**
@@ -234,6 +233,13 @@ export interface DecisionGround {
 export interface BoardConfig {
   lanes: Lane[];
   columns: Column[];
+  /**
+   * WIP limits per cell (ADR 046): column id → canal id (or "*" for a
+   * column without canal, ADR 039) → limit ≥ 1. Absent = no limit. A set
+   * limit warns at 80 %, reddens beyond, never blocks. The default model
+   * carries none (ADR 031): limits are calibrated once the flow has lived.
+   */
+  wipLimits: Record<string, Record<string, number>>;
   domains: Domain[];
   types: ProjectType[];
   natures: Record<NatureKey, NatureStyle>;

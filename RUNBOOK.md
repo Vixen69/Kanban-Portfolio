@@ -143,8 +143,8 @@ node sync/import.ts imports --charger
 > imports-2027 --charger --exercice 2027`. Un import ne lit et ne touche
 > que les cartes de SON exercice (un même code PE y est une autre carte,
 > avec son budget) ; une année close est refusée, de même qu'un lot de
-> fichiers sans projet sur l'année demandée. Dans l'outil : le sélecteur
-> « Exercice » de l'importeur.
+> fichiers sans projet sur l'année demandée. Dans l'outil : ⚙ › onglet
+> **Importer** (ou « ⋯ » › Importer), le sélecteur « Exercice ».
 
 > **Configuration appliquée et modèle versionné** (ADR 038) : une
 > configuration appliquée depuis ⚙ n'est gardée que tant que le
