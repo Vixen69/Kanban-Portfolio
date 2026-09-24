@@ -10,7 +10,10 @@ import { isStale } from "../../core/aging.ts";
 import { CollapsedTicketList } from "./CollapsedTicketList.tsx";
 
 // Rect state + open handler shared by the two collapsed-cell variants:
-// hover or click anchors the ticket popover on the cell (design v11).
+// hover or click anchors the ticket popover on the cell (design v11). The
+// popover is a DOM child of the cell, so the cell's mouseleave fires only
+// once the pointer has left BOTH (author, 2026-09-24: leaving the collapsed
+// column must close the list; going down into it must keep it).
 function useCellPopover(count: number) {
   const [rect, setRect] = useState<DOMRect | null>(null);
   const open = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -38,7 +41,7 @@ export function CollapsedCell({ cards, config, now, onOpen }: {
   const stale = cards.filter((card) => isStale(card, config, date)).length;
   const pop = useCellPopover(cards.length);
   return (
-    <div className={"ccell" + (cards.length ? " has" : "")} onMouseEnter={pop.open} onClick={pop.open}>
+    <div className={"ccell" + (cards.length ? " has" : "")} onMouseEnter={pop.open} onMouseLeave={pop.close} onClick={pop.open}>
       <span className="ccount">{cards.length || ""}</span>
       {blocked > 0 && <span className="cblk">{blocked}</span>}
       {stale > 0 && <span className="cstale" title={stale + " stagnant(s)"} />}
@@ -64,7 +67,7 @@ export function CollapsedColCell({ cards, config, onOpen, style }: {
   const blocked = cards.filter((card) => card.blocked).length;
   const pop = useCellPopover(cards.length);
   return (
-    <div className={"ccol-cell" + (cards.length ? " has" : "")} style={style} onMouseEnter={pop.open} onClick={pop.open}>
+    <div className={"ccol-cell" + (cards.length ? " has" : "")} style={style} onMouseEnter={pop.open} onMouseLeave={pop.close} onClick={pop.open}>
       <span className="ccount">{cards.length || ""}</span>
       {blocked > 0 && <span className="cblk">{blocked}</span>}
       {pop.rect && <CollapsedTicketList anchorRect={pop.rect} list={cards} config={config} onOpen={onOpen} onClose={pop.close} />}

@@ -1,7 +1,10 @@
 // Popover listing the tickets inside a collapsed cell (design v11
 // grid.jsx): one click opens a card without expanding the lane or column.
 // Positioned fixed off the cell's rect so it escapes the board's overflow
-// clipping; flips upward when the space below is short.
+// clipping; flips upward when the space below is short. A transparent
+// 4px band bridges the cell and the list, so the pointer never leaves the
+// cell's DOM subtree on its way down — the cell's mouseleave closes the
+// list, not the list's own.
 
 import type { BoardConfig, CardState } from "../../core/types.ts";
 import { typeById } from "../lookup.ts";
@@ -20,8 +23,10 @@ export interface CollapsedTicketListProps {
 /**
  * The ticket popover of a collapsed cell: count header + one row per card
  * (type badge, name, blocked mark). Clicking a row closes the popover and
- * opens the card detail; leaving the popover closes it.
- * Inputs: CollapsedTicketListProps. Output: the fixed-position div.cpop.
+ * opens the card detail; leaving the cell AND the popover closes it (the
+ * owning cell's mouseleave).
+ * Inputs: CollapsedTicketListProps. Output: the fixed-position anchor
+ * holding div.cpop.
  * Failure modes: none.
  */
 export function CollapsedTicketList({ anchorRect, list, config, onOpen, onClose }: CollapsedTicketListProps) {
@@ -33,10 +38,11 @@ export function CollapsedTicketList({ anchorRect, list, config, onOpen, onClose 
     left: Math.min(anchorRect.left, window.innerWidth - 268),
     width: 252,
     zIndex: 60,
-    ...(openUp ? { bottom: window.innerHeight - anchorRect.top + 4 } : { top: anchorRect.bottom + 4 }),
+    ...(openUp ? { bottom: window.innerHeight - anchorRect.top } : { top: anchorRect.bottom }),
   };
   return (
-    <div className="cpop" style={style} onMouseLeave={onClose}>
+    <div className={"cpop-anchor" + (openUp ? " up" : "")} style={style}>
+    <div className="cpop">
       <div className="cpop-head">{list.length} sujet{list.length > 1 ? "s" : ""}</div>
       <div className="cpop-list">
         {list.map((card) => {
@@ -51,6 +57,7 @@ export function CollapsedTicketList({ anchorRect, list, config, onOpen, onClose 
           );
         })}
       </div>
+    </div>
     </div>
   );
 }
