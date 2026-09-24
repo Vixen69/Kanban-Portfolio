@@ -84,7 +84,7 @@ function Delay({ label, days, warm, hot, empty = "—" }: { label: string; days:
  */
 export function DelaysSection({ flow, anchors }: { flow: FlowTimes; anchors: FlowAnchors | null }) {
   const [open, setOpen] = useState(false);
-  const endName = flow.finished ? anchors?.terminal?.name ?? "Done" : "aujourd’hui";
+  const endName = flow.finished ? anchors?.terminal?.name ?? "Terminé" : "aujourd’hui";
   return (
     <div className="history">
       <SectionToggle label="Délais" what="les délais" open={open} onToggle={() => setOpen((o) => !o)} />

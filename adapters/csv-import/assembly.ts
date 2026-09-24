@@ -213,12 +213,12 @@ function ownerStatus(deck: CardAssembly, projets: ProjetsTable, data: AssemblyDa
 
 function positionStatus(data: AssemblyData, deck: CardAssembly): string {
   const s = deck.stats;
-  const byState = s.doneByState === 0 ? "" : ` · en Done par l'état du projet : ${s.doneByState} (ADR 043)`;
+  const byState = s.doneByState === 0 ? "" : ` · dans Terminé par l'état du projet : ${s.doneByState} (ADR 043)`;
   if (data.jalons === null) {
     return `en attente de \`ProjetsJalons\` — ${s.total - s.doneByState} carte(s) en colonne d'entrée${byState}`;
   }
   const stages: Array<[string, string]> = [
-    ["done", "Done"], ["actifs", "Actifs"], ["etudes", "Études"], ["entree", "entrée"],
+    ["done", "Terminé"], ["actifs", "Actifs"], ["etudes", "Études/Cadrage"], ["entree", "entrée"],
   ];
   const detail = stages.map(([key, label]) => `${label} ${s.stageCounts.get(key as never) ?? 0}`).join(" · ");
   const r = data.jalons.reading;

@@ -50,7 +50,7 @@ test("a « Terminé » project lands in Done without any milestone line, positio
   const others = deck.cards.filter((card) => card.codename !== FINISHED);
   assert.ok(others.every((card) => card.columnId === "demandes" && !card.positioned));
   assert.equal(deck.stats.doneByState, 1);
-  assert.ok(report.warnings.some((w) => /état « Terminé » sans RDR approuvé — carte placée en Done par l'état \(ADR 043\)/.test(w.message)));
+  assert.ok(report.warnings.some((w) => /état « Terminé » sans RDR approuvé — carte placée dans Terminé par l'état \(ADR 043\)/.test(w.message)));
 });
 
 test("the state wins over milestones that stop at RDLI, and says so; an approved RDR agrees silently", () => {

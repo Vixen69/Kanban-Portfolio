@@ -28,21 +28,39 @@ function CollapsedColumnHead({ col, onToggleCollapse }: { col: Column; onToggleC
   );
 }
 
-// The marks at the entry of the stage (ADR 045): the referential's review
-// or milestone (RDO, RDLI, Kick-off, RDR — the config's words) above the
-// quality gate it conditions (DoR, DoD). Small and grey, at the right of
-// the header: a reminder, never a rule the software enforces.
-function ColumnMarks({ col, gateDef }: { col: Column; gateDef: GateDef | null }) {
-  const gated = gateDef !== null && col.gate !== null;
-  if (col.review === null && !gated) return null;
+// One quality-gate badge: validated at this entry (solid, ✓) or opened
+// here (dashed) — ADR 047.
+function GateMark({ code, def, validated, column }: { code: string; def: GateDef; validated: boolean; column: string }) {
+  const title = validated
+    ? `${code} validée à l’entrée de ${column} — ${def.name}`
+    : `${code} ouverte à ${column} — ${def.name} à instruire`;
+  return (
+    <span className={"gate-badge" + (validated ? "" : " opened")} style={{ "--gate": def.color } as CSSProperties} title={title}>
+      {code}{validated && " ✓"}
+    </span>
+  );
+}
+
+// The marks at the entry of the stage (ADR 045/047): the referential's
+// review or milestone (RDO, RDLI, Kick-off, RDR — the config's words), then
+// the gate VALIDATED at this entry and the gate whose checklist OPENS here:
+// the DoR opens at the RDO and is validated at the RDLI, the DoD opens at
+// the RDLI and is validated at the RDR. Small and grey, at the right of
+// the header: a reminder, never a rule the software enforces. The badges
+// sit side by side under the review, so the header keeps its height.
+function ColumnMarks({ col, config }: { col: Column; config: BoardConfig }) {
+  const validated = col.gate === null ? null : config.gateDefs[col.gate];
+  const opened = col.gateStart === null ? null : config.gateDefs[col.gateStart];
+  if (col.review === null && validated === null && opened === null) return null;
   return (
     <span className="col-marks">
       {col.review !== null && (
         <span className="review-mark" title={`${col.review} · jalon à l’entrée de ${col.name}`}>{col.review}</span>
       )}
-      {gated && (
-        <span className="gate-badge" style={{ "--gate": gateDef.color } as CSSProperties} title={`${col.gate} — ${gateDef.name}`}>
-          {col.gate}
+      {(validated !== null || opened !== null) && (
+        <span className="gate-row">
+          {validated !== null && col.gate !== null && <GateMark code={col.gate} def={validated} validated column={col.name} />}
+          {opened !== null && col.gateStart !== null && <GateMark code={col.gateStart} def={opened} validated={false} column={col.name} />}
         </span>
       )}
     </span>
@@ -64,7 +82,7 @@ function ColumnCount({ shown, all, narrowed }: { shown: number; all: number; nar
  * Column header. Clicking the body focuses the stage; the caret button
  * collapses the column to a 30px strip (design grid.jsx). The functional
  * note is carried by the tooltip since v12 gave its row to the totals.
- * Inputs: the column, its gate definition (null when ungated), focus and
+ * Inputs: the column (its review and gate marks read from the config), focus and
  * collapse state, the visible totals of the column (its `count` is the
  * retained card count) and whether they are unfolded, the column's whole
  * card count and whether the board is narrowed by the filters, and the
@@ -72,9 +90,8 @@ function ColumnCount({ shown, all, narrowed }: { shown: number; all: number; nar
  * Output: the header element — a vertical label variant when collapsed.
  * Failure modes: none.
  */
-export function ColumnHeader({ col, gateDef, focused, colCollapsed, totals, totalsOpen, all, narrowed, config, onFocus, onToggleCollapse }: {
+export function ColumnHeader({ col, focused, colCollapsed, totals, totalsOpen, all, narrowed, config, onFocus, onToggleCollapse }: {
   col: Column;
-  gateDef: GateDef | null;
   focused: boolean;
   colCollapsed: boolean;
   totals: GroupTotals;
@@ -95,7 +112,7 @@ export function ColumnHeader({ col, gateDef, focused, colCollapsed, totals, tota
       <div className="col-head-top">
         <span className="col-label">{col.name}</span>
         <ColumnCount shown={totals.count} all={all} narrowed={narrowed} />
-        <ColumnMarks col={col} gateDef={gateDef} />
+        <ColumnMarks col={col} config={config} />
         <button
           className="col-collapse"
           onClick={(e) => { e.stopPropagation(); onToggleCollapse(col.id); }}
@@ -136,7 +153,6 @@ export function ColumnHeads({ config, columns, cards, hiddenIds, focusedColumn, 
         <ColumnHeader
           key={col.id}
           col={col}
-          gateDef={gateDefOf(config, col)}
           focused={focusedColumn === col.id}
           colCollapsed={collapsedCols.has(col.id)}
           totals={byColumn[col.id] ?? emptyTotals()}

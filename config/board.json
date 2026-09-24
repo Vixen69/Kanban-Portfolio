@@ -33,12 +33,13 @@
       "id": "qualification",
       "name": "Qualification",
       "gate": null,
+      "gateStart": "DoR",
       "review": "RDO",
       "note": "RDO · détection de nature"
     },
     {
       "id": "etudes",
-      "name": "Études",
+      "name": "Études/Cadrage",
       "gate": null,
       "note": "DAAT · estimation · dépendances"
     },
@@ -46,6 +47,7 @@
       "id": "prets",
       "name": "Prêts",
       "gate": "DoR",
+      "gateStart": "DoD",
       "review": "RDLI",
       "note": "Qualifié, estimé — tiré par l’équipe"
     },
@@ -65,7 +67,7 @@
     },
     {
       "id": "done",
-      "name": "Done",
+      "name": "Terminé",
       "gate": "DoD",
       "review": "RDR",
       "note": "DoD atteinte · PV Reprise d’Exploitation"

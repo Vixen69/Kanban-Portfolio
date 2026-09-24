@@ -15,10 +15,10 @@ const DAY_MS = 86_400_000;
 function metricsConfig(): BoardConfig {
   const config = testConfig();
   config.columns = [
-    { id: "col1", name: "Demandes", gate: null, review: null, note: "" },
-    { id: "col2", name: "Prêts", gate: "DoR", review: null, note: "" },
-    { id: "col3", name: "Actifs", gate: null, review: null, note: "" },
-    { id: "col4", name: "Done", gate: "DoD", review: null, note: "" },
+    { id: "col1", name: "Demandes", gate: null, review: null, gateStart: null, note: "" },
+    { id: "col2", name: "Prêts", gate: "DoR", review: null, gateStart: null, note: "" },
+    { id: "col3", name: "Actifs", gate: null, review: null, gateStart: null, note: "" },
+    { id: "col4", name: "Done", gate: "DoD", review: null, gateStart: null, note: "" },
   ];
   // col1 and col2 have no canal (the second column is the qualification
   // anchor): col2's limit is the column's own; col3's is per canal.

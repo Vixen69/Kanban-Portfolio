@@ -251,7 +251,9 @@ INSERT/SELECT. Courtesy heads-up to the tech lead: the schema is append-only
 
 Config (`config/board.json`, versioned in git — the NMO default model):
 lanes (name, nature subtitle, `natureKey` — the nature the canal confers to
-its cards, ADR 018 — detail), columns (name, `gate` DoR/DoD,
+its cards, ADR 018 — detail), columns (name, `gate` — the DoR/DoD
+VALIDATED at the column's entry — and `gateStart` — the one whose
+checklist OPENS there, ADR 047,
 `review` — the referential's review or milestone at the column's entry,
 written as-is: RDO, RDLI, Kick-off, RDR — ADR 045; note), `wipLimits`
 (ADR 046: column → canal, or "*" for a column without canal → limit ≥ 1;
@@ -294,9 +296,11 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
 
 - Grid: lanes as horizontal swimlanes (canaux), columns as vertical stages;
   at the right of each header a small grey stack — the stage's review mark
-  above the gate badge it conditions (ADR 045, author 2026-09-24: RDO on
-  Qualification, RDLI over DoR on Prêts, Kick-off on Actifs, RDR over DoD
-  on Done; a reminder, never enforced). The intake columns up to the
+  above its gate badges, side by side (ADR 045/047, author 2026-09-24): the
+  gate validated at the entry solid with ✓, the gate opened there dashed.
+  Qualification: RDO, DoR opens; Prêts: RDLI, DoR ✓, DoD opens; Actifs:
+  Kick-off; Terminé: RDR, DoD ✓. A reminder, never enforced. Column names
+  « Études/Cadrage » and « Terminé » (author, 2026-09-24; ids unchanged). The intake columns up to the
   qualification stage (the RDO) have NO canal (ADR 039, author
   2026-09-16): each is one cell tall as the board, unlabelled; the canals
   start right after. Two gutters: left of Demandes the board-wide totals

@@ -125,7 +125,7 @@ export function Cell(props: CellProps) {
         <span
           className="gate-line"
           style={{ "--gate": gateDef.color } as CSSProperties}
-          title={`${column.gate} — ${gateDef.name}`}
+          title={`${column.gate} validée à l’entrée — ${gateDef.name}`}
         />
       )}
       <div className="cell-head">

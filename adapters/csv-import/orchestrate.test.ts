@@ -57,9 +57,10 @@ test("the five fixture files assemble the full deck", () => {
   const byLabel = new Map(report.assembly.map((a) => [a.subject, a.status]));
   assert.equal(byLabel.get("table PARAM"), "prête (5 responsable(s) de domaine · 7 ligne(s) organisation, 7 avec chemin)");
   assert.match(byLabel.get("périmètre `projets`") ?? "", /^6 carte\(s\) — la liste fait foi \(« Projets\.csv »\) · types : .*Étude 2.*hors des types retenus 1 · domaine : colonnes Orga \(direct\)$/);
-  assert.equal(byLabel.get("cartes"), "6 — répartition : Demandes 2 · Études 1 · Actifs 1 · Done 2");
+  assert.equal(byLabel.get("cartes"), "6 — répartition : Demandes 2 · Études/Cadrage 1 · Actifs 1 · Terminé 2");
   assert.equal(byLabel.get("position"),
-    "jalons 5/6 (Done 2 · Actifs 1 · Études 1 · entrée 1) · sans jalon : 1 → colonne d'entrée · lignes jalons hors périmètre : 1" +
+    "jalons 5/6 (Terminé 2 · Actifs 1 · Études/Cadrage 1 · entrée 1) · sans jalon : 1 → colonne d'entrée · lignes jalons hors périmètre : 1" +
+
     " · cellules décidées par : statut 10 · date 0 · « franchi » 8");
   assert.equal(byLabel.get("domaine"), "6/6 (direct 6 · via PARAM 0 · manquant 0) · sous-domaine : 3 détaillé(s), 2 replié(s) dans leur domaine");
   assert.equal(byLabel.get("chef de projet"),

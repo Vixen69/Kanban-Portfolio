@@ -171,7 +171,7 @@ function positionOf(ctx: JoinContext, entry: ProjetEntry, jalon: JalonEntry | nu
   if (ctx.doneColumnId !== null && isFinished(ctx, entry)) {
     ctx.stats.doneByState++;
     if (jalon?.stage !== "done") {
-      tallyInto(ctx.tallies, `état « ${entry.state.trim()} » sans RDR approuvé — carte placée en Done par l'état (ADR 043)`, entry.ref.line);
+      tallyInto(ctx.tallies, `état « ${entry.state.trim()} » sans RDR approuvé — carte placée dans Terminé par l'état (ADR 043)`, entry.ref.line);
     }
     return { columnId: ctx.doneColumnId, positioned: true };
   }

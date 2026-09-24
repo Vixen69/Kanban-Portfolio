@@ -27,8 +27,14 @@ export interface Lane {
 export interface Column {
   id: string;
   name: string;
-  /** Gate at the entry of this column, or null. Rendered as a badge + line. */
+  /** Gate VALIDATED at the entry of this column, or null. Rendered as a ✓ badge + the cell's edge line. */
   gate: GateCode | null;
+  /**
+   * Gate whose checklist OPENS at the entry of this column, or null
+   * (ADR 047: the DoR opens at the RDO and is validated at the RDLI; the
+   * DoD opens at the RDLI and is validated at the RDR). A dashed badge.
+   */
+  gateStart: GateCode | null;
   /**
    * The referential's review or milestone at the entry of this column
    * (« RDO », « RDLI », « Kick-off », « RDR »), or null (ADR 045). Written

@@ -637,6 +637,18 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-24 — Où la DoR et la DoD s'ouvrent, où elles sont validées ; Études/Cadrage, Terminé (ADR 047)
+
+- **Demande de l'auteur** (croquis) : montrer où chaque gate démarre et où
+  elle est validée ; renommer « Études » en « Études/Cadrage » et « Done »
+  en « Terminé ».
+- **Fait** : un champ de vocabulaire `gateStart` à côté de `gate`. Modèle
+  versionné : Qualification ouvre la DoR, Prêts valide la DoR (✓) et ouvre
+  la DoD, Terminé valide la DoD (✓). En tête de colonne, sous le jalon, les
+  badges côte à côte — validée en trait plein avec ✓, ouverte en
+  pointillés ; hauteur d'en-tête inchangée (67 px). Le rapport d'audit de
+  l'import reprend les nouveaux noms. Identifiants de colonnes inchangés.
+
 ### 2026-09-24 — Limites WIP par case, panneau de configuration verrouillé (ADR 046)
 
 - **Demande de l'auteur** : la limite se lit par case mais ne se réglait

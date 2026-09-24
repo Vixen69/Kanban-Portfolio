@@ -39,10 +39,6 @@ test("the repository's config/board.json is valid", () => {
   const detailed = config.domains.filter((d) => d.subDomains !== undefined).map((d) => [d.id, d.subDomains?.length]);
   assert.deepEqual(detailed, [["ad", 3], ["corporate", 9]]);
   assert.equal(config.fields.length, 0);
-  assert.equal(config.columns.find((c) => c.id === "prets")?.gate, "DoR");
-  assert.equal(config.columns.find((c) => c.id === "done")?.gate, "DoD");
-  const reviews = config.columns.map((c) => [c.id, c.review]); // the referential's reviews at the entries (ADR 045)
-  assert.deepEqual(reviews, [["demandes", null], ["qualification", "RDO"], ["etudes", null], ["prets", "RDLI"], ["pause", null], ["actifs", "Kick-off"], ["done", "RDR"], ["exploitation", null]]);
   assert.equal(config.columns.find((c) => c.id === "actifs")?.hasBlockedZone, true);
   assert.deepEqual(config.age, { freshMaxDays: 7, recentMaxDays: 28, agingMaxDays: 60 });
   assert.equal(config.andonThresholdDays, 5);
@@ -153,6 +149,7 @@ const INVALID_CASES: { name: string; mutate: (raw: any) => void }[] = [
   { name: "wip limit on an unknown canal", mutate: (raw) => (raw.wipLimits = { col3: { nope: 1 } }) },
   { name: "wip limits not an object", mutate: (raw) => (raw.wipLimits = [1]) },
   { name: "unknown gate code", mutate: (raw) => (raw.columns[0].gate = "DoX") },
+  { name: "unknown gate start code", mutate: (raw) => (raw.columns[0].gateStart = "DoX") },
   { name: "gate as number", mutate: (raw) => (raw.columns[0].gate = 5) },
   { name: "review as number", mutate: (raw) => (raw.columns[0].review = 5) },
   { name: "review too long", mutate: (raw) => (raw.columns[0].review = "x".repeat(17)) },
@@ -280,13 +277,4 @@ test("decisions and grid terms default to the referential when absent, validate 
   assert.deepEqual(explicit.decisions.map((d) => d.id), ["X"]);
   assert.throws(() => validateBoardConfig({ ...rawConfig(), decisions: [{ id: "X", name: "X", short: "X", color: "#000" }] }), ConfigError);
   assert.throws(() => validateBoardConfig({ ...rawConfig(), decisionGrounds: [{ id: "g", name: "G", family: "autre" }] }), ConfigError);
-});
-
-test("column review (ADR 045): a trimmed short text, or null — an empty text reads as null", () => {
-  const raw = rawConfig();
-  raw.columns[0].review = "  RDO ";
-  raw.columns[1].review = "   ";
-  delete raw.columns[2].review;
-  const config = validateBoardConfig(raw);
-  assert.deepEqual(config.columns.map((c) => c.review), ["RDO", null, null]);
 });

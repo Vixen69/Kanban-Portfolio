@@ -74,6 +74,7 @@ function parseColumn(value: unknown, index: number): Column {
     id: requireText(record.id, `columns[${index}].id`),
     name: requireText(record.name, `columns[${index}].name`),
     gate: parseGate(record.gate, `columns[${index}].gate`),
+    gateStart: parseGate(record.gateStart, `columns[${index}].gateStart`),
     review: parseReview(record.review, `columns[${index}].review`),
     note: optionalText(record.note, `columns[${index}].note`),
   };
@@ -211,7 +212,7 @@ function parseAge(value: unknown): AgeThresholds {
  * Output: a structurally valid BoardConfig. Display strings are kept as-is
  * (diacritics and typographic apostrophes included). Normalizations: purely
  * visual text (column note, lane nature/detail) defaults to "" when absent;
- * a missing column gate or review defaults to null, a missing wipLimits
+ * a missing column gate, gateStart or review defaults to null, a missing wipLimits
  * table to {} (ADR 046); a missing fields array
  * defaults to []; a missing showOnCard defaults to false; options are kept
  * only on "select" fields; a domain's subDomains is kept only when declared

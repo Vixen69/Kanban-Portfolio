@@ -34,6 +34,10 @@
 .col-marks { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 1px; flex: 0 0 auto; }
 .col-marks + .col-collapse { margin-left: 0; }
 .review-mark { font-size: 7px; font-weight: 700; color: var(--tx-3); letter-spacing: .06em; line-height: 1.2; white-space: nowrap; }
+/* Gate ouverte ici (ADR 047) : pointillés, plus discrète que la gate validée (✓). */
+.gate-badge.opened { border-style: dashed; opacity: .7; }
+.gate-row { display: flex; gap: 2px; }
+
 /* Totaux d'en-tête (design v12). La note fonctionnelle de la colonne est
    passée en infobulle : les totaux ont pris sa ligne (ADR 020). */
 .col-totals { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--bd-sub); display: flex; flex-direction: column; gap: 1px; }
