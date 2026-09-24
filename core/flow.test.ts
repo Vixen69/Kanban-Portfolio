@@ -14,12 +14,12 @@ function event(partial: Partial<CardEvent> & Pick<CardEvent, "id" | "ts" | "type
 function nmoConfig(): BoardConfig {
   const config = testConfig();
   config.columns = [
-    { id: "demandes", name: "Demandes", wip: null, gate: null, note: "" },
-    { id: "qualification", name: "Qualification", wip: null, gate: null, note: "" },
-    { id: "prets", name: "Prêts", wip: null, gate: "DoR", note: "" },
-    { id: "actifs", name: "Actifs", wip: null, gate: null, note: "" },
-    { id: "done", name: "Done", wip: null, gate: "DoD", note: "" },
-    { id: "exploitation", name: "Exploitation", wip: null, gate: null, note: "" },
+    { id: "demandes", name: "Demandes", wip: null, gate: null, review: null, note: "" },
+    { id: "qualification", name: "Qualification", wip: null, gate: null, review: null, note: "" },
+    { id: "prets", name: "Prêts", wip: null, gate: "DoR", review: null, note: "" },
+    { id: "actifs", name: "Actifs", wip: null, gate: null, review: null, note: "" },
+    { id: "done", name: "Done", wip: null, gate: "DoD", review: null, note: "" },
+    { id: "exploitation", name: "Exploitation", wip: null, gate: null, review: null, note: "" },
   ];
   return config;
 }
@@ -41,8 +41,8 @@ test("anchors fall back to structure: second column, post-DoR column, DoD gate",
   assert.equal(anchors?.terminal, null);
   const dod = testConfig();
   dod.columns = [
-    { id: "a", name: "A", wip: null, gate: null, note: "" },
-    { id: "b", name: "B", wip: null, gate: "DoD", note: "" },
+    { id: "a", name: "A", wip: null, gate: null, review: null, note: "" },
+    { id: "b", name: "B", wip: null, gate: "DoD", review: null, note: "" },
   ];
   assert.equal(resolveFlowAnchors(dod)?.terminal?.id, "b");
 });

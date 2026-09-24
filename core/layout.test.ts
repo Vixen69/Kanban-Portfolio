@@ -104,6 +104,7 @@ function boardShapedConfig(): BoardConfig {
     name: `Colonne ${i}`,
     wip: null,
     gate: null,
+    review: null,
     note: "",
   }));
   return config;
@@ -126,10 +127,10 @@ test("150 cards at density 16 / gap 2 fit a 1080p viewport when spread over the 
 test("unifiedColumnIds: the columns up to the qualification anchor; none when it is the last column or absent", () => {
   assert.deepEqual([...unifiedColumnIds(CONFIG)], ["col1", "col2"], "col2 is the second column, the qualification fallback");
   const named: BoardConfig = { ...CONFIG, columns: [
-    { id: "demandes", name: "Demandes", wip: null, gate: null, note: "" },
-    { id: "qualification", name: "Qualification", wip: null, gate: null, note: "" },
-    { id: "etudes", name: "Études", wip: null, gate: null, note: "" },
-    { id: "actifs", name: "Actifs", wip: null, gate: null, note: "" },
+    { id: "demandes", name: "Demandes", wip: null, gate: null, review: null, note: "" },
+    { id: "qualification", name: "Qualification", wip: null, gate: null, review: null, note: "" },
+    { id: "etudes", name: "Études", wip: null, gate: null, review: null, note: "" },
+    { id: "actifs", name: "Actifs", wip: null, gate: null, review: null, note: "" },
   ] };
   assert.deepEqual([...unifiedColumnIds(named)], ["demandes", "qualification"]);
   const twoOnly: BoardConfig = { ...CONFIG, columns: CONFIG.columns.slice(0, 2) };

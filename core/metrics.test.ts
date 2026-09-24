@@ -15,10 +15,10 @@ const DAY_MS = 86_400_000;
 function metricsConfig(): BoardConfig {
   const config = testConfig();
   config.columns = [
-    { id: "col1", name: "Demandes", wip: null, gate: null, note: "" },
-    { id: "col2", name: "Prêts", wip: 3, gate: "DoR", note: "" },
-    { id: "col3", name: "Actifs", wip: 2, gate: null, note: "" },
-    { id: "col4", name: "Done", wip: null, gate: "DoD", note: "" },
+    { id: "col1", name: "Demandes", wip: null, gate: null, review: null, note: "" },
+    { id: "col2", name: "Prêts", wip: 3, gate: "DoR", review: null, note: "" },
+    { id: "col3", name: "Actifs", wip: 2, gate: null, review: null, note: "" },
+    { id: "col4", name: "Done", wip: null, gate: "DoD", review: null, note: "" },
   ];
   return config;
 }

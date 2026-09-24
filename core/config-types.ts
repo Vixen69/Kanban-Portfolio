@@ -30,6 +30,12 @@ export interface Column {
   wip: number | null;
   /** Gate at the entry of this column, or null. Rendered as a badge + line. */
   gate: GateCode | null;
+  /**
+   * The referential's review or milestone at the entry of this column
+   * (« RDO », « RDLI », « Kick-off », « RDR »), or null (ADR 045). Written
+   * as-is above the gate badge. Vocabulary only — never enforced.
+   */
+  review: string | null;
   /** Short functional note shown under the column name. */
   note: string;
   /** Declarative marker (design: Actifs). No behavior attached today. */

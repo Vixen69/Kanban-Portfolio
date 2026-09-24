@@ -29,7 +29,11 @@
 /* Retained-card count of the stage (ADR 031): the whole count, or « retenus/total » while the board is narrowed. */
 .col-count { font-size: 9px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--tx-4); background: rgba(15,23,42,.06); border-radius: 8px; padding: 0 5px; line-height: 1.5; white-space: nowrap; }
 .col-count.narrowed { color: #fff; background: var(--accent); }
-.gate-badge { font-size: 7px; font-weight: 700; color: var(--gate); border: 1px solid var(--gate); border-radius: 3px; padding: 0 3px; letter-spacing: .04em; }
+.gate-badge { font-size: 7px; font-weight: 700; color: var(--gate); border: 1px solid var(--gate); border-radius: 3px; padding: 0 3px; letter-spacing: .04em; line-height: 1.2; }
+/* Marques d'entrée de colonne (ADR 045) : le jalon du référentiel au-dessus de la gate qu'il conditionne. */
+.col-marks { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 1px; flex: 0 0 auto; }
+.col-marks + .col-collapse { margin-left: 0; }
+.review-mark { font-size: 7px; font-weight: 700; color: var(--tx-3); letter-spacing: .06em; line-height: 1.2; white-space: nowrap; }
 /* Totaux d'en-tête (design v12). La note fonctionnelle de la colonne est
    passée en infobulle : les totaux ont pris sa ligne (ADR 020). */
 .col-totals { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--bd-sub); display: flex; flex-direction: column; gap: 1px; }

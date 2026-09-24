@@ -28,6 +28,27 @@ function CollapsedColumnHead({ col, onToggleCollapse }: { col: Column; onToggleC
   );
 }
 
+// The marks at the entry of the stage (ADR 045): the referential's review
+// or milestone (RDO, RDLI, Kick-off, RDR — the config's words) above the
+// quality gate it conditions (DoR, DoD). Small and grey, at the right of
+// the header: a reminder, never a rule the software enforces.
+function ColumnMarks({ col, gateDef }: { col: Column; gateDef: GateDef | null }) {
+  const gated = gateDef !== null && col.gate !== null;
+  if (col.review === null && !gated) return null;
+  return (
+    <span className="col-marks">
+      {col.review !== null && (
+        <span className="review-mark" title={`${col.review} · jalon à l’entrée de ${col.name}`}>{col.review}</span>
+      )}
+      {gated && (
+        <span className="gate-badge" style={{ "--gate": gateDef.color } as CSSProperties} title={`${col.gate} — ${gateDef.name}`}>
+          {col.gate}
+        </span>
+      )}
+    </span>
+  );
+}
+
 // The stage's card count (ADR 031): the whole count, or « retenus/total »
 // in the accent color while the board is narrowed by the filters.
 function ColumnCount({ shown, all, narrowed }: { shown: number; all: number; narrowed: boolean }) {
@@ -74,9 +95,7 @@ export function ColumnHeader({ col, gateDef, focused, colCollapsed, totals, tota
       <div className="col-head-top">
         <span className="col-label">{col.name}</span>
         <ColumnCount shown={totals.count} all={all} narrowed={narrowed} />
-        {gateDef !== null && col.gate !== null && (
-          <span className="gate-badge" style={{ "--gate": gateDef.color } as CSSProperties}>{col.gate}</span>
-        )}
+        <ColumnMarks col={col} gateDef={gateDef} />
         <button
           className="col-collapse"
           onClick={(e) => { e.stopPropagation(); onToggleCollapse(col.id); }}

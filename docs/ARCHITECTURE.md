@@ -637,6 +637,18 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-24 — Les jalons du référentiel en tête de colonne (ADR 045)
+
+- **Demande de l'auteur** : voir RDO, RDLI, le kick-off et RDR « au bon
+  endroit » sur le tableau, avec DoR sous RDLI et DoD sous RDR — de
+  petits marquages, discrets.
+- **Fait** : un champ de vocabulaire `review` sur la colonne (texte court
+  ou null, réglable depuis ⚙ › Structure), le modèle versionné plaçant
+  RDO sur Qualification, RDLI sur Prêts, Kick-off sur Actifs, RDR sur
+  Done ; à droite de l'en-tête, une pile de 7 px — le jalon en gris
+  au-dessus du badge de gate existant. Rien n'est vérifié par le logiciel.
+  Hauteur d'en-tête inchangée.
+
 ### 2026-09-21 — Trier les cartes : par reste à faire, par meilleur estimé, par métier (ADR 044)
 
 - **Demande de l'auteur** : pour l'instance d'arbitrage qui gèle une

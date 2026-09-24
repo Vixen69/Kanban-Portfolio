@@ -72,6 +72,8 @@ function ColumnRows({ columns, onChange }: { columns: Column[]; onChange: (colum
           </span>
           <input className="ainp grow" value={c.name} onChange={(e) => upd(i, { name: e.target.value })} />
           <input className="ainp wip-inp" type="number" min="0" placeholder="WIP" title="Limite WIP (vide = aucune)" value={c.wip ?? ""} onChange={(e) => upd(i, { wip: e.target.value === "" ? null : Number(e.target.value) })} />
+          <input className="ainp review-inp" placeholder="Jalon" maxLength={16} title="Jalon à l'entrée de la colonne (RDO, RDLI, Kick-off, RDR…)"
+            value={c.review ?? ""} onChange={(e) => upd(i, { review: e.target.value === "" ? null : e.target.value })} />
           <select className="ainp gate-inp" title="Gate à l'entrée" value={c.gate ?? ""} onChange={(e) => upd(i, { gate: (e.target.value || null) as GateCode | null })}>
             <option value="">— gate</option>
             <option value="DoR">DoR</option>
@@ -80,7 +82,7 @@ function ColumnRows({ columns, onChange }: { columns: Column[]; onChange: (colum
           <button className="abtn del" disabled={columns.length <= 2} title="Supprimer (les sujets seront déplacés)" onClick={() => onChange(columns.filter((_, idx) => idx !== i))}>✕</button>
         </div>
       ))}
-      <button className="a-add" onClick={() => onChange([...columns, { id: slugId("colonne"), name: "Nouvelle colonne", wip: null, gate: null, note: "" }])}>+ Ajouter une colonne</button>
+      <button className="a-add" onClick={() => onChange([...columns, { id: slugId("colonne"), name: "Nouvelle colonne", wip: null, gate: null, review: null, note: "" }])}>+ Ajouter une colonne</button>
     </>
   );
 }

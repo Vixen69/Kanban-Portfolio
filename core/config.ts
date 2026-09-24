@@ -62,6 +62,18 @@ function parseGate(value: unknown, path: string): GateCode | null {
   return value as GateCode;
 }
 
+const REVIEW_MAX = 16;
+
+// The review mark of a column (ADR 045): a short text or null; an empty
+// text reads as null so the admin panel's cleared field means « none ».
+function parseReview(value: unknown, path: string): string | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "string") fail(`${path} doit être un texte court ou null`);
+  const text = value.trim();
+  if (text.length > REVIEW_MAX) fail(`${path} doit compter ${REVIEW_MAX} caractères au plus`);
+  return text === "" ? null : text;
+}
+
 function parseColumn(value: unknown, index: number): Column {
   const record = requireRecord(value, `columns[${index}]`);
   const column: Column = {
@@ -69,6 +81,7 @@ function parseColumn(value: unknown, index: number): Column {
     name: requireText(record.name, `columns[${index}].name`),
     wip: parseWip(record.wip, `columns[${index}].wip`),
     gate: parseGate(record.gate, `columns[${index}].gate`),
+    review: parseReview(record.review, `columns[${index}].review`),
     note: optionalText(record.note, `columns[${index}].note`),
   };
   if (record.hasBlockedZone !== undefined) {

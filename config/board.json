@@ -35,6 +35,7 @@
       "name": "Qualification",
       "wip": null,
       "gate": null,
+      "review": "RDO",
       "note": "RDO · détection de nature"
     },
     {
@@ -49,6 +50,7 @@
       "name": "Prêts",
       "wip": null,
       "gate": "DoR",
+      "review": "RDLI",
       "note": "Qualifié, estimé — tiré par l’équipe"
     },
     {
@@ -63,6 +65,7 @@
       "name": "Actifs",
       "wip": null,
       "gate": null,
+      "review": "Kick-off",
       "note": "En cours · Andon si bloqué > 5j",
       "hasBlockedZone": true
     },
@@ -71,6 +74,7 @@
       "name": "Done",
       "wip": null,
       "gate": "DoD",
+      "review": "RDR",
       "note": "DoD atteinte · PV Reprise d’Exploitation"
     },
     {
