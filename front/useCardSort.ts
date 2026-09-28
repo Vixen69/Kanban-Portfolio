@@ -47,11 +47,12 @@ export function useCardSort(): CardSorting {
 /**
  * The cards in the sort's order; the same array when no sort is active, so
  * nothing re-renders for it.
- * Inputs: the cards in board order, the sort. Output: the cards to show.
- * Failure modes: none.
+ * Inputs: the cards in board order, the sort, the métiers the « reste à
+ * faire » key counts (the config's — ADR 048: an unknown métier never
+ * counts). Output: the cards to show. Failure modes: none.
  */
-export function useSortedCards(cards: CardState[], sort: CardSort): CardState[] {
-  return useMemo(() => (isSortActive(sort) ? sortCards(cards, sort) : cards), [cards, sort]);
+export function useSortedCards(cards: CardState[], sort: CardSort, counted: ReadonlySet<string>): CardState[] {
+  return useMemo(() => (isSortActive(sort) ? sortCards(cards, sort, counted) : cards), [cards, sort, counted]);
 }
 
 /** What the sidebar's section and the header's chip read. */
@@ -86,7 +87,10 @@ export function useSortPanel(cards: CardState[], hidden: ReadonlySet<string>, co
     const totals = profileRemainingTotals(shown, config);
     if (!isSortActive(sort)) return { totals, blind, label: null, chip: null };
     const label = `${sortedBy(sort, config)} · ${sort.direction === "desc" ? "décroissant" : "croissant"}`;
-    const unranked = sort.key === "profiles" && blind > 0 ? ` · ${blind} sans ventilation` : "";
+    // Neither a métier sort nor the « reste à faire » one (ADR 048: no
+    // fallback on the card effort) can rank a card without a per-métier plan.
+    const perMetier = sort.key === "profiles" || sort.key === "remaining";
+    const unranked = perMetier && blind > 0 ? ` · ${blind} sans ventilation` : "";
     return { totals, blind, label, chip: `Trié par ${label}${unranked}` };
   }, [cards, hidden, config, sort]);
 }

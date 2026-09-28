@@ -8,6 +8,7 @@
 // visibility, so the board and the totals cannot drift apart.
 
 import type { BoardConfig, CardState, Profile } from "./types.ts";
+import { profileRemaining } from "./raf-card.ts";
 
 /** One profile's share of an aggregate, in jours-homme. */
 export interface LoadByProfile {
@@ -15,6 +16,12 @@ export interface LoadByProfile {
   jh: number;
   /** Consommé, j.h. */
   done: number;
+  /**
+   * Reste à faire (ADR 048): the sum over the cards of each card's own
+   * max(0, planned − done) for this profile — clamped per card, so any
+   * partition of the cards adds up exactly to the whole.
+   */
+  raf: number;
 }
 
 /**
@@ -39,6 +46,8 @@ export interface GroupTotals {
   done: number;
   /** Per-profile split, keyed by profile id. */
   byProfile: Record<string, LoadByProfile>;
+  /** Cards without a per-métier plan (« sans ventilation », ADR 048): they count in no reste à faire. */
+  blind: number;
 }
 
 /** One row of the per-profile breakdown, resolved against the config. */
@@ -60,7 +69,7 @@ const UNKNOWN_PROFILE_COLOR = "#64748b";
  * Inputs: none. Output: a fresh GroupTotals (safe to mutate). Failure: none.
  */
 export function emptyTotals(): GroupTotals {
-  return { count: 0, rdli: 0, estimated: 0, engaged: 0, consumed: 0, jh: 0, done: 0, byProfile: {} };
+  return { count: 0, rdli: 0, estimated: 0, engaged: 0, consumed: 0, jh: 0, done: 0, byProfile: {}, blind: 0 };
 }
 
 /**
@@ -73,22 +82,30 @@ export function remainingLoad(totals: GroupTotals): number {
 }
 
 // Adds one card's load to the aggregate. A card with a per-profile plan is
-// attributed profile by profile; one without falls back to its card-level
-// effort, which stays unattributed (it belongs to no profile).
+// attributed profile by profile, its reste à faire clamped per card and
+// per profile (ADR 048); one without is counted « sans ventilation » and
+// its card-level effort feeds jh/done only (read by core/metrics alone —
+// no board figure uses it any more).
 function addLoad(totals: GroupTotals, card: CardState): void {
-  if (card.chargeByProfile.length > 0) {
-    for (const entry of card.chargeByProfile) {
-      totals.jh += entry.jh;
-      totals.done += entry.done;
-      const bucket = totals.byProfile[entry.profileId] ?? { jh: 0, done: 0 };
-      bucket.jh += entry.jh;
-      bucket.done += entry.done;
-      totals.byProfile[entry.profileId] = bucket;
-    }
+  if (card.chargeByProfile.length === 0) {
+    totals.blind++;
+    totals.jh += card.effortEstimated ?? 0;
+    totals.done += card.effortConsumed ?? 0;
     return;
   }
-  totals.jh += card.effortEstimated ?? 0;
-  totals.done += card.effortConsumed ?? 0;
+  const seen = new Set<string>();
+  for (const entry of card.chargeByProfile) {
+    totals.jh += entry.jh;
+    totals.done += entry.done;
+    const bucket = totals.byProfile[entry.profileId] ?? { jh: 0, done: 0, raf: 0 };
+    bucket.jh += entry.jh;
+    bucket.done += entry.done;
+    if (!seen.has(entry.profileId)) {
+      seen.add(entry.profileId);
+      bucket.raf += profileRemaining(card, entry.profileId);
+    }
+    totals.byProfile[entry.profileId] = bucket;
+  }
 }
 
 // Adds one card's money and load. Null money fields count as zero: the
@@ -192,3 +209,61 @@ export function profileLoadRows(totals: GroupTotals, config: BoardConfig): Profi
   rows.sort((a, b) => b.jh - a.jh || a.name.localeCompare(b.name, "fr"));
   return rows;
 }
+
+/**
+ * The reste à faire of an aggregate on the counted métiers (ADR 048): the
+ * plain sum of their per-card clamped RAF.
+ * Inputs: an aggregate, the counted profile ids (raf-card countedIds).
+ * Output: j.h. Failure: none.
+ */
+export function scopedRaf(totals: GroupTotals, counted: ReadonlySet<string>): number {
+  let sum = 0;
+  for (const id of counted) sum += totals.byProfile[id]?.raf ?? 0;
+  return sum;
+}
+
+/**
+ * The sum of several aggregates (the board gutter is the sum of the column
+ * headers, ADR 048, so the two can never disagree).
+ * Input: the aggregates. Output: a fresh GroupTotals. Failure: none.
+ */
+export function sumTotals(parts: readonly GroupTotals[]): GroupTotals {
+  const sum = emptyTotals();
+  for (const part of parts) {
+    sum.count += part.count;
+    sum.rdli += part.rdli;
+    sum.estimated += part.estimated;
+    sum.engaged += part.engaged;
+    sum.consumed += part.consumed;
+    sum.jh += part.jh;
+    sum.done += part.done;
+    sum.blind += part.blind;
+    for (const [id, load] of Object.entries(part.byProfile)) {
+      const bucket = sum.byProfile[id] ?? { jh: 0, done: 0, raf: 0 };
+      bucket.jh += load.jh;
+      bucket.done += load.done;
+      bucket.raf += load.raf;
+      sum.byProfile[id] = bucket;
+    }
+  }
+  return sum;
+}
+
+/**
+ * The per-métier reste à faire of an aggregate, counted métiers only,
+ * largest first (the unfolded header's breakdown, ADR 048). Métiers with
+ * nothing left are dropped; a profile unknown to the config never shows.
+ * Inputs: an aggregate, the config, the counted profile ids.
+ * Output: the rows (remaining = the per-card clamped RAF). Failure: none.
+ */
+export function rafRows(totals: GroupTotals, config: BoardConfig, counted: ReadonlySet<string>): ProfileLoadRow[] {
+  const rows: ProfileLoadRow[] = [];
+  for (const profile of config.profiles) {
+    const load = totals.byProfile[profile.id];
+    if (!counted.has(profile.id) || load === undefined || load.raf <= 0) continue;
+    rows.push({ id: profile.id, name: profile.name, color: profile.color, jh: load.jh, done: load.done, remaining: load.raf });
+  }
+  rows.sort((a, b) => b.remaining - a.remaining || a.name.localeCompare(b.name, "fr"));
+  return rows;
+}
+

@@ -79,11 +79,11 @@ export function useDisplayCards(cards: CardState[], config: BoardConfig, year: n
  * the sort. Output: { cards, archivedCards } (memoised). Failure modes: none.
  */
 export function useBoardCards(
-  allCards: CardState[], viewYear: number, currentYear: number, sort: CardSort,
+  allCards: CardState[], viewYear: number, currentYear: number, sort: CardSort, counted: ReadonlySet<string>,
 ): { cards: CardState[]; archivedCards: CardState[] } {
   const closed = viewYear < currentYear;
   const active = useMemo(() => (closed ? allCards : allCards.filter((card) => !card.archived)), [allCards, closed]);
-  const cards = useSortedCards(active, sort);
+  const cards = useSortedCards(active, sort, counted);
   const archivedCards = useMemo(() => allCards.filter((card) => card.archived), [allCards]);
   return { cards, archivedCards };
 }

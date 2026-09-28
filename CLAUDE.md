@@ -334,6 +334,19 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
   scrollable per-profile breakdown. Two Σ toggles in the grid corner, each
   remembered per browser (localStorage — the only client-side storage).
   The column note moved to the header tooltip.
+- Périmètre RAF (ADR 048, author 2026-09-28): ONE reste-à-faire arithmetic
+  — per card × métier, max(0, planned − done) of the per-métier plan, NO
+  fallback on the card effort (a card without plan is « sans
+  ventilation », counted 0); every figure is a plain sum, so the gutter
+  equals the headers. Columns are classed from the flow anchors: engagé
+  (Qualification, Études/Cadrage, Actifs — top rule), non engagé
+  (Demandes, Prêts, Pause), hors calcul (Terminé and after; left out of
+  the canal RAF). The board gutter has its own Σ (third localStorage
+  flag): RAF engagé in large, « ≈ N pers. d'ici le 31/12 » (working days,
+  fériés deducted, current exercise only), non engagé, hors calcul,
+  legend, divisor, blind note, k€ line, and the métier lens (checkboxes,
+  « tout · rien ») — a SESSION state, never written, not cleared by
+  Escape, header chip « RAF : … ✕ ». Capacity stays out of the tool.
 - Hard acceptance criterion: at 1920x1080 with 150 cards, the full board is
   visible with zero scrolling; never any horizontal scroll. Measured in the
   COMPACT default state (v12): unfolded totals and the 176px canal gutter

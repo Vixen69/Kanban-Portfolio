@@ -637,6 +637,24 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-28 — Périmètre RAF : engagé / non engagé, loupe par métier (ADR 048)
+
+- **Demande de l'auteur** (préparation de la Revue Stratégique de
+  Portefeuille du 1er octobre) : distinguer le reste à faire qui mobilise
+  déjà les équipes de celui qui attend, et le lire métier par métier
+  (« N j.h d'Infra d'ici le 31/12, soit X personnes : tu les as ? »).
+- **Fait (tranche A)** : une seule arithmétique du reste à faire, par carte
+  et par métier, sans repli sur l'effort de la carte ; trois classes de
+  colonnes dérivées du modèle (engagé : Qualification, Études/Cadrage,
+  Actifs ; non engagé : Demandes, Prêts, Pause ; hors calcul : Terminé et
+  après) ; en-têtes « RAF engagé / non engagé / hors calcul » ; gouttière
+  du tableau avec son propre Σ, les personnes d'ici le 31/12 (jours ouvrés,
+  fériés déduits) et la liste des métiers à cocher (« tout · rien ») ;
+  pastille de la loupe dans l'en-tête ; « Budget engagé », « Taux de
+  charge ». La loupe est un état de séance, rien n'est écrit.
+- **Suite** : tranche B (le tri et la carte dépliée suivent la loupe, la clé
+  de tri « par métier » disparaît), tranche C après la séance.
+
 ### 2026-09-24 — Où la DoR et la DoD s'ouvrent, où elles sont validées ; Études/Cadrage, Terminé (ADR 047)
 
 - **Demande de l'auteur** (croquis) : montrer où chaque gate démarre et où

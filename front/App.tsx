@@ -22,6 +22,8 @@ import {
   type UiState,
 } from "./useInteractions.ts";
 import { useNow } from "./useNow.ts";
+import { useBoardLens, type BoardLens } from "./useRafLens.ts";
+import { scopeLabel, scopeTitle } from "./rafLabels.ts";
 import { AdminPanel } from "./components/AdminPanel.tsx";
 import { ArchiveView } from "./components/ArchiveView.tsx";
 import { BoardGrid } from "./components/BoardGrid.tsx";
@@ -63,6 +65,8 @@ interface Ctx {
   /** The board's sort (ADR 044) and its read-out for the sidebar and the header. */
   sorting: CardSorting;
   sortPanel: SortPanel;
+  /** The métier lens of the reste à faire (ADR 048), a session state. */
+  lens: BoardLens;
 }
 
 
@@ -149,7 +153,7 @@ function BoardArea({ ctx }: { ctx: Ctx }) {
       <BoardGrid config={config} cards={ctx.cards} hiddenIds={derived.hidden}
         focusedColumn={ui.focusCol} collapsedLanes={ui.collapsedLanes}
         collapsedCols={ui.collapsedCols} now={ctx.nowMs} showCodes={ui.showCodes} showTypes={ui.showTypes}
-        sort={ctx.sorting.sort}
+        sort={ctx.sorting.sort} lens={ctx.lens}
         dragOver={ui.dragOver}
         onFocusColumn={handlers.onFocusColumn} onToggleLane={handlers.onToggleLane}
         onToggleColumnCollapse={handlers.onToggleColumnCollapse}
@@ -173,7 +177,8 @@ function Screen({ ctx }: { ctx: Ctx }) {
         filtersActive={filters.active} focusLabel={ctx.focusLabel}
         onResetFilters={filters.reset} onClearFocus={() => ui.setFocusCol(null)}
         sortLabel={ctx.sortPanel.chip} onClearSort={ctx.sorting.clear}
-
+        lensLabel={ctx.lens.active ? `RAF : ${scopeLabel(ctx.lens.scope, config)}` : null}
+        lensTitle={scopeTitle(ctx.lens.scope, config)} onClearLens={ctx.lens.all}
         onToggleSidebar={() => ui.setSidebar((open) => !open)}
         onMetrics={() => ui.setMetrics(true)} onAdmin={() => ui.openAdmin("wip")}
         onImport={() => ui.openAdmin("importer")}
@@ -214,9 +219,10 @@ function Shell({ store, config }: { store: BoardStore; config: BoardConfig }) {
   const handlers = useBoardHandlers(ui, config.lanes);
   useShortcuts(ui, searchRef);
   const { viewYear, exercise } = useExerciseShown(store.cards, config.exercise.year); // ADR 035: the year shown
+  const lens = useBoardLens(config, nowMs, viewYear); // ADR 048: session only, a reload returns to « tous métiers »
   const allCards = useDisplayCards(store.cards, config, viewYear);
   // The detail lookup searches ALL cards so an archived fiche opens from the archive.
-  const { cards, archivedCards } = useBoardCards(allCards, viewYear, config.exercise.year, sorting.sort);
+  const { cards, archivedCards } = useBoardCards(allCards, viewYear, config.exercise.year, sorting.sort, lens.allCounted);
   const { capacity, draw, bumpCapacity } = useResourceDraw(viewYear, config); // ADR 041
   const derived = useDerived(cards, config, filters, now, draw);
   const sortPanel = useSortPanel(cards, derived.hidden, config, sorting.sort);
@@ -233,7 +239,7 @@ function Shell({ store, config }: { store: BoardStore; config: BoardConfig }) {
   const focusLabel = ui.focusCol ? (columnById(config)[ui.focusCol]?.name ?? null) : null;
   const ctx: Ctx = {
     store, config, ui, nowMs, filters, cards, archivedCards, derived, drag,
-    handlers, searchRef, detailCard, focusLabel, viewYear, exercise, capacity, draw, bumpCapacity, sorting, sortPanel,
+    handlers, searchRef, detailCard, focusLabel, viewYear, exercise, capacity, draw, bumpCapacity, sorting, sortPanel, lens,
   };
 
   return <Screen ctx={ctx} />;

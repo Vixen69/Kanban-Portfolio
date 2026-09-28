@@ -1,0 +1,75 @@
+/* Périmètre RAF (ADR 048) : classes de colonnes, gouttière du tableau,
+   liste des métiers. Lu au projecteur : rien sous 10px dans la gouttière
+   dépliée, aucun gris plus clair que --tx-3 pour un chiffre. */
+
+/* ---------- Classes de colonnes ---------- */
+/* Les trois colonnes engagées portent un liseré sombre en haut ; combiné
+   au soulignement du focus, sans changer la hauteur de l'en-tête. */
+.col-head.engaged { box-shadow: inset 0 2px 0 var(--tx-2); }
+.col-head.focused.engaged { box-shadow: inset 0 2px 0 var(--tx-2), inset 0 -2px 0 var(--accent); }
+
+/* La ligne de RAF porte le ton de sa classe (remplace le bleu de « cap »). */
+.ct-row.cap.raf-engaged > span { color: var(--tx-2); font-weight: 600; }
+.ct-row.cap.raf-engaged b { color: var(--tx-1); }
+.ct-row.cap.raf-idle b { color: var(--tx-3); font-weight: 600; }
+.ct-row.cap.raf-excluded > span { color: var(--tx-4); }
+.ct-row.cap.raf-excluded b { color: var(--tx-3); font-weight: 500; }
+.ct-row.cap.raf-lane b { color: var(--tx-1); }
+/* Lentille active : la valeur passe en accent, la portée est dans l'infobulle. */
+.ct-row.cap.lens-on b { color: var(--accent); }
+.lane-totals.lens-on b.raf { color: var(--accent); }
+
+/* ---------- Gouttière du tableau, repliée ---------- */
+.lane-label.board-gutter { cursor: pointer; }
+.lane-label.board-gutter:hover { background: #e7ebf2; }
+.lane-label.board-gutter .lane-name { color: var(--tx-1); }
+
+/* ---------- Gouttière du tableau, dépliée ---------- */
+/* Colonne flex : l'en-tête reste en place, seule la liste des métiers défile.
+   overflow: hidden laisse la cellule de grille descendre à 0 de hauteur
+   minimale : la gouttière ne peut jamais agrandir les lignes du tableau. */
+.board-gutter-open { background: var(--bg-page); border-right: 1px solid var(--bd); text-align: left; display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; min-height: 0; overflow: hidden; }
+.gut-caption { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; font-size: 11px; font-weight: 700; color: var(--tx-1); }
+.gut-flag { font-size: 10px; font-weight: 600; color: #fff; background: var(--accent); border-radius: 8px; padding: 0 6px; line-height: 1.5; white-space: nowrap; }
+.gut-flag.year { background: var(--tx-3); }
+/* Deux lignes réservées : cocher un métier ne décale jamais la liste. */
+.gut-scope { font-size: 10px; color: var(--tx-3); line-height: 1.3; min-height: 2.6em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.gut-scope.on { color: var(--accent); font-weight: 700; }
+.gut-headline { border-top: 1px solid var(--bd-sub); padding-top: 5px; }
+.gut-label { font-size: 11px; font-weight: 700; color: var(--tx-2); }
+.gut-big { font-size: 28px; font-weight: 700; color: var(--tx-1); font-variant-numeric: tabular-nums; line-height: 1.1; white-space: nowrap; }
+.gut-big i { font-size: 12px; font-style: normal; font-weight: 500; color: var(--tx-3); margin-left: 4px; }
+.gut-big.on { color: var(--accent); }
+.gut-pers { font-size: 13px; font-weight: 600; color: var(--tx-1); min-height: 18px; line-height: 18px; white-space: nowrap; }
+.gut-pers.prompt { font-size: 11px; font-weight: 500; color: var(--tx-3); font-style: italic; }
+.gut-line { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; font-size: 11px; color: var(--tx-2); }
+.gut-line b { color: var(--tx-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.gut-line b i { font-style: normal; font-weight: 500; color: var(--tx-3); margin-left: 2px; font-size: 10px; }
+.gut-line.faded, .gut-line.faded b { color: var(--tx-3); font-weight: 500; }
+.gut-legend { font-size: 10px; color: var(--tx-3); line-height: 1.35; display: flex; flex-direction: column; gap: 1px; border-top: 1px dotted var(--bd-sub); padding-top: 4px; }
+.gut-note { font-size: 10px; color: var(--warn); line-height: 1.35; }
+.gut-money { font-size: 10px; color: var(--tx-3); line-height: 1.35; }
+.gut-money b { color: var(--tx-2); font-variant-numeric: tabular-nums; }
+
+/* ---------- Liste des métiers ---------- */
+.gm { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; border-top: 1px solid var(--bd-sub); padding-top: 5px; }
+.gm .cat-head { margin-bottom: 4px; }
+.gm .sb-label { font-size: 10px; color: var(--tx-3); letter-spacing: .04em; }
+.gm .mini-act { font-size: 10px; padding: 2px 4px; }
+.gm .cat-sep { font-size: 10px; }
+.gm-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 1px; }
+.gm-row { display: grid; grid-template-columns: 14px 1fr auto; column-gap: 5px; align-items: start; padding: 2px 2px; border-radius: 3px; font-size: 11px; color: var(--tx-3); cursor: pointer; }
+.gm-row:hover { background: #e7ebf2; }
+.gm-row input { margin: 2px 0 0; cursor: pointer; }
+.gm-row.on { color: var(--tx-1); }
+.gm-name { overflow-wrap: anywhere; line-height: 1.3; }
+.gm-name i { display: inline-block; width: 6px; height: 6px; border-radius: 1px; margin-right: 4px; vertical-align: 1px; }
+.gm-row b { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; line-height: 1.3; }
+.gm-row.on b { color: var(--tx-1); font-weight: 700; }
+.gm.active .gm-row.on b { color: var(--accent); }
+.gm-sub { grid-column: 2 / 4; font-size: 10px; color: var(--tx-2); }
+
+/* ---------- Pastille de la lentille (en-tête) ---------- */
+/* Le texte seul se coupe : le ✕ reste toujours visible. */
+.lens-chip { display: inline-flex; align-items: center; gap: 4px; max-width: 380px; white-space: nowrap; }
+.lens-chip-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }

@@ -3,13 +3,15 @@
 // métiers, all domains mixed, instead of being grilled one portfolio after
 // the other). A sort is a VIEW: it never writes an event, the manual order
 // (ADR 019) stays underneath and comes back when the sort is cleared.
-// Four keys: the board's own order, the card's reste à faire (j.h), its
-// meilleur estimé (k€), the reste à faire of chosen métiers (the card's
-// per-profile plan, the same figures as the column headers' breakdown).
+// Four keys: the board's own order, the card's reste à faire (j.h — the
+// per-métier plan only, ADR 048: a card « sans ventilation » has no
+// figure), its meilleur estimé (k€), the reste à faire of chosen métiers
+// (the same figures as the column headers' breakdown).
 // A card with nothing to show for the key goes LAST in both directions —
 // an ascending sort must not put the cards without data on top.
 
 import type { BoardConfig, CardState, Profile } from "./types.ts";
+import { cardRaf, profileRemaining } from "./raf-card.ts";
 
 /** What the cards are sorted by. */
 export type SortKey = "board" | "remaining" | "estimate" | "profiles";
@@ -37,43 +39,15 @@ export function isSortActive(sort: CardSort): boolean {
 }
 
 /**
- * The card's load in jours-homme: its per-profile plan when it has one,
- * else its card-level effort (the rule of core/totals and of the fiche).
- * Input: the card. Output: planned, done and reste à faire (clamped at 0).
- * Failure: none.
- */
-export function cardLoad(card: CardState): { jh: number; done: number; raf: number } {
-  const plan = card.chargeByProfile;
-  const jh = plan.length > 0 ? plan.reduce((total, entry) => total + entry.jh, 0) : card.effortEstimated ?? 0;
-  const done = plan.length > 0 ? plan.reduce((total, entry) => total + entry.done, 0) : card.effortConsumed ?? 0;
-  return { jh, done, raf: Math.max(0, jh - done) };
-}
-
-/**
- * The reste à faire of one métier on a card: planned minus done over the
- * card's entries of that profile, clamped at 0.
- * Inputs: the card, the profile id. Output: j.h remaining. Failure: none.
- */
-export function profileRemaining(card: CardState, profileId: string): number {
-  let jh = 0;
-  let done = 0;
-  for (const entry of card.chargeByProfile) {
-    if (entry.profileId !== profileId) continue;
-    jh += entry.jh;
-    done += entry.done;
-  }
-  return Math.max(0, jh - done);
-}
-
-/**
- * The figure a card is sorted by: reste à faire (j.h), meilleur estimé
+ * The figure a card is sorted by: reste à faire (j.h, on the counted
+ * métiers — every métier of the card when none is given), meilleur estimé
  * (k€), or the summed reste à faire of the chosen métiers.
- * Inputs: the card, the sort. Output: the figure, 0 when the card has
- * nothing to show for that key (or the key is the board's order).
- * Failure: none.
+ * Inputs: the card, the sort, optionally the counted profile ids.
+ * Output: the figure, 0 when the card has nothing to show for that key (or
+ * the key is the board's order). Failure: none.
  */
-export function sortValue(card: CardState, sort: CardSort): number {
-  if (sort.key === "remaining") return cardLoad(card).raf;
+export function sortValue(card: CardState, sort: CardSort, counted?: ReadonlySet<string>): number {
+  if (sort.key === "remaining") return cardRaf(card, counted ?? new Set(card.chargeByProfile.map((entry) => entry.profileId)));
   if (sort.key === "estimate") return Math.max(0, card.budgetEstimated ?? 0);
   if (sort.key !== "profiles") return 0;
   return sort.profileIds.reduce((total, id) => total + profileRemaining(card, id), 0);
@@ -84,12 +58,13 @@ export function sortValue(card: CardState, sort: CardSort): number {
  * input (board) order, and the cards without a figure go last — in both
  * directions — in their input order. An inactive sort returns a copy in
  * input order.
- * Inputs: the cards, the sort. Output: a new array. Failure: none.
+ * Inputs: the cards, the sort, optionally the counted profile ids (the
+ * « reste à faire » key only). Output: a new array. Failure: none.
  */
-export function sortCards<T extends CardState>(cards: readonly T[], sort: CardSort): T[] {
+export function sortCards<T extends CardState>(cards: readonly T[], sort: CardSort, counted?: ReadonlySet<string>): T[] {
   if (!isSortActive(sort)) return [...cards];
   const sign = sort.direction === "desc" ? -1 : 1;
-  const rows = cards.map((card, index) => ({ card, index, value: sortValue(card, sort) }));
+  const rows = cards.map((card, index) => ({ card, index, value: sortValue(card, sort, counted) }));
   rows.sort((a, b) => {
     const aEmpty = a.value <= 0;
     const bEmpty = b.value <= 0;

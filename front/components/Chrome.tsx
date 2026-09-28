@@ -24,6 +24,12 @@ export interface HeaderProps {
   sortLabel: string | null;
   /** Back to the board's own order. */
   onClearSort: () => void;
+  /** « RAF : A + B + N » while the métier lens narrows the reste à faire (ADR 048), else null. */
+  lensLabel: string | null;
+  /** The lens scope in full, the chip's tooltip. */
+  lensTitle: string;
+  /** Back to « tous métiers ». */
+  onClearLens: () => void;
   onToggleSidebar: () => void;
   onMetrics: () => void;
   /** Opens the archives overlay (design v11). */
@@ -52,37 +58,52 @@ function Legend({ config }: { config: BoardConfig }) {
   );
 }
 
+// What narrows the board right now, each with its ✕: the filters, the
+// focused stage, the sort (ADR 044) and the métier lens (ADR 048).
+function HeaderChips({ props }: { props: HeaderProps }) {
+  return (
+    <>
+      {props.filtersActive && (
+        <button className="filter-chip" onClick={props.onResetFilters} title="Réinitialiser les filtres (Esc)">
+          Filtré : {props.view.shown}/{props.stats.total} ✕
+        </button>
+      )}
+      {props.focusLabel && (
+        <button className="focus-chip" onClick={props.onClearFocus} title="Quitter le focus (Esc)">
+          Focus : {props.focusLabel} ✕
+        </button>
+      )}
+      {props.sortLabel !== null && (
+        <button className="focus-chip" onClick={props.onClearSort} title="Revenir à l’ordre du tableau">
+          {props.sortLabel} ✕
+        </button>
+      )}
+      {props.lensLabel !== null && (
+        <button className="focus-chip lens-chip" onClick={props.onClearLens} title={`${props.lensTitle} · revenir à tous les métiers`}>
+          <span className="lens-chip-text">{props.lensLabel}</span> ✕
+        </button>
+      )}
+    </>
+  );
+}
+
 /**
  * App header: sidebar toggle, title, the exercise selector (ADR 035), the
- * "Filtré"/"Focus" chips, subject and blocked counts, the domain legend,
- * the « Analytics » button, the « ⋯ » menu (archives, import, admin) and
- * the "+ Sujet" action.
+ * chips of what narrows the board (filters, focus, sort, métier lens),
+ * subject and blocked counts, the domain legend, the « Analytics » button,
+ * the « ⋯ » menu (archives, import, admin) and the "+ Sujet" action.
  * Inputs: HeaderProps (config, counts, chip state, callbacks).
  * Output: the header element. Failure: none.
  */
 export function Header(props: HeaderProps) {
-  const { stats, view } = props;
+  const { stats } = props;
   return (
     <header className="header">
       <div className="hd-left">
         <button className="icon-btn" onClick={props.onToggleSidebar} title="Filtres (S)">≡</button>
         <span className="hd-title">Portfolio Kanban DSI</span>
         <YearPicker {...props.exercise} />
-        {props.filtersActive && (
-          <button className="filter-chip" onClick={props.onResetFilters} title="Réinitialiser les filtres (Esc)">
-            Filtré : {view.shown}/{stats.total} ✕
-          </button>
-        )}
-        {props.focusLabel && (
-          <button className="focus-chip" onClick={props.onClearFocus} title="Quitter le focus (Esc)">
-            Focus : {props.focusLabel} ✕
-          </button>
-        )}
-        {props.sortLabel !== null && (
-          <button className="focus-chip" onClick={props.onClearSort} title="Revenir à l’ordre du tableau">
-            {props.sortLabel} ✕
-          </button>
-        )}
+        <HeaderChips props={props} />
       </div>
       <div className="hd-right">
         <div className="hd-stat"><b>{stats.total}</b> sujets</div>

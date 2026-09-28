@@ -79,7 +79,7 @@ function MatrixRow({ row, columns }: { row: TransverseRow; columns: Column[] }) 
 export function TransversePanel({ rows }: { rows: TransverseRow[] }) {
   const columns = columnsOf(rows);
   return (
-    <Panel title="Les domaines transverses : engagement réel et part du tableau" wide
+    <Panel title="Les domaines transverses : taux de charge réel et part du tableau" wide
       hint="projeté = tout le plan de charge · dont tableau = les cartes du tableau, réparties par domaine demandeur (j.h et part de la capacité)">
       {rows.length === 0 && <div className="mp-empty">Aucun domaine transverse dans la configuration.</div>}
       {rows.length > 0 && (
@@ -89,7 +89,7 @@ export function TransversePanel({ rows }: { rows: TransverseRow[] }) {
               <tr>
                 <th>Domaine transverse</th>
                 <th>Capacité j.h</th>
-                <th>Projeté j.h · engagement</th>
+                <th>Projeté j.h · taux de charge</th>
                 <th>dont tableau</th>
                 <th>dont hors tableau</th>
                 {columns.map((column) => (

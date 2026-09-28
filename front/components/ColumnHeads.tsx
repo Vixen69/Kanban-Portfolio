@@ -3,11 +3,18 @@
 // retained cards, and the stage's card count — « retenus/total » while the
 // board is narrowed by the sidebar filters (ADR 031). Split from
 // BoardGrid.tsx to respect the 300-line file cap.
+//
+// ADR 048: the three engaged columns wear a thin dark rule on top (the
+// class is read without hovering); a collapsed strip says its reste à
+// faire in its tooltip, since it shows no totals.
 
 import type { CSSProperties } from "react";
 import type { BoardConfig, CardState, Column, GateDef } from "../../core/types.ts";
-import { emptyTotals, type GroupTotals } from "../../core/totals.ts";
-import { ColumnTotals } from "./BoardTotals.tsx";
+import type { ColumnClass } from "../../core/column-class.ts";
+import { emptyTotals, scopedRaf, type GroupTotals } from "../../core/totals.ts";
+import { fmtUnit } from "../format.ts";
+import { CLASS_LABEL } from "../rafLabels.ts";
+import { ColumnTotals, type RafRead } from "./BoardTotals.tsx";
 
 /**
  * The gate definition of a column, or null when the column has no gate.
@@ -18,10 +25,18 @@ export function gateDefOf(config: BoardConfig, column: Column): GateDef | null {
   return column.gate === null ? null : config.gateDefs[column.gate];
 }
 
+// The tooltip of a collapsed strip: unfold it, and its reste à faire.
+function collapsedTitle(col: Column, cls: ColumnClass, totals: GroupTotals, read: RafRead): string {
+  const raf = read.counted.size === 0 ? "—" : fmtUnit(scopedRaf(totals, read.counted));
+  return `Déplier ${col.name} · ${CLASS_LABEL[cls]} ${raf} j.h` + (read.active ? ` · ${read.title}` : "");
+}
+
 // Collapsed column: a 30px vertical strip, one click to unfold it again.
-function CollapsedColumnHead({ col, onToggleCollapse }: { col: Column; onToggleCollapse: (id: string) => void }) {
+function CollapsedColumnHead({ col, engaged, title, onToggleCollapse }: {
+  col: Column; engaged: boolean; title: string; onToggleCollapse: (id: string) => void;
+}) {
   return (
-    <div className="col-head col-collapsed" onClick={() => onToggleCollapse(col.id)} title={"Déplier " + col.name}>
+    <div className={"col-head col-collapsed" + (engaged ? " engaged" : "")} onClick={() => onToggleCollapse(col.id)} title={title}>
       <span className="collapse-caret">{"›"}</span>
       <span className="col-label-v">{col.name}</span>
     </div>
@@ -86,11 +101,12 @@ function ColumnCount({ shown, all, narrowed }: { shown: number; all: number; nar
  * collapse state, the visible totals of the column (its `count` is the
  * retained card count) and whether they are unfolded, the column's whole
  * card count and whether the board is narrowed by the filters, and the
- * callbacks (both receive the column id).
+ * callbacks (both receive the column id), the column's class and the lens
+ * read (ADR 048).
  * Output: the header element — a vertical label variant when collapsed.
  * Failure modes: none.
  */
-export function ColumnHeader({ col, focused, colCollapsed, totals, totalsOpen, all, narrowed, config, onFocus, onToggleCollapse }: {
+export function ColumnHeader({ col, focused, colCollapsed, totals, totalsOpen, all, narrowed, config, cls, read, onFocus, onToggleCollapse }: {
   col: Column;
   focused: boolean;
   colCollapsed: boolean;
@@ -99,13 +115,18 @@ export function ColumnHeader({ col, focused, colCollapsed, totals, totalsOpen, a
   all: number;
   narrowed: boolean;
   config: BoardConfig;
+  cls: ColumnClass;
+  read: RafRead;
   onFocus: (id: string) => void;
   onToggleCollapse: (id: string) => void;
 }) {
-  if (colCollapsed) return <CollapsedColumnHead col={col} onToggleCollapse={onToggleCollapse} />;
+  const engaged = cls === "engaged";
+  if (colCollapsed) {
+    return <CollapsedColumnHead col={col} engaged={engaged} title={collapsedTitle(col, cls, totals, read)} onToggleCollapse={onToggleCollapse} />;
+  }
   return (
     <div
-      className={"col-head" + (focused ? " focused" : "")}
+      className={"col-head" + (focused ? " focused" : "") + (engaged ? " engaged" : "")}
       onClick={() => onFocus(col.id)}
       title={col.note === "" ? "Cliquer pour focaliser ce stade" : col.note}
     >
@@ -121,7 +142,7 @@ export function ColumnHeader({ col, focused, colCollapsed, totals, totalsOpen, a
           {"‹"}
         </button>
       </div>
-      <ColumnTotals totals={totals} config={config} open={totalsOpen} />
+      <ColumnTotals totals={totals} config={config} open={totalsOpen} cls={cls} read={read} />
     </div>
   );
 }
@@ -130,10 +151,11 @@ export function ColumnHeader({ col, focused, colCollapsed, totals, totalsOpen, a
  * The row of column headers: per-column totals of the retained cards, the
  * whole card count of each column, and the narrowed flag (ADR 031).
  * Inputs: the config, all folded cards, the hidden id set, focus/collapse
- * state, the per-column totals, the unfolded flag, the callbacks.
+ * state, the per-column totals, the unfolded flag, the column classes and
+ * the lens read (ADR 048), the callbacks.
  * Output: the header elements (a fragment). Failure modes: none.
  */
-export function ColumnHeads({ config, columns, cards, hiddenIds, focusedColumn, collapsedCols, byColumn, totalsOpen, onFocus, onToggleCollapse }: {
+export function ColumnHeads({ config, columns, cards, hiddenIds, focusedColumn, collapsedCols, byColumn, totalsOpen, classes, read, onFocus, onToggleCollapse }: {
   config: BoardConfig;
   /** The columns to render (a slice of the config's, ADR 039); all of them by default. */
   columns?: Column[];
@@ -143,6 +165,8 @@ export function ColumnHeads({ config, columns, cards, hiddenIds, focusedColumn, 
   collapsedCols: Set<string>;
   byColumn: Record<string, GroupTotals>;
   totalsOpen: boolean;
+  classes: Record<string, ColumnClass>;
+  read: RafRead;
   onFocus: (id: string) => void;
   onToggleCollapse: (id: string) => void;
 }) {
@@ -160,6 +184,8 @@ export function ColumnHeads({ config, columns, cards, hiddenIds, focusedColumn, 
           all={cards.filter((card) => card.columnId === col.id).length}
           narrowed={narrowed}
           config={config}
+          cls={classes[col.id] ?? "idle"}
+          read={read}
           onFocus={onFocus}
           onToggleCollapse={onToggleCollapse}
         />

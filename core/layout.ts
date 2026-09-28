@@ -69,6 +69,16 @@ export const LANE_GUTTER = {
 } as const;
 
 /**
+ * Width of the board gutter left of Demandes (ADR 048): the lane strip
+ * folded, the arbitration read-out and its métier list unfolded — wide
+ * enough for « CdP INFRA BUILD » and its figure on one line at 11px.
+ */
+export const BOARD_GUTTER = {
+  compact: "var(--lane-w)",
+  expanded: "232px",
+} as const;
+
+/**
  * CSS grid-template-columns for the board. Without unified columns: the
  * lane-label gutter followed by one weight per column. With them (ADR
  * 039): the board-totals gutter, the unified columns, then the lane
@@ -80,7 +90,7 @@ export const LANE_GUTTER = {
  * set of collapsed column ids, the lane gutter width (the default
  * `var(--lane-w)` narrow strip, widened when the per-canal totals are
  * unfolded — design v12), the unified column ids and the board gutter
- * width (widened when the per-column totals are unfolded).
+ * width (BOARD_GUTTER, widened by its own Σ « tableau » — ADR 048).
  * Output: the grid-template-columns string. Failure: none.
  */
 export function columnTemplate(
@@ -89,7 +99,7 @@ export function columnTemplate(
   collapsedColumnIds: ReadonlySet<string>,
   laneWidth: string = LANE_GUTTER.compact,
   unified: ReadonlySet<string> = new Set(),
-  boardWidth: string = LANE_GUTTER.compact,
+  boardWidth: string = BOARD_GUTTER.compact,
 ): string {
   const weight = (column: Column): string =>
     collapsedColumnIds.has(column.id)

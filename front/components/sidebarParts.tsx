@@ -32,9 +32,13 @@ export function Pill(props: {
   );
 }
 
-// Category header: label + tout/rien quick toggles (matters most for the
-// ten domains).
-function CatHead(props: { label: string; allOn: boolean; noneOn: boolean; onAll: () => void; onNone: () => void }) {
+/**
+ * Category header: label + tout/rien quick toggles (matters most for the
+ * ten domains; the board gutter's métier list reuses it, ADR 048).
+ * Inputs: the label, whether everything / nothing is already on, the two
+ * actions. Output: the header. Failure modes: none.
+ */
+export function CatHead(props: { label: string; allOn: boolean; noneOn: boolean; onAll: () => void; onNone: () => void }) {
   return (
     <div className="cat-head">
       <span className="sb-label">{props.label}</span>

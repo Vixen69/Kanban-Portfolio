@@ -140,12 +140,12 @@ function FocusCardBody(props: CardItemProps) {
         </div>
         <FocusMeta card={card} config={config} showCodes={props.showCodes} showTypes={props.showTypes} />
         {card.blocked && <div className="focus-block">{card.blockedReason}</div>}
-        <EstimeBar card={card} />
+        <EstimeBar card={card} config={config} />
       </div>
       <ProfileBlock card={card} config={config} sort={props.sort} />
       <div className="focus-side">
         <AgeText days={days} age={config.age} />
-        <SortTag card={card} sort={props.sort} />
+        <SortTag card={card} sort={props.sort} config={config} />
       </div>
     </div>
   );

@@ -7,12 +7,11 @@
 // dragging a card from a unified cell into a canal of Études.
 
 import type { CSSProperties } from "react";
-import type { BoardConfig, CardState, Column } from "../../core/types.ts";
+import type { CardState, Column } from "../../core/types.ts";
 import { UNIFIED_LANE } from "../../core/layout.ts";
 import { cellWipLimit } from "../../core/wip.ts";
-import type { GroupTotals } from "../../core/totals.ts";
 import type { BoardGridProps } from "./BoardGrid.tsx";
-import { LaneTotals, TotalsToggle } from "./BoardTotals.tsx";
+import { TotalsToggle } from "./BoardTotals.tsx";
 import { Cell } from "./Cell.tsx";
 import { gateDefOf } from "./ColumnHeads.tsx";
 import { CollapsedColCell } from "./CollapsedCells.tsx";
@@ -30,25 +29,6 @@ export function LaneCorner({ open, onToggle }: { open: boolean; onToggle: () => 
   return (
     <div className="corner lane-corner">
       <TotalsToggle open={open} onToggle={onToggle} what="canal" />
-    </div>
-  );
-}
-
-/**
- * The board-totals gutter, left of Demandes: the whole board shown —
- * Demandes, Qualification and every canal after — count, estimé and RAF,
- * folded as a vertical label or unfolded as the full budget block (it
- * follows the per-column Σ). Never a list of projects: cards start in
- * Demandes.
- * Inputs: the totals of the visible cards, the config, the unfolded flag,
- * the number of lane rows to span. Output: the gutter cell. Failure: none.
- */
-export function BoardGutter({ totals, config, open, rows }: { totals: GroupTotals; config: BoardConfig; open: boolean; rows: number }) {
-  return (
-    <div className={"lane-label no-collapse board-gutter" + (open ? " expanded" : "")} style={span(1, rows)}
-      title={`${totals.count} sujet(s) sur le tableau · totaux filtrés`}>
-      <span className="lane-name">Projets · {totals.count}</span>
-      <LaneTotals totals={totals} config={config} open={open} laneName="tableau entier" />
     </div>
   );
 }

@@ -70,6 +70,7 @@ test("emptyTotals is the neutral element", () => {
     jh: 0,
     done: 0,
     byProfile: {},
+    blind: 0,
   });
   assert.equal(remainingLoad(totals), 0);
 });
@@ -88,17 +89,18 @@ test("a per-profile plan drives the load and its split", () => {
   assert.equal(totals.jh, 150);
   assert.equal(totals.done, 50);
   assert.deepEqual(totals.byProfile, {
-    pA: { jh: 100, done: 30 },
-    pB: { jh: 50, done: 20 },
+    pA: { jh: 100, done: 30, raf: 70 },
+    pB: { jh: 50, done: 20, raf: 30 },
   });
   assert.equal(remainingLoad(totals), 100);
 });
 
-test("without a per-profile plan the card-level effort is used, unattributed", () => {
+test("without a per-profile plan the card-level effort feeds jh/done only, the card counted « sans ventilation »", () => {
   const totals = totalsOf([FALLBACK]);
   assert.equal(totals.jh, 40);
   assert.equal(totals.done, 15);
   assert.deepEqual(totals.byProfile, {});
+  assert.equal(totals.blind, 1);
   assert.equal(remainingLoad(totals), 25);
 });
 

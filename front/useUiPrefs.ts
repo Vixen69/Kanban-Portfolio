@@ -1,10 +1,10 @@
-// Sticky view preferences (design v12): the two Σ toggles that unfold the
-// per-column and per-canal totals. These are pure view preferences of ONE
-// operator's browser — not portfolio data, not topology — so they live in
+// Sticky view preferences (design v12): the Σ toggles that unfold the
+// per-column and per-canal totals, and the board gutter (ADR 048). These
+// are pure view preferences of ONE operator's browser — not portfolio data, not topology — so they live in
 // localStorage rather than in the board config or the event log (ADR 020).
 //
 // This is the first and only client-side storage in the product: it holds
-// two booleans, never card data, and every access is guarded so a browser
+// three booleans, never card data, and every access is guarded so a browser
 // with storage disabled (or a private window) degrades to the defaults
 // instead of throwing. Nothing here may ever reach core/ — core stays
 // DOM-free and dependency-free.
@@ -62,3 +62,9 @@ export function useStoredFlag(key: string, fallback: boolean): [boolean, () => v
 export const COLUMN_TOTALS_KEY = "nmo_totals_open";
 /** localStorage key of the per-canal totals toggle (folded by default). */
 export const LANE_TOTALS_KEY = "nmo_lane_totals_open";
+/**
+ * localStorage key of the board gutter toggle (« Σ tableau », ADR 048 —
+ * the third flag, amending ADR 020). Folded by default: the one-screen
+ * criterion is measured folded; the operator unfolds it for the session.
+ */
+export const BOARD_TOTALS_KEY = "nmo_board_totals_open";

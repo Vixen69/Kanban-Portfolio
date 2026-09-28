@@ -5,6 +5,7 @@
 import type { CSSProperties } from "react";
 import type {
   AgeThresholds,
+  BoardConfig,
   CardState,
   Criticality,
   CustomValue,
@@ -12,7 +13,7 @@ import type {
   ProjectType,
 } from "../../core/types.ts";
 import { ageCategory, ageLabel } from "../../core/aging.ts";
-import { cardLoad } from "../../core/card-sort.ts";
+import { cardRaf, countedIds, hasBreakdown } from "../../core/raf-card.ts";
 import { fmtNum } from "../format.ts";
 
 /**
@@ -57,19 +58,22 @@ export function TypeTag({ type, big }: { type: ProjectType | null; big?: boolean
  * estimate nor a plan de charge.
  * Failure modes: none. The k€ estimate never borrows the effort (j.h):
  * without a budget the figure reads « — » (author, 2026-09-10 — a 31 j.h
- * effort was shown as 31 k€). The RAF still falls back on the card-level
- * effort when there is no per-profile plan (same rule as core/totals).
+ * effort was shown as 31 k€). Nor does the RAF (ADR 048): it is the
+ * per-métier plan's, every métier of the config, one arithmetic with the
+ * headers; a card without a per-métier plan reads « RAF — ».
  */
-export function EstimeBar({ card }: { card: CardState }) {
+export function EstimeBar({ card, config }: { card: CardState; config: BoardConfig }) {
   const est = card.budgetEstimated;
-  const { jh, raf } = cardLoad(card); // one rule with the sort (ADR 044)
-  if (est === null && jh === 0) return null;
+  const plan = hasBreakdown(card);
+  if (est === null && !plan) return null;
+  const raf = cardRaf(card, countedIds(null, config));
   const estLabel = est === null ? "non renseigné" : `${fmtNum(est)} k€`;
+  const rafLabel = plan ? `Reste à faire ${fmtNum(raf)} j.h` : "Reste à faire : sans ventilation par métier";
   return (
-    <div className="ec-row" title={`Meilleur estimé ${estLabel} · Reste à faire ${fmtNum(raf)} j.h`}>
+    <div className="ec-row" title={`Meilleur estimé ${estLabel} · ${rafLabel}`}>
       <span className="ec-stat">est. <b>{est === null ? "—" : fmtNum(est)}</b> k€</span>
       <span className="ec-sep" />
-      <span className="ec-stat">RAF <b>{fmtNum(raf)}</b> j.h</span>
+      <span className="ec-stat">RAF <b>{plan ? fmtNum(raf) : "—"}</b>{plan ? " j.h" : ""}</span>
     </div>
   );
 }

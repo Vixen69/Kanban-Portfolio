@@ -6,6 +6,7 @@
 
 import type { BoardConfig, CardState } from "../../core/types.ts";
 import { isSortActive, sortValue, topProfiles, type CardSort, type SortKey } from "../../core/card-sort.ts";
+import { countedIds } from "../../core/raf-card.ts";
 import { fmtNum } from "../format.ts";
 import { profileById } from "../lookup.ts";
 
@@ -39,12 +40,13 @@ const UNIT: Record<SortKey, string> = { board: "", remaining: "j.h", estimate: "
 
 /**
  * The sort's figure of the card, written on it while a sort is active.
- * Inputs: the card, the sort. Output: the tag, or null when no sort is
+ * Inputs: the card, the sort, the config (the « reste à faire » counts its
+ * métiers only, ADR 048). Output: the tag, or null when no sort is
  * active or the card has no figure for it. Failure modes: none.
  */
-export function SortTag({ card, sort }: { card: CardState; sort: CardSort }) {
+export function SortTag({ card, sort, config }: { card: CardState; sort: CardSort; config: BoardConfig }) {
   if (!isSortActive(sort)) return null;
-  const value = sortValue(card, sort);
+  const value = sortValue(card, sort, countedIds(null, config));
   if (value <= 0) return null;
   return <span className="sort-tag" title="La valeur du tri en cours">{fmtNum(value)} {UNIT[sort.key]}</span>;
 }

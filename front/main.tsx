@@ -10,6 +10,7 @@ import "./styles/fonts.css";
 import "./styles/base.css";
 import "./styles/sidebar.css";
 import "./styles/board.css";
+import "./styles/lens.css";
 import "./styles/cards.css";
 import "./styles/modal.css";
 import "./styles/admin.css";

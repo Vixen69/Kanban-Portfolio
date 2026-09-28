@@ -5,8 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { CardSort } from "./card-sort.ts";
 import {
-  BOARD_ORDER, cardLoad, isSortActive, profileRemaining, profileRemainingTotals, sortCards, sortValue, topProfiles,
-  withoutBreakdown,
+  BOARD_ORDER, isSortActive, profileRemainingTotals, sortCards, sortValue, topProfiles, withoutBreakdown,
 } from "./card-sort.ts";
 import type { Card, CardState } from "./types.ts";
 import { foldEvents } from "./state.ts";
@@ -39,18 +38,19 @@ test("isSortActive: the board's order and a métier sort without métier reorder
   assert.equal(ids(sortCards(CARDS, by("profiles", "asc"))), "ABCDE");
 });
 
-test("cardLoad / profileRemaining: the per-profile plan first, the card-level effort otherwise, clamped at 0", () => {
-  assert.deepEqual(cardLoad(A), { jh: 200, done: 65, raf: 135 });
-  assert.deepEqual(cardLoad(C), { jh: 80, done: 30, raf: 50 }, "no plan: the card-level effort");
-  assert.deepEqual(cardLoad(D), { jh: 10, done: 25, raf: 0 }, "over-consumed never reads negative");
-  assert.equal(profileRemaining(A, "expert"), 60);
-  assert.equal(profileRemaining(D, "expert"), 0);
-  assert.equal(profileRemaining(A, "ghost"), 0);
+test("sortValue « reste à faire »: the per-métier plan only, clamped per métier, never the card-level effort (ADR 048)", () => {
+  assert.equal(sortValue(A, by("remaining", "desc")), 135);
+  assert.equal(sortValue(C, by("remaining", "desc")), 0, "sans ventilation: no figure, whatever its effort");
+  assert.equal(sortValue(D, by("remaining", "desc")), 0, "over-consumed never reads negative");
+  const mixed = testState({ id: "M", chargeByProfile: [{ profileId: "dev", jh: 10, done: 30 }, { profileId: "cdp", jh: 20, done: 5 }] });
+  assert.equal(sortValue(mixed, by("remaining", "desc")), 15, "one métier over-consumed does not eat another's reste à faire");
+  assert.equal(sortValue(A, by("remaining", "desc"), new Set(["expert", "dev"])), 70, "the counted métiers only");
 });
 
 test("sortCards by reste à faire and by meilleur estimé: both directions, the cards without a figure last", () => {
-  assert.equal(ids(sortCards(CARDS, by("remaining", "desc"))), "BACDE", "B 180, A 135, C 50 — D (0) and E (none) last, board order");
-  assert.equal(ids(sortCards(CARDS, by("remaining", "asc"))), "CABDE", "ascending never puts the empty cards on top");
+  assert.equal(ids(sortCards(CARDS, by("remaining", "desc"))), "BACDE", "B 180, A 135 — C, D, E without a figure last, board order");
+  assert.equal(ids(sortCards(CARDS, by("remaining", "asc"))), "ABCDE", "ascending never puts the empty cards on top");
+  assert.equal(ids(sortCards(CARDS, by("remaining", "desc"), new Set(["expert"]))), "ABCDE", "A 60, B 40 on the expert métier");
   assert.equal(ids(sortCards(CARDS, by("estimate", "desc"))), "BADCE");
   assert.equal(ids(sortCards(CARDS, by("estimate", "asc"))), "DABCE");
   assert.equal(sortValue(C, by("estimate", "desc")), 0, "a null estimate is no figure");

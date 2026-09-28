@@ -41,7 +41,7 @@ function Kpi({ num, unit, label, tone }: { num: string | number; unit?: string; 
   );
 }
 
-// Engagement: past the capacity is an alert, close to it a warning.
+// Taux de charge: past the capacity is an alert, close to it a warning.
 function ratioTone(ratio: number | null): Tone {
   if (ratio === null) return null;
   if (ratio > 1) return "alert";
@@ -65,7 +65,7 @@ function Kpis({ readout }: { readout: CapacityReadout }) {
       <Kpi num={fmtUnit(planKnown ? kpis.plannedJh : kpis.demandJh)} unit="j.h"
         label={planKnown ? "Projeté · tout le plan de charge" : "Demande du tableau"} tone="accent" />
       <Kpi num={pct(kpis.engagement ?? kpis.ratio)}
-        label={planKnown ? "Engagement · projeté / capacité" : "Charge du tableau / capacité"}
+        label={planKnown ? "Taux de charge · projeté / capacité" : "Charge du tableau / capacité"}
         tone={ratioTone(kpis.engagement ?? kpis.ratio)} />
       <Kpi num={pct(kpis.progress)} label={`Avancement · réalisé / projeté · ${pct(kpis.yearElapsed)} de l’année écoulée`}
         tone={progressTone(kpis)} />

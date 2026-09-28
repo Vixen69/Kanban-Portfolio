@@ -32,7 +32,7 @@ export function budgetModel(card: CardState): { rows: BudgetRow[]; bMax: number;
   const rows: BudgetRow[] = [
     { key: "rdli", field: "budgetRdli", label: "Enveloppe RDLI", val: bRdli, color: "#94a3b8", ref: true },
     { key: "est", field: "budgetEstimated", label: "Meilleur estimé", val: bEst, color: "var(--accent)" },
-    { key: "eng", field: "budgetEngaged", label: "Engagé", val: bEng, color: "#b45309" },
+    { key: "eng", field: "budgetEngaged", label: "Budget engagé", val: bEng, color: "#b45309" },
     { key: "real", field: "budgetConsumed", label: "Réalisé", val: bReal, color: bReal > bRdli ? "var(--danger)" : "var(--ok)" },
   ];
   return { rows, bMax, bRdli, bReal };
