@@ -22,8 +22,8 @@ export interface CellProps {
   /** Grid placement of the cell root (the unified cells span the lane rows). */
   style?: CSSProperties;
   /** The cards of THIS cell only (BoardGrid filters via core cellCards),
-   * the sidebar filters already applied — hidden cards never reach the
-   * cell (ADR 031). */
+   * the sidebar filters and the métier lens already applied — hidden
+   * cards never reach the cell (ADR 031, 048). */
   cards: CardState[];
   focused: boolean;
   config: BoardConfig;
@@ -33,7 +33,7 @@ export interface CellProps {
   showTypes: boolean;
   /** The board's sort (ADR 044), read by the expanded cards. */
   sort: CardSort;
-  /** The métier lens (ADR 048): the cards it does not concern are dimmed, the expanded card's RAF follows it. */
+  /** The métier lens (ADR 048): the expanded card's RAF follows it. */
   read: RafRead;
   /** True when a dragged card is currently over this cell. */
   dragOver: boolean;

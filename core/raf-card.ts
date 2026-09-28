@@ -68,18 +68,16 @@ export function hasBreakdown(card: CardState): boolean {
 }
 
 /**
- * The cards with a reste à faire on the counted métiers first, the others
- * after — stable on both sides (ADR 048: while the lens narrows the board,
- * the cards it does not concern sink to the bottom of their cells, the
- * order above them untouched).
- * Inputs: the cards (already in board or sort order), the counted métiers.
- * Output: a new array; unchanged order when no métier is counted (nothing
- * would stay on top). Failure: none.
+ * The cards the métier lens filters out (ADR 048, author 2026-09-28: they
+ * disappear exactly like with the other filters, ADR 031): those without
+ * any reste à faire on the counted métiers — a card « sans ventilation »
+ * included, nothing says it concerns them.
+ * Inputs: the cards, the counted métiers. Output: their ids; none when no
+ * métier is counted (« rien » would empty the board). Failure: none.
  */
-export function scopeFirst<T extends CardState>(cards: readonly T[], counted: ReadonlySet<string>): T[] {
-  if (counted.size === 0) return [...cards];
-  const inside: T[] = [];
-  const outside: T[] = [];
-  for (const card of cards) (cardRaf(card, counted) > 0 ? inside : outside).push(card);
-  return [...inside, ...outside];
+export function outOfScopeIds(cards: readonly CardState[], counted: ReadonlySet<string>): Set<string> {
+  const ids = new Set<string>();
+  if (counted.size === 0) return ids;
+  for (const card of cards) if (cardRaf(card, counted) <= 0) ids.add(card.id);
+  return ids;
 }

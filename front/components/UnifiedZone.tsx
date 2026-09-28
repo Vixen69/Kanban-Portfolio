@@ -42,7 +42,7 @@ function UnifiedColumn({ col, index, cards, rows, props, read }: {
 }) {
   const style = span(index + 2, rows);
   if (props.collapsedCols.has(col.id)) {
-    return <CollapsedColCell cards={cards} config={props.config} read={read} onOpen={props.onOpen} style={style} />;
+    return <CollapsedColCell cards={cards} config={props.config} onOpen={props.onOpen} style={style} />;
   }
   const wipLimit = cellWipLimit(props.config, UNIFIED_LANE, col.id);
   return (

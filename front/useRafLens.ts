@@ -1,16 +1,16 @@
 // The « Périmètre RAF » lens (ADR 048): which métiers the reste à faire
 // counts, everywhere on the board at once — headers, canal labels, the
-// board gutter. A SESSION state (author, 2026-09-28): it lives in memory,
-// a reload returns to « tous métiers », Escape never clears it, nothing is
-// written to the log nor to localStorage. The lens also carries the
-// divisor of the persons figure: the working days left in the exercise.
+// board gutter — and, while it counts at least one métier, it FILTERS the
+// board: the projects without reste à faire on those métiers disappear
+// like with any other filter (author, 2026-09-28, ADR 031). A SESSION
+// state: it lives in memory, a reload returns to « tous métiers », Escape
+// never clears it, nothing is written to the log nor to localStorage.
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { BoardConfig } from "../core/types.ts";
 import { exerciseStatus, type ExerciseStatus } from "../core/exercise.ts";
 import { countedIds, type RafScope } from "../core/raf-card.ts";
 import type { LensRow } from "../core/raf.ts";
-import { calendarDateOf, workingDaysLeft } from "../core/workdays.ts";
 
 /** The lens as the board reads it. */
 export interface BoardLens {
@@ -22,9 +22,9 @@ export interface BoardLens {
   active: boolean;
   /**
    * The counted métiers while the lens narrows the board to at least one
-   * métier, else null: what sinks the cards it does not concern to the
-   * bottom of their cells, dims them, and turns a drop onto a card into a
-   * plain move (« rien » partitions nothing — nothing would stay on top).
+   * métier, else null: the cards without reste à faire on them are then
+   * hidden like by any filter (« rien » hides nothing — it would empty the
+   * board).
    */
   narrowing: ReadonlySet<string> | null;
   /** Checks or unchecks one métier. */
@@ -33,8 +33,6 @@ export interface BoardLens {
   all: () => void;
   /** « rien »: no métier counted. */
   none: () => void;
-  /** Working days left to 31/12 of the exercise shown; null away from the current one. */
-  days: number | null;
   /** The exercise shown and its status against the current one. */
   year: number;
   status: ExerciseStatus;
@@ -50,11 +48,11 @@ function toggled(current: RafScope, id: string, ids: readonly string[]): RafScop
 }
 
 /**
- * The board's lens: its scope, the métiers counted and the divisor.
- * Inputs: the config, the shared clock (epoch ms), the exercise shown.
- * Output: the BoardLens. Failure: none.
+ * The board's lens: its scope and the métiers counted.
+ * Inputs: the config, the exercise shown. Output: the BoardLens.
+ * Failure: none.
  */
-export function useBoardLens(config: BoardConfig, nowMs: number, viewYear: number): BoardLens {
+export function useBoardLens(config: BoardConfig, viewYear: number): BoardLens {
   const [scope, setScope] = useState<RafScope>(null);
   const ids = useMemo(() => config.profiles.map((profile) => profile.id), [config]);
   const toggle = useCallback((id: string) => setScope((current) => toggled(current, id, ids)), [ids]);
@@ -63,16 +61,9 @@ export function useBoardLens(config: BoardConfig, nowMs: number, viewYear: numbe
   const counted = useMemo(() => countedIds(scope, config), [scope, config]);
   const narrowing = scope !== null && counted.size > 0 ? counted : null;
   const status = exerciseStatus(viewYear, config.exercise.year);
-  // Keyed on the local midnight: recomputed once a day, not on every one-minute tick.
-  // Past the 31/12 (before the year switch) no day is left: no divisor at all.
-  const midnight = new Date(nowMs).setHours(0, 0, 0, 0);
-  const days = useMemo(() => {
-    const left = status === "current" ? workingDaysLeft(calendarDateOf(midnight), viewYear) : 0;
-    return left > 0 ? left : null;
-  }, [midnight, status, viewYear]);
   return useMemo(
-    () => ({ scope, counted, active: scope !== null, narrowing, toggle, all, none, days, year: viewYear, status }),
-    [scope, counted, narrowing, toggle, all, none, days, viewYear, status],
+    () => ({ scope, counted, active: scope !== null, narrowing, toggle, all, none, year: viewYear, status }),
+    [scope, counted, narrowing, toggle, all, none, viewYear, status],
   );
 }
 
@@ -87,19 +78,9 @@ export interface RafRead {
 }
 
 /**
- * True when a card falls outside the lens: the lens narrows the board to
- * at least one métier and the card has no reste à faire on any of them.
- * Inputs: the card's RAF on the counted métiers, the read. Output: the
- * flag. Failure: none.
- */
-export function outOfScope(raf: number, read: RafRead): boolean {
-  return read.active && read.counted.size > 0 && raf <= 0;
-}
-
-/**
  * The métier rows in a stable order while the lens is on: the order seen
- * when the lens was switched on holds until « tout », so a card dragged
- * from Actifs to Pause never makes the rows jump under the operator's eyes.
+ * when the lens was switched on holds until « tout », so a card moved
+ * between columns never makes the rows jump under the operator's eyes.
  * Inputs: the rows (core lensRows order), whether the lens is on.
  * Output: the rows to render. Failure: none — a métier unknown to the
  * frozen order goes last.

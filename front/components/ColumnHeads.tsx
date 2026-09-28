@@ -1,7 +1,8 @@
 // Column headers of the board (design grid.jsx): click to focus a stage,
 // caret to collapse it to a 30px strip, the v12 money/charge totals of the
 // retained cards, and the stage's card count — « retenus/total » while the
-// board is narrowed by the sidebar filters (ADR 031). Split from
+// board is narrowed by the sidebar filters or the métier lens (ADR 031,
+// ADR 048). Split from
 // BoardGrid.tsx to respect the 300-line file cap.
 //
 // ADR 048: the three engaged columns wear a thin dark rule on top (the

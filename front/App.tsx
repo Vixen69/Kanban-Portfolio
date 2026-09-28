@@ -150,7 +150,7 @@ function BoardArea({ ctx }: { ctx: Ctx }) {
   const { config, ui, derived, drag, handlers } = ctx;
   return (
     <div className="board-area">
-      <BoardGrid config={config} cards={ctx.cards} hiddenIds={derived.hidden}
+      <BoardGrid config={config} cards={ctx.cards} hiddenIds={derived.hidden} filterHiddenIds={derived.filterHidden}
         focusedColumn={ui.focusCol} collapsedLanes={ui.collapsedLanes}
         collapsedCols={ui.collapsedCols} now={ctx.nowMs} showCodes={ui.showCodes} showTypes={ui.showTypes}
         sort={ctx.sorting.sort} lens={ctx.lens}
@@ -163,7 +163,7 @@ function BoardArea({ ctx }: { ctx: Ctx }) {
         onDragLeaveCell={drag.onDragLeaveCell}
         onCardOver={drag.onCardOver} onCardDrop={drag.onCardDrop}
         dropCardId={ui.dropCardId} />
-      {derived.view.shown === 0 && <EmptyOverlay onReset={ctx.filters.reset} />}
+      {derived.view.shown === 0 && <EmptyOverlay onReset={() => { ctx.filters.reset(); ctx.lens.all(); }} />}
     </div>
   );
 }
@@ -189,7 +189,8 @@ function Screen({ ctx }: { ctx: Ctx }) {
         onToggleBlockedOnly={filters.toggleBlockedOnly}
         onToggleNoConstraint={filters.toggleNoConstraint}
         onSetGroup={filters.setGroup} stats={derived.all} view={derived.view}
-        filtersActive={filters.active} onReset={filters.reset} searchRef={ctx.searchRef}
+        filtersActive={filters.active} narrowed={filters.active || ctx.lens.narrowing !== null}
+        onReset={filters.reset} searchRef={ctx.searchRef}
         showCodes={ui.showCodes} setShowCodes={ui.setShowCodes}
         showTypes={ui.showTypes} setShowTypes={ui.setShowTypes}
         sorting={ctx.sorting} sortPanel={ctx.sortPanel} />
@@ -216,16 +217,15 @@ function Shell({ store, config }: { store: BoardStore; config: BoardConfig }) {
   const filters = useFilters(config);
   const sorting = useCardSort();
   const { viewYear, exercise } = useExerciseShown(store.cards, config.exercise.year); // ADR 035: the year shown
-  const lens = useBoardLens(config, nowMs, viewYear); // ADR 048: session only, a reload returns to « tous métiers »
-  // A sorted board (ADR 044) or one the lens partitions (ADR 048) has no manual insertion point.
-  const drag = useDragHandlers(store, ui, !sorting.active && lens.narrowing === null);
+  const lens = useBoardLens(config, viewYear); // ADR 048: session only, a reload returns to « tous métiers »
+  const drag = useDragHandlers(store, ui, !sorting.active); // ADR 044: a sorted board has no manual insertion point
   const handlers = useBoardHandlers(ui, config.lanes);
   useShortcuts(ui, searchRef);
   const allCards = useDisplayCards(store.cards, config, viewYear);
   // The detail lookup searches ALL cards so an archived fiche opens from the archive.
   const { cards, archivedCards } = useBoardCards(allCards, viewYear, config.exercise.year, sorting.sort, lens);
   const { capacity, draw, bumpCapacity } = useResourceDraw(viewYear, config); // ADR 041
-  const derived = useDerived(cards, config, filters, now, draw);
+  const derived = useDerived(cards, config, filters, now, draw, lens.narrowing); // the lens filters too (ADR 048)
   const sortPanel = useSortPanel(cards, derived.hidden, config, sorting.sort, lens);
   const detailCard = allCards.find((card) => card.id === ui.detailId) ?? null;
   // A card removed from the fold (deleted elsewhere) leaves detailId

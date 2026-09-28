@@ -82,8 +82,10 @@ export function LaneLabel({ lane, collapsed, disabled, totals, rafTotals, totals
 export interface BoardGridProps {
   config: BoardConfig;
   cards: CardState[];
-  /** Ids of the cards the sidebar filters hide (ADR 031) — left off the cells. */
+  /** Ids of the cards the sidebar filters and the métier lens hide (ADR 031, 048) — left off the cells. */
   hiddenIds: Set<string>;
+  /** Ids the sidebar filters alone hide: the lens list and its « sans ventilation » note read the board without the lens's own filtering. */
+  filterHiddenIds: Set<string>;
   focusedColumn: string | null;
   collapsedLanes: Set<string>;
   collapsedCols: Set<string>;
@@ -93,7 +95,7 @@ export interface BoardGridProps {
   showTypes: boolean;
   /** The board's sort (ADR 044), handed down to the expanded cards. */
   sort: CardSort;
-  /** The métier lens and the persons divisor (ADR 048). */
+  /** The métier lens (ADR 048): the métiers every reste à faire counts; while it narrows, the cards it filters out are in hiddenIds. */
   lens: BoardLens;
   /** The cell a dragged card is currently over, or null. */
   dragOver: { laneId: string; columnId: string } | null;
@@ -168,10 +170,10 @@ function LaneRow({ lane, columns, props, totals, totalsOpen, read }: {
       {columns.map((col) => {
         const inCell = cellCards(props.cards, lane.id, col.id).filter((card) => !props.hiddenIds.has(card.id));
         if (laneCollapsed) {
-          return <CollapsedCell key={col.id} cards={inCell} config={props.config} now={props.now} read={read} onOpen={props.onOpen} />;
+          return <CollapsedCell key={col.id} cards={inCell} config={props.config} now={props.now} onOpen={props.onOpen} />;
         }
         if (props.collapsedCols.has(col.id)) {
-          return <CollapsedColCell key={col.id} cards={inCell} config={props.config} read={read} onOpen={props.onOpen} />;
+          return <CollapsedColCell key={col.id} cards={inCell} config={props.config} onOpen={props.onOpen} />;
         }
         return <BoardCell key={col.id} lane={lane} col={col} cards={inCell} props={props} read={read} />;
       })}
@@ -210,7 +212,7 @@ export function BoardGrid(props: BoardGridProps) {
   const [lanesOpen, toggleLanes] = useStoredFlag(LANE_TOTALS_KEY, false);
   const [boardOpen, toggleBoard] = useStoredFlag(BOARD_TOTALS_KEY, false);
   const unified = useMemo(() => unifiedColumnIds(config), [config]);
-  const totals = useBoardTotals(props.cards, props.hiddenIds, config, unified, props.lens.counted, props.lens.active);
+  const totals = useBoardTotals(props.cards, { shown: props.hiddenIds, lensBase: props.filterHiddenIds }, config, unified, props.lens);
 
   const read = useRafRead(props.lens, config);
   const laneWidth = lanesOpen ? LANE_GUTTER.expanded : LANE_GUTTER.compact;

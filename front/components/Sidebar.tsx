@@ -32,6 +32,8 @@ export interface SidebarProps {
   /** Counts over the visible (not hidden) subset. */
   view: ViewCounts;
   filtersActive: boolean;
+  /** True when anything narrows the board — the sidebar filters or the métier lens (ADR 048); the stats block then reads « Sélection · total » with its « / total » references. */
+  narrowed: boolean;
   onReset: () => void;
   /** Focused by the "/" shortcut. */
   searchRef: Ref<HTMLInputElement>;
@@ -194,7 +196,7 @@ function CritSection(props: SidebarProps) {
 }
 
 function StatsBlock(props: SidebarProps) {
-  const { view, stats, filtersActive: active, config } = props;
+  const { view, stats, narrowed: active, config } = props;
   return (
     <div className="sb-stats">
       <div className="sb-label">{active ? "Sélection · total" : "Vue d’ensemble"}</div>

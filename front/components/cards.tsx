@@ -8,9 +8,8 @@ import type { CSSProperties, DragEvent } from "react";
 import type { BoardConfig, CardState } from "../../core/types.ts";
 import { daysInColumn } from "../../core/aging.ts";
 import type { CardSort } from "../../core/card-sort.ts";
-import { cardRaf } from "../../core/raf-card.ts";
 import { domainById, typeById } from "../lookup.ts";
-import { outOfScope, type RafRead } from "../useRafLens.ts";
+import type { RafRead } from "../useRafLens.ts";
 import { AgeText, CritMark, CustomBadges, EstimeBar, TypeTag } from "./cardParts.tsx";
 import { ProfileBlock, SortTag } from "./ProfileBlock.tsx";
 import { AbsentMark, DecisionMark } from "./cardMarks.tsx";
@@ -37,14 +36,8 @@ export interface CardItemProps {
   dropTarget: boolean;
   /** The board's sort (ADR 044): the expanded card writes its figure. */
   sort: CardSort;
-  /** The métier lens (ADR 048): the card is dimmed when it falls outside, the expanded card's RAF follows it. */
+  /** The métier lens (ADR 048): the expanded card's RAF and « RAF par métier » follow it. */
   read: RafRead;
-}
-
-// The class a card wears outside the lens (ADR 048: dimmed, at the bottom
-// of its cell — the partition itself is done once, upstream).
-function scopeClass(card: CardState, read: RafRead): string {
-  return outOfScope(cardRaf(card, read.counted), read) ? " out-scope" : "";
 }
 
 // Blocked cards override the domain accent with the validated red wash +
@@ -90,7 +83,7 @@ function MiniCardBody(props: CardItemProps) {
   const domain = domainById(config)[card.domain];
   return (
     <div
-      className={"mini" + (props.dropTarget ? " drop-before" : "") + scopeClass(card, props.read)}
+      className={"mini" + (props.dropTarget ? " drop-before" : "")}
       draggable
       onClick={() => props.onOpen(card)}
       onDragStart={(e) => props.onDragStart(e, card)}
@@ -131,7 +124,7 @@ function FocusCardBody(props: CardItemProps) {
   const acc = cardAccent(card, config);
   return (
     <div
-      className={"focus-card" + (props.dropTarget ? " drop-before" : "") + scopeClass(card, props.read)}
+      className={"focus-card" + (props.dropTarget ? " drop-before" : "")}
       draggable
       onClick={() => props.onOpen(card)}
       onDragStart={(e) => props.onDragStart(e, card)}

@@ -5,7 +5,9 @@
 /**
  * The "no match" overlay: title, explanation and a reset button. Rendered
  * by App over the board area when the visible count drops to zero.
- * Inputs: onReset — clears the search and re-enables every filter.
+ * Inputs: onReset — clears the search, re-enables every filter and
+ * returns the métier lens to « tous métiers » (ADR 048: it filters too;
+ * the board gutter stays above the overlay so the lens can be adjusted).
  * Output: the overlay element. Failure: none.
  */
 export function EmptyOverlay({ onReset }: { onReset: () => void }) {

@@ -3,16 +3,17 @@
 // count, estimé k€, RAF engagé — a click unfolds it. Unfolded (Σ tableau,
 // its own toggle, remembered), the read-out the room looks at: the caption
 // and what bounds the figures (filters, exercise, métiers), the RAF engagé
-// in large with its persons, the non-engaged and out-of-count RAF, the
-// legend of the classes and the divisor, the « sans ventilation » note, a
-// k€ line, then the métier list (GutterMetiers). Only the list scrolls:
-// nothing above it changes height while métiers are checked. No tooltip
-// on the unfolded gutter — it is read on the projector, not hovered.
+// in large, the non-engaged and out-of-count RAF, the legend of the
+// classes, the « sans ventilation » note, a k€ line, then the métier list
+// (GutterMetiers). No persons figure (author, 2026-09-28): j.h ÷ working
+// days is not a headcount the tool can stand behind. Only the list
+// scrolls: nothing above it changes height while métiers are checked. No
+// tooltip on the unfolded gutter — it is read on the projector.
 
 import type { CSSProperties, KeyboardEvent } from "react";
 import type { BoardConfig } from "../../core/types.ts";
 import { fmtUnit } from "../format.ts";
-import { blindNote, classLegend, divisorLabel, personsLabel, scopeLabel, scopeTitle } from "../rafLabels.ts";
+import { blindNote, classLegend, scopeLabel, scopeTitle } from "../rafLabels.ts";
 import type { BoardTotals } from "../useBoardTotals.ts";
 import type { BoardLens } from "../useRafLens.ts";
 import { TotalsToggle } from "./BoardTotals.tsx";
@@ -29,7 +30,7 @@ export interface BoardGutterProps {
   rows: number;
   /** The cards of the exercise shown (the « filtré N/M » denominator). */
   all: number;
-  /** True while the sidebar filters hide cards. */
+  /** True while the sidebar filters or the métier lens hide cards (ADR 031, 048). */
   narrowed: boolean;
 }
 
@@ -65,10 +66,13 @@ function FoldedGutter({ props }: { props: BoardGutterProps }) {
   );
 }
 
-// The caption: the count, then what bounds the figures — the filters, an
-// exercise other than the current one, the métiers counted.
+// The caption: the count, then what bounds the figures — the filters (the
+// lens's own included), an exercise other than the current one, the
+// métiers counted; with « rien », the prompt, in the same two reserved
+// lines so the list never moves under the hand.
 function GutterCaption({ props }: { props: BoardGutterProps }) {
   const { totals, lens } = props;
+  const prompt = lens.counted.size === 0 ? " — cochez un ou plusieurs métiers" : "";
   return (
     <>
       <div className="gut-caption">
@@ -79,29 +83,23 @@ function GutterCaption({ props }: { props: BoardGutterProps }) {
           <span className="gut-flag year">{lens.year} · {lens.status === "closed" ? "exercice clos" : "en préparation"}</span>
         )}
       </div>
-      <div className={"gut-scope" + (lens.active ? " on" : "")}>Périmètre : {scopeLabel(lens.scope, props.config)}</div>
+      <div className={"gut-scope" + (lens.active ? " on" : "")}>Périmètre : {scopeLabel(lens.scope, props.config)}{prompt}</div>
     </>
   );
 }
 
-// The headline: the engaged RAF in large, its persons below (the line
-// keeps its height, empty or not, so the list never moves under the hand).
+// The headline: the engaged RAF in large.
 function GutterHeadline({ props }: { props: BoardGutterProps }) {
   const { totals, lens } = props;
-  const none = lens.counted.size === 0;
-  const persons = none ? null : personsLabel(totals.split.engaged, lens.days);
   return (
     <div className="gut-headline">
       <div className="gut-label">RAF engagé</div>
       <div className={"gut-big" + (lens.active ? " on" : "")}>{rafText(totals.split.engaged, lens)}<i>j.h</i></div>
-      <div className={"gut-pers" + (none ? " prompt" : "")}>
-        {none ? "Cochez un ou plusieurs métiers" : persons === null ? "" : `${persons} d’ici le 31/12`}
-      </div>
     </div>
   );
 }
 
-// The other classes, the legend and divisor, the blind note, the k€ line.
+// The other classes, the legend, the blind note, the k€ line.
 function GutterFigures({ props }: { props: BoardGutterProps }) {
   const { totals, lens } = props;
   const note = blindNote(totals.split);
@@ -111,7 +109,6 @@ function GutterFigures({ props }: { props: BoardGutterProps }) {
       <div className="gut-line faded"><span>RAF hors calcul</span><b>{rafText(totals.split.excluded, lens)}<i>j.h</i></b></div>
       <div className="gut-legend">
         {classLegend(props.config).map((line) => <div key={line.cls}>{line.text}</div>)}
-        {lens.days !== null && <div>{divisorLabel(lens.days, lens.year)}</div>}
       </div>
       {note !== null && <div className="gut-note">{note}</div>}
       <div className="gut-money">

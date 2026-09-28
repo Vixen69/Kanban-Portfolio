@@ -5,21 +5,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { validateBoardConfig } from "../core/config.ts";
 import { testConfig } from "../core/test-helpers.ts";
-import { blindNote, classLegend, divisorLabel, personsLabel, scopeLabel, scopeTitle } from "./rafLabels.ts";
+import { blindNote, classLegend, scopeLabel, scopeTitle } from "./rafLabels.ts";
 
-const NBSP = /[\u00a0\u202f]/g;
-const plain = (text: string | null) => (text === null ? null : text.replace(NBSP, " "));
-
-test("personsLabel: j.h ÷ days, one decimal below ten, nothing without a divisor", () => {
-  assert.equal(personsLabel(1280, 64), "≈ 20 pers.");
-  assert.equal(personsLabel(25, 64), "≈ 0,4 pers.");
-  assert.equal(personsLabel(0, 64), "≈ 0 pers.");
-  assert.equal(personsLabel(100, null), null);
-  assert.equal(personsLabel(100, 0), null);
-});
-
-test("divisorLabel and classLegend: the versioned model's words", () => {
-  assert.equal(divisorLabel(64, 2026), "j.h ÷ 64 jours ouvrés restants au 31/12/2026 (fériés déduits, congés non)");
+test("classLegend: the versioned model's words", () => {
   const config = validateBoardConfig(JSON.parse(readFileSync(new URL("../config/board.json", import.meta.url), "utf8")));
   const legend = classLegend(config).map((line) => line.text);
   assert.equal(legend[0], "engagé : Qualification · Études/Cadrage · Actifs");
@@ -42,7 +30,7 @@ test("scopeLabel / scopeTitle: every métier, none, a few, many", () => {
 test("blindNote: the engaged cards first, the others in a word", () => {
   const split = { engaged: 0, idle: 0, excluded: 0 };
   assert.equal(blindNote({ ...split, blindEngaged: 0, blindOther: 0 }), null);
-  assert.equal(plain(blindNote({ ...split, blindEngaged: 1, blindOther: 0 })), "1 sujet engagé sans ventilation par métier (non compté)");
+  assert.equal(blindNote({ ...split, blindEngaged: 1, blindOther: 0 }), "1 sujet engagé sans ventilation par métier (non compté)");
   assert.equal(blindNote({ ...split, blindEngaged: 3, blindOther: 5 }), "3 sujets engagés sans ventilation par métier (non comptés) · 5 ailleurs");
   assert.equal(blindNote({ ...split, blindEngaged: 0, blindOther: 2 }), "0 sujet engagé sans ventilation par métier (non compté) · 2 ailleurs");
 });

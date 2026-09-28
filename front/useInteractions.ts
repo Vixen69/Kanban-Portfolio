@@ -137,9 +137,9 @@ export function useShortcuts(ui: UiState, searchRef: RefObject<HTMLInputElement 
  * fallback); every drop POSTs a move intent through the store — the server
  * records the event.
  * Inputs: the board store, the UiState (dragOver highlight + dropCardId),
- * reorder (default true): false while the board is sorted (ADR 044) or
- * partitioned by the métier lens (ADR 048) — a drop onto a card is then a
- * plain move into that card's cell, with no beforeId and no insertion mark.
+ * reorder (default true): false while the board is sorted (ADR 044) — a
+ * drop onto a card is then a plain move into that card's cell, with no
+ * beforeId and no insertion mark.
  * Output: the seven handlers BoardGrid expects. Failure: a refused move is
  * logged by the store; the board simply does not change.
  */
@@ -203,11 +203,10 @@ function useCellHoverHandlers(ui: UiState) {
 // Where a card dropped ONTO another goes. In a unified cell (ADR 039) the
 // dragged card keeps its own canal — a lane change there would count as a
 // stage entry (ADR 019). With the manual order in force the move inserts
-// before the target; on a SORTED board (ADR 044), or one the métier lens
-// partitions (ADR 048 — the cards it does not concern sink to the bottom,
-// so the order shown is not the manual one), there is no insertion point:
-// the drop is a plain move into the target's cell, or nothing when the
-// card is already there.
+// before the target; on a SORTED board (ADR 044) there is no insertion
+// point: the drop is a plain move into the target's cell, or nothing when
+// the card is already there. The métier lens hides cards like any filter
+// (ADR 048, ADR 031): the manual order of the visible ones stays in force.
 function cardDropMove(id: string, target: CardState, store: BoardStore, reorder: boolean): MoveTarget | null {
   const unified = store.config === null ? new Set<string>() : unifiedColumnIds(store.config);
   const dragged = store.cards.find((candidate) => candidate.id === id);
@@ -230,7 +229,7 @@ function useCardDropHandlers(
     event.stopPropagation();
     event.dataTransfer.dropEffect = "move";
     const id = dragId.current;
-    const next = reorder && id !== null && id !== card.id ? card.id : null; // no insertion mark on a sorted or partitioned board
+    const next = reorder && id !== null && id !== card.id ? card.id : null; // no insertion mark on a sorted board
     setDropCardId((current) => (current === next ? current : next));
     // stopPropagation keeps onDragOverCell from firing: refresh the cell
     // highlight from the hovered card so it never lags a cell behind.

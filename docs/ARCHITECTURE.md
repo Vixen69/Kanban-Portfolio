@@ -656,10 +656,14 @@ de son ADR.
   plus que trois clés, le « reste à faire » compte les métiers de la loupe
   (la clé « par métier » et ses 19 cases disparaissent) ; la carte dépliée
   suit la loupe (RAF, valeur du tri, métiers comptés en tête et les autres
-  en gris) ; quand la loupe restreint le tableau, les cartes sans reste à
-  faire sur les métiers comptés descendent en bas de leur case, grisées, et
-  un dépôt sur une carte devient un simple déplacement. Retour arrière
-  possible sur 695e3e3 (tranche A seule) ou dc781df.
+  en gris). Retour arrière possible sur 695e3e3 (tranche A seule) ou
+  dc781df.
+- **Retour de l'auteur (28/09, essai local)** : la loupe doit filtrer
+  « de la même manière que les filtres habituels » — les projets sans le
+  métier coché disparaissent (plus de mise en bas de case ni de grisé, le
+  glisser sur une carte réordonne à nouveau) ; et le chiffre en personnes
+  est retiré, faute de pouvoir le construire de façon sûre aujourd'hui
+  (`core/workdays.ts` supprimé, récupérable dans l'historique).
 
 ### 2026-09-24 — Où la DoR et la DoD s'ouvrent, où elles sont validées ; Études/Cadrage, Terminé (ADR 047)
 

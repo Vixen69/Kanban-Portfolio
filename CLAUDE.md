@@ -344,11 +344,14 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
   (Qualification, Études/Cadrage, Actifs — top rule), non engagé
   (Demandes, Prêts, Pause), hors calcul (Terminé and after; left out of
   the canal RAF). The board gutter has its own Σ (third localStorage
-  flag): RAF engagé in large, « ≈ N pers. d'ici le 31/12 » (working days,
-  fériés deducted, current exercise only), non engagé, hors calcul,
-  legend, divisor, blind note, k€ line, and the métier lens (checkboxes,
-  « tout · rien ») — a SESSION state, never written, not cleared by
-  Escape, header chip « RAF : … ✕ ». Capacity stays out of the tool.
+  flag): RAF engagé in large, non engagé, hors calcul, legend, blind
+  note, k€ line, and the métier lens (checkboxes, « tout · rien ») — a
+  SESSION state, never written, not cleared by Escape, header chip
+  « RAF : … ✕ ». Counting at least one métier, the lens FILTERS like any
+  filter (ADR 031): projects without RAF on those métiers disappear
+  (« rien » hides nothing); the métier list and the blind note read the
+  board without that filtering. No persons figure (author, 2026-09-28:
+  not a headcount the tool can stand behind). Capacity stays out.
 - Hard acceptance criterion: at 1920x1080 with 150 cards, the full board is
   visible with zero scrolling; never any horizontal scroll. Measured in the
   COMPACT default state (v12): unfolded totals and the 176px canal gutter
@@ -373,9 +376,7 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
   list) / meilleur estimé k€ — and an order, décroissant or croissant. A sort is a VIEW: nothing is written,
   the manual order (ADR 019) stays underneath and comes back with the
   header chip's ✕; cards without a figure go last in BOTH directions;
-  while sorted — or partitioned by the lens (ADR 048: the cards without
-  RAF on the counted métiers sink to the bottom of their cells, dimmed) —
-  a drop onto a card no longer reorders (plain move);
+  while sorted, a drop onto a card no longer reorders (plain move);
   cards without a per-profile plan are counted on the chip. Then
   codes-projet and types toggles, « Contrainte »
   pills (config-driven + a synthetic « Aucune »; OR-shaped — a card stays

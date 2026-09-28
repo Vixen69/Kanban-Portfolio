@@ -42,14 +42,22 @@ attend.
 4. **La gouttière du tableau** (à gauche de Demandes) a son propre Σ,
    « tableau », replié par défaut et mémorisé — le troisième booléen du
    navigateur (amende l'ADR 020). Dépliée : le périmètre, le RAF engagé en
-   grand et « ≈ N pers. d'ici le 31/12 », le non engagé, le hors calcul,
-   la légende des classes, le diviseur (jours ouvrés restants jusqu'au
-   31/12, fériés déduits, congés non — `core/workdays.ts`), la note des
-   sujets sans ventilation, une ligne k€, puis la liste des métiers.
-   Les personnes ne s'affichent que sur l'exercice courant.
+   grand, le non engagé, le hors calcul, la légende des classes, la note
+   des sujets sans ventilation, une ligne k€, puis la liste des métiers.
+   Pas de chiffre en personnes (auteur, 28/09 au soir) : j.h ÷ jours
+   ouvrés restants n'est pas un effectif que l'outil peut garantir
+   (congés, temps partiels, personnes sur plusieurs rôles) ; il était
+   affiché dans la première livraison, puis retiré.
 5. **La loupe par métier** : chaque métier se coche, « tout · rien »
    comme les filtres. Elle change ce que compte le RAF partout à la fois
-   (en-têtes, canaux, gouttière) ; valeurs en couleur d'accent et
+   (en-têtes, canaux, gouttière) et, dès qu'elle compte au moins un
+   métier, elle FILTRE comme les autres filtres (ADR 031, auteur 28/09) :
+   les projets sans reste à faire sur ces métiers — sans plan par métier
+   compris — disparaissent ; les en-têtes disent « retenus/total », la
+   gouttière « filtré N/M ». Avec « rien », rien ne disparaît (le tableau
+   serait vide). La liste des métiers et la note « sans ventilation »
+   lisent le tableau sans ce filtrage-là, pour qu'un métier non coché dise
+   ce qu'il ajouterait ; valeurs en couleur d'accent et
    périmètre en infobulle quand elle restreint, pastille « RAF : … ✕ »
    dans l'en-tête. État de séance : en mémoire seulement, un
    rechargement revient à « tous métiers », Échap ne l'efface pas. Rien
@@ -60,21 +68,19 @@ attend.
    cases disparaissent, la loupe les remplace : le « reste à faire »
    compte les métiers de la loupe (tous par défaut), sans repli sur
    l'effort ; les cartes sans plan par métier n'ont plus de chiffre, vont
-   en fin de liste et la pastille du tri les compte. La carte dépliée
+   en fin de liste et la pastille du tri les compte (tant que la loupe
+   compte tous les métiers — dès qu'elle restreint, elles sont filtrées). La carte dépliée
    suit la loupe : son RAF (en accent), la valeur du tri écrite dessus, et
    son bloc « RAF par métier » où les métiers comptés passent en tête, les
    autres en gris.
-7. **Les cartes hors périmètre.** Quand la loupe restreint le tableau à
-   au moins un métier, les cartes sans reste à faire sur ces métiers
-   descendent en bas de leur case (l'ordre au-dessus est inchangé, tri
-   compris) et sont grisées — dans la liste d'une case repliée aussi.
-   L'ordre affiché n'étant plus l'ordre manuel, un dépôt sur une carte
-   devient un simple déplacement dans sa case, comme pendant un tri
-   (ADR 044). Avec « rien », rien ne bouge ni ne grise : il n'y aurait
-   rien à mettre en tête.
-8. **La capacité reste hors de l'outil** pour cette mission : le chiffre
-   en personnes se compare à l'effectif que les responsables de domaine
-   annoncent en séance.
+7. **Les cartes hors périmètre disparaissent**, comme avec tout filtre.
+   La première livraison les faisait descendre en bas de case, grisées,
+   avec un dépôt sur carte sans insertion ; l'auteur a demandé le même
+   comportement que les filtres habituels. L'ordre manuel des cartes
+   visibles reste en vigueur, le glisser sur une carte réordonne comme
+   d'habitude (sauf pendant un tri, ADR 044).
+8. **La capacité reste hors de l'outil** pour cette mission : l'effectif
+   est dit en séance par les responsables de domaine, face au RAF en j.h.
 
 ## Conséquences
 

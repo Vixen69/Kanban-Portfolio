@@ -71,11 +71,13 @@ La clé « Reste à faire par métier » et sa liste de cases disparaissent :
 la loupe par métier de la gouttière du tableau les remplace. La clé
 « Reste à faire » compte les métiers de la loupe (tous par défaut), sans
 repli sur l'effort de la carte : les cartes sans plan par métier n'ont plus
-de chiffre et vont en fin de liste, la pastille les compte. Le bloc « RAF
+de chiffre et vont en fin de liste, la pastille les compte — tant que la
+loupe compte tous les métiers ; dès qu'elle en restreint, elles
+disparaissent avec les cartes hors périmètre. Le bloc « RAF
 par métier » de la carte dépliée met en tête les métiers de la loupe et
 grise les autres. `cardLoad` (la règle vit désormais dans
 `core/raf-card.ts` : `cardRaf`, `profileRemaining`), `profileRemainingTotals`
 et `withoutBreakdown` sont retirés ; `topProfiles` prend le périmètre de
-la loupe. Tant que la loupe restreint le tableau à au moins un métier, un
-dépôt sur une carte est aussi un simple déplacement dans sa case (ADR 048,
-décision 7). Le tri a trois clés.
+la loupe. La loupe filtre comme les autres filtres (ADR 048,
+décisions 5 et 7) ; elle ne touche pas au glisser-déposer : seule la règle
+de dépôt pendant un tri demeure. Le tri a trois clés.

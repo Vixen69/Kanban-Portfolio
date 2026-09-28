@@ -1,13 +1,11 @@
 // French wording of the reste à faire read-outs (ADR 048): the class of a
-// column, the scope of the métier lens, the persons figure and its divisor,
-// the « sans ventilation » note. Pure string building — the figures come
-// from core/raf and core/workdays; fr-FR formatting stays in the front.
+// column, the scope of the métier lens, the « sans ventilation » note.
+// Pure string building — the figures come from core/raf.
 
 import type { BoardConfig } from "../core/types.ts";
 import { columnsOfClass, type ColumnClass } from "../core/column-class.ts";
 import type { RafScope } from "../core/raf-card.ts";
 import type { RafSplit } from "../core/raf.ts";
-import { fmtNum, fmtUnit } from "./format.ts";
 
 /** The label of a column's reste à faire, by class (author, 2026-09-28). */
 export const CLASS_LABEL: Record<ColumnClass, string> = {
@@ -15,28 +13,6 @@ export const CLASS_LABEL: Record<ColumnClass, string> = {
   idle: "RAF non engagé",
   excluded: "RAF hors calcul",
 };
-
-/**
- * The persons figure: j.h ÷ working days, « ≈ 12 pers. » — one decimal
- * below ten persons (a métier's 0,4 must not read « 0 »).
- * Inputs: the reste à faire (j.h), the working days left (null = not the
- * current exercise). Output: the label, or null when there is no divisor.
- * Failure: none.
- */
-export function personsLabel(raf: number, days: number | null): string | null {
-  if (days === null || days <= 0) return null;
-  const persons = raf / days;
-  return `≈ ${persons >= 10 ? fmtUnit(persons) : fmtNum(persons)} pers.`;
-}
-
-/**
- * The divisor, said once under the headline.
- * Inputs: the working days left, the exercise year. Output: the sentence.
- * Failure: none.
- */
-export function divisorLabel(days: number, year: number): string {
-  return `j.h ÷ ${days} jours ouvrés restants au 31/12/${year} (fériés déduits, congés non)`;
-}
 
 /**
  * The legend of the classes: which columns count as engaged, non engaged,

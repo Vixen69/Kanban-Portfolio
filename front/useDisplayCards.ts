@@ -10,7 +10,7 @@ import type { BoardConfig, CardState } from "../core/types.ts";
 import { portfolioStats } from "../core/board.ts";
 import type { CardSort } from "../core/card-sort.ts";
 import { laneNature, reconcileCardRefs } from "../core/config.ts";
-import { scopeFirst } from "../core/raf-card.ts";
+import { outOfScopeIds } from "../core/raf-card.ts";
 import { cardCountsByYear, cardsOfExercise, selectableYears } from "../core/exercise.ts";
 import { hiddenCardIds, portfolioCounts, viewCounts, type ResourceDraw } from "../core/filters.ts";
 import type { YearPickerProps } from "./components/YearPicker.tsx";
@@ -18,20 +18,35 @@ import type { Filters } from "./useFilters.ts";
 import { useSortedCards } from "./useCardSort.ts";
 import type { BoardLens } from "./useRafLens.ts";
 
+// The ids the métier lens filters out, added to those of the sidebar
+// filters (ADR 048): one hidden set, so every count reads both alike.
+function withLens(cards: CardState[], filterHidden: Set<string>, narrowing: ReadonlySet<string> | null): Set<string> {
+  if (narrowing === null) return filterHidden;
+  const hidden = new Set(filterHidden);
+  for (const id of outOfScopeIds(cards, narrowing)) hidden.add(id);
+  return hidden;
+}
+
 /**
  * The filter and count projections over the board's cards (all from
- * core/): the hidden ids, the counts over the visible subset, the
+ * core/): the hidden ids — the sidebar filters' and the métier lens's
+ * (ADR 048: its out-of-scope projects disappear like with any filter) —,
+ * the ids the sidebar filters alone hide (the lens list reads the board
+ * without its own filtering), the counts over the visible subset, the
  * whole-portfolio counts and stats.
  * Inputs: the active cards, the config, the filters, now, the resource
- * draw of the exercise shown (ADR 041). Output: the projections (memoised).
- * Failure modes: none.
+ * draw of the exercise shown (ADR 041), the lens's narrowing métiers (or
+ * null). Output: the projections (memoised). Failure modes: none.
  */
-export function useDerived(cards: CardState[], config: BoardConfig, filters: Filters, now: Date, draw: ResourceDraw) {
-  const hidden = useMemo(() => hiddenCardIds(cards, filters.state, draw), [cards, filters.state, draw]);
+export function useDerived(
+  cards: CardState[], config: BoardConfig, filters: Filters, now: Date, draw: ResourceDraw, narrowing: ReadonlySet<string> | null,
+) {
+  const filterHidden = useMemo(() => hiddenCardIds(cards, filters.state, draw), [cards, filters.state, draw]);
+  const hidden = useMemo(() => withLens(cards, filterHidden, narrowing), [cards, filterHidden, narrowing]);
   const view = useMemo(() => viewCounts(cards, hidden, config, now), [cards, hidden, config, now]);
   const all = useMemo(() => portfolioCounts(cards, config, now), [cards, config, now]);
   const stats = useMemo(() => portfolioStats(cards), [cards]);
-  return { hidden, view, all, stats };
+  return { hidden, filterHidden, view, all, stats };
 }
 
 /**
@@ -76,9 +91,7 @@ export function useDisplayCards(cards: CardState[], config: BoardConfig, year: n
  * are listed only by the Archives view (design v11, ADR 017). A closed
  * year is read as it stood: its cards were archived at the switch
  * (ADR 038), so they stay on its board. The board's cards come in the
- * sort's order (ADR 044), then — while the métier lens narrows the board
- * (ADR 048) — the cards it does not concern sink below the others, so
- * every cell shows them at its bottom.
+ * sort's order (ADR 044) — the « reste à faire » on the lens's métiers.
  * Inputs: the display cards, the year shown, the current exercise year,
  * the sort, the lens. Output: { cards, archivedCards } (memoised).
  * Failure modes: none.
@@ -88,9 +101,7 @@ export function useBoardCards(
 ): { cards: CardState[]; archivedCards: CardState[] } {
   const closed = viewYear < currentYear;
   const active = useMemo(() => (closed ? allCards : allCards.filter((card) => !card.archived)), [allCards, closed]);
-  const sorted = useSortedCards(active, sort, lens.counted);
-  const { narrowing } = lens;
-  const cards = useMemo(() => (narrowing === null ? sorted : scopeFirst(sorted, narrowing)), [sorted, narrowing]);
+  const cards = useSortedCards(active, sort, lens.counted);
   const archivedCards = useMemo(() => allCards.filter((card) => card.archived), [allCards]);
   return { cards, archivedCards };
 }
