@@ -7,6 +7,7 @@ import { useState } from "react";
 import type { CSSProperties } from "react";
 import type { BoardConfig, CardState } from "../../core/types.ts";
 import { isStale } from "../../core/aging.ts";
+import type { RafRead } from "../useRafLens.ts";
 import { CollapsedTicketList } from "./CollapsedTicketList.tsx";
 
 // Rect state + open handler shared by the two collapsed-cell variants:
@@ -26,14 +27,16 @@ function useCellPopover(count: number) {
  * Collapsed-lane summary cell: the signals that matter at a glance, plus
  * the one-click ticket popover on hover/click (design v11).
  * Inputs: the cards of this cell (pre-filtered), the config (stale
- * threshold + type badges), now in epoch ms, the open-card callback.
+ * threshold + type badges), now in epoch ms, the lens read (ADR 048 — the
+ * popover dims the tickets it does not concern), the open-card callback.
  * Output: count (empty when zero), blocked badge, stagnation dot.
  * Failure modes: none.
  */
-export function CollapsedCell({ cards, config, now, onOpen }: {
+export function CollapsedCell({ cards, config, now, read, onOpen }: {
   cards: CardState[];
   config: BoardConfig;
   now: number;
+  read: RafRead;
   onOpen: (card: CardState) => void;
 }) {
   const date = new Date(now);
@@ -45,7 +48,7 @@ export function CollapsedCell({ cards, config, now, onOpen }: {
       <span className="ccount">{cards.length || ""}</span>
       {blocked > 0 && <span className="cblk">{blocked}</span>}
       {stale > 0 && <span className="cstale" title={stale + " stagnant(s)"} />}
-      {pop.rect && <CollapsedTicketList anchorRect={pop.rect} list={cards} config={config} onOpen={onOpen} onClose={pop.close} />}
+      {pop.rect && <CollapsedTicketList anchorRect={pop.rect} list={cards} config={config} read={read} onOpen={onOpen} onClose={pop.close} />}
     </div>
   );
 }
@@ -53,13 +56,14 @@ export function CollapsedCell({ cards, config, now, onOpen }: {
 /**
  * Collapsed-column strip cell: count and blocked badge, plus the same
  * one-click ticket popover (design v11).
- * Inputs: the cards of this cell (pre-filtered), the config, the
- * open-card callback. Output: the narrow strip content.
+ * Inputs: the cards of this cell (pre-filtered), the config, the lens
+ * read, the open-card callback. Output: the narrow strip content.
  * Failure modes: none.
  */
-export function CollapsedColCell({ cards, config, onOpen, style }: {
+export function CollapsedColCell({ cards, config, read, onOpen, style }: {
   cards: CardState[];
   config: BoardConfig;
+  read: RafRead;
   onOpen: (card: CardState) => void;
   /** Grid placement (a unified column's strip spans the lane rows, ADR 039). */
   style?: CSSProperties;
@@ -70,7 +74,7 @@ export function CollapsedColCell({ cards, config, onOpen, style }: {
     <div className={"ccol-cell" + (cards.length ? " has" : "")} style={style} onMouseEnter={pop.open} onMouseLeave={pop.close} onClick={pop.open}>
       <span className="ccount">{cards.length || ""}</span>
       {blocked > 0 && <span className="cblk">{blocked}</span>}
-      {pop.rect && <CollapsedTicketList anchorRect={pop.rect} list={cards} config={config} onOpen={onOpen} onClose={pop.close} />}
+      {pop.rect && <CollapsedTicketList anchorRect={pop.rect} list={cards} config={config} read={read} onOpen={onOpen} onClose={pop.close} />}
     </div>
   );
 }

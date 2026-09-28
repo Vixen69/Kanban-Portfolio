@@ -10,6 +10,7 @@ import type { CSSProperties } from "react";
 import type { CardState, Column } from "../../core/types.ts";
 import { UNIFIED_LANE } from "../../core/layout.ts";
 import { cellWipLimit } from "../../core/wip.ts";
+import type { RafRead } from "../useRafLens.ts";
 import type { BoardGridProps } from "./BoardGrid.tsx";
 import { TotalsToggle } from "./BoardTotals.tsx";
 import { Cell } from "./Cell.tsx";
@@ -36,12 +37,12 @@ export function LaneCorner({ open, onToggle }: { open: boolean; onToggle: () => 
 // One unified column: the whole column's cards in one cell spanning the
 // lane rows, or its collapsed strip. Any lane hovered inside it is the
 // same drop target (the cell has no canal).
-function UnifiedColumn({ col, index, cards, rows, props }: {
-  col: Column; index: number; cards: CardState[]; rows: number; props: BoardGridProps;
+function UnifiedColumn({ col, index, cards, rows, props, read }: {
+  col: Column; index: number; cards: CardState[]; rows: number; props: BoardGridProps; read: RafRead;
 }) {
   const style = span(index + 2, rows);
   if (props.collapsedCols.has(col.id)) {
-    return <CollapsedColCell cards={cards} config={props.config} onOpen={props.onOpen} style={style} />;
+    return <CollapsedColCell cards={cards} config={props.config} read={read} onOpen={props.onOpen} style={style} />;
   }
   const wipLimit = cellWipLimit(props.config, UNIFIED_LANE, col.id);
   return (
@@ -57,6 +58,7 @@ function UnifiedColumn({ col, index, cards, rows, props }: {
       showCodes={props.showCodes}
       showTypes={props.showTypes}
       sort={props.sort}
+      read={read}
       dragOver={props.dragOver !== null && props.dragOver.columnId === col.id}
       gateDef={gateDefOf(props.config, col)}
       onOpen={props.onOpen}
@@ -76,15 +78,15 @@ function UnifiedColumn({ col, index, cards, rows, props }: {
  * The unified cells, one per intake column, each spanning every lane row
  * (grid columns 2…, right after the board gutter).
  * Inputs: the unified columns in board order, the board props (cards,
- * hidden ids, state, callbacks), the number of lane rows.
+ * hidden ids, state, callbacks), the number of lane rows, the lens read.
  * Output: the cells. Failure modes: none.
  */
-export function UnifiedCells({ columns, props, rows }: { columns: Column[]; props: BoardGridProps; rows: number }) {
+export function UnifiedCells({ columns, props, rows, read }: { columns: Column[]; props: BoardGridProps; rows: number; read: RafRead }) {
   return (
     <>
       {columns.map((col, index) => {
         const inColumn = props.cards.filter((card) => card.columnId === col.id && !props.hiddenIds.has(card.id));
-        return <UnifiedColumn key={col.id} col={col} index={index} cards={inColumn} rows={rows} props={props} />;
+        return <UnifiedColumn key={col.id} col={col} index={index} cards={inColumn} rows={rows} props={props} read={read} />;
       })}
     </>
   );

@@ -103,3 +103,12 @@ lequel se mesure le critère « une seule page ».
   régression assumée du design v12, à confirmer avec les utilisateurs PMO.
 - Aucun changement de schéma, de migration ni de code `middle/` : les champs
   agrégés existaient déjà et la vue est une lecture.
+
+## Amendement (ADR 048, 2026-09-28)
+
+Un troisième booléen rejoint le stockage du navigateur :
+`nmo_board_totals_open`, le Σ « tableau » de la gouttière à gauche de
+Demandes, replié par défaut. Le Σ des colonnes ne l'élargit plus. La
+ligne « Engagé » (k€) devient « Budget engagé » ; la ligne de reste à
+faire des en-têtes porte la classe de la colonne (RAF engagé, non engagé,
+hors calcul).

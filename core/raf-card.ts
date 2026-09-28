@@ -66,3 +66,20 @@ export function cardRaf(card: CardState, counted: ReadonlySet<string>): number {
 export function hasBreakdown(card: CardState): boolean {
   return card.chargeByProfile.length > 0;
 }
+
+/**
+ * The cards with a reste à faire on the counted métiers first, the others
+ * after — stable on both sides (ADR 048: while the lens narrows the board,
+ * the cards it does not concern sink to the bottom of their cells, the
+ * order above them untouched).
+ * Inputs: the cards (already in board or sort order), the counted métiers.
+ * Output: a new array; unchanged order when no métier is counted (nothing
+ * would stay on top). Failure: none.
+ */
+export function scopeFirst<T extends CardState>(cards: readonly T[], counted: ReadonlySet<string>): T[] {
+  if (counted.size === 0) return [...cards];
+  const inside: T[] = [];
+  const outside: T[] = [];
+  for (const card of cards) (cardRaf(card, counted) > 0 ? inside : outside).push(card);
+  return [...inside, ...outside];
+}

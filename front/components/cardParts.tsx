@@ -5,7 +5,6 @@
 import type { CSSProperties } from "react";
 import type {
   AgeThresholds,
-  BoardConfig,
   CardState,
   Criticality,
   CustomValue,
@@ -13,7 +12,8 @@ import type {
   ProjectType,
 } from "../../core/types.ts";
 import { ageCategory, ageLabel } from "../../core/aging.ts";
-import { cardRaf, countedIds, hasBreakdown } from "../../core/raf-card.ts";
+import { cardRaf, hasBreakdown } from "../../core/raf-card.ts";
+import type { RafRead } from "../useRafLens.ts";
 import { fmtNum } from "../format.ts";
 
 /**
@@ -53,27 +53,32 @@ export function TypeTag({ type, big }: { type: ProjectType | null; big?: boolean
  * meilleur estimé in k€ next to the reste à faire in j.h. The progress bar
  * it replaces mixed two units on one track; these are the two figures a
  * stage is actually read on, so they are stated rather than drawn.
- * Input: the card state.
+ * Inputs: card — the card state; read — the lens read (the métiers
+ * counted, whether the lens narrows, the scope's title for the tooltip).
  * Output: the two-stat row, or null when the card carries neither an
  * estimate nor a plan de charge.
  * Failure modes: none. The k€ estimate never borrows the effort (j.h):
  * without a budget the figure reads « — » (author, 2026-09-10 — a 31 j.h
  * effort was shown as 31 k€). Nor does the RAF (ADR 048): it is the
- * per-métier plan's, every métier of the config, one arithmetic with the
- * headers; a card without a per-métier plan reads « RAF — ».
+ * per-métier plan's, on the métiers the lens counts (every métier of the
+ * config when it is off — in the accent colour while it narrows), one
+ * arithmetic with the headers; a card without a per-métier plan, or a lens
+ * counting no métier, reads « RAF — ».
  */
-export function EstimeBar({ card, config }: { card: CardState; config: BoardConfig }) {
+export function EstimeBar({ card, read }: { card: CardState; read: RafRead }) {
   const est = card.budgetEstimated;
   const plan = hasBreakdown(card);
   if (est === null && !plan) return null;
-  const raf = cardRaf(card, countedIds(null, config));
+  const shown = plan && read.counted.size > 0;
+  const raf = cardRaf(card, read.counted);
   const estLabel = est === null ? "non renseigné" : `${fmtNum(est)} k€`;
-  const rafLabel = plan ? `Reste à faire ${fmtNum(raf)} j.h` : "Reste à faire : sans ventilation par métier";
+  const rafLabel = !plan ? "Reste à faire : sans ventilation par métier"
+    : `Reste à faire ${shown ? fmtNum(raf) + " j.h" : "—"}` + (read.active ? ` · ${read.title}` : "");
   return (
     <div className="ec-row" title={`Meilleur estimé ${estLabel} · ${rafLabel}`}>
       <span className="ec-stat">est. <b>{est === null ? "—" : fmtNum(est)}</b> k€</span>
       <span className="ec-sep" />
-      <span className="ec-stat">RAF <b>{plan ? fmtNum(raf) : "—"}</b>{plan ? " j.h" : ""}</span>
+      <span className={"ec-stat" + (read.active && shown ? " lens-on" : "")}>RAF <b>{shown ? fmtNum(raf) : "—"}</b>{shown ? " j.h" : ""}</span>
     </div>
   );
 }

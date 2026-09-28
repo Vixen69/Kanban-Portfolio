@@ -9,6 +9,7 @@ import type { CSSProperties, DragEvent } from "react";
 import type { BoardConfig, CardState, Column, GateDef } from "../../core/types.ts";
 import { wipDisplay, wipState } from "../../core/board.ts";
 import type { CardSort } from "../../core/card-sort.ts";
+import type { RafRead } from "../useRafLens.ts";
 import { FocusCard, MiniCard } from "./cards.tsx";
 
 /** Props of one cell (pinned build-spec contract). */
@@ -32,6 +33,8 @@ export interface CellProps {
   showTypes: boolean;
   /** The board's sort (ADR 044), read by the expanded cards. */
   sort: CardSort;
+  /** The métier lens (ADR 048): the cards it does not concern are dimmed, the expanded card's RAF follows it. */
+  read: RafRead;
   /** True when a dragged card is currently over this cell. */
   dragOver: boolean;
   /** The gate definition of the column, or null when ungated. */
@@ -78,6 +81,7 @@ function CellCardList({ props, listRef }: { props: CellProps; listRef: React.Ref
     showCodes: props.showCodes,
     showTypes: props.showTypes,
     sort: props.sort,
+    read: props.read,
     onOpen: props.onOpen,
     onDragStart: props.onDragStart,
     onDragEnd: props.onDragEnd,

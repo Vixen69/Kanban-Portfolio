@@ -3,7 +3,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cardRaf, countedIds, hasBreakdown, profileRemaining } from "./raf-card.ts";
+import { cardRaf, countedIds, hasBreakdown, profileRemaining, scopeFirst } from "./raf-card.ts";
 import { foldEvents } from "./state.ts";
 import { testCard, testConfig } from "./test-helpers.ts";
 import type { Card, CardState } from "./types.ts";
@@ -42,4 +42,16 @@ test("cardRaf: one métier over-consumed does not eat another's, the card-level 
   assert.equal(cardRaf(blind, countedIds(null, CONFIG)), 0);
   assert.equal(hasBreakdown(blind), false);
   assert.equal(hasBreakdown(CARD), true);
+});
+
+test("scopeFirst: the cards with a reste à faire on the counted métiers first, both sides stable", () => {
+  const a = testState({ id: "a", chargeByProfile: [{ profileId: "pB", jh: 5, done: 0 }] });
+  const b = testState({ id: "b", chargeByProfile: [{ profileId: "pA", jh: 5, done: 0 }] });
+  const c = testState({ id: "c", chargeByProfile: [] });
+  const d = testState({ id: "d", chargeByProfile: [{ profileId: "pA", jh: 2, done: 9 }, { profileId: "pB", jh: 1, done: 0 }] });
+  const e = testState({ id: "e", chargeByProfile: [{ profileId: "pA", jh: 3, done: 1 }] });
+  const order = (cards: CardState[]) => cards.map((card) => card.id).join("");
+  assert.equal(order(scopeFirst([a, b, c, d, e], new Set(["pA"]))), "beacd", "d's pA is over-consumed: out of scope");
+  assert.equal(order(scopeFirst([a, b, c, d, e], new Set(["pA", "pB"]))), "abdec");
+  assert.equal(order(scopeFirst([a, b, c, d, e], new Set())), "abcde", "no métier counted: order untouched");
 });

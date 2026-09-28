@@ -13,19 +13,10 @@ import type { ColumnClass } from "../../core/column-class.ts";
 import { rafRows, scopedRaf, type GroupTotals } from "../../core/totals.ts";
 import { fmtUnit } from "../format.ts";
 import { CLASS_LABEL, laneRafNote } from "../rafLabels.ts";
+import type { RafRead } from "../useRafLens.ts";
 
 // Aggregates are read at portfolio scale: whole units (front/format.ts).
 const fmt = fmtUnit;
-
-/** How a totals block reads its reste à faire (ADR 048). */
-export interface RafRead {
-  /** The métiers counted. */
-  counted: ReadonlySet<string>;
-  /** True while the lens narrows the métiers. */
-  active: boolean;
-  /** The scope in words, the tooltip of a lensed value. */
-  title: string;
-}
 
 /** The tone of a reste à faire row: its column's class, or the canal's own. */
 export type RafTone = ColumnClass | "lane";

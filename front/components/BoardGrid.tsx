@@ -31,10 +31,10 @@ import { BOARD_GUTTER, LANE_GUTTER, columnTemplate, rowTemplate, unifiedColumnId
 import { emptyTotals, type GroupTotals } from "../../core/totals.ts";
 import { scopeTitle } from "../rafLabels.ts";
 import { useBoardTotals, type BoardTotals } from "../useBoardTotals.ts";
-import type { BoardLens } from "../useRafLens.ts";
+import type { BoardLens, RafRead } from "../useRafLens.ts";
 import { BOARD_TOTALS_KEY, COLUMN_TOTALS_KEY, LANE_TOTALS_KEY, useStoredFlag } from "../useUiPrefs.ts";
 import { Cell } from "./Cell.tsx";
-import { LaneTotals, TotalsToggle, type RafRead } from "./BoardTotals.tsx";
+import { LaneTotals, TotalsToggle } from "./BoardTotals.tsx";
 import { BoardGutter } from "./BoardGutter.tsx";
 import { ColumnHeads, gateDefOf } from "./ColumnHeads.tsx";
 import { CollapsedCell, CollapsedColCell } from "./CollapsedCells.tsx";
@@ -114,7 +114,7 @@ export interface BoardGridProps {
 }
 
 // The expanded cell of one lane-column pair, wired to the grid callbacks.
-function BoardCell({ lane, col, cards, props }: { lane: Lane; col: Column; cards: CardState[]; props: BoardGridProps }) {
+function BoardCell({ lane, col, cards, props, read }: { lane: Lane; col: Column; cards: CardState[]; props: BoardGridProps; read: RafRead }) {
   const over = props.dragOver;
   return (
     <Cell
@@ -128,6 +128,7 @@ function BoardCell({ lane, col, cards, props }: { lane: Lane; col: Column; cards
       showCodes={props.showCodes}
       showTypes={props.showTypes}
       sort={props.sort}
+      read={read}
       dragOver={over !== null && over.laneId === lane.id && over.columnId === col.id}
       gateDef={gateDefOf(props.config, col)}
       onOpen={props.onOpen}
@@ -167,12 +168,12 @@ function LaneRow({ lane, columns, props, totals, totalsOpen, read }: {
       {columns.map((col) => {
         const inCell = cellCards(props.cards, lane.id, col.id).filter((card) => !props.hiddenIds.has(card.id));
         if (laneCollapsed) {
-          return <CollapsedCell key={col.id} cards={inCell} config={props.config} now={props.now} onOpen={props.onOpen} />;
+          return <CollapsedCell key={col.id} cards={inCell} config={props.config} now={props.now} read={read} onOpen={props.onOpen} />;
         }
         if (props.collapsedCols.has(col.id)) {
-          return <CollapsedColCell key={col.id} cards={inCell} config={props.config} onOpen={props.onOpen} />;
+          return <CollapsedColCell key={col.id} cards={inCell} config={props.config} read={read} onOpen={props.onOpen} />;
         }
-        return <BoardCell key={col.id} lane={lane} col={col} cards={inCell} props={props} />;
+        return <BoardCell key={col.id} lane={lane} col={col} cards={inCell} props={props} read={read} />;
       })}
     </>
   );
@@ -236,7 +237,7 @@ export function BoardGrid(props: BoardGridProps) {
         <BoardGutter totals={totals} config={config} lens={props.lens} open={boardOpen} onToggle={toggleBoard}
           rows={config.lanes.length} all={props.cards.length} narrowed={props.hiddenIds.size > 0} />
       )}
-      <UnifiedCells columns={unifiedCols} props={props} rows={config.lanes.length} />
+      <UnifiedCells columns={unifiedCols} props={props} rows={config.lanes.length} read={read} />
       {config.lanes.map((lane) => (
         <LaneRow key={lane.id} lane={lane} columns={laneCols} props={props} totals={totals} totalsOpen={lanesOpen} read={read} />
       ))}

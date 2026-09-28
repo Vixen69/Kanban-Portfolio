@@ -8,7 +8,9 @@ import type { CSSProperties, DragEvent } from "react";
 import type { BoardConfig, CardState } from "../../core/types.ts";
 import { daysInColumn } from "../../core/aging.ts";
 import type { CardSort } from "../../core/card-sort.ts";
+import { cardRaf } from "../../core/raf-card.ts";
 import { domainById, typeById } from "../lookup.ts";
+import { outOfScope, type RafRead } from "../useRafLens.ts";
 import { AgeText, CritMark, CustomBadges, EstimeBar, TypeTag } from "./cardParts.tsx";
 import { ProfileBlock, SortTag } from "./ProfileBlock.tsx";
 import { AbsentMark, DecisionMark } from "./cardMarks.tsx";
@@ -33,8 +35,16 @@ export interface CardItemProps {
   onCardDrop: (e: DragEvent, card: CardState) => void;
   /** True while this card is the insertion target of the current drag. */
   dropTarget: boolean;
-  /** The board's sort (ADR 044): the expanded card emphasises its métiers and writes its figure. */
+  /** The board's sort (ADR 044): the expanded card writes its figure. */
   sort: CardSort;
+  /** The métier lens (ADR 048): the card is dimmed when it falls outside, the expanded card's RAF follows it. */
+  read: RafRead;
+}
+
+// The class a card wears outside the lens (ADR 048: dimmed, at the bottom
+// of its cell — the partition itself is done once, upstream).
+function scopeClass(card: CardState, read: RafRead): string {
+  return outOfScope(cardRaf(card, read.counted), read) ? " out-scope" : "";
 }
 
 // Blocked cards override the domain accent with the validated red wash +
@@ -80,7 +90,7 @@ function MiniCardBody(props: CardItemProps) {
   const domain = domainById(config)[card.domain];
   return (
     <div
-      className={"mini" + (props.dropTarget ? " drop-before" : "")}
+      className={"mini" + (props.dropTarget ? " drop-before" : "") + scopeClass(card, props.read)}
       draggable
       onClick={() => props.onOpen(card)}
       onDragStart={(e) => props.onDragStart(e, card)}
@@ -121,7 +131,7 @@ function FocusCardBody(props: CardItemProps) {
   const acc = cardAccent(card, config);
   return (
     <div
-      className={"focus-card" + (props.dropTarget ? " drop-before" : "")}
+      className={"focus-card" + (props.dropTarget ? " drop-before" : "") + scopeClass(card, props.read)}
       draggable
       onClick={() => props.onOpen(card)}
       onDragStart={(e) => props.onDragStart(e, card)}
@@ -140,12 +150,12 @@ function FocusCardBody(props: CardItemProps) {
         </div>
         <FocusMeta card={card} config={config} showCodes={props.showCodes} showTypes={props.showTypes} />
         {card.blocked && <div className="focus-block">{card.blockedReason}</div>}
-        <EstimeBar card={card} config={config} />
+        <EstimeBar card={card} read={props.read} />
       </div>
-      <ProfileBlock card={card} config={config} sort={props.sort} />
+      <ProfileBlock card={card} config={config} scope={props.read.active ? props.read.counted : null} />
       <div className="focus-side">
         <AgeText days={days} age={config.age} />
-        <SortTag card={card} sort={props.sort} config={config} />
+        <SortTag card={card} sort={props.sort} counted={props.read.counted} />
       </div>
     </div>
   );

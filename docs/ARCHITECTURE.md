@@ -652,8 +652,14 @@ de son ADR.
   fériés déduits) et la liste des métiers à cocher (« tout · rien ») ;
   pastille de la loupe dans l'en-tête ; « Budget engagé », « Taux de
   charge ». La loupe est un état de séance, rien n'est écrit.
-- **Suite** : tranche B (le tri et la carte dépliée suivent la loupe, la clé
-  de tri « par métier » disparaît), tranche C après la séance.
+- **Fait le même soir (tranches B et C, à l'essai sur la VM)** : le tri n'a
+  plus que trois clés, le « reste à faire » compte les métiers de la loupe
+  (la clé « par métier » et ses 19 cases disparaissent) ; la carte dépliée
+  suit la loupe (RAF, valeur du tri, métiers comptés en tête et les autres
+  en gris) ; quand la loupe restreint le tableau, les cartes sans reste à
+  faire sur les métiers comptés descendent en bas de leur case, grisées, et
+  un dépôt sur une carte devient un simple déplacement. Retour arrière
+  possible sur 695e3e3 (tranche A seule) ou dc781df.
 
 ### 2026-09-24 — Où la DoR et la DoD s'ouvrent, où elles sont validées ; Études/Cadrage, Terminé (ADR 047)
 

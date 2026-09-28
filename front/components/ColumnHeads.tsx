@@ -14,7 +14,8 @@ import type { ColumnClass } from "../../core/column-class.ts";
 import { emptyTotals, scopedRaf, type GroupTotals } from "../../core/totals.ts";
 import { fmtUnit } from "../format.ts";
 import { CLASS_LABEL } from "../rafLabels.ts";
-import { ColumnTotals, type RafRead } from "./BoardTotals.tsx";
+import type { RafRead } from "../useRafLens.ts";
+import { ColumnTotals } from "./BoardTotals.tsx";
 
 /**
  * The gate definition of a column, or null when the column has no gate.

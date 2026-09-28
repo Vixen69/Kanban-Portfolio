@@ -7,7 +7,9 @@
 // list, not the list's own.
 
 import type { BoardConfig, CardState } from "../../core/types.ts";
+import { cardRaf } from "../../core/raf-card.ts";
 import { typeById } from "../lookup.ts";
+import { outOfScope, type RafRead } from "../useRafLens.ts";
 
 /** Props of the collapsed-cell ticket popover. */
 export interface CollapsedTicketListProps {
@@ -16,6 +18,8 @@ export interface CollapsedTicketListProps {
   /** The cards of that cell (pre-filtered). */
   list: CardState[];
   config: BoardConfig;
+  /** The métier lens (ADR 048): the tickets it does not concern are dimmed. */
+  read: RafRead;
   onOpen: (card: CardState) => void;
   onClose: () => void;
 }
@@ -29,7 +33,7 @@ export interface CollapsedTicketListProps {
  * holding div.cpop.
  * Failure modes: none.
  */
-export function CollapsedTicketList({ anchorRect, list, config, onOpen, onClose }: CollapsedTicketListProps) {
+export function CollapsedTicketList({ anchorRect, list, config, read, onOpen, onClose }: CollapsedTicketListProps) {
   const types = typeById(config);
   const belowSpace = window.innerHeight - anchorRect.bottom;
   const openUp = belowSpace < 220 && anchorRect.top > belowSpace;
@@ -48,7 +52,7 @@ export function CollapsedTicketList({ anchorRect, list, config, onOpen, onClose 
         {list.map((card) => {
           const type = card.typeId === null ? undefined : types[card.typeId];
           return (
-            <button className="cpop-row" key={card.id} title={"Ouvrir · " + card.title}
+            <button className={"cpop-row" + (outOfScope(cardRaf(card, read.counted), read) ? " out-scope" : "")} key={card.id} title={"Ouvrir · " + card.title}
               onClick={(event) => { event.stopPropagation(); onClose(); onOpen(card); }}>
               {type && <span className="cpop-type" style={{ background: type.color }}>{type.short}</span>}
               <span className="cpop-name">{card.title}</span>

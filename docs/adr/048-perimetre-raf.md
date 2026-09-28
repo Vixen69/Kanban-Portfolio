@@ -1,7 +1,8 @@
 # ADR 048 — Périmètre RAF : reste à faire engagé / non engagé, loupe par métier
 
 Date : 2026-09-28 · Statut : accepté (décisions de l'auteur du jour),
-tranche A livrée · Amende les ADR 020 et 044
+livré en entier le 28/09 au soir pour essai sur la VM · Amende les ADR
+020 et 044
 
 ## Contexte
 
@@ -54,9 +55,24 @@ attend.
    rechargement revient à « tous métiers », Échap ne l'efface pas. Rien
    n'est écrit, ni au journal ni dans le navigateur. L'ordre des lignes
    est figé tant qu'elle est active.
-6. **Le tri « reste à faire »** (ADR 044) suit la règle 1 : les cartes
-   sans plan par métier n'ont plus de chiffre et passent en fin de liste.
-7. **La capacité reste hors de l'outil** pour cette mission : le chiffre
+6. **Le tri** (ADR 044) n'a plus que trois clés : ordre du tableau,
+   reste à faire, meilleur estimé. La clé « par métier » et sa liste de
+   cases disparaissent, la loupe les remplace : le « reste à faire »
+   compte les métiers de la loupe (tous par défaut), sans repli sur
+   l'effort ; les cartes sans plan par métier n'ont plus de chiffre, vont
+   en fin de liste et la pastille du tri les compte. La carte dépliée
+   suit la loupe : son RAF (en accent), la valeur du tri écrite dessus, et
+   son bloc « RAF par métier » où les métiers comptés passent en tête, les
+   autres en gris.
+7. **Les cartes hors périmètre.** Quand la loupe restreint le tableau à
+   au moins un métier, les cartes sans reste à faire sur ces métiers
+   descendent en bas de leur case (l'ordre au-dessus est inchangé, tri
+   compris) et sont grisées — dans la liste d'une case repliée aussi.
+   L'ordre affiché n'étant plus l'ordre manuel, un dépôt sur une carte
+   devient un simple déplacement dans sa case, comme pendant un tri
+   (ADR 044). Avec « rien », rien ne bouge ni ne grise : il n'y aurait
+   rien à mettre en tête.
+8. **La capacité reste hors de l'outil** pour cette mission : le chiffre
    en personnes se compare à l'effectif que les responsables de domaine
    annoncent en séance.
 
@@ -67,9 +83,8 @@ attend.
   consommé effaçait les autres. En local, les fixtures ont toutes un plan.
 - `core/metrics.ts` garde son calcul (jh/done avec repli) : il n'est plus
   lu par aucun chiffre du tableau.
-- Reste à faire (tranche B) : le tri « reste à faire » et le RAF de la
-  carte dépliée suivent la loupe ; la clé de tri « par métier » et sa
-  liste disparaissent. Après la séance (tranche C) : les cartes sans RAF
-  sur les métiers comptés en bas de cellule, avec la règle de dépôt.
+- Retour arrière possible, si l'essai sur la VM ne convient pas : le
+  commit de la tranche A seule (695e3e3), ou dc781df avant toute la
+  fonction.
 - En séance, Pause est dépliée au départ : une colonne repliée ne reçoit
   pas de dépôt (son RAF reste lisible dans son infobulle).

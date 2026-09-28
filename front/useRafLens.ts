@@ -18,10 +18,15 @@ export interface BoardLens {
   scope: RafScope;
   /** The profile ids counted (the config's métiers within the scope). */
   counted: ReadonlySet<string>;
-  /** Every métier of the config — what the sort counts until it follows the lens. */
-  allCounted: ReadonlySet<string>;
   /** True while the scope narrows the métiers (the chip shows). */
   active: boolean;
+  /**
+   * The counted métiers while the lens narrows the board to at least one
+   * métier, else null: what sinks the cards it does not concern to the
+   * bottom of their cells, dims them, and turns a drop onto a card into a
+   * plain move (« rien » partitions nothing — nothing would stay on top).
+   */
+  narrowing: ReadonlySet<string> | null;
   /** Checks or unchecks one métier. */
   toggle: (profileId: string) => void;
   /** « tout »: every métier again (the lens is off). */
@@ -56,7 +61,7 @@ export function useBoardLens(config: BoardConfig, nowMs: number, viewYear: numbe
   const all = useCallback(() => setScope(null), []);
   const none = useCallback(() => setScope(new Set<string>()), []);
   const counted = useMemo(() => countedIds(scope, config), [scope, config]);
-  const allCounted = useMemo(() => countedIds(null, config), [config]);
+  const narrowing = scope !== null && counted.size > 0 ? counted : null;
   const status = exerciseStatus(viewYear, config.exercise.year);
   // Keyed on the local midnight: recomputed once a day, not on every one-minute tick.
   // Past the 31/12 (before the year switch) no day is left: no divisor at all.
@@ -66,9 +71,29 @@ export function useBoardLens(config: BoardConfig, nowMs: number, viewYear: numbe
     return left > 0 ? left : null;
   }, [midnight, status, viewYear]);
   return useMemo(
-    () => ({ scope, counted, allCounted, active: scope !== null, toggle, all, none, days, year: viewYear, status }),
-    [scope, counted, allCounted, toggle, all, none, days, viewYear, status],
+    () => ({ scope, counted, active: scope !== null, narrowing, toggle, all, none, days, year: viewYear, status }),
+    [scope, counted, narrowing, toggle, all, none, days, viewYear, status],
   );
+}
+
+/** How a figure reads its reste à faire (ADR 048): the headers, the canals, the cards. */
+export interface RafRead {
+  /** The métiers counted. */
+  counted: ReadonlySet<string>;
+  /** True while the lens narrows the métiers. */
+  active: boolean;
+  /** The scope in words, the tooltip of a lensed value. */
+  title: string;
+}
+
+/**
+ * True when a card falls outside the lens: the lens narrows the board to
+ * at least one métier and the card has no reste à faire on any of them.
+ * Inputs: the card's RAF on the counted métiers, the read. Output: the
+ * flag. Failure: none.
+ */
+export function outOfScope(raf: number, read: RafRead): boolean {
+  return read.active && read.counted.size > 0 && raf <= 0;
 }
 
 /**

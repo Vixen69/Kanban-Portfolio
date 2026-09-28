@@ -214,18 +214,19 @@ function Shell({ store, config }: { store: BoardStore; config: BoardConfig }) {
   const ui = useUiState();
   const searchRef = useRef<HTMLInputElement>(null);
   const filters = useFilters(config);
-  const sorting = useCardSort(); // ADR 044: a sorted board has no manual insertion point
-  const drag = useDragHandlers(store, ui, !sorting.active);
-  const handlers = useBoardHandlers(ui, config.lanes);
-  useShortcuts(ui, searchRef);
+  const sorting = useCardSort();
   const { viewYear, exercise } = useExerciseShown(store.cards, config.exercise.year); // ADR 035: the year shown
   const lens = useBoardLens(config, nowMs, viewYear); // ADR 048: session only, a reload returns to « tous métiers »
+  // A sorted board (ADR 044) or one the lens partitions (ADR 048) has no manual insertion point.
+  const drag = useDragHandlers(store, ui, !sorting.active && lens.narrowing === null);
+  const handlers = useBoardHandlers(ui, config.lanes);
+  useShortcuts(ui, searchRef);
   const allCards = useDisplayCards(store.cards, config, viewYear);
   // The detail lookup searches ALL cards so an archived fiche opens from the archive.
-  const { cards, archivedCards } = useBoardCards(allCards, viewYear, config.exercise.year, sorting.sort, lens.allCounted);
+  const { cards, archivedCards } = useBoardCards(allCards, viewYear, config.exercise.year, sorting.sort, lens);
   const { capacity, draw, bumpCapacity } = useResourceDraw(viewYear, config); // ADR 041
   const derived = useDerived(cards, config, filters, now, draw);
-  const sortPanel = useSortPanel(cards, derived.hidden, config, sorting.sort);
+  const sortPanel = useSortPanel(cards, derived.hidden, config, sorting.sort, lens);
   const detailCard = allCards.find((card) => card.id === ui.detailId) ?? null;
   // A card removed from the fold (deleted elsewhere) leaves detailId
   // dangling: clear it so Escape acts on the visible context again.
