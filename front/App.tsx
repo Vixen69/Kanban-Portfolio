@@ -24,6 +24,8 @@ import {
 import { useNow } from "./useNow.ts";
 import { useCellNav } from "./cellNav.ts";
 import { useFullscreen, type Fullscreen } from "./useFullscreen.ts";
+import { useMoveFlash, type MoveFlashState } from "./useMoveFlash.ts";
+import { MoveFlash } from "./components/MoveFlash.tsx";
 import { useBoardLens, type BoardLens } from "./useRafLens.ts";
 import { scopeLabel, scopeTitle } from "./rafLabels.ts";
 import { AdminPanel } from "./components/AdminPanel.tsx";
@@ -71,6 +73,8 @@ interface Ctx {
   lens: BoardLens;
   /** Full screen for the meeting room (ADR 050). */
   fullscreen: Fullscreen;
+  /** The last move, outlined for 4 s and read to screen readers (ADR 050). */
+  moveFlash: MoveFlashState | null;
 }
 
 
@@ -170,11 +174,12 @@ function BoardArea({ ctx }: { ctx: Ctx }) {
         onCardOver={drag.onCardOver} onCardDrop={drag.onCardDrop}
         dropCardId={ui.dropCardId} />
       {derived.view.shown === 0 && <EmptyOverlay onReset={() => { ctx.filters.reset(); ctx.lens.all(); }} />}
+      <MoveFlash current={ctx.moveFlash} />
     </div>
   );
 }
 
-// Entrée dans la recherche : quand un seul sujet reste affiché, sa fiche s'ouvre.
+// Enter in the search box: when exactly one card is shown, its fiche opens.
 function openIfSingle(ctx: Ctx): void {
   const shown = ctx.cards.filter((card) => !ctx.derived.hidden.has(card.id));
   if (shown.length === 1 && shown[0] !== undefined) ctx.ui.setDetailId(shown[0].id);
@@ -232,7 +237,8 @@ function Shell({ store, config }: { store: BoardStore; config: BoardConfig }) {
   const sorting = useCardSort();
   const { viewYear, exercise } = useExerciseShown(store.cards, config.exercise.year); // ADR 035: the year shown
   const lens = useBoardLens(config, viewYear); // ADR 048: session only, a reload returns to « tous métiers »
-  const drag = useDragHandlers(store, ui, !sorting.active); // ADR 044: a sorted board has no manual insertion point
+  const moveFlash = useMoveFlash(config); // ADR 050: the last move signalled for 4 s
+  const drag = useDragHandlers(store, ui, !sorting.active, moveFlash.flash); // ADR 044: a sorted board has no manual insertion point
   const handlers = useBoardHandlers(ui, config.lanes);
   const fullscreen = useFullscreen(); // ADR 050: F or the header button
   useShortcuts(ui, searchRef, fullscreen.toggle);
@@ -256,7 +262,7 @@ function Shell({ store, config }: { store: BoardStore; config: BoardConfig }) {
   const ctx: Ctx = {
     store, config, ui, nowMs, filters, cards, archivedCards, derived, drag,
     handlers, searchRef, detailCard, focusLabel, viewYear, exercise, capacity, draw, bumpCapacity, sorting, sortPanel, lens,
-    fullscreen,
+    fullscreen, moveFlash: moveFlash.current,
   };
 
   return <Screen ctx={ctx} />;

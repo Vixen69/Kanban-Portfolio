@@ -99,7 +99,8 @@ function HeaderChips({ props }: { props: HeaderProps }) {
  * App header: sidebar toggle, title (one line, never wrapped), the
  * exercise selector (ADR 035), the chips of what narrows the board
  * (filters, focus, sort, métier lens — they shrink first), subject and
- * blocked counts, the domain legend, the gear settings menu (analytics,
+ * blocked counts, the domain legend, the full-screen button (ADR 050,
+ * hidden where the browser refuses it), the gear settings menu (analytics,
  * archives, import, exercise, snapshots, configuration) and "+ Sujet".
  * Inputs: HeaderProps (config, counts, chip state, callbacks).
  * Output: the header element. Failure: none.

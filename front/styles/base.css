@@ -11,6 +11,9 @@ body {
   overflow: hidden;
 }
 :focus-visible { outline: 2px solid #1d4ed8; outline-offset: 2px; border-radius: 2px; }
+/* Texte pour les lecteurs d'écran seulement (annonce du dernier déplacement, ADR 050). */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-thumb { background: #b6bfcd; border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: #97a3b4; }

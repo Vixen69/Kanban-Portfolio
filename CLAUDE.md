@@ -406,6 +406,9 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
   2026-09-29, ADR 050). Every move POSTs an
   intent; the middle writes the event with server-assigned actor/ts.
   Dropping a card ON another card inserts it just before it (ADR 019).
+  The moved card wears a 2px ink outline for 4 s, no fade, and a polite
+  live zone reads « Titre : Demandes → Études/Cadrage » to screen readers
+  (ADR 050) — a view signal only, the move is the event in the log.
 - Card detail: « ‹ 3 / 12 › » in its header and ← → move to the previous /
   next card of the SAME cell, in the order on screen (sort, filters and lens
   included; a canal-less column is one cell — ADR 050); charge j.h + budget k€ bars (budget before plan de charge),

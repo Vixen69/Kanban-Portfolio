@@ -48,7 +48,8 @@ function cellLabel(config: BoardConfig, card: CardState, unified: ReadonlySet<st
  * The open fiche's navigation within its cell.
  * Inputs: the board's cards, the hidden ids, the config, the open card (or
  * null), the callback that opens a card by id. Output: the CellNav, or null
- * when no card is open or it is not on the board (an archived fiche).
+ * when no card is open or it is not on the board (an archived fiche outside
+ * a closed year — a closed year's archived cards stay on its board, ADR 038).
  * Failure: none.
  */
 export function useCellNav(
@@ -78,9 +79,18 @@ function typing(target: EventTarget | null): boolean {
   return tag === "input" || tag === "textarea" || tag === "select" || target.isContentEditable;
 }
 
+// True while an editor of the fiche holds a draft a move would drop: the
+// blocking, decision and checklist forms, or an unsent comment.
+function draftOpen(): boolean {
+  if (document.querySelector(".modal .block-form, .modal .dec-form, .modal .charge-editor") !== null) return true;
+  const comment = document.querySelector<HTMLInputElement>(".modal .cm-add input");
+  return comment !== null && comment.value.trim() !== "";
+}
+
 /**
  * ← and → move through the cell while the fiche is open — never while a
- * field is being typed in, never with a modifier key.
+ * field is being typed in, while a form of the fiche holds a draft, or
+ * with a modifier key.
  * Input: the CellNav (null: nothing is listened to). Output: none.
  * Failure: none.
  */
@@ -88,7 +98,7 @@ export function useArrowKeys(nav: CellNav | null): void {
   useEffect(() => {
     if (nav === null) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || typing(event.target)) return;
+      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || typing(event.target) || draftOpen()) return;
       const move = event.key === "ArrowLeft" ? nav.onPrev : event.key === "ArrowRight" ? nav.onNext : null;
       if (move === null) return;
       event.preventDefault();

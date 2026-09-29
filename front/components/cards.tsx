@@ -84,6 +84,7 @@ function MiniCardBody(props: CardItemProps) {
   return (
     <div
       className={"mini" + (props.dropTarget ? " drop-before" : "")}
+      data-card-id={card.id}
       draggable
       onClick={() => props.onOpen(card)}
       onDragStart={(e) => props.onDragStart(e, card)}
@@ -125,6 +126,7 @@ function FocusCardBody(props: CardItemProps) {
   return (
     <div
       className={"focus-card" + (props.dropTarget ? " drop-before" : "")}
+      data-card-id={card.id}
       draggable
       onClick={() => props.onOpen(card)}
       onDragStart={(e) => props.onDragStart(e, card)}

@@ -124,7 +124,7 @@
    la pulsation du blocage (§1, non négociable) reste. */
 @media (prefers-reduced-motion: reduce) {
   .scroll-hint.on { animation: none; }
-  .board, .scroll-hint, .switch, .knob, .inline-val { transition: none; }
+  .board, .scroll-hint, .switch, .knob { transition: none; }
 }
 
 .ccell { background: var(--bg-cell); display: flex; align-items: center; justify-content: center; gap: 6px; }
