@@ -8,6 +8,7 @@
 import { useState } from "react";
 import type { SortKey } from "../../core/card-sort.ts";
 import type { CardSorting, SortPanel } from "../useCardSort.ts";
+import { Icon } from "./icons.tsx";
 
 /** Props of the sort section. */
 export interface SortSectionProps {
@@ -33,7 +34,7 @@ function KeyRows({ sorting, panel }: SortSectionProps) {
         </label>
       ))}
       <div className="sort-note">
-        Reste à faire compté sur : {panel.scope ?? "tous les métiers"} (métiers cochés dans la colonne des totaux, Σ ▾ en haut à gauche).
+        Reste à faire compté sur : {panel.scope ?? "tous les métiers"} (métiers cochés dans la colonne des totaux, deuxième Σ en haut à gauche).
         {panel.blind > 0 && ` ${panel.blind} carte(s) affichée(s) sans ventilation par métier.`}
       </div>
     </>
@@ -53,7 +54,7 @@ export function SortSection({ sorting, panel }: SortSectionProps) {
       <button className="sort-head" onClick={() => setOpen((current) => !current)} title={open ? "Replier le tri" : "Déplier le tri"}>
         <span className="sb-label" style={{ marginBottom: 0 }}>Trier les cartes</span>
         <span className="sort-current">{panel.label ?? "ordre du tableau"}</span>
-        <span className="pill-chev">{open ? "▾" : "▸"}</span>
+        <span className="pill-chev"><Icon name={open ? "chevron-down" : "chevron-right"} /></span>
       </button>
       {open && (
         <div className="sort-body">

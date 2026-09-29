@@ -5,6 +5,7 @@
 // (import, exercise switch, snapshots), then the board configuration.
 
 import { useEffect, useRef, useState } from "react";
+import { Icon } from "./icons.tsx";
 
 /** Props of the settings menu. */
 export interface HeaderMenuProps {
@@ -18,34 +19,6 @@ export interface HeaderMenuProps {
   onAdmin: () => void;
 }
 
-// An 8-tooth gear drawn in code (no icon library): teeth on a 24px grid
-// around a hub, the hole cut by the even-odd rule.
-function gearPath(): string {
-  const teeth = 8;
-  const outer = 10.5;
-  const inner = 8;
-  const points: string[] = [];
-  for (let i = 0; i < teeth; i++) {
-    const base = (i / teeth) * Math.PI * 2;
-    const step = (Math.PI * 2) / teeth;
-    for (const [fraction, radius] of [[0, inner], [0.18, outer], [0.5, outer], [0.68, inner]] as const) {
-      const angle = base + fraction * step;
-      points.push(`${(12 + radius * Math.cos(angle)).toFixed(2)},${(12 + radius * Math.sin(angle)).toFixed(2)}`);
-    }
-  }
-  return `M${points.join("L")}Z M15.2,12 A3.2,3.2 0 1 0 8.8,12 A3.2,3.2 0 1 0 15.2,12 Z`;
-}
-
-const GEAR = gearPath();
-
-// The gear icon, sized by the surrounding font (1em).
-function GearIcon() {
-  return (
-    <svg width="1em" height="1em" viewBox="0 0 24 24" aria-hidden="true">
-      <path d={GEAR} fill="currentColor" fillRule="evenodd" />
-    </svg>
-  );
-}
 
 // While the menu is open, Escape closes it — caught in the capture phase
 // so it never reaches the board's own Escape (which unwinds focus,
@@ -92,7 +65,7 @@ export function HeaderMenu(props: HeaderMenuProps) {
       <button ref={gear} className={"icon-btn gear-btn" + (open ? " on" : "")} onClick={() => setOpen((o) => !o)}
         title="Paramètres : analytics, archives, import, exercice, instantanés, configuration" aria-label="Paramètres"
         aria-haspopup="menu" aria-expanded={open}>
-        <GearIcon />
+        <Icon name="gear" />
       </button>
       {open && (
         <>

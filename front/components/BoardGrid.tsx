@@ -38,6 +38,7 @@ import { BOARD_TOTALS_KEY, COLUMN_TOTALS_KEY, LANE_TOTALS_KEY, useStoredFlag } f
 import { Cell } from "./Cell.tsx";
 import { LaneTotals, TotalsToggle } from "./BoardTotals.tsx";
 import { BoardGutter } from "./BoardGutter.tsx";
+import { Icon } from "./icons.tsx";
 import { ColumnHeads, gateDefOf } from "./ColumnHeads.tsx";
 import { CollapsedCell, CollapsedColCell } from "./CollapsedCells.tsx";
 import { LaneCorner, UnifiedCells } from "./UnifiedZone.tsx";
@@ -70,7 +71,7 @@ export function LaneLabel({ lane, collapsed, disabled, totals, rafTotals, totals
       onClick={disabled ? undefined : onToggle}
       title={disabled ? "Au moins une ligne doit rester dépliée" : (collapsed ? "Déplier " : "Replier ") + lane.name}
     >
-      {!disabled && <span className="collapse-caret">{collapsed ? "▸" : "▾"}</span>}
+      {!disabled && <span className="collapse-caret"><Icon name={collapsed ? "chevron-right" : "chevron-down"} /></span>}
       <span className="lane-name">{lane.name}</span>
       {!collapsed && !totalsOpen && <span className="lane-nature">{lane.nature}</span>}
       {!collapsed && (

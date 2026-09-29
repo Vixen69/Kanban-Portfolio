@@ -11,6 +11,7 @@ import type { GroupLoad, PersonLoad } from "../../core/capacity.ts";
 import { loadLevel } from "../../core/capacity.ts";
 import type { Coverage, DomainLoadRow, MetierTension, Overload, ProfileLoadRow } from "../../core/capacity-view.ts";
 import { fmtUnit } from "../format.ts";
+import { Icon } from "./icons.tsx";
 
 /** Percentage of a ratio ("88 %"), "—" when the capacity is unknown. */
 export function pct(ratio: number | null): string {
@@ -34,7 +35,7 @@ export function Panel({ title, hint, wide, open, children }: {
   return (
     <div className={"m2-panel" + (wide === true ? " wide" : "") + (shown ? "" : " folded")}>
       <button type="button" className="m2-title m2-fold" aria-expanded={shown} onClick={() => setShown((s) => !s)}>
-        <span>{title}</span><span className="m2-hint">{hint}</span><span className="m2-chev">{shown ? "▾" : "▸"}</span>
+        <span>{title}</span><span className="m2-hint">{hint}</span><span className="m2-chev"><Icon name={shown ? "chevron-down" : "chevron-right"} /></span>
       </button>
       {shown && children}
     </div>

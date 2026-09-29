@@ -68,6 +68,13 @@ optionnel (le wrapper `fetch` existant suffit).
   `front/public/fonts/` et déclarés en `@font-face`. Licence SIL OFL
   (redistribution permise). Auto-hébergées pour respecter le zéro-egress :
   aucune police distante, aucun appel à Google Fonts à l'exécution.
+- **Police Inter (variable, 4.x)** — branche `proposition-design` seulement
+  (passe graphique v13, à tester) : `front/public/fonts/InterVariable.woff2`
+  (352 Ko, téléchargé le 2026-09-29 depuis rsms.me/inter avec l'accord de
+  l'auteur) et sa licence `Inter-OFL.txt` (SIL OFL 1.1, redistribution
+  permise, la licence voyage avec la police). Chiffres à chasse fixe
+  (`tnum`), variantes cv05/cv08, espace fine insécable (U+202F). Aucun code,
+  aucun appel réseau à l'exécution.
 
 ## Ajout autorisé — `pg` (PostgreSQL)
 

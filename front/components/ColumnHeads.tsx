@@ -17,6 +17,7 @@ import { fmtUnit } from "../format.ts";
 import { CLASS_LABEL } from "../rafLabels.ts";
 import type { RafRead } from "../useRafLens.ts";
 import { ColumnTotals } from "./BoardTotals.tsx";
+import { Icon } from "./icons.tsx";
 
 /**
  * The gate definition of a column, or null when the column has no gate.
@@ -39,7 +40,7 @@ function CollapsedColumnHead({ col, engaged, title, onToggleCollapse }: {
 }) {
   return (
     <div className={"col-head col-collapsed" + (engaged ? " engaged" : "")} onClick={() => onToggleCollapse(col.id)} title={title}>
-      <span className="collapse-caret">{"›"}</span>
+      <span className="collapse-caret"><Icon name="chevron-right" /></span>
       <span className="col-label-v">{col.name}</span>
     </div>
   );
@@ -141,7 +142,7 @@ export function ColumnHeader({ col, focused, colCollapsed, totals, totalsOpen, a
           onClick={(e) => { e.stopPropagation(); onToggleCollapse(col.id); }}
           title={"Replier " + col.name}
         >
-          {"‹"}
+          <Icon name="chevron-left" />
         </button>
       </div>
       <ColumnTotals totals={totals} config={config} open={totalsOpen} cls={cls} read={read} />

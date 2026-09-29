@@ -8,6 +8,7 @@ import type { CardComment } from "../../core/types.ts";
 import type { HistoryEntry } from "../../core/history.ts";
 import type { FlowAnchors, FlowTimes } from "../../core/flow.ts";
 import { displayActor } from "../lookup.ts";
+import { Icon } from "./icons.tsx";
 
 // French short date for comment and history metadata.
 function frDate(iso: string): string {
@@ -19,7 +20,7 @@ function SectionToggle({ label, what, open, onToggle }: { label: string; what: s
   return (
     <button className="hist-head-btn" onClick={onToggle} title={(open ? "Replier " : "Déplier ") + what}>
       <span className="sec-title">{label}</span>
-      <span className="hist-caret">{open ? "▾" : "▸"}</span>
+      <span className="hist-caret"><Icon name={open ? "chevron-down" : "chevron-right"} /></span>
     </button>
   );
 }

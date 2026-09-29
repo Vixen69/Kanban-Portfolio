@@ -14,6 +14,7 @@ import { GroupSection, Pill, ResourceSection } from "./sidebarParts.tsx";
 import { DomainSection } from "./SidebarDomains.tsx";
 import { SortSection } from "./SortSection.tsx";
 import type { CardSorting, SortPanel } from "../useCardSort.ts";
+import { Icon } from "./icons.tsx";
 
 /** Props of the sidebar. All state and callbacks are owned by App. */
 export interface SidebarProps {
@@ -72,7 +73,7 @@ function SearchSection(props: SidebarProps) {
         onChange={(event) => props.setSearch(event.target.value)}
       />
       {props.search && (
-        <button className="search-x" onClick={() => props.setSearch("")} title="Effacer">✕</button>
+        <button className="search-x" onClick={() => props.setSearch("")} title="Effacer" aria-label="Effacer la recherche"><Icon name="x" /></button>
       )}
     </div>
   );

@@ -7,6 +7,7 @@ import type { ViewCounts } from "../../core/filters.ts";
 import { YearPicker } from "./YearPicker.tsx";
 import type { YearPickerProps } from "./YearPicker.tsx";
 import { HeaderMenu } from "./HeaderMenu.tsx";
+import { Icon } from "./icons.tsx";
 
 /** Props of the app header. All data flows down from App — no context. */
 export interface HeaderProps {
@@ -69,22 +70,22 @@ function HeaderChips({ props }: { props: HeaderProps }) {
     <>
       {props.filtersActive && (
         <button className="filter-chip" onClick={props.onResetFilters} title="Réinitialiser les filtres (Esc)">
-          Filtré : {props.view.shown}/{props.stats.total} ✕
+          Filtré : {props.view.shown}/{props.stats.total} <Icon name="x" className="chip-x" />
         </button>
       )}
       {props.focusLabel && (
         <button className="focus-chip" onClick={props.onClearFocus} title="Quitter le focus (Esc)">
-          Focus : {props.focusLabel} ✕
+          Focus : {props.focusLabel} <Icon name="x" className="chip-x" />
         </button>
       )}
       {props.sortLabel !== null && (
         <button className="focus-chip sort-chip" onClick={props.onClearSort} title={`${props.sortLabel} · revenir à l’ordre du tableau`}>
-          <span className="chip-text">{props.sortLabel}</span> ✕
+          <span className="chip-text">{props.sortLabel}</span> <Icon name="x" className="chip-x" />
         </button>
       )}
       {props.lensLabel !== null && (
         <button className="focus-chip lens-chip" onClick={props.onClearLens} title={`${props.lensTitle} · revenir à tous les métiers`}>
-          <span className="chip-text">{props.lensLabel}</span> ✕
+          <span className="chip-text">{props.lensLabel}</span> <Icon name="x" className="chip-x" />
         </button>
       )}
     </>
@@ -105,7 +106,7 @@ export function Header(props: HeaderProps) {
   return (
     <header className="header">
       <div className="hd-left">
-        <button className="icon-btn" onClick={props.onToggleSidebar} title="Filtres (S)">≡</button>
+        <button className="icon-btn" onClick={props.onToggleSidebar} title="Filtres (S)" aria-label="Filtres"><Icon name="menu" /></button>
         <span className="hd-title">Portfolio Kanban DSI</span>
         <YearPicker {...props.exercise} />
         <HeaderChips props={props} />
@@ -118,7 +119,7 @@ export function Header(props: HeaderProps) {
         <Legend config={props.config} />
         <HeaderMenu archivedCount={props.archivedCount} onMetrics={props.onMetrics} onArchive={props.onArchive}
           onImport={props.onImport} onExercise={props.onExercise} onSnapshots={props.onSnapshots} onAdmin={props.onAdmin} />
-        <button className="add-btn" onClick={props.onAdd} title="Nouveau sujet (N)">+ Sujet</button>
+        <button className="add-btn" onClick={props.onAdd} title="Nouveau sujet (N)"><Icon name="plus" /> Sujet</button>
       </div>
     </header>
   );

@@ -50,7 +50,8 @@ function FoldedGutter({ props }: { props: BoardGutterProps }) {
   const { totals, lens } = props;
   return (
     <div className="lane-label board-gutter" style={spanStyle(props.rows)} onClick={props.onToggle}
-      title={`Déplier la colonne des totaux (Σ ▾ en haut à gauche) · ${scopeTitle(lens.scope, props.config)}`}>
+      title={`Déplier la colonne des totaux (deuxième Σ en haut à gauche) · ${scopeTitle(lens.scope, props.config)}`}>
+
       <span className="lane-name">Projets · {totals.board.count}</span>
       <span className={"lane-totals" + (lens.active ? " lens-on" : "")}>
         <b>{fmtUnit(totals.board.estimated)}</b>k€ · RAF engagé <b className="raf">{rafText(totals.split.engaged, lens)}</b>j.h

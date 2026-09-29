@@ -16,6 +16,7 @@ import { WipTab } from "./adminWip.tsx";
 import { ExerciseTab } from "./adminExercise.tsx";
 import { SnapshotsTab } from "./adminSnapshots.tsx";
 import { ImportPanel } from "./ImportView.tsx";
+import { Icon } from "./icons.tsx";
 
 /** Props of the admin configuration modal. */
 export interface AdminPanelProps {
@@ -131,7 +132,7 @@ export function AdminPanel(props: AdminPanelProps) {
         <div className="modal-body">
           <div className="modal-top">
             <h2 className="modal-name">{panelTitle(tab)}</h2>
-            <button className="x" onClick={onClose}>✕</button>
+            <button className="x" onClick={onClose} title="Fermer" aria-label="Fermer"><Icon name="x" /></button>
           </div>
           {editing && (
             <div className="atabs">

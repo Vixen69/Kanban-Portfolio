@@ -5,6 +5,7 @@
 
 import { useState } from "react";
 import type { BoardConfig, CardState } from "../../core/types.ts";
+import { Icon } from "./icons.tsx";
 
 /** Props of the archives overlay. All state and actions live in App. */
 export interface ArchiveViewProps {
@@ -55,7 +56,7 @@ function ArchHead({ count, query, setQuery, onClose }: {
           <h2 className="modal-name">Archives</h2>
           <span className="modal-code">{count} sujet{count > 1 ? "s" : ""} archivé{count > 1 ? "s" : ""}</span>
         </div>
-        <button className="x" onClick={onClose}>✕</button>
+        <button className="x" onClick={onClose} title="Fermer" aria-label="Fermer"><Icon name="x" /></button>
       </div>
       {count > 0 && (
         <div className="arch-search-wrap">

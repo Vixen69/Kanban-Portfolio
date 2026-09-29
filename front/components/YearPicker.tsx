@@ -9,6 +9,7 @@
 import { useState } from "react";
 import { exerciseStatus } from "../../core/exercise.ts";
 import type { ExerciseStatus } from "../../core/exercise.ts";
+import { Icon } from "./icons.tsx";
 
 const STATUS_LABEL: Record<ExerciseStatus, string> = { closed: "clos", current: "en cours", preparing: "en préparation" };
 
@@ -48,7 +49,7 @@ export function YearPicker({ year, years, currentYear, counts, onYear }: YearPic
     <div className="hd-year-wrap">
       <button className={"hd-year " + status} onClick={() => setOpen((o) => !o)}
         title="Exercice affiché — cliquer pour en changer" aria-haspopup="listbox" aria-expanded={open}>
-        {year}<span className="hd-year-arrow">▾</span>
+        {year}<span className="hd-year-arrow"><Icon name="chevron-down" /></span>
       </button>
       <Chip status={status} />
       {open && (

@@ -13,6 +13,7 @@ import type { ColumnClass } from "../../core/column-class.ts";
 import { rafRows, scopedRaf, type GroupTotals } from "../../core/totals.ts";
 import { fmtUnit } from "../format.ts";
 import { CLASS_LABEL, laneRafNote } from "../rafLabels.ts";
+import { Icon } from "./icons.tsx";
 import type { RafRead } from "../useRafLens.ts";
 
 // Aggregates are read at portfolio scale: whole units (front/format.ts).
@@ -191,7 +192,7 @@ export function TotalsToggle({ open, onToggle, what }: { open: boolean; onToggle
   const title = what === "tableau" ? `${verb} la colonne des totaux du tableau et des métiers` : `${verb} les totaux par ${what}`;
   return (
     <button className={"totals-toggle" + (open ? " on" : "")} onClick={onToggle} title={title} aria-expanded={open}>
-      Σ {what === "colonne" ? "▸" : "▾"}
+      Σ <Icon name={what === "colonne" ? "chevron-right" : "chevron-down"} />
     </button>
   );
 }

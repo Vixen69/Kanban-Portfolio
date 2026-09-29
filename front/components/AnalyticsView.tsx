@@ -9,6 +9,7 @@ import type { BoardConfig, CardEvent, CardState } from "../../core/types.ts";
 import { CapacityTab } from "./CapacityView.tsx";
 import { FlowTab } from "./FlowView.tsx";
 import type { CapacityFetch } from "../useCapacity.ts";
+import { Icon } from "./icons.tsx";
 
 type Tab = "capacite" | "flux";
 
@@ -56,7 +57,7 @@ export function AnalyticsView(props: AnalyticsViewProps) {
           <span className="metrics-sub">Exercice {props.year} · {props.cards.length} carte(s) actives</span>
         </div>
         <TabBar tab={tab} onTab={setTab} />
-        <button className="btn ghost" onClick={props.onClose}>Fermer ✕</button>
+        <button className="btn ghost" onClick={props.onClose}>Fermer <Icon name="x" /></button>
       </div>
       {tab === "capacite"
         ? <CapacityTab cards={props.cards} config={props.config} now={props.now} fetch={props.capacity} />

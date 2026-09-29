@@ -15,6 +15,7 @@ import { ageCategory, ageLabel } from "../../core/aging.ts";
 import { cardRaf, hasBreakdown } from "../../core/raf-card.ts";
 import type { RafRead } from "../useRafLens.ts";
 import { fmtNum } from "../format.ts";
+import { Icon } from "./icons.tsx";
 
 /**
  * Criticality marker (author, 2026-09-11 — the crown is gone): top = gold
@@ -23,7 +24,7 @@ import { fmtNum } from "../format.ts";
  * Output: the marker element, or null for "normal". Failure modes: none.
  */
 export function CritMark({ c, big }: { c: Criticality; big?: boolean }) {
-  if (c === "top") return <span className="crit-star" title="Top" style={{ fontSize: big ? 14 : 11 }}>{"★"}</span>;
+  if (c === "top") return <span className="crit-star" title="Top" style={{ fontSize: big ? 14 : 11 }}><Icon name="star" /></span>;
   if (c === "major") {
     const size = big ? 8 : 6;
     return <span className="crit-dot" title="Majeur" style={{ width: size, height: size }} />;
@@ -42,7 +43,7 @@ export function CritMark({ c, big }: { c: Criticality; big?: boolean }) {
 export function TypeTag({ type, big }: { type: ProjectType | null; big?: boolean }) {
   if (type === null) return null;
   return (
-    <span className={"type-tag" + (big ? " big" : "")} style={{ background: type.color }} title={type.name}>
+    <span className={"type-tag" + (big ? " big" : "")} style={{ background: type.color, "--type": type.color } as CSSProperties} title={type.name}>
       {big ? type.name : type.short}
     </span>
   );

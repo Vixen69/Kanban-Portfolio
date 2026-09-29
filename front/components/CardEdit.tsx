@@ -9,6 +9,7 @@ import { useState } from "react";
 import type { BoardConfig, CardPatch, CardState, Criticality, CustomValue, FieldDef } from "../../core/types.ts";
 import { reconcileCardRefs, subDomainsOf } from "../../core/config.ts";
 import { CRITICALITY_KEYS, CustomInput, Field, SelectField } from "./modalParts.tsx";
+import { Icon } from "./icons.tsx";
 
 /** Move intent computed on save when the card changed cell. */
 export interface EditMove {
@@ -203,7 +204,7 @@ export function CardEdit(props: CardEditProps) {
         <div className="modal-body">
           <div className="modal-top">
             <h2 className="modal-name">Modifier</h2>
-            <button className="x" onClick={props.onClose}>✕</button>
+            <button className="x" onClick={props.onClose} title="Fermer" aria-label="Fermer"><Icon name="x" /></button>
           </div>
           <Field label="Nom"><input className="inp" value={draft.title} onChange={(e) => set({ title: e.target.value })} /></Field>
           <TypeCodeRow draft={draft} config={config} set={set} />

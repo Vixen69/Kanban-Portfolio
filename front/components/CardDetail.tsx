@@ -17,6 +17,7 @@ import type { DecisionInput } from "../api.ts";
 import { ConstraintEditor, InlineEdit } from "./modalEditors.tsx";
 import { ContentionSection, OwnerStrip, PlanDeCharge, RdrStrip } from "./DetailPlan.tsx";
 import { BudgetGraph, RisksSection } from "./DetailRisk.tsx";
+import { Icon } from "./icons.tsx";
 
 /** Props of the card detail modal — all intents flow up to App. */
 export interface CardDetailProps {
@@ -56,7 +57,7 @@ function TopBar({ card, onClose, onPatch }: { card: CardState; onClose: () => vo
         <h2 className="modal-name"><InlineEdit value={card.title} onCommit={(v) => { if (v.trim()) onPatch({ title: v.trim() }); }} /></h2>
         <span className="modal-code"><InlineEdit value={card.codename} placeholder="code" onCommit={(v) => onPatch({ codename: v.trim() })} /></span>
       </div>
-      <button className="x" onClick={onClose}>✕</button>
+      <button className="x" onClick={onClose} title="Fermer" aria-label="Fermer"><Icon name="x" /></button>
     </div>
   );
 }

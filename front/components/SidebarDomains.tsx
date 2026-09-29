@@ -9,6 +9,7 @@ import { Fragment, useState } from "react";
 import type { BoardConfig, Domain } from "../../core/types.ts";
 import { subDomainKey, type FilterGroup, type FilterState } from "../../core/filters.ts";
 import { GroupSection, Pill } from "./sidebarParts.tsx";
+import { Icon } from "./icons.tsx";
 
 /** Props of the domain section (a slice of SidebarProps). */
 export interface DomainSectionProps {
@@ -62,7 +63,7 @@ function DomainPill({ domain, open, onFlip, filters, onToggle }: {
           aria-expanded={open}
           onClick={onFlip}
         >
-          {open ? "▾" : "▸"}
+          <Icon name={open ? "chevron-down" : "chevron-right"} />
         </button>
       )}
       <Pill

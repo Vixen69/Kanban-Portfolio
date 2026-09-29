@@ -8,6 +8,7 @@ import { useState } from "react";
 import type { BoardConfig, Criticality } from "../../core/types.ts";
 import { unifiedColumnIds } from "../../core/layout.ts";
 import { CRITICALITY_KEYS, Field, SelectField } from "./modalParts.tsx";
+import { Icon } from "./icons.tsx";
 
 /** Creation intent sent to POST /api/cards (through App/useBoardStore). The
  * nature is NOT part of it: the server derives it from the canal (ADR 018). */
@@ -82,7 +83,7 @@ export function QuickAdd({ config, onClose, onCreate }: QuickAddProps) {
         <div className="modal-body">
           <div className="modal-top">
             <h2 className="modal-name">Nouveau sujet</h2>
-            <button className="x" onClick={onClose}>✕</button>
+            <button className="x" onClick={onClose} title="Fermer" aria-label="Fermer"><Icon name="x" /></button>
           </div>
           <div className="intake-note">Entre dans <b>{config.columns[0]!.name}</b> — tout sujet arrive par la gauche.</div>
           <Field label="Nom du sujet *"><input className="inp" autoFocus value={draft.title} onChange={(e) => set({ title: e.target.value })} /></Field>
