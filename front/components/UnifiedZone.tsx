@@ -59,7 +59,7 @@ function UnifiedColumn({ col, index, cards, rows, props, read }: {
       showTypes={props.showTypes}
       sort={props.sort}
       read={read}
-      dragOver={props.dragOver !== null && props.dragOver.columnId === col.id}
+      dragHover={props.dragHover}
       gateDef={gateDefOf(props.config, col)}
       onOpen={props.onOpen}
       onDragStart={props.onDragStart}
@@ -69,7 +69,6 @@ function UnifiedColumn({ col, index, cards, rows, props, read }: {
       onDragLeaveCell={props.onDragLeaveCell}
       onCardOver={props.onCardOver}
       onCardDrop={props.onCardDrop}
-      dropCardId={props.dropCardId}
     />
   );
 }

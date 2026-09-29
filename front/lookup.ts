@@ -4,13 +4,23 @@
 
 import type { BoardConfig, Column, Domain, Lane, Profile, ProjectType } from "../core/types.ts";
 
+// One index per config list, kept as long as the list itself (ADR 051): the
+// tickets read the domain and type of every card at each render, and a
+// config is replaced whole, never edited in place.
+const indexes = new WeakMap<object, Record<string, unknown>>();
+
 function byId<T extends { id: string }>(items: T[]): Record<string, T> {
-  return Object.fromEntries(items.map((item) => [item.id, item]));
+  let index = indexes.get(items);
+  if (index === undefined) {
+    index = Object.fromEntries(items.map((item) => [item.id, item]));
+    indexes.set(items, index);
+  }
+  return index as Record<string, T>;
 }
 
 /**
  * Domains of the config keyed by id.
- * Input: the board config. Output: a fresh Record (unknown id → undefined).
+ * Input: the board config. Output: a shared, read-only Record (unknown id → undefined).
  * Failure: none.
  */
 export function domainById(config: BoardConfig): Record<string, Domain> {
@@ -19,7 +29,7 @@ export function domainById(config: BoardConfig): Record<string, Domain> {
 
 /**
  * DSI profiles (métiers) of the config keyed by id.
- * Input: the board config. Output: a fresh Record (unknown id → undefined).
+ * Input: the board config. Output: a shared, read-only Record (unknown id → undefined).
  * Failure: none.
  */
 export function profileById(config: BoardConfig): Record<string, Profile> {
@@ -28,7 +38,7 @@ export function profileById(config: BoardConfig): Record<string, Profile> {
 
 /**
  * Project types of the config keyed by id.
- * Input: the board config. Output: a fresh Record (unknown id → undefined).
+ * Input: the board config. Output: a shared, read-only Record (unknown id → undefined).
  * Failure: none.
  */
 export function typeById(config: BoardConfig): Record<string, ProjectType> {
@@ -37,7 +47,7 @@ export function typeById(config: BoardConfig): Record<string, ProjectType> {
 
 /**
  * Columns of the config keyed by id.
- * Input: the board config. Output: a fresh Record (unknown id → undefined).
+ * Input: the board config. Output: a shared, read-only Record (unknown id → undefined).
  * Failure: none.
  */
 export function columnById(config: BoardConfig): Record<string, Column> {
@@ -46,7 +56,7 @@ export function columnById(config: BoardConfig): Record<string, Column> {
 
 /**
  * Lanes (canaux) of the config keyed by id.
- * Input: the board config. Output: a fresh Record (unknown id → undefined).
+ * Input: the board config. Output: a shared, read-only Record (unknown id → undefined).
  * Failure: none.
  */
 export function laneById(config: BoardConfig): Record<string, Lane> {

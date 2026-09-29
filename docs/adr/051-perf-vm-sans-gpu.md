@@ -52,11 +52,28 @@ version d'avant l'ADR 048 (dc781df) a été mesurée de la même façon.
    d'un autre canal était refusé (« Carte cible de l'insertion hors de la
    cellule visée »). La colonne entière est une seule case : le serveur
    n'exige plus le même canal (test ajouté).
+5. **Moins de rendu React pour rien** (mêmes pixels, vérifié carte par
+   carte) :
+   - les petites cartes lisent l'horloge au jour (leur âge en jours) et non
+     plus à la minute : le tic de chaque minute ne redessine plus les 154
+     cartes ;
+   - elles ne reçoivent plus le tri ni la loupe, qui ne servent qu'à la
+     carte dépliée : cocher un métier ne les redessine plus ;
+   - les index domaine / type ne sont plus reconstruits trois fois par
+     carte et par rendu ;
+   - le survol pendant un glisser vit hors de l'état de l'application
+     (`front/dragHover.ts`, `useSyncExternalStore` de React) : chaque carte
+     survolée redessinait ~220 composants, seulement les cases concernées
+     désormais (13) — la marque de dépôt ne traîne plus derrière la souris
+     sur un processeur lent.
 
 ## Conséquences
 
 - `front/styles/board.css`, `cards.css`, `modal.css`, `sidebar.css`,
-  `metrics.css` ; `middle/storage/postgres.ts` ; `middle/api.ts` (+ test).
+  `metrics.css` ; `middle/storage/postgres.ts` ; `middle/api.ts` (+ test) ;
+  `front/components/cards.tsx`, `Cell.tsx`, `BoardGrid.tsx`,
+  `UnifiedZone.tsx`, `front/App.tsx`, `useInteractions.ts`, `lookup.ts`,
+  `front/dragHover.ts` (+ test).
 - Aucun changement de modèle ni de données ; à l'écran, seuls le flou et le
   mouvement disparaissent. Au clic sur un en-tête, la colonne s'élargit
   d'un coup.

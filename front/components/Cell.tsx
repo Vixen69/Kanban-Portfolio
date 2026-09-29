@@ -10,7 +10,9 @@ import type { BoardConfig, CardState, Column, GateDef } from "../../core/types.t
 import { wipDisplay, wipState } from "../../core/board.ts";
 import type { CardSort } from "../../core/card-sort.ts";
 import type { RafRead } from "../useRafLens.ts";
+import { useCellDropCard, useCellHovered, type DragHoverStore } from "../dragHover.ts";
 import { FocusCard, MiniCard } from "./cards.tsx";
+import { daysInColumn } from "../../core/aging.ts";
 
 /** Props of one cell (pinned build-spec contract). */
 export interface CellProps {
@@ -35,8 +37,8 @@ export interface CellProps {
   sort: CardSort;
   /** The métier lens (ADR 048): the expanded card's RAF follows it. */
   read: RafRead;
-  /** True when a dragged card is currently over this cell. */
-  dragOver: boolean;
+  /** Where a dragged card hovers; the cell reads its own highlight and insertion mark from it. */
+  dragHover: DragHoverStore;
   /** The gate definition of the column, or null when ungated. */
   gateDef: GateDef | null;
   onOpen: (card: CardState) => void;
@@ -48,8 +50,6 @@ export interface CellProps {
   /** Card-level drag plumbing (insert-before reorder, ADR 019). */
   onCardOver: (e: DragEvent, card: CardState) => void;
   onCardDrop: (e: DragEvent, card: CardState) => void;
-  /** Id of the card currently marked as the insertion target, or null. */
-  dropCardId: string | null;
 }
 
 // Scroll hint: true while the card list can scroll further down, recomputed
@@ -75,13 +75,13 @@ function useScrollHint(count: number, focused: boolean) {
 // The card stack of the cell; a focused column shows expanded cards. An
 // empty cell keeps a filler so the drop target spans the full height.
 function CellCardList({ props, listRef }: { props: CellProps; listRef: React.Ref<HTMLDivElement> }) {
+  const dropCardId = useCellDropCard(props.dragHover, props.cards);
+  const nowDate = new Date(props.now);
+  const today = Date.UTC(nowDate.getUTCFullYear(), nowDate.getUTCMonth(), nowDate.getUTCDate());
   const shared = {
-    now: props.now,
     config: props.config,
     showCodes: props.showCodes,
     showTypes: props.showTypes,
-    sort: props.sort,
-    read: props.read,
     onOpen: props.onOpen,
     onDragStart: props.onDragStart,
     onDragEnd: props.onDragEnd,
@@ -92,9 +92,9 @@ function CellCardList({ props, listRef }: { props: CellProps; listRef: React.Ref
     <div className="cell-cards" ref={listRef}>
       {props.cards.map((card) =>
         props.focused ? (
-          <FocusCard key={card.id} card={card} dropTarget={props.dropCardId === card.id} {...shared} />
+          <FocusCard key={card.id} card={card} dropTarget={dropCardId === card.id} now={props.now} sort={props.sort} read={props.read} {...shared} />
         ) : (
-          <MiniCard key={card.id} card={card} dropTarget={props.dropCardId === card.id} {...shared} />
+          <MiniCard key={card.id} card={card} dropTarget={dropCardId === card.id} days={daysInColumn(card, nowDate)} today={today} {...shared} />
         ),
       )}
       {props.cards.length === 0 && <span className="cell-empty" />}
@@ -116,9 +116,10 @@ export function Cell(props: CellProps) {
   const wip = wipState(cards.length, limit);
   const blockedCount = cards.filter((card) => card.blocked).length;
   const scroll = useScrollHint(cards.length, props.focused);
+  const dragOver = useCellHovered(props.dragHover, laneId, column.id);
   return (
     <div
-      className={"cell" + (props.focused ? " focused" : "") + (props.dragOver ? " dragover" : "")}
+      className={"cell" + (props.focused ? " focused" : "") + (dragOver ? " dragover" : "")}
       data-wip={wip}
       style={props.style}
       onDragOver={(e) => props.onDragOverCell(e, laneId, column.id)}

@@ -164,15 +164,14 @@ function BoardArea({ ctx }: { ctx: Ctx }) {
         focusedColumn={ui.focusCol} collapsedLanes={ui.collapsedLanes}
         collapsedCols={ui.collapsedCols} now={ctx.nowMs} showCodes={ui.showCodes} showTypes={ui.showTypes}
         sort={ctx.sorting.sort} lens={ctx.lens}
-        dragOver={ui.dragOver}
+        dragHover={ui.dragHover}
         onFocusColumn={handlers.onFocusColumn} onToggleLane={handlers.onToggleLane}
         onToggleColumnCollapse={handlers.onToggleColumnCollapse}
         onOpen={handlers.onOpenCard}
         onDragStart={drag.onDragStart} onDragEnd={drag.onDragEnd}
         onDrop={drag.onDrop} onDragOverCell={drag.onDragOverCell}
         onDragLeaveCell={drag.onDragLeaveCell}
-        onCardOver={drag.onCardOver} onCardDrop={drag.onCardDrop}
-        dropCardId={ui.dropCardId} />
+        onCardOver={drag.onCardOver} onCardDrop={drag.onCardDrop} />
       {derived.view.shown === 0 && <EmptyOverlay onReset={() => { ctx.filters.reset(); ctx.lens.all(); }} />}
       <MoveFlash current={ctx.moveFlash} />
     </div>
