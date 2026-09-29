@@ -4,9 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Portfolio Kanban DSI</title>
-    <!-- Preloaded (ADR 051): otherwise the fonts are asked for only once the board is laid out, and their late arrival lays out and repaints all the text again. -->
-    <link rel="preload" href="/fonts/dm-sans-latin.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="preload" href="/fonts/dm-serif-display-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <!-- Preloaded (ADR 051): the v13 design draws everything in Inter; asked for only once the board is laid out, it laid out and repainted all the text again. Remove with the design-v13.css import. -->
+    <link rel="preload" href="/fonts/InterVariable.woff2" as="font" type="font/woff2" crossorigin />
   </head>
   <body>
     <div id="root"></div>
