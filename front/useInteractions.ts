@@ -1,5 +1,5 @@
 // View-state hooks of the app shell (design v9 app.jsx): panel/modal state,
-// focus and collapse, keyboard shortcuts (/ N S Esc) and HTML5 drag & drop.
+// focus and collapse, keyboard shortcuts (/ N S F Esc) and HTML5 drag & drop.
 // No domain logic here — moves go through the store, which POSTs intents.
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -95,10 +95,14 @@ export function useBoardHandlers(ui: UiState, lanes: Lane[]) {
 
 /**
  * Keyboard shortcuts: / focuses the search (opening the sidebar), N opens
- * QuickAdd, S toggles the sidebar; Escape unwinds one level of context per
- * press in the design's exact order: detail → adding → archives → sidebar
- * → focused column → collapsed lanes. While typing in a field, only Escape
- * acts. Inputs: the UiState and the sidebar search input ref. Failure: none.
+ * QuickAdd, S toggles the sidebar, F toggles full screen (ADR 050); Escape
+ * unwinds one level of context per press in the design's exact order:
+ * detail → adding → archives → sidebar → focused column → collapsed lanes
+ * (in full screen the browser keeps the first Escape to leave it). While
+ * typing in a field, only Escape acts; a key held with Ctrl, Cmd or Alt is
+ * left to the browser (Ctrl+F finds, Ctrl+S saves).
+ * Inputs: the UiState, the sidebar search input ref, the full-screen
+ * toggle. Failure: none.
  */
 export function useShortcuts(ui: UiState, searchRef: RefObject<HTMLInputElement | null>, onFullscreen: () => void): void {
   const { detailId, adding, archive, sidebar, focusCol, collapsedLanes, setDetailId, setEditing,
@@ -117,13 +121,14 @@ export function useShortcuts(ui: UiState, searchRef: RefObject<HTMLInputElement 
       const typing = tag === "input" || tag === "textarea" || tag === "select";
       if (event.key === "Escape") { unwind(); return; }
       if (typing) return;
+      if (event.ctrlKey || event.metaKey || event.altKey) return; // Ctrl+F, Cmd+F, Ctrl+S… stay the browser's
       if (event.key === "/") {
         event.preventDefault();
         setSidebar(true);
         setTimeout(() => searchRef.current?.focus(), 60);
       } else if (event.key.toLowerCase() === "n") { event.preventDefault(); setAdding(true); }
       else if (event.key.toLowerCase() === "s") setSidebar((open) => !open);
-      else if (event.key.toLowerCase() === "f") { event.preventDefault(); onFullscreen(); }
+      else if (event.key.toLowerCase() === "f" && !event.repeat) { event.preventDefault(); onFullscreen(); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -138,13 +143,14 @@ export function useShortcuts(ui: UiState, searchRef: RefObject<HTMLInputElement 
  * fallback); every drop POSTs a move intent through the store — the server
  * records the event.
  * Inputs: the board store, the UiState (dragOver highlight + dropCardId),
- * reorder (default true): false while the board is sorted (ADR 044) — a
- * drop onto a card is then a plain move into that card's cell, with no
- * beforeId and no insertion mark.
+ * reorder: false while the board is sorted (ADR 044) — a drop onto a card
+ * is then a plain move into that card's cell, with no beforeId and no
+ * insertion mark; onMoved: called with the card as it was and its target
+ * once the move is written (the 4-second signal, ADR 050).
  * Output: the seven handlers BoardGrid expects. Failure: a refused move is
  * logged by the store; the board simply does not change.
  */
-export function useDragHandlers(store: BoardStore, ui: UiState, reorder = true) {
+export function useDragHandlers(store: BoardStore, ui: UiState, reorder: boolean, onMoved: (card: CardState, to: MoveTarget) => void) {
   const dragId = useRef<string | null>(null);
   const { setDragOver, setDropCardId } = ui;
   const { cards, moveCard } = store;
@@ -170,10 +176,11 @@ export function useDragHandlers(store: BoardStore, ui: UiState, reorder = true) 
     // A unified cell (before the RDO, ADR 039) has no canal: the card keeps its own.
     const target = laneId === UNIFIED_LANE ? card.laneId : laneId;
     if (card.laneId === target && card.columnId === columnId) return;
-    void moveCard(id, { laneId: target, columnId });
-  }, [cards, moveCard, setDragOver, setDropCardId]);
+    const to = { laneId: target, columnId };
+    void moveCard(id, to).then((ok) => { if (ok) onMoved(card, to); });
+  }, [cards, moveCard, setDragOver, setDropCardId, onMoved]);
   const cellHover = useCellHoverHandlers(ui);
-  const cardLevel = useCardDropHandlers(dragId, store, ui, reorder);
+  const cardLevel = useCardDropHandlers(dragId, store, ui, reorder, onMoved);
   return { onDragStart, onDragEnd, onDrop, ...cellHover, ...cardLevel };
 }
 
@@ -222,6 +229,7 @@ function useCardDropHandlers(
   store: BoardStore,
   ui: UiState,
   reorder: boolean,
+  onMoved: (card: CardState, to: MoveTarget) => void,
 ) {
   const { setDragOver, setDropCardId } = ui;
   const { moveCard } = store;
@@ -249,7 +257,8 @@ function useCardDropHandlers(
     setDropCardId(null);
     if (!id || id === target.id) return;
     const move = cardDropMove(id, target, store, reorder);
-    if (move !== null) void moveCard(id, move);
-  }, [dragId, moveCard, reorder, setDragOver, setDropCardId, store]);
+    const dragged = store.cards.find((candidate) => candidate.id === id);
+    if (move !== null) void moveCard(id, move).then((ok) => { if (ok && dragged !== undefined) onMoved(dragged, move); });
+  }, [dragId, moveCard, reorder, setDragOver, setDropCardId, store, onMoved]);
   return { onCardOver, onCardDrop };
 }

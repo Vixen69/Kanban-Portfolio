@@ -48,7 +48,7 @@ export interface CardDetailProps {
   onArchive: () => void;
   /** Restores an archived subject to the board (fiche opened from Archives). */
   onUnarchive: () => void;
-  /** The open card's place in its cell and the ← → moves (ADR 050); null for an archived fiche. */
+  /** The open card's place in its cell and the ← → moves (ADR 050); null off the board (an archived fiche outside a closed year). */
   nav: CellNav | null;
 }
 

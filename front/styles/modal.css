@@ -10,6 +10,8 @@
 .modal-name { font-size: 16px; font-weight: 700; color: var(--tx-1); line-height: 1.25; }
 .modal-code { font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: var(--tx-3); display: block; margin-top: 3px; }
 .x { background: none; border: none; color: var(--tx-3); cursor: pointer; font-size: 14px; }
+/* Budget de mouvement (ADR 050) : l'édition en place perd sa transition sous « réduire les animations ». */
+@media (prefers-reduced-motion: reduce) { .inline-val { transition: none !important; } }
 /* Fiche : carte précédente / suivante de la case (ADR 050), « ‹ 3 / 12 › ». */
 .modal-top-right { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
 .fiche-nav { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--bd); border-radius: 6px; padding: 1px; background: #fff; }

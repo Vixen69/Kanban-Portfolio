@@ -12,7 +12,7 @@ const COMPRESS = "M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5";
  * button. Failure modes: none.
  */
 export function FullscreenButton({ full, onToggle }: { full: boolean; onToggle: () => void }) {
-  const label = full ? "Quitter le plein écran (F ou Échap)" : "Plein écran (F)";
+  const label = full ? "Quitter le plein écran (F ou Échap)" : "Plein écran (F) — en plein écran, fermer une fiche par ✕ ou un clic à côté : Échap quitte d'abord le plein écran";
   return (
     <button className={"icon-btn fullscreen-btn" + (full ? " on" : "")} onClick={onToggle} title={label} aria-label={label} aria-pressed={full}>
       <svg width="1em" height="1em" viewBox="0 0 24 24" aria-hidden="true">

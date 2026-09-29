@@ -648,7 +648,13 @@ de son ADR.
   fiche, dans l'ordre affiché ; `core/text-search.ts` (accents, casse,
   apostrophes) dans la recherche et les Archives, Entrée ouvre la fiche
   quand il ne reste qu'un sujet ; transitions à 200 ms au plus, coupées
-  sous « réduire les animations ».
+  sous « réduire les animations » ; la carte qu'on vient de déposer reste
+  encadrée 4 secondes (et annoncée aux lecteurs d'écran).
+- **Revue** : Ctrl+F et les raccourcis du navigateur ne sont plus captés ;
+  ← → ne changent pas de fiche pendant qu'un formulaire de la fiche est
+  ouvert ; en plein écran, Échap quitte d'abord le plein écran (règle du
+  navigateur, la VM est en HTTP) — la fiche se ferme par ✕.
+
 
 ### 2026-09-29 — Un seul menu « Paramètres » ; le Σ de la colonne des totaux dans le coin (ADR 049)
 

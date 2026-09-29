@@ -22,7 +22,7 @@ export interface SidebarProps {
   config: BoardConfig;
   search: string;
   setSearch: (value: string) => void;
-  /** Entrée dans la recherche : ouvre la fiche quand un seul sujet reste affiché. */
+  /** Enter in the search box: opens the fiche when exactly one card is shown. */
   onSearchEnter: () => void;
   filters: FilterState;
   onToggle: (group: FilterGroup, key: string) => void;
@@ -224,6 +224,7 @@ function Shortcuts() {
       <span><kbd>/</kbd> rechercher</span>
       <span><kbd>N</kbd> nouveau</span>
       <span><kbd>S</kbd> panneau</span>
+      {document.fullscreenEnabled && <span><kbd>F</kbd> plein écran</span>}
       <span><kbd>Esc</kbd> revenir</span>
     </div>
   );

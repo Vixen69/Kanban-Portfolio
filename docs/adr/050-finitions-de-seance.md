@@ -16,13 +16,22 @@ déjà présentes sans décision écrite.
    L'API Fullscreen du navigateur : barre d'adresse et onglets disparaissent,
    le tableau garde sa hauteur ; le curseur et toutes les commandes restent
    (pas de curseur masqué, pas de contrôles cachés — l'auteur continue de
-   déplacer les cartes). Échap (celui du navigateur) ou F en sort.
+   déplacer les cartes). Échap (celui du navigateur) ou F en sort. Règle du
+   navigateur : en plein écran, le premier Échap sert à en sortir — il ne
+   ferme donc pas la fiche ; on la ferme par ✕ ou d'un clic à côté. (Le
+   verrouillage clavier qui l'éviterait n'existe qu'en HTTPS, pas sur la VM
+   en HTTP.) Ctrl+F, Cmd+F et les autres raccourcis du navigateur restent
+   les siens.
 2. **Fiches enchaînées** : fiche ouverte, ← et → passent à la carte
    précédente ou suivante de la MÊME case, dans l'ordre affiché (ordre
    manuel ou tri, filtres et loupe compris) ; une colonne sans canal est une
    seule case. En tête de fiche, « ‹ 3 / 12 › ». Jamais pendant la saisie
-   d'un champ ni avec une touche de modification ; rien en mode édition.
-   Une fiche ouverte depuis les Archives n'a pas de voisines.
+   d'un champ, ni quand un formulaire de la fiche est ouvert (blocage,
+   décision, éditeurs) ou qu'un commentaire est en cours, ni avec une touche
+   de modification ; rien en mode édition. Une fiche archivée hors du
+   tableau n'a pas de voisines ; sur un exercice clos, où les cartes
+   archivées restent au tableau (ADR 038), elle garde celles de sa case.
+
 3. **Recherche sans accents** : majuscules, accents, apostrophes
    typographiques, œ/æ et espaces multiples ne comptent plus
    (`core/text-search.ts`) — « securite » trouve « Sécurité ». Même règle
@@ -39,14 +48,22 @@ déjà présentes sans décision écrite.
    Écartés aussi : le rideau, la décision éclair (les décisions se prennent
    sur papier pour l'instant), l'aide-mémoire des raccourcis (il n'y en a
    que cinq : `/`, N, S, F, Échap).
+6. **Dernier déplacement signalé** (« les 4 secondes, c'est convaincant ») :
+   après un dépôt, la carte déplacée porte un cadre encre de 2 px pendant
+   4 secondes, sans fondu — il s'arrête, simplement ; un nouveau dépôt
+   remplace le précédent. Une zone invisible à l'écran annonce la même
+   chose aux lecteurs d'écran (« Titre : Demandes → Études/Cadrage ·
+   Projets », « réordonné dans … » au sein d'une case). Un signal de vue :
+   rien n'est écrit de plus, le déplacement reste l'événement du journal.
 
 ## Conséquences
 
 - `core/text-search.ts` (+ tests), `core/filters.ts`, `front/cellNav.ts`
   (+ tests), `front/useFullscreen.ts`, `front/components/FullscreenButton.tsx`,
   `CardDetail.tsx`, `Chrome.tsx`, `Sidebar.tsx`, `ArchiveView.tsx`,
-  `App.tsx`, `useInteractions.ts`, `board.css`, `modal.css`.
+  `App.tsx`, `useInteractions.ts`, `useMoveFlash.ts`, `MoveFlash.tsx`,
+  `cards.tsx` (`data-card-id`), `base.css`, `board.css`, `modal.css`.
 - Aucun changement de modèle, d'API ni de journal.
-- À représenter à l'auteur : « dernier geste signalé » (annonce pour lecteur
-  d'écran, surlignage bref), la palette de commandes, « depuis la dernière
-  synchro » (bouton de filtre ancré sur un instantané).
+- Écartée ensuite : la palette de commandes (« on n'en a pas besoin »).
+  Reste à trancher : « depuis la dernière synchro » (bouton de filtre ancré
+  sur un instantané) et un journal global des déplacements.

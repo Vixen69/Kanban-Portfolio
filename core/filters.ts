@@ -39,7 +39,7 @@ function subDomainKeys(config: BoardConfig): string[] {
  * `!== false` convention, tolerant to config edits).
  */
 export interface FilterState {
-  /** Matches title or codename, trimmed, case-insensitive. Empty = all. */
+  /** Matches title or codename; case, accents, apostrophes and spacing ignored (core/text-search.ts). Blank = all. */
   search: string;
   /** « Bloqués uniquement » — hides every card that is not blocked. */
   blockedOnly: boolean;
