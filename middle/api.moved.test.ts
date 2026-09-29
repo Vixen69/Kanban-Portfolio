@@ -96,3 +96,22 @@ test("beforeId must reference another card sitting in the target cell", async ()
     /Carte cible de l’insertion hors de la cellule visée/,
   );
 });
+
+test("a canal-less column is one cell: a drop onto a card of another canal reorders there (ADR 039)", async () => {
+  // testConfig: col1 and col2 (up to the qualification stage) have no canal; col3 has canals.
+  const storage = stubStorage([
+    testCard({ id: "S001" }),
+    testCard({ id: "S002", laneId: "laneB" }),
+    testCard({ id: "S003", columnId: "col3" }),
+    testCard({ id: "S004", columnId: "col3", laneId: "laneB" }),
+  ]);
+  const result = await postEvent(storage, config, {
+    type: "moved", cardId: "S001", toLaneId: "laneA", toColumnId: "col1", beforeId: "S002",
+  });
+  assert.equal(result.status, 201);
+  assert.equal((result.body as CardEvent).payload["beforeId"], "S002");
+  await assert.rejects(
+    () => postEvent(storage, config, { type: "moved", cardId: "S003", toLaneId: "laneA", toColumnId: "col3", beforeId: "S004" }),
+    /Carte cible de l’insertion hors de la cellule visée/,
+  );
+});

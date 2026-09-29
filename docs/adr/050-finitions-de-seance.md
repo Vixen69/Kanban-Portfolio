@@ -42,7 +42,9 @@ déjà présentes sans décision écrite.
    et repli des colonnes, interrupteurs, édition en place), coupées quand le
    poste demande moins de mouvement (`prefers-reduced-motion`). Aucun
    mouvement ambiant, hormis les deux exceptions déjà admises (pulsation du
-   blocage, rebond de la flèche de défilement).
+   blocage, rebond de la flèche de défilement). **Remplacé le soir même par
+   l'ADR 051 : plus aucune animation ni transition.**
+
 5. **Pas de déplacement de carte au clavier** : l'alternative clavier
    promise au §5 est abandonnée (« ce n'était pas une bonne idée »).
    Écartés aussi : le rideau, la décision éclair (les décisions se prennent

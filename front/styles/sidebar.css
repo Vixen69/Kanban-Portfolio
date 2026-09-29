@@ -52,9 +52,9 @@ kbd { font-family: inherit; font-size: 8px; font-weight: 700; color: var(--tx-2)
 
 /* Codename show/hide switch */
 .code-toggle { display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
-.switch { width: 32px; height: 18px; background: #cbd5e1; border-radius: 10px; position: relative; transition: background .15s; flex: 0 0 auto; }
+.switch { width: 32px; height: 18px; background: #cbd5e1; border-radius: 10px; position: relative; flex: 0 0 auto; }
 .switch.on { background: var(--accent); }
-.knob { position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; background: #fff; border-radius: 50%; transition: left .15s; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+.knob { position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; background: #fff; border-radius: 50%; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
 .switch.on .knob { left: 16px; }
 .code-hint { font-size: 9px; color: var(--tx-4); margin-top: 7px; line-height: 1.4; }
 .code-hint + .code-toggle { margin-top: 9px; }

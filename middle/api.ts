@@ -9,6 +9,7 @@ import type { CardEventInput } from "../core/events.ts";
 import { lifecycleEvent, movedEvent } from "../core/events.ts";
 import { EDITABLE_FIELDS, foldEvents } from "../core/state.ts";
 import { RESTORE_CARD_ID } from "../core/restore.ts";
+import { unifiedColumnIds } from "../core/layout.ts";
 import { validateBoardConfig } from "../core/config.ts";
 import type { BoardConfig, CardEventType, CardState } from "../core/types.ts";
 import type { ConfigStore } from "./config-store.ts";
@@ -193,13 +194,12 @@ function buildByType(
   }
 }
 
-// The optional insertion target of a move (ADR 019): another card the drop
-// landed on, which MUST sit in the target cell of the folded board.
+// A move's optional insertion target (ADR 019): a card of the target cell — the whole column without canal (ADR 039).
 function validBeforeId(
   states: CardState[],
   state: CardState,
   body: Record<string, unknown>,
-  to: { laneId: string; columnId: string },
+  to: { laneId: string; columnId: string; anyLane: boolean },
 ): string | undefined {
   const beforeId = body["beforeId"];
   if (beforeId === undefined) return undefined;
@@ -208,7 +208,7 @@ function validBeforeId(
   }
   // An archived target is off the board: no legitimate drop can land on it.
   const target = states.find((card) => card.id === beforeId);
-  if (!target || target.archived || target.laneId !== to.laneId || target.columnId !== to.columnId) {
+  if (!target || target.archived || (!to.anyLane && target.laneId !== to.laneId) || target.columnId !== to.columnId) {
     throw new BadRequest("Carte cible de l’insertion hors de la cellule visée.");
   }
   return beforeId;
@@ -238,7 +238,7 @@ function buildMoved(
     throw new BadRequest("Canal cible inconnu.");
   }
   const to = { laneId: toLaneId, columnId: toColumnId };
-  const beforeId = validBeforeId(states, state, body, to);
+  const beforeId = validBeforeId(states, state, body, { ...to, anyLane: unifiedColumnIds(config).has(toColumnId) });
   if (state.laneId === toLaneId && state.columnId === toColumnId && beforeId === undefined) {
     throw new BadRequest("Carte déjà dans cette cellule.");
   }

@@ -70,7 +70,8 @@ It is an instrument, not a platform. The product's value IS its opinion:
 - Pull flow. Work is pulled forward, never pushed. All intake enters left.
 - Time is visible. Every card wears its age (text pill, warn/danger colors;
   background decay kept in core as an option — off in the validated design).
-- Blockages scream. Blocked cards pulse; cells show a blocked count badge.
+- Blockages scream. Blocked cards wear a red wash; cells show a blocked
+  count badge (no pulse since ADR 051 — nothing moves on the VM).
 - One screen, zero scroll. The whole portfolio is visible at once, always.
 - The event log is the truth. Every movement, edit, comment and deletion is
   recorded append-only (deletion is itself an event).
@@ -290,11 +291,12 @@ Diacritics in display names come from the config as-is.
 ## 5. UI specification (carries over)
 
 Aesthetic: industrial control panel. Dense, sober, professional. No
-decoration, no gradients-for-style, no animation except the blocked pulse
-and the scroll-hint bob (accepted v11 exception). Brief transitions are
-allowed under a strict budget (ADR 050, author 2026-09-29): 200 ms at most,
-only in response to a gesture (focus/collapse, switches, inline edit),
-cut under prefers-reduced-motion — never ambient motion. (Implemented in
+decoration, no gradients-for-style. **Nothing moves** (ADR 051, author
+2026-09-29 — « fais péter les animes »): no animation, no transition, no
+backdrop blur — the client VM has no GPU and is reached through Guacamole,
+so every animated frame is rasterised by the CPU and re-sent over the
+network. The blocked dot and the scroll-hint arrow are static; the 4-second
+move outline appears and disappears without fade. (Implemented in
 hand-written CSS now; adapted to Tailwind/Radix later.)
 
 - Grid: lanes as horizontal swimlanes (canaux), columns as vertical stages;
@@ -316,7 +318,7 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
 - Aging (design v9): age is worn as a text pill (3j/2s/4m; warn ≥ recent,
   danger ≥ aging thresholds). No background darkening by default.
 - Blocked: red card wash alone on tickets (one signal per information —
-  author's call, 2026-07-10; the pulsing dot stays in the fiche's BLOCAGE
+  author's call, 2026-07-10; a static red dot in the fiche's BLOCAGE
   banner), reason on the card in focus and in the detail; per-cell blocked
   count badge.
 - Ticket layout: type tag first, then the name (aligned across tickets),

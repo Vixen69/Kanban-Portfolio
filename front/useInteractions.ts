@@ -9,6 +9,7 @@ import { UNIFIED_LANE, unifiedColumnIds } from "../core/layout.ts";
 
 import type { MoveTarget } from "./api.ts";
 import type { BoardStore } from "./useBoardStore.ts";
+import { createDragHoverStore } from "./dragHover.ts";
 
 /** What the admin shell opens on: a configuration tab (wip, categories, champs), or the import / exercise / snapshots gesture shown alone from the gear menu (ADR 046/049). */
 export type AdminTab = "wip" | "categories" | "champs" | "importer" | "exercice" | "instantanes";
@@ -35,15 +36,13 @@ export function useUiState() {
   const openAdmin = useCallback((tab: AdminTab = "wip") => { setAdminTab(tab); setAdmin(true); }, []);
   const [showCodes, setShowCodes] = useState(false);
   const [showTypes, setShowTypes] = useState(true);
-  const [dragOver, setDragOver] = useState<MoveTarget | null>(null);
-  const [dropCardId, setDropCardId] = useState<string | null>(null);
+  const [dragHover] = useState(createDragHoverStore); // outside React state: a hover change re-renders two cells, not the shell
   return {
     sidebar, setSidebar, focusCol, setFocusCol,
     collapsedLanes, setCollapsedLanes, collapsedCols, setCollapsedCols,
     detailId, setDetailId, editing, setEditing, adding, setAdding,
     archive, setArchive, admin, setAdmin, adminTab, openAdmin, metrics, setMetrics,
-    showCodes, setShowCodes, showTypes, setShowTypes, dragOver, setDragOver,
-    dropCardId, setDropCardId,
+    showCodes, setShowCodes, showTypes, setShowTypes, dragHover,
   };
 }
 
@@ -152,7 +151,7 @@ export function useShortcuts(ui: UiState, searchRef: RefObject<HTMLInputElement 
  */
 export function useDragHandlers(store: BoardStore, ui: UiState, reorder: boolean, onMoved: (card: CardState, to: MoveTarget) => void) {
   const dragId = useRef<string | null>(null);
-  const { setDragOver, setDropCardId } = ui;
+  const { dragHover } = ui;
   const { cards, moveCard } = store;
   const onDragStart = useCallback((event: DragEvent, card: CardState) => {
     dragId.current = card.id;
@@ -161,15 +160,13 @@ export function useDragHandlers(store: BoardStore, ui: UiState, reorder: boolean
   }, []);
   const onDragEnd = useCallback(() => {
     dragId.current = null;
-    setDragOver(null);
-    setDropCardId(null);
-  }, [setDragOver, setDropCardId]);
+    dragHover.set({ over: null, dropCardId: null });
+  }, [dragHover]);
   const onDrop = useCallback((event: DragEvent, laneId: string, columnId: string) => {
     event.preventDefault();
     const id = dragId.current ?? event.dataTransfer.getData("text/plain");
     dragId.current = null;
-    setDragOver(null);
-    setDropCardId(null);
+    dragHover.set({ over: null, dropCardId: null });
     if (!id) return;
     const card = cards.find((candidate) => candidate.id === id);
     if (!card) return;
@@ -178,7 +175,7 @@ export function useDragHandlers(store: BoardStore, ui: UiState, reorder: boolean
     if (card.laneId === target && card.columnId === columnId) return;
     const to = { laneId: target, columnId };
     void moveCard(id, to).then((ok) => { if (ok) onMoved(card, to); });
-  }, [cards, moveCard, setDragOver, setDropCardId, onMoved]);
+  }, [cards, moveCard, dragHover, onMoved]);
   const cellHover = useCellHoverHandlers(ui);
   const cardLevel = useCardDropHandlers(dragId, store, ui, reorder, onMoved);
   return { onDragStart, onDragEnd, onDrop, ...cellHover, ...cardLevel };
@@ -188,17 +185,12 @@ export function useDragHandlers(store: BoardStore, ui: UiState, reorder: boolean
 // clear any card insertion marker (cards stop propagation, so this only
 // fires over cell background).
 function useCellHoverHandlers(ui: UiState) {
-  const { setDragOver, setDropCardId } = ui;
+  const { dragHover } = ui;
   const onDragOverCell = useCallback((event: DragEvent, laneId: string, columnId: string) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
-    setDragOver((current) =>
-      current && current.laneId === laneId && current.columnId === columnId
-        ? current
-        : { laneId, columnId },
-    );
-    setDropCardId((current) => (current === null ? current : null));
-  }, [setDragOver, setDropCardId]);
+    dragHover.set({ over: { laneId, columnId }, dropCardId: null });
+  }, [dragHover]);
   const onDragLeaveCell = useCallback(() => {
     // Design no-op: the next dragover repaints the highlighted cell.
   }, []);
@@ -231,7 +223,7 @@ function useCardDropHandlers(
   reorder: boolean,
   onMoved: (card: CardState, to: MoveTarget) => void,
 ) {
-  const { setDragOver, setDropCardId } = ui;
+  const { dragHover } = ui;
   const { moveCard } = store;
   const onCardOver = useCallback((event: DragEvent, card: CardState) => {
     event.preventDefault();
@@ -239,26 +231,20 @@ function useCardDropHandlers(
     event.dataTransfer.dropEffect = "move";
     const id = dragId.current;
     const next = reorder && id !== null && id !== card.id ? card.id : null; // no insertion mark on a sorted board
-    setDropCardId((current) => (current === next ? current : next));
     // stopPropagation keeps onDragOverCell from firing: refresh the cell
     // highlight from the hovered card so it never lags a cell behind.
-    setDragOver((current) =>
-      current && current.laneId === card.laneId && current.columnId === card.columnId
-        ? current
-        : { laneId: card.laneId, columnId: card.columnId },
-    );
-  }, [dragId, reorder, setDragOver, setDropCardId]);
+    dragHover.set({ over: { laneId: card.laneId, columnId: card.columnId }, dropCardId: next });
+  }, [dragId, reorder, dragHover]);
   const onCardDrop = useCallback((event: DragEvent, target: CardState) => {
     event.preventDefault();
     event.stopPropagation();
     const id = dragId.current ?? event.dataTransfer.getData("text/plain");
     dragId.current = null;
-    setDragOver(null);
-    setDropCardId(null);
+    dragHover.set({ over: null, dropCardId: null });
     if (!id || id === target.id) return;
     const move = cardDropMove(id, target, store, reorder);
     const dragged = store.cards.find((candidate) => candidate.id === id);
     if (move !== null) void moveCard(id, move).then((ok) => { if (ok && dragged !== undefined) onMoved(dragged, move); });
-  }, [dragId, moveCard, reorder, setDragOver, setDropCardId, store, onMoved]);
+  }, [dragId, moveCard, reorder, dragHover, store, onMoved]);
   return { onCardOver, onCardDrop };
 }

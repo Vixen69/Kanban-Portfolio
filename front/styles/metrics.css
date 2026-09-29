@@ -9,7 +9,7 @@
    - .bgraph / .bg-row / .bg-label / .bg-track / .bg-fill / .bg-ref / .bg-val
      are defined in modal.css (the card detail's budget graph) and reused
      verbatim here; only the positioning guard below is restated.
-   - .blk-pulse and @keyframes pulse come from cards.css.
+   - .blk-pulse comes from cards.css (a static dot since ADR 051).
 */
 
 /* ---------- Shell ---------- */

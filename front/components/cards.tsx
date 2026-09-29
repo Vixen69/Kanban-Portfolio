@@ -75,9 +75,8 @@ function domPillStyle(color: string): CSSProperties {
  * Failure modes: unknown domain/type ids degrade to a neutral accent and
  * no tag — the display never crashes after an admin topology edit.
  */
-function MiniCardBody(props: CardItemProps) {
-  const { card, config } = props;
-  const days = daysInColumn(card, new Date(props.now));
+function MiniCardBody(props: MiniCardProps) {
+  const { card, config, days } = props;
   const acc = cardAccent(card, config);
   const type = typeById(config)[card.typeId ?? ""] ?? null;
   const domain = domainById(config)[card.domain];
@@ -103,7 +102,7 @@ function MiniCardBody(props: CardItemProps) {
       {props.showCodes && card.codename !== null && <span className="mini-code">{card.codename}</span>}
       <span className="mini-name">{card.title}</span>
       <CritMark c={card.criticality} />
-      <DecisionMark card={card} config={config} now={props.now} />
+      <DecisionMark card={card} config={config} now={props.today} />
       <AbsentMark card={card} />
       <span className="card-fill" />
       <AgeText days={days} age={config.age} />
@@ -189,9 +188,22 @@ function FocusMeta({
 }
 
 /**
- * The radiator ticket, memoised (ADR 040): a filter keystroke or a now tick
- * re-renders only the tickets whose props changed — the card object keeps
- * its identity between folds, the callbacks are stable hooks.
+ * A radiator ticket's props (ADR 051): no sort nor lens — they only shape
+ * the expanded card — and the clock read at the day, not the minute: its
+ * age in days and the UTC start of today (the decision review is dated).
+ */
+export type MiniCardProps = Omit<CardItemProps, "sort" | "read" | "now"> & {
+  /** Days in the current column (daysInColumn). */
+  days: number;
+  /** Epoch ms of today's UTC midnight — the day the decision review reads. */
+  today: number;
+};
+
+/**
+ * The radiator ticket, memoised (ADR 040): a filter keystroke re-renders
+ * only the tickets whose props changed — the callbacks are stable hooks; it
+ * takes neither the sort nor the lens, and reads the clock at the day, so
+ * the minute tick and the lens no longer re-render the 154 bars (ADR 051).
  */
 export const MiniCard = memo(MiniCardBody);
 

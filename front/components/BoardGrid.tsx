@@ -33,6 +33,7 @@ import { BOARD_GUTTER, LANE_GUTTER, columnTemplate, rowTemplate, unifiedColumnId
 import { emptyTotals, type GroupTotals } from "../../core/totals.ts";
 import { scopeTitle } from "../rafLabels.ts";
 import { useBoardTotals, type BoardTotals } from "../useBoardTotals.ts";
+import type { DragHoverStore } from "../dragHover.ts";
 import type { BoardLens, RafRead } from "../useRafLens.ts";
 import { BOARD_TOTALS_KEY, COLUMN_TOTALS_KEY, LANE_TOTALS_KEY, useStoredFlag } from "../useUiPrefs.ts";
 import { Cell } from "./Cell.tsx";
@@ -100,8 +101,8 @@ export interface BoardGridProps {
   sort: CardSort;
   /** The métier lens (ADR 048): the métiers every reste à faire counts; while it narrows, the cards it filters out are in hiddenIds. */
   lens: BoardLens;
-  /** The cell a dragged card is currently over, or null. */
-  dragOver: { laneId: string; columnId: string } | null;
+  /** Where a dragged card hovers (the cell, the insertion target) — read by the cells alone. */
+  dragHover: DragHoverStore;
   onFocusColumn: (id: string) => void;
   onToggleLane: (id: string) => void;
   onToggleColumnCollapse: (id: string) => void;
@@ -114,13 +115,10 @@ export interface BoardGridProps {
   /** Card-level drag plumbing (insert-before reorder, ADR 019). */
   onCardOver: (e: DragEvent, card: CardState) => void;
   onCardDrop: (e: DragEvent, card: CardState) => void;
-  /** Id of the card currently marked as the insertion target, or null. */
-  dropCardId: string | null;
 }
 
 // The expanded cell of one lane-column pair, wired to the grid callbacks.
 function BoardCell({ lane, col, cards, props, read }: { lane: Lane; col: Column; cards: CardState[]; props: BoardGridProps; read: RafRead }) {
-  const over = props.dragOver;
   return (
     <Cell
       laneId={lane.id}
@@ -134,7 +132,7 @@ function BoardCell({ lane, col, cards, props, read }: { lane: Lane; col: Column;
       showTypes={props.showTypes}
       sort={props.sort}
       read={read}
-      dragOver={over !== null && over.laneId === lane.id && over.columnId === col.id}
+      dragHover={props.dragHover}
       gateDef={gateDefOf(props.config, col)}
       onOpen={props.onOpen}
       onDragStart={props.onDragStart}
@@ -144,7 +142,6 @@ function BoardCell({ lane, col, cards, props, read }: { lane: Lane; col: Column;
       onDragLeaveCell={props.onDragLeaveCell}
       onCardOver={props.onCardOver}
       onCardDrop={props.onCardDrop}
-      dropCardId={props.dropCardId}
     />
   );
 }
