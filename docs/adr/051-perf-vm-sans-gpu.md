@@ -67,6 +67,15 @@ version d'avant l'ADR 048 (dc781df) a été mesurée de la même façon.
      désormais (13) — la marque de dépôt ne traîne plus derrière la souris
      sur un processeur lent.
 
+6. **Frappe de recherche et chargement** (fin de l'audit, mêmes pixels —
+   résultats identiques vérifiés sur quatre recherches) : la requête est
+   repliée une fois par frappe et chaque carte une fois pour sa vie
+   (`core/text-search.ts`) ; l'ensemble des cartes masquées garde son
+   identité quand il ne change pas, et la grille est mémoïsée ; les deux
+   polices sont préchargées (`front/index.html`) — sans quoi elles
+   n'étaient demandées qu'après la première mise en page du tableau,
+   qui recommençait à leur arrivée (70 à 100 ms à chaque chargement).
+
 ## Conséquences
 
 - `front/styles/board.css`, `cards.css`, `modal.css`, `sidebar.css`,

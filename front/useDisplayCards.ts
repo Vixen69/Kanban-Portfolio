@@ -5,7 +5,7 @@
 // never an event, the fold keeps the original references). The nature is
 // derived from the (remapped) canal (ADR 018: nature is positional).
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { BoardConfig, CardState } from "../core/types.ts";
 import { portfolioStats } from "../core/board.ts";
 import type { CardSort } from "../core/card-sort.ts";
@@ -41,8 +41,8 @@ function withLens(cards: CardState[], filterHidden: Set<string>, narrowing: Read
 export function useDerived(
   cards: CardState[], config: BoardConfig, filters: Filters, now: Date, draw: ResourceDraw, narrowing: ReadonlySet<string> | null,
 ) {
-  const filterHidden = useMemo(() => hiddenCardIds(cards, filters.state, draw), [cards, filters.state, draw]);
-  const hidden = useMemo(() => withLens(cards, filterHidden, narrowing), [cards, filterHidden, narrowing]);
+  const filterHidden = useStableIds(useMemo(() => hiddenCardIds(cards, filters.state, draw), [cards, filters.state, draw]));
+  const hidden = useStableIds(useMemo(() => withLens(cards, filterHidden, narrowing), [cards, filterHidden, narrowing]));
   const view = useMemo(() => viewCounts(cards, hidden, config, now), [cards, hidden, config, now]);
   const all = useMemo(() => portfolioCounts(cards, config, now), [cards, config, now]);
   const stats = useMemo(() => portfolioStats(cards), [cards]);
@@ -104,4 +104,13 @@ export function useBoardCards(
   const cards = useSortedCards(active, sort, lens.counted);
   const archivedCards = useMemo(() => allCards.filter((card) => card.archived), [allCards]);
   return { cards, archivedCards };
+}
+
+// The same Set while its members do not change (ADR 051): a keystroke that
+// hides no other card re-renders nothing below — every reader calls .has().
+function useStableIds(next: Set<string>): Set<string> {
+  const kept = useRef(next);
+  const previous = kept.current;
+  if (previous !== next && (previous.size !== next.size || [...next].some((id) => !previous.has(id)))) kept.current = next;
+  return kept.current;
 }

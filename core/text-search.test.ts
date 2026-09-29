@@ -21,3 +21,18 @@ test("cardMatchesQuery: typed without accents finds the accented title or code",
   assert.equal(cardMatchesQuery(card, "infra"), false);
   assert.equal(cardMatchesQuery({ title: "Portail d’accès", codename: null }, "d'acces"), true, "typographic apostrophe");
 });
+
+test("cardMatchesQuery: one card object, several queries; an edited card is a new object, read anew (ADR 051)", () => {
+  const card = { title: "Refonte gestion clés", codename: "PX123" };
+  assert.equal(cardMatchesQuery(card, "cles"), true);
+  assert.equal(cardMatchesQuery(card, "px1"), true);
+  assert.equal(cardMatchesQuery(card, "sap"), false);
+  const edited = { ...card, title: "Migration SAP" };
+  assert.equal(cardMatchesQuery(edited, "sap"), true);
+  assert.equal(cardMatchesQuery(card, "sap"), false);
+});
+
+test("cardMatchesQuery: a query never matches across the title and the code", () => {
+  assert.equal(cardMatchesQuery({ title: "Portail", codename: "PX9" }, "portail px"), false);
+  assert.equal(cardMatchesQuery({ title: "Portail PX", codename: null }, "portail px"), true);
+});

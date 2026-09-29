@@ -20,13 +20,40 @@ export function foldText(text: string): string {
     .trim();
 }
 
+// A keystroke folds the query once, not once per card; a card is folded
+// once for its lifetime — the fold builds new card objects, never mutates
+// them (ADR 051: typing in front of the room, on a CPU without GPU).
+let lastQuery = "";
+let lastNeedle = "";
+const haystacks = new WeakMap<object, string>();
+
+function needleOf(query: string): string {
+  if (query !== lastQuery) {
+    lastQuery = query;
+    lastNeedle = foldText(query);
+  }
+  return lastNeedle;
+}
+
+// Title and code folded, joined by a line break a folded needle never holds
+// (foldText turns every whitespace into one space): no match across both.
+function haystackOf(card: { title: string; codename: string | null }): string {
+  let haystack = haystacks.get(card);
+  if (haystack === undefined) {
+    haystack = `${foldText(card.title)}\n${foldText(card.codename ?? "")}`;
+    haystacks.set(card, haystack);
+  }
+  return haystack;
+}
+
 /**
  * True when a card's title or code projet contains the query, both folded.
- * Inputs: the card (title, codename), the query as typed. Output: the
- * flag — an empty or blank query matches every card. Failure: none.
+ * Inputs: the card (title, codename — read once per card object), the
+ * query as typed. Output: the flag — an empty or blank query matches every
+ * card. Failure: none.
  */
 export function cardMatchesQuery(card: { title: string; codename: string | null }, query: string): boolean {
-  const needle = foldText(query);
+  const needle = needleOf(query);
   if (needle === "") return true;
-  return foldText(card.title).includes(needle) || foldText(card.codename ?? "").includes(needle);
+  return haystackOf(card).includes(needle);
 }
