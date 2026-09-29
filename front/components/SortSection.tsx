@@ -33,7 +33,7 @@ function KeyRows({ sorting, panel }: SortSectionProps) {
         </label>
       ))}
       <div className="sort-note">
-        Reste à faire compté sur : {panel.scope ?? "tous les métiers"} (Σ de la gouttière du tableau).
+        Reste à faire compté sur : {panel.scope ?? "tous les métiers"} (métiers cochés dans la colonne des totaux, Σ ▾ en haut à gauche).
         {panel.blind > 0 && ` ${panel.blind} carte(s) affichée(s) sans ventilation par métier.`}
       </div>
     </>

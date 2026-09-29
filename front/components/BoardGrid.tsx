@@ -18,8 +18,10 @@
 // totals sit in a gutter left of Demandes, the canals and their gutter
 // (with the per-canal Σ) start after.
 //
-// ADR 048: the board gutter has its own Σ (« tableau », BoardGutter.tsx)
-// and holds the métier lens; every reste à faire of the grid reads it.
+// ADR 048: the board gutter has its own Σ (« tableau ») and holds the
+// métier lens; every reste à faire of the grid reads it. Its Σ sits in the
+// top-left corner under the header-totals one, pointing down to the
+// gutter it unfolds (author, 2026-09-29) — not inside the gutter.
 
 import { useMemo } from "react";
 import type { DragEvent } from "react";
@@ -196,6 +198,20 @@ function headProps(props: BoardGridProps, totals: BoardTotals, totalsOpen: boole
     onFocus: props.onFocusColumn, onToggleCollapse: props.onToggleColumnCollapse };
 }
 
+// The top-left corner: the header-totals Σ, then under it the Σ of the
+// board gutter pointing down to it (ADR 048) — or, on a board without
+// canal-less columns, the canal totals Σ.
+function GridCorner({ columns, second, secondWhat }: {
+  columns: [boolean, () => void]; second: [boolean, () => void]; secondWhat: "tableau" | "canal";
+}) {
+  return (
+    <div className="corner grid-corner">
+      <TotalsToggle open={columns[0]} onToggle={columns[1]} what="colonne" />
+      <TotalsToggle open={second[0]} onToggle={second[1]} what={secondWhat} />
+    </div>
+  );
+}
+
 /**
  * The whole board: one CSS grid of column headers, gutters, lane labels
  * and cells. Focus widens a column (2.6fr), collapse shrinks a column to
@@ -228,10 +244,8 @@ export function BoardGrid(props: BoardGridProps) {
         gridTemplateRows: rowTemplate(config.lanes, props.collapsedLanes),
       }}
     >
-      <div className="corner">
-        <TotalsToggle open={columnsOpen} onToggle={toggleColumns} what="colonne" />
-        {unified.size === 0 && <TotalsToggle open={lanesOpen} onToggle={toggleLanes} what="canal" />}
-      </div>
+      <GridCorner columns={[columnsOpen, toggleColumns]} second={unified.size > 0 ? [boardOpen, toggleBoard] : [lanesOpen, toggleLanes]}
+        secondWhat={unified.size > 0 ? "tableau" : "canal"} />
       <ColumnHeads {...heads} columns={unifiedCols} />
       {unified.size > 0 && <LaneCorner open={lanesOpen} onToggle={toggleLanes} />}
       <ColumnHeads {...heads} columns={laneCols} />

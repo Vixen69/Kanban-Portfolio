@@ -84,3 +84,9 @@ la vérité et la piste d'audit (§1, ADR 016).
   la remplace.
 - Le `pg_dump` garde sa place : c'est la sauvegarde hors de l'outil (VM
   perdue, base corrompue). L'instantané est le garde-fou du geste métier.
+
+## Amendement (ADR 049, 2026-09-29)
+
+L'écran des instantanés n'est plus un onglet de la configuration du
+tableau : engrenage › « Instantanés » l'ouvre seul, sous son propre titre.
+Le reste est inchangé.

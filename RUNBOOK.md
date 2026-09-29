@@ -117,7 +117,7 @@ dans le conteneur `db`.
 > carte déplacée à la main, qui garde sa colonne et apparaît dans les
 > divergences du rapport.
 
-> **Instantanés** (ADR 042) : le filet DANS l'outil. ⚙ › onglet
+> **Instantanés** (ADR 042) : le filet DANS l'outil. ⚙ ›
 > **Instantanés** › un libellé (le pourquoi) › « Prendre un instantané ».
 > Un instantané est pris tout seul avant chaque chargement d'import et
 > avant chaque bascule d'année (« avant chargement 2026 », « avant bascule
@@ -143,11 +143,11 @@ node sync/import.ts imports --charger
 > imports-2027 --charger --exercice 2027`. Un import ne lit et ne touche
 > que les cartes de SON exercice (un même code PE y est une autre carte,
 > avec son budget) ; une année close est refusée, de même qu'un lot de
-> fichiers sans projet sur l'année demandée. Dans l'outil : ⚙ › onglet
-> **Importer** (ou « ⋯ » › Importer), le sélecteur « Exercice ».
+> fichiers sans projet sur l'année demandée. Dans l'outil : ⚙ ›
+> **Importer un export PPM**, le sélecteur « Exercice ».
 
 > **Configuration appliquée et modèle versionné** (ADR 038) : une
-> configuration appliquée depuis ⚙ n'est gardée que tant que le
+> configuration appliquée depuis ⚙ › Configuration du tableau n'est gardée que tant que le
 > `config/board.json` du dépôt n'a pas changé. Après un `git pull` qui le
 > modifie, le middle l'écarte au démarrage (elle reste dans
 > `config-history.jsonl`) et sert le fichier versionné. Si un réglage fait
@@ -155,7 +155,7 @@ node sync/import.ts imports --charger
 > dans `exercise.json` et survit à tout.
 
 > **Changer d'année en cours** (ADR 035/038) : importer d'abord l'année
-> suivante (sélecteur « Exercice » de l'importeur), puis ⚙ › onglet
+> suivante (sélecteur « Exercice » de l'importeur), puis ⚙ ›
 > **Exercice** › cocher la confirmation › « Passer à l'exercice N+1 ». En
 > un lot : les cartes sans année sont épinglées sur l'année qui se clôt,
 > ses cartes actives sont archivées (son tableau reste lisible, clos), les

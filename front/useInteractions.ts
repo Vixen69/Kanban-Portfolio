@@ -10,7 +10,7 @@ import { UNIFIED_LANE, unifiedColumnIds } from "../core/layout.ts";
 import type { MoveTarget } from "./api.ts";
 import type { BoardStore } from "./useBoardStore.ts";
 
-/** The tabs of the configuration panel (ADR 046): the ⋯ menu opens it on « Importer ». */
+/** What the admin shell opens on: a configuration tab (wip, categories, champs), or the import / exercise / snapshots gesture shown alone from the gear menu (ADR 046/049). */
 export type AdminTab = "wip" | "categories" | "champs" | "importer" | "exercice" | "instantanes";
 
 /**
@@ -31,7 +31,7 @@ export function useUiState() {
   const [admin, setAdmin] = useState(false);
   const [adminTab, setAdminTab] = useState<AdminTab>("wip");
   const [metrics, setMetrics] = useState(false);
-  // Opens the configuration panel on a tab (the ⋯ menu's « Importer » lands on the import, ADR 046).
+  // Opens the admin shell on a configuration tab, or on one gesture shown alone (gear menu, ADR 049).
   const openAdmin = useCallback((tab: AdminTab = "wip") => { setAdminTab(tab); setAdmin(true); }, []);
   const [showCodes, setShowCodes] = useState(false);
   const [showTypes, setShowTypes] = useState(true);

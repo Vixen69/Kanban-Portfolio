@@ -344,7 +344,8 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
   (Qualification, Études/Cadrage, Actifs — top rule), non engagé
   (Demandes, Prêts, Pause), hors calcul (Terminé and after; left out of
   the canal RAF). The board gutter has its own Σ (third localStorage
-  flag): RAF engagé in large, non engagé, hors calcul, legend, blind
+  flag; in the top-left corner under the header-totals Σ, pointing down —
+  ADR 049): RAF engagé in large, non engagé, hors calcul, legend, blind
   note, k€ line, and the métier lens (checkboxes, « tout · rien ») — a
   SESSION state, never written, not cleared by Escape, header chip
   « RAF : … ✕ ». Counting at least one métier, the lens FILTERS like any
@@ -365,9 +366,10 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
   preselected exercise; away from the current year a chip says
   « Préparation · horloge gelée » or « Exercice clos »; a closed year
   shows its archived cards too (they were archived at the switch, ADR 038).
-  No « NMO » label. On the right: a labelled « Analytics » button and a
-  « ⋯ » menu (Archives with count, Importer, Configuration du tableau —
-  ADR 038).
+  No « NMO » label; the title never wraps — the chips shrink first. On
+  the right: ONE gear button (ADR 049, author 2026-09-29) whose menu holds,
+  in three groups, Analytics and Archives (with count); Importer,
+  Exercice, Instantanés; Configuration du tableau.
 - Sidebar: search (title + codename), **« Trier les cartes »** (ADR 044,
   author 2026-09-21 — the arbitration session looks at what costs the
   scarce métiers, all domains mixed): folded by default, one key at a time
@@ -404,7 +406,7 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
   (collapsible, event-backed, incl. block/unblock lines), full edit
   (no Nature select, no Bloqué toggle), archive (« Archiver »), delete
   (as `deleted` event).
-- Archives (header icon + count badge): searchable list, « Désarchiver »,
+- Archives (gear menu › Archives, the count on the menu item — ADR 049): searchable list, « Désarchiver »,
   open-the-fiche (ADR 017).
 - QuickAdd (« + Sujet », touche N): always enters the first column; the
   canal confers the nature. When the intake column has no canal (ADR 039)
@@ -416,13 +418,13 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
   Structure pane — columns, canals, gates, reviews, domains, types, aliases
   and sub-domains are the versioned model's), **Catégories** (rename and
   recolour domains, types, natures, criticalities — never add or remove),
-  **Champs de carte**, **Importer** (the import pane, also reached from the
-  ⋯ menu; the panel widens there; the draft footer shows only on the three
-  editing tabs), plus the **Exercice** tab (ADR 038): the year switch — pins
+  **Champs de carte** — the only three tabs (ADR 049); **Importer** (the
+  panel widens there), **Exercice** and **Instantanés** open ON THEIR OWN
+  from the gear menu, under their own title. The **Exercice** panel (ADR 038): the year switch — pins
   the unstamped cards on the closing year, archives its active cards,
   activates the next year's (clock starts), then records the new current
   exercise; next year only, explicit confirmation. The **Instantanés**
-  tab (ADR 042): « Prendre un instantané » with a mandatory label, the
+  panel (ADR 042): « Prendre un instantané » with a mandatory label, the
   list (date, label, cards, exercise, log position, applied config or
   versioned model), « Restaurer… » then an explicit confirmation — the
   panel closes, config, board and capacity reload; the fiche's Historique

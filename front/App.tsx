@@ -181,7 +181,8 @@ function Screen({ ctx }: { ctx: Ctx }) {
         lensTitle={scopeTitle(ctx.lens.scope, config)} onClearLens={ctx.lens.all}
         onToggleSidebar={() => ui.setSidebar((open) => !open)}
         onMetrics={() => ui.setMetrics(true)} onAdmin={() => ui.openAdmin("wip")}
-        onImport={() => ui.openAdmin("importer")}
+        onImport={() => ui.openAdmin("importer")} onExercise={() => ui.openAdmin("exercice")}
+        onSnapshots={() => ui.openAdmin("instantanes")}
         onArchive={() => ui.setArchive(true)} archivedCount={ctx.archivedCards.length}
         onAdd={() => ui.setAdding(true)} />
       <Sidebar open={ui.sidebar} config={config} search={filters.state.search} draw={ctx.draw}

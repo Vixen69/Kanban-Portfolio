@@ -94,3 +94,9 @@ attend.
   fonction.
 - En séance, Pause est dépliée au départ : une colonne repliée ne reçoit
   pas de dépôt (son RAF reste lisible dans son infobulle).
+
+## Amendement (ADR 049, 2026-09-29)
+
+Le Σ de la colonne des totaux du tableau quitte la colonne : il est dans
+le coin en haut à gauche, sous celui des en-têtes, flèche vers le bas.
+La colonne passe à trois tailles de police (11, 10 et 22 px).

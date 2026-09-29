@@ -60,3 +60,11 @@ pas encore (ADR 035, séance C).
 - RUNBOOK : la règle du modèle versionné (ré-appliquer depuis ⚙ si une
   configuration écartée doit revenir) et la procédure de bascule.
 - Toujours ouvert (§12) : verrouiller ou non l'édition d'une année close.
+
+## Amendement (ADR 049, 2026-09-29)
+
+Le bouton « Analytics » et le menu « ⋯ » cèdent la place à un seul bouton
+engrenage : Analytics, Archives (avec leur nombre) ; Importer un export
+PPM, Exercice, Instantanés ; Configuration du tableau. La bascule d'année
+n'est plus un onglet de la configuration : « Exercice » s'ouvre seul depuis
+l'engrenage, sous son propre titre.

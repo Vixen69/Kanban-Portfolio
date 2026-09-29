@@ -1,7 +1,8 @@
 // The board gutter, left of Demandes (ADR 039, ADR 048): the whole board
 // shown, read for the arbitration session. Folded, a vertical strip —
-// count, estimé k€, RAF engagé — a click unfolds it. Unfolded (Σ tableau,
-// its own toggle, remembered), the read-out the room looks at: the caption
+// count, estimé k€, RAF engagé. Unfolded by its Σ in the grid's top-left
+// corner (author, 2026-09-29: the button is not in the column), the
+// read-out the room looks at: the caption
 // and what bounds the figures (filters, exercise, métiers), the RAF engagé
 // in large, the non-engaged and out-of-count RAF, the legend of the
 // classes, the « sans ventilation » note, a k€ line, then the métier list
@@ -10,13 +11,12 @@
 // scrolls: nothing above it changes height while métiers are checked. No
 // tooltip on the unfolded gutter — it is read on the projector.
 
-import type { CSSProperties, KeyboardEvent } from "react";
+import type { CSSProperties } from "react";
 import type { BoardConfig } from "../../core/types.ts";
 import { fmtUnit } from "../format.ts";
 import { blindNote, classLegend, scopeLabel, scopeTitle } from "../rafLabels.ts";
 import type { BoardTotals } from "../useBoardTotals.ts";
 import type { BoardLens } from "../useRafLens.ts";
-import { TotalsToggle } from "./BoardTotals.tsx";
 import { GutterMetiers } from "./GutterMetiers.tsx";
 
 /** Props of the board gutter. */
@@ -44,20 +44,13 @@ function rafText(value: number, lens: BoardLens): string {
   return lens.counted.size === 0 ? "—" : fmtUnit(value);
 }
 
-// Folded: the vertical strip, one click (or Enter / Space) unfolds it —
-// it is the only way to reach the métier lens.
+// Folded: the vertical strip. The corner's Σ unfolds it; a click on the
+// strip does too, as a shortcut (the button stays the keyboard's way).
 function FoldedGutter({ props }: { props: BoardGutterProps }) {
   const { totals, lens } = props;
-  const onKey = (event: KeyboardEvent) => {
-    if (event.key !== "Enter" && event.key !== " ") return;
-    event.preventDefault();
-    props.onToggle();
-  };
   return (
     <div className="lane-label board-gutter" style={spanStyle(props.rows)} onClick={props.onToggle}
-      role="button" tabIndex={0} onKeyDown={onKey}
-      title={`Déplier la gouttière du tableau · ${scopeTitle(lens.scope, props.config)}`}>
-      <span className="collapse-caret">▸</span>
+      title={`Déplier la colonne des totaux (Σ ▾ en haut à gauche) · ${scopeTitle(lens.scope, props.config)}`}>
       <span className="lane-name">Projets · {totals.board.count}</span>
       <span className={"lane-totals" + (lens.active ? " lens-on" : "")}>
         <b>{fmtUnit(totals.board.estimated)}</b>k€ · RAF engagé <b className="raf">{rafText(totals.split.engaged, lens)}</b>j.h
@@ -76,7 +69,6 @@ function GutterCaption({ props }: { props: BoardGutterProps }) {
   return (
     <>
       <div className="gut-caption">
-        <TotalsToggle open onToggle={props.onToggle} what="tableau" />
         <span>Projets · {totals.board.count}</span>
         {props.narrowed && <span className="gut-flag">filtré {totals.board.count}/{props.all}</span>}
         {lens.status !== "current" && (
@@ -99,20 +91,30 @@ function GutterHeadline({ props }: { props: BoardGutterProps }) {
   );
 }
 
-// The other classes, the legend, the blind note, the k€ line.
+// One labelled figure of the gutter: label left, value and unit right.
+function GutterLine({ label, value, unit, faded }: { label: string; value: string; unit: string; faded?: boolean }) {
+  return <div className={"gut-line" + (faded === true ? " faded" : "")}><span>{label}</span><b>{value}<i>{unit}</i></b></div>;
+}
+
+// The other classes, the legend (the class word set off), the blind
+// note, then the board's money on the same label/value lines.
 function GutterFigures({ props }: { props: BoardGutterProps }) {
   const { totals, lens } = props;
   const note = blindNote(totals.split);
   return (
     <>
-      <div className="gut-line"><span>RAF non engagé</span><b>{rafText(totals.split.idle, lens)}<i>j.h</i></b></div>
-      <div className="gut-line faded"><span>RAF hors calcul</span><b>{rafText(totals.split.excluded, lens)}<i>j.h</i></b></div>
+      <GutterLine label="RAF non engagé" value={rafText(totals.split.idle, lens)} unit="j.h" />
+      <GutterLine label="RAF hors calcul" value={rafText(totals.split.excluded, lens)} unit="j.h" faded />
       <div className="gut-legend">
-        {classLegend(props.config).map((line) => <div key={line.cls}>{line.text}</div>)}
+        {classLegend(props.config).map((line) => {
+          const [word, names] = line.text.split(" : ");
+          return <div key={line.cls}><b>{word}</b> : {names}</div>;
+        })}
       </div>
       {note !== null && <div className="gut-note">{note}</div>}
       <div className="gut-money">
-        Estimé <b>{fmtUnit(totals.board.estimated)}</b> k€ · Budget engagé <b>{fmtUnit(totals.board.engaged)}</b> k€
+        <GutterLine label="Estimé" value={fmtUnit(totals.board.estimated)} unit="k€" />
+        <GutterLine label="Budget engagé" value={fmtUnit(totals.board.engaged)} unit="k€" />
       </div>
     </>
   );

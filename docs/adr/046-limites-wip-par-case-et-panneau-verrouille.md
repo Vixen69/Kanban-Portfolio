@@ -60,3 +60,10 @@ l'onglet Structure ne tenait d'ailleurs plus.
   portait `wip` par colonne n'est plus lue — elle est dans l'historique.
 - Le champ « jalon » ajouté à Structure par l'ADR 045 disparaît avec
   l'onglet : les jalons se règlent dans le modèle versionné seulement.
+
+## Amendement (ADR 049, 2026-09-29)
+
+La configuration du tableau n'a plus que trois onglets (Limites WIP,
+Catégories, Champs de carte), avec son pied « Réinitialiser · Annuler ·
+Appliquer ». L'import, l'exercice et les instantanés s'ouvrent chacun seul
+depuis l'engrenage, sous leur propre titre.

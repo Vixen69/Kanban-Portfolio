@@ -12,7 +12,6 @@
 import type { LensRow } from "../../core/raf.ts";
 import { fmtUnit } from "../format.ts";
 import type { BoardLens } from "../useRafLens.ts";
-import { CatHead } from "./sidebarParts.tsx";
 
 // One métier: its checkbox, its name, its engaged RAF.
 function MetierRow({ row, lens }: { row: LensRow; lens: BoardLens }) {
@@ -26,6 +25,25 @@ function MetierRow({ row, lens }: { row: LensRow; lens: BoardLens }) {
   );
 }
 
+// The list's head: its name and the « tout · rien » links, then what the
+// figures are and what a check does — in the gutter's own type, not the
+// sidebar's uppercase micro-labels.
+function MetiersHead({ lens }: { lens: BoardLens }) {
+  return (
+    <>
+      <div className="gm-head">
+        <span className="gm-title">Métiers</span>
+        <span className="gm-acts">
+          <button disabled={!lens.active} onClick={lens.all} title="Compter tous les métiers">tout</button>
+          <span aria-hidden="true">·</span>
+          <button disabled={lens.counted.size === 0} onClick={lens.none} title="Ne compter aucun métier">rien</button>
+        </span>
+      </div>
+      <div className="gm-hint">RAF engagé en j.h · cocher pour filtrer</div>
+    </>
+  );
+}
+
 /**
  * The métier list with its « tout · rien » head; only the list scrolls.
  * Inputs: the métier rows (core lensRows), the board lens.
@@ -34,8 +52,7 @@ function MetierRow({ row, lens }: { row: LensRow; lens: BoardLens }) {
 export function GutterMetiers({ rows, lens }: { rows: LensRow[]; lens: BoardLens }) {
   return (
     <div className={"gm" + (lens.active ? " active" : "")}>
-      <CatHead label="Métiers · RAF engagé j.h" allOn={!lens.active} noneOn={lens.counted.size === 0}
-        onAll={lens.all} onNone={lens.none} />
+      <MetiersHead lens={lens} />
       <div className="gm-list">
         {rows.map((row) => <MetierRow key={row.profile.id} row={row} lens={lens} />)}
       </div>

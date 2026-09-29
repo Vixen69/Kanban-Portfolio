@@ -10,7 +10,7 @@ import type { SnapshotSummary } from "../../core/snapshot.ts";
 import { messageOf } from "../api.ts";
 import { fetchSnapshots } from "../apiSnapshots.ts";
 
-/** Props of the snapshots tab. */
+/** Props of the snapshots pane. */
 export interface SnapshotsTabProps {
   /** Takes a snapshot; resolves null on success, the French message otherwise. */
   onTake: (label: string) => Promise<string | null>;
@@ -114,8 +114,8 @@ function SnapshotList({ list, error, armed, busy, onArm, onRestore }: ListProps)
 }
 
 /**
- * The « Instantanés » tab of the admin panel.
- * Inputs: SnapshotsTabProps. Output: the tab DOM. Failure modes: none — a
+ * The « Instantanés » pane, opened alone from the gear menu (ADR 049).
+ * Inputs: SnapshotsTabProps. Output: the pane DOM. Failure modes: none — a
  * refused take or restore shows through the panel's error line; an
  * unreachable list shows its message in place.
  */

@@ -12,12 +12,19 @@
 .board-area { grid-area: board; position: relative; overflow: hidden; }
 .board { height: 100%; width: 100%; display: grid; gap: 1px; background: var(--bd); transition: grid-template-columns .22s ease, grid-template-rows .2s ease; }
 .corner { background: var(--bg-page); display: flex; flex-direction: column; align-items: stretch; justify-content: center; gap: 3px; padding: 3px; }
+/* Le coin du tableau (ADR 049) : deux Σ empilés, à leur largeur, calés à gauche. */
+.grid-corner { align-items: flex-start; padding: 3px 4px; }
+.grid-corner .totals-toggle { min-width: 37px; text-align: center; }
+
 /* Gouttière des totaux du tableau, à gauche de Demandes (ADR 039) : repliée,
    la même étiquette verticale que les canaux ; ses règles sont dans lens.css
    (ADR 048 : son propre Σ, un clic la déplie). */
 
 .totals-toggle { background: none; border: 1px solid var(--bd-sub); border-radius: 4px; color: var(--tx-3); cursor: pointer; font-size: 9px; font-family: inherit; padding: 2px 6px; }
 .totals-toggle:hover { color: var(--accent); border-color: var(--accent); }
+/* Σ de la colonne des totaux du tableau (ADR 048) : sous celui des en-têtes, flèche vers le bas. */
+.totals-toggle.on { color: var(--accent); border-color: var(--accent); background: #eef2fb; }
+
 
 .col-head { background: var(--bg-page); padding: 5px 9px; cursor: pointer; display: flex; flex-direction: column; gap: 2px; justify-content: center; overflow: hidden; }
 .col-head:hover { background: #e7ebf2; }

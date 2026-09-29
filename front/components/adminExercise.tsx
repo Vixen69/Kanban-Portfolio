@@ -1,5 +1,5 @@
 // « Changer d'année en cours » (ADR 035/038, author 2026-09-16: « l'année
-// dernière est archivée, on passe d'année »). The tab says what the switch
+// dernière est archivée, on passe d'année »). The pane says what the switch
 // will do on THIS board, asks for an explicit confirmation, then posts it;
 // the server writes the events in one batch and records the new current
 // exercise. Nothing is deleted: every step is an event in the Historique.
@@ -8,7 +8,7 @@ import { useState } from "react";
 import type { BoardConfig, CardState } from "../../core/types.ts";
 import { exerciseOf } from "../../core/exercise.ts";
 
-/** Props of the exercise tab. */
+/** Props of the exercise pane. */
 export interface ExerciseTabProps {
   config: BoardConfig;
   /** Every folded card (archived included) — the counts the switch announces. */
@@ -18,8 +18,8 @@ export interface ExerciseTabProps {
 }
 
 /**
- * The « Exercice » tab of the admin panel.
- * Inputs: ExerciseTabProps. Output: the tab DOM. Failure modes: none — a
+ * The « Exercice » pane, opened alone from the gear menu (ADR 049).
+ * Inputs: ExerciseTabProps. Output: the pane DOM. Failure modes: none — a
  * refused switch shows its message through the panel's error line.
  */
 export function ExerciseTab({ config, cards, onSwitch }: ExerciseTabProps) {

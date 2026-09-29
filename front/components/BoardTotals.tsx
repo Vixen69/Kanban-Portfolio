@@ -178,15 +178,23 @@ export function LaneTotals({ totals, rafTotals, config, open, laneName, read }: 
 /**
  * One Σ toggle: the per-column totals (grid corner, top left), the
  * per-canal totals (the lane gutter's head, ADR 039), or the board gutter
- * (ADR 048), each remembered across reloads.
+ * (ADR 048 — in the corner under the column one, its arrow pointing down
+ * to the gutter below, up once unfolded), each remembered across reloads.
  * Inputs: the open flag, its toggle, what it unfolds.
  * Output: the button. Failure modes: none.
  */
 export function TotalsToggle({ open, onToggle, what }: { open: boolean; onToggle: () => void; what: "colonne" | "canal" | "tableau" }) {
   const verb = open ? "Replier" : "Déplier";
-  const title = what === "tableau" ? `${verb} la gouttière du tableau` : `${verb} les totaux par ${what}`;
+  if (what === "tableau") {
+    return (
+      <button className={"totals-toggle" + (open ? " on" : "")} onClick={onToggle}
+        title={`${verb} la colonne des totaux du tableau et des métiers`} aria-expanded={open}>
+        Σ {open ? "▴" : "▾"}
+      </button>
+    );
+  }
   return (
-    <button className="totals-toggle" onClick={onToggle} title={title}>
+    <button className="totals-toggle" onClick={onToggle} title={`${verb} les totaux par ${what}`} aria-expanded={open}>
       {open ? "▾" : "▸"} Σ
     </button>
   );

@@ -34,11 +34,15 @@ export interface HeaderProps {
   onMetrics: () => void;
   /** Opens the archives overlay (design v11). */
   onArchive: () => void;
-  /** Number of archived subjects — the badge hides at zero. */
+  /** Number of archived subjects — shown on the Archives item when non-zero. */
   archivedCount: number;
   onAdmin: () => void;
-  /** Opens the import overlay (ADR 027). */
+  /** Opens the import panel (ADR 027). */
   onImport: () => void;
+  /** Opens the exercise switch panel (ADR 038). */
+  onExercise: () => void;
+  /** Opens the snapshots panel (ADR 042). */
+  onSnapshots: () => void;
   onAdd: () => void;
   /** The exercise shown and the selector's data (ADR 035). */
   exercise: YearPickerProps;
@@ -74,13 +78,13 @@ function HeaderChips({ props }: { props: HeaderProps }) {
         </button>
       )}
       {props.sortLabel !== null && (
-        <button className="focus-chip" onClick={props.onClearSort} title="Revenir à l’ordre du tableau">
-          {props.sortLabel} ✕
+        <button className="focus-chip sort-chip" onClick={props.onClearSort} title={`${props.sortLabel} · revenir à l’ordre du tableau`}>
+          <span className="chip-text">{props.sortLabel}</span> ✕
         </button>
       )}
       {props.lensLabel !== null && (
         <button className="focus-chip lens-chip" onClick={props.onClearLens} title={`${props.lensTitle} · revenir à tous les métiers`}>
-          <span className="lens-chip-text">{props.lensLabel}</span> ✕
+          <span className="chip-text">{props.lensLabel}</span> ✕
         </button>
       )}
     </>
@@ -88,10 +92,11 @@ function HeaderChips({ props }: { props: HeaderProps }) {
 }
 
 /**
- * App header: sidebar toggle, title, the exercise selector (ADR 035), the
- * chips of what narrows the board (filters, focus, sort, métier lens),
- * subject and blocked counts, the domain legend, the « Analytics » button,
- * the « ⋯ » menu (archives, import, admin) and the "+ Sujet" action.
+ * App header: sidebar toggle, title (one line, never wrapped), the
+ * exercise selector (ADR 035), the chips of what narrows the board
+ * (filters, focus, sort, métier lens — they shrink first), subject and
+ * blocked counts, the domain legend, the gear settings menu (analytics,
+ * archives, import, exercise, snapshots, configuration) and "+ Sujet".
  * Inputs: HeaderProps (config, counts, chip state, callbacks).
  * Output: the header element. Failure: none.
  */
@@ -111,8 +116,8 @@ export function Header(props: HeaderProps) {
           <span className="blk-dot-static" /> <b>{stats.blocked}</b> bloqués
         </div>
         <Legend config={props.config} />
-        <button className="hd-btn" onClick={props.onMetrics} title="Analytics : capacité, flux">Analytics</button>
-        <HeaderMenu archivedCount={props.archivedCount} onArchive={props.onArchive} onImport={props.onImport} onAdmin={props.onAdmin} />
+        <HeaderMenu archivedCount={props.archivedCount} onMetrics={props.onMetrics} onArchive={props.onArchive}
+          onImport={props.onImport} onExercise={props.onExercise} onSnapshots={props.onSnapshots} onAdmin={props.onAdmin} />
         <button className="add-btn" onClick={props.onAdd} title="Nouveau sujet (N)">+ Sujet</button>
       </div>
     </header>

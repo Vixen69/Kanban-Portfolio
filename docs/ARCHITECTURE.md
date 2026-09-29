@@ -637,6 +637,20 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-29 — Un seul menu « Paramètres » ; le Σ de la colonne des totaux dans le coin (ADR 049)
+
+- **Demande de l'auteur** : le titre passait sur deux lignes ; l'import,
+  l'exercice et les instantanés n'avaient « pas tant à voir » avec la
+  configuration du tableau ; un seul bouton engrenage pour tout ; le Σ de
+  la colonne des totaux dans le coin, sous l'autre, flèche vers le bas ;
+  des polices « pas jolies » dans cette colonne.
+- **Fait** : engrenage (Analytics, Archives · Importer, Exercice,
+  Instantanés · Configuration du tableau) à la place du bouton Analytics et
+  du menu « ⋯ » ; import, exercice et instantanés ouverts seuls, sous leur
+  titre ; titre sur une ligne, les pastilles se tronquent ; Σ dans le coin ;
+  colonne des totaux sur trois tailles de police, chiffres alignés.
+- **À part** : proposition de passe graphique générale, sur une branche.
+
 ### 2026-09-28 — Périmètre RAF : engagé / non engagé, loupe par métier (ADR 048)
 
 - **Demande de l'auteur** (préparation de la Revue Stratégique de

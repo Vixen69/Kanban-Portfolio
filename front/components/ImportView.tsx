@@ -199,8 +199,8 @@ function Outcome({ phase, error, shown, config, decisions, setDecisions, acknowl
 }
 
 /**
- * The import pane — ⚙ › Importer (ADR 046; the header's ⋯ menu opens the
- * panel on it).
+ * The import pane — ⚙ › Importer un export PPM (ADR 046/049; the admin
+ * shell shows it alone, without the configuration's tabs).
  * Inputs: onLoaded (the board refetches after a load), the runtime config
  * (the current exercise, the domain labels), the exercise shown. Output:
  * the pane DOM. Failure modes: none — API refusals (400 files, wrong-year

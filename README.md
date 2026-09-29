@@ -9,8 +9,9 @@ C'est un **instrument, pas une plateforme**. Les comportements (âge visible,
 pulsation des bloqués, flux tiré, un écran sans défilement) sont câblés en
 dur. Seule la **topologie** est configurable : `config/board.json` (canaux,
 colonnes, WIP, gates, domaines, types, seuils) est le modèle par défaut
-versionné dans git ; un panneau d'administration (⚙, réservé à l'admin)
-peut appliquer une surcharge à chaud, historisée en append-only (ADR 013).
+versionné dans git ; la configuration du tableau (⚙ › Configuration du
+tableau, réservée à l'admin) peut appliquer une surcharge à chaud,
+historisée en append-only (ADR 013).
 
 Architecture en couches et historique : voir `docs/ARCHITECTURE.md` (journal
 vivant) et `docs/adr/` (décisions). Le contrat de travail est `CLAUDE.md`.
@@ -53,19 +54,24 @@ vivant) et `docs/adr/` (décisions). Le contrat de travail est `CLAUDE.md`.
   sélecteur nature ni bascule Bloqué), **archivage** (`archived`/`unarchived`),
   suppression (`deleted` — le journal garde tout). **« + Sujet »** (`N`) :
   création locale, entre toujours dans la première colonne (flux tiré). Vue
-  **Archives** (icône + badge) : liste cherchable, « Désarchiver », ouverture
-  de la fiche (ADR 017).
-- **Panneau d'administration** (⚙) : topologie/vocabulaire uniquement —
-  colonnes (ordre, WIP, gate), canaux, domaines, types, libellés natures/
-  criticités, champs de carte personnalisés. Surcharge persistée côté
-  middle avec historique append-only ; « Réinitialiser le modèle » revient
-  à `config/board.json` (ADR 013).
+  **Archives** (⚙ › Archives, avec leur nombre) : liste cherchable,
+  « Désarchiver », ouverture de la fiche (ADR 017).
+- **Menu ⚙** (ADR 049) : Analytics, Archives ; Importer un export PPM,
+  Exercice (bascule d'année, ADR 038), Instantanés (ADR 042) ;
+  Configuration du tableau.
+- **Configuration du tableau** (⚙ › Configuration du tableau, ADR 046/049) :
+  Limites WIP (une par case), Catégories (renommer / recolorer domaines,
+  types, natures, criticités — jamais ajouter ni retirer), Champs de carte.
+  Surcharge persistée côté middle avec historique append-only ;
+  « Réinitialiser le modèle » revient à `config/board.json` (ADR 013). Les
+  colonnes, canaux, gates, revues, domaines, types et alias sont ceux du
+  modèle versionné.
 - **Totaux d'agrégats** (design v12, ADR 020) : les en-têtes de colonne et
   les étiquettes de canal portent les totaux des sujets **visibles** —
   repliés : estimé k€ + charge RAF j.h ; dépliés : enveloppe RDLI, meilleur
   estimé, engagé, réalisé, plan de charge et ventilation par profil. Deux
   bascules Σ dans le coin du tableau, mémorisées par navigateur.
-- **Capacité** (☷, ADR 024/025/028) : la lecture d'arbitrage entre
+- **Capacité** (⚙ › Analytics, onglet Capacité ; ADR 024/025/028/037) : la lecture d'arbitrage entre
   responsables de domaines, calculée depuis le snapshot importé (personnes
   avec capacité, projeté et réalisé sur tout le plan de charge, affectations
   aux cartes) — six chiffres de tête (capacité, projeté, engagement,
@@ -102,7 +108,7 @@ vivant) et `docs/adr/` (décisions). Le contrat de travail est `CLAUDE.md`.
   domaine lu dans le portefeuille via les alias de domaines de la config) ;
   l'onglet Projets ne sert qu'au recoupement, dit code par code dans le
   rapport.
-- **Import depuis l'outil** (⬆, ADR 027) : déposer les CSV du classeur,
+- **Import depuis l'outil** (⚙ › Importer un export PPM, ADR 027/049) : déposer les CSV du classeur,
   lire le rapport d'audit, charger — même moteur et même rapport que la
   ligne de commande. Sans authentification jusqu'à RP3, comme le reste de
   l'API d'écriture (l'accès réseau à la VM fait barrière).
