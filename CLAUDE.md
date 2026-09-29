@@ -147,7 +147,8 @@ PortfolioDataSource           (read-only PPM access — adapters/)
   getFinancials(subjectId): { budget, consumed, remaining } | null
 
 BoardStorage                  (persistence — Postgres adapter behind it)
-  importCards / insertCard / appendEvent / listEvents(filter?) / listBaseCards / close
+  importCards / insertCard / appendEvent / appendEvents / listEvents(filter?) / listBaseCards / close
+  (appendEvents, ADR 052: a move and the decisions it carries — all or none)
   (filter = afterSeq | cardIds, ADR 040: the incremental refresh and the
    per-action validation fold never read the whole log)
   importCapacity / getCapacity(year)                      (ADR 024/035)
@@ -215,7 +216,19 @@ fields, append-only enforced by table grants/triggers):
   reversible `archived`/`unarchived` pair (the fold keeps the card flagged,
   the board excludes it — ADR 017); manual order rides in the `moved`
   payload (`beforeId` — same-cell reorders never reset the aging clock and
-  never count as stage entries, ADR 019).
+  never count as stage entries, ADR 019); a canal change inside a stage
+  keeps the clock too (ADR 052). Decisions by the gesture (ADR 052,
+  `core/gesture.ts`): a move INTO Pause is « Mettre en pause » (D4), a
+  change of a canal a person already chose is « Requalifier » (D5) — the
+  `moved` event and its `decided` events are appended together, and the
+  middle refuses such a move without them; the first canal choice (the
+  qualification drag, or the first correction of the canal an import set
+  by default) and leaving Pause are no decision; leaving the intake column
+  is labelled « Faire entrer ». `decided` carries the blocks of the fiche
+  « Décision et Raison » V0.1 (instance, reason, options, frees, pause kind
+  tactique/parking + lift condition + review date — none for a parking —,
+  what changed + canal from → to + architect validation, decidedOn), read
+  back by `core/decision-record.ts`.
 - `users`: id, login, scrypt_hash, role (viewer/editor/admin), created_at,
   disabled.
 - `capacity` (ADR 024/028/035): one row PER EXERCISE YEAR (id = the
@@ -408,6 +421,12 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
   2026-09-29, ADR 050). Every move POSTs an
   intent; the middle writes the event with server-assigned actor/ts.
   Dropping a card ON another card inserts it just before it (ADR 019).
+  A move that IS a decision (into Pause, a chosen canal changed — ADR 052)
+  opens the fiche « Décision et Raison » and HOLDS the card (dashed
+  outline) until « Valider »; « Annuler » / Échap writes nothing, a click
+  beside does not close it; the edit form's canal / column go through the
+  same fiche; the collapsed Pause strip accepts drops. No « Stopper »
+  button (author, 2026-09-30: pause, then archive).
   The moved card wears a 2px ink outline for 4 s, no fade, and a polite
   live zone reads « Titre : Demandes → Études/Cadrage » to screen readers
   (ADR 050) — a view signal only, the move is the event in the log.
@@ -416,8 +435,12 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
   included; a canal-less column is one cell — ADR 050); charge j.h + budget k€ bars (budget before plan de charge),
   no canal tag (v12: the canal is read spatially from the board row),
   per-profile consumed editing, ressources, commentaires (event-backed),
-  BLOCAGE section (mandatory motif, « Lever »), Décision section (D1–D6
-  traced with the grid's terms and a review date, ADR 026), Délais + Historique
+  BLOCAGE section (mandatory motif, « Lever »), Décision section (the
+  traced decisions with their fiche's blocks; for a card in Pause « Tracer
+  la pause » — a paper decision, « décidée le » — or « Reconduire la
+  pause »; no manual D1–D6 form since ADR 052), Délais + Historique
+  (gestures named: Faire entrer, Qualifiée, Requalifiée, Mise en pause,
+  Reprise)
   (collapsible, event-backed, incl. block/unblock lines), full edit
   (no Nature select, no Bloqué toggle), archive (« Archiver »), delete
   (as `deleted` event).
@@ -444,7 +467,14 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
   versioned model), « Restaurer… » then an explicit confirmation — the
   panel closes, config, board and capacity reload; the fiche's Historique
   says how many of the card's events a restore undid. **Analytics** (ADR 037): one view, a tab bar « Capacité »
-  · « Flux »; every panel folds (closed by default, hint readable folded).
+  · « Flux » · « Journal »; every panel folds (closed by default, hint readable folded).
+  The Journal tab (ADR 052): every move, decision, blocking, archiving —
+  import off by default — of the exercise, newest first by day, by period
+  (7 / 30 days, the exercise, since an instantané), searchable; a click
+  opens the fiche; the decision record after a séance. Only the pause in
+  force shows on the board: on tickets in Pause « D4 », « T » / « P » when
+  its kind is said, ringed red past its review, a dashed « ? » untraced;
+  the sidebar's « Pause : réexamen dépassé » counts those.
   The Flux tab (ADR 037) brings the flow diagnostics back: six KPIs
   (en cours, bloqués, livrés 30 j / 90 j, lead and cycle time), the
   « Temps par étape » table (`core/stage-dwell.ts`: current occupants and

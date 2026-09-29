@@ -637,6 +637,22 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-30 — Décisions par le geste, fiche « Décision et Raison », journal global (ADR 052)
+
+- **Demande de l'auteur** : quand on met en pause, ou qu'on change le canal
+  d'un projet déjà qualifié, une fiche de décision s'ouvre — la traçabilité
+  de la décision, sur le modèle de la fiche papier V0.1 ; « Faire entrer »
+  ne demande rien ; pas de « Stopper » ; un historique de tous les
+  déplacements.
+- **Fait** : le geste est lu par une règle pure (`core/gesture.ts`) ; la
+  carte attend « Valider » ; le déplacement et sa décision s'écrivent
+  ensemble (une écriture, une transaction) et le serveur refuse l'un sans
+  l'autre ; « Annuler » n'écrit rien. La fiche reprend les blocs 1, 3, 4, 5
+  et 6 ; la première qualification (y compris la correction du canal posé
+  par l'import) n'est pas une décision. Seule la pause en cours se voit
+  au tableau (D4 / T / P / ?). Onglet Analytics › Journal. `board.json`
+  inchangé.
+
 ### 2026-09-29 (soir) — Plus rien ne bouge : passe de perf pour la VM sans carte graphique (ADR 051)
 
 - **Constat de l'auteur** : « un peu plus lent qu'avant » ; « au pire, fais
