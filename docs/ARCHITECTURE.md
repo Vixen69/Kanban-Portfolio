@@ -637,6 +637,20 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-29 (soir) — Plus rien ne bouge : passe de perf pour la VM sans carte graphique (ADR 051)
+
+- **Constat de l'auteur** : « un peu plus lent qu'avant » ; « au pire, fais
+  péter les animes » ; des vraies passes de performance sur ce qu'on
+  maîtrise.
+- **Mesuré d'abord** (Chrome sans carte graphique, build de prod, version
+  d'avant l'ADR 048 en comparaison) : le calcul n'a pas régressé ; le
+  temps part dans le dessin — flou derrière la fiche (~60 ms par image),
+  transition de la grille (3 000+ opérations de dessin par clic), flèche
+  de défilement et point de blocage animés en continu.
+- **Fait** : aucune animation ni transition, plus de flou d'arrière-plan ;
+  connexions PostgreSQL gardées 30 min au lieu de 10 s ; correctif du
+  dépôt sur une carte d'un autre canal dans Demandes / Qualification.
+
 ### 2026-09-29 (après-midi) — Plein écran, fiches enchaînées, recherche sans accents (ADR 050)
 
 - **Demande de l'auteur**, en revue des idées de finition : le plein écran

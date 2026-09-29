@@ -2,7 +2,9 @@
    comments, history, block form), edit form, QuickAdd.
    Ported verbatim from design/Portefeuille DSI - Kanban NMO.html (design v9). */
 
-.overlay { position: fixed; inset: 0; background: rgba(15,23,42,.45); backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; z-index: 60; }
+/* Pas de flou d'arrière-plan (ADR 051) : sans carte graphique, un backdrop-filter
+   plein écran se recalcule à chaque image (curseur de saisie compris). */
+.overlay { position: fixed; inset: 0; background: rgba(15,23,42,.45); display: flex; align-items: center; justify-content: center; z-index: 60; }
 .modal { position: relative; width: 450px; max-width: 92vw; max-height: 88vh; overflow: auto; background: #fff; border: 1px solid var(--bd); border-radius: 10px; box-shadow: 0 24px 60px rgba(15,23,42,.28); }
 .modal-bar { position: absolute; left: 0; right: 0; top: 0; height: 3px; border-radius: 10px 10px 0 0; }
 .modal-body { padding: 19px; }
@@ -10,8 +12,7 @@
 .modal-name { font-size: 16px; font-weight: 700; color: var(--tx-1); line-height: 1.25; }
 .modal-code { font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: var(--tx-3); display: block; margin-top: 3px; }
 .x { background: none; border: none; color: var(--tx-3); cursor: pointer; font-size: 14px; }
-/* Budget de mouvement (ADR 050) : l'édition en place perd sa transition sous « réduire les animations ». */
-@media (prefers-reduced-motion: reduce) { .inline-val { transition: none !important; } }
+
 /* Fiche : carte précédente / suivante de la case (ADR 050), « ‹ 3 / 12 › ». */
 .modal-top-right { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
 .fiche-nav { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--bd); border-radius: 6px; padding: 1px; background: #fff; }
@@ -163,7 +164,7 @@
 .pl-sw { width: 10px; height: 9px; border-radius: 2px; background: #dfe5ee; border: 1px solid #c3ccda; }
 .pl-sw.filled { background: #64748b; border-color: #64748b; }
 /* Inline edit (click-to-edit values) */
-  .inline-val { cursor: text; border-radius: 3px; padding: 0 2px; margin: 0 -2px; transition: background .12s; }
+  .inline-val { cursor: text; border-radius: 3px; padding: 0 2px; margin: 0 -2px; }
 .inline-val:hover { background: color-mix(in oklab, var(--accent) 10%, transparent); box-shadow: inset 0 -1px 0 color-mix(in oklab, var(--accent) 45%, transparent); }
 .inline-inp { font: inherit; color: inherit; background: #fff; border: 1px solid var(--accent); border-radius: 4px; padding: 0 4px; outline: none; max-width: 100%; box-sizing: border-box; }
 .inline-inp[type=number] { width: 56px; text-align: right; -moz-appearance: textfield; }

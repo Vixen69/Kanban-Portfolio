@@ -284,7 +284,8 @@ function buildStorage(pool: Pool, runTx: Tx): BoardStorage {
  * an operation errors (a duplicate insertCard id, a non-serializable payload).
  */
 export async function createPostgresStorage(connectionString?: string, appendOnly = true): Promise<BoardStorage> {
-  const pool = connectionString ? new Pool({ connectionString }) : new Pool();
+  // pg closes a connection idle for 10 s, so each move of a séance paid a new login; keep them 30 min (ADR 051).
+  const pool = new Pool({ connectionString, idleTimeoutMillis: 30 * 60_000 });
   // An idle pooled connection can emit 'error' with no query in flight (a DB
   // restart, failover or network blip). An 'error' event with no listener is a
   // fatal uncaught exception in Node — attach one so the middle logs it and

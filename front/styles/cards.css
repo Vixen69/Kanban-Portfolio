@@ -15,8 +15,8 @@
 .card-fill { flex: 1 1 0; min-width: 0; }
 .age { font-size: 8px; color: var(--tx-3); flex: 0 0 auto; font-variant-numeric: tabular-nums; }
 .age.aging { color: var(--warn); font-weight: 600; } .age.stale { color: var(--danger-strong); font-weight: 700; }
-.blk-pulse { width: 5px; height: 5px; border-radius: 50%; background: var(--danger); flex: 0 0 auto; box-shadow: 0 0 0 0 rgba(220,38,38,.5); animation: pulse 1.6s ease-in-out infinite; }
-@keyframes pulse { 0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(220,38,38,.45); } 50% { opacity: .55; box-shadow: 0 0 0 3px rgba(220,38,38,0); } }
+/* Point rouge du blocage : fixe depuis l'ADR 051 (plus de pulsation). */
+.blk-pulse { width: 5px; height: 5px; border-radius: 50%; background: var(--danger); flex: 0 0 auto; box-shadow: 0 0 0 2px rgba(220,38,38,.22); }
 .crit-star { color: #a16207; flex: 0 0 auto; line-height: 1; }
 .crit-dot { flex: 0 0 auto; display: inline-block; background: #475569; border-radius: 50%; }
 /* Type-of-project tag — deliberately more prominent than the domain bar. */
