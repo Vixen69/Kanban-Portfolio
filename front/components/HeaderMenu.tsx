@@ -98,14 +98,17 @@ export function HeaderMenu(props: HeaderMenuProps) {
         <>
           <div className="hd-year-backdrop" onClick={() => setOpen(false)} />
           <ul className="hd-menu" role="menu">
+            <li className="hd-menu-cap" role="presentation">Consulter</li>
             <Item label="Analytics" onPick={pick(props.onMetrics)} />
             <Item label="Archives" count={props.archivedCount} onPick={pick(props.onArchive)} />
             <li className="hd-menu-sep" role="separator" />
-            <Item label="Importer un export PPM" onPick={pick(props.onImport)} />
-            <Item label="Exercice" onPick={pick(props.onExercise)} />
-            <Item label="Instantanés" onPick={pick(props.onSnapshots)} />
+            <li className="hd-menu-cap" role="presentation">Données</li>
+            <Item label="Importer un export PPM…" onPick={pick(props.onImport)} />
+            <Item label="Instantanés…" onPick={pick(props.onSnapshots)} />
+            <Item label="Exercice…" onPick={pick(props.onExercise)} />
             <li className="hd-menu-sep" role="separator" />
-            <Item label="Configuration du tableau" onPick={pick(props.onAdmin)} />
+            <li className="hd-menu-cap" role="presentation">Modèle</li>
+            <Item label="Configuration du tableau…" onPick={pick(props.onAdmin)} />
           </ul>
         </>
       )}

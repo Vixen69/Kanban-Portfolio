@@ -1,0 +1,164 @@
+/* Proposition de passe graphique « v13 » (2026-09-29, branche
+   proposition-design — à tester, pas adoptée). Chargée en DERNIER : elle
+   ne fait que surcharger ; retirer son import dans main.tsx rend le
+   tableau d'avant à l'identique.
+
+   Fondée sur l'état de l'art (synthèse dans docs/design/proposition-v13.md) :
+   - le gris dit « normal », la couleur dit « anormal » (ISA-101, ASM
+     Consortium, Hollifield) : une teinte = un sens ; le bleu = « chiffres
+     calculés sur un ensemble restreint » (filtres, loupe, retenus/total) ;
+   - deux paliers de lisibilité : SALLE (≥ 13px/600 ou un signal couleur)
+     et POSTE (≥ 10px) ; plus rien d'informatif à 7–8px (AVIXA, APCA) ;
+   - une seule échelle de tailles : 9 (sigles en capitales) / 10 / 11 /
+     13 / 16 / 22 px, la hiérarchie par la graisse (Carbon, Fluent 2) ;
+   - aplats 2-D, pas de dégradé ni de flou, un seul système de filets ;
+   - zéro hauteur en plus : barres 16px, en-tête 44px, en-têtes de colonne
+     sous leur budget. */
+
+/* ---------- Jetons ---------- */
+body { background: #dfe3e9; }
+.app {
+  --bg-page: #dfe3e9; --bg-cell: #e9ecf0; --bg-cell-2: #e3e9f2;
+  --bd: #aab4c2; --bd-sub: #c9d0da;
+  --tx-4: #56657a;
+  --warn-text: #92400e;
+  --blocked-wash: #f6b4b4; --blocked-bar: #991b1b;
+  --sel-border: var(--tx-1);
+  --ink: #1e293b;
+  --lane-w: 50px;
+  --fs-caps: 9px; --fs-1: 10px; --fs-2: 11px; --fs-3: 13px; --fs-4: 16px; --fs-5: 22px;
+}
+
+/* ---------- En-tête ---------- */
+.hd-title { font-family: 'DM Sans', system-ui, sans-serif; font-size: var(--fs-4); font-weight: 700; letter-spacing: -.005em; }
+.hd-year { font-size: var(--fs-3); font-weight: 600; }
+.hd-stat { font-size: var(--fs-2); color: var(--tx-3); }
+.hd-stat b { font-size: var(--fs-4); font-weight: 700; }
+.lg { font-size: var(--fs-1); }
+.icon-btn { border-color: var(--tx-4); width: 28px; height: 26px; }
+.gear-btn { font-size: 16px; }
+.gear-btn.on { color: var(--tx-1); border-color: var(--sel-border); background: #fff; }
+.add-btn { background: var(--ink); font-size: 12px; padding: 6px 14px; }
+.add-btn:hover { background: #0f172a; }
+/* Une seule forme de pastille ; la couleur dit le genre : bleu = chiffres
+   restreints (filtres, loupe), neutre = vue (focus, tri). */
+.filter-chip, .focus-chip { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 8px; border-radius: 999px; font-size: var(--fs-2); font-weight: 500; }
+.filter-chip, .lens-chip { background: #fff; border: 1px solid var(--accent); color: var(--accent); }
+.focus-chip:not(.lens-chip) { background: #fff; border: 1px solid var(--tx-4); color: var(--tx-1); }
+.year-chip { font-size: var(--fs-1); }
+.year-chip.preparing { color: var(--warn-text); }
+.hd-menu-item { font-size: 13px; padding: 6px 10px; color: var(--tx-1); }
+.hd-menu-cap { padding: 6px 10px 2px; font-size: var(--fs-1); font-weight: 600; color: var(--tx-3); }
+.hd-menu-item small { background: none; color: var(--tx-3); font-size: var(--fs-2); font-weight: 400; font-variant-numeric: tabular-nums; }
+
+/* ---------- Coin : les deux Σ, flèche vers ce qu'ils déplient ---------- */
+.totals-toggle { height: 18px; font-size: var(--fs-1); font-weight: 600; border-color: var(--tx-4); color: var(--tx-2); padding: 0 6px; }
+.totals-toggle:hover { color: var(--tx-1); border-color: var(--tx-1); }
+.totals-toggle.on { color: var(--tx-1); border-color: var(--sel-border); background: #fff; }
+.grid-corner { gap: 6px; }
+.grid-corner .totals-toggle { min-width: 40px; }
+
+/* ---------- En-têtes de colonne ---------- */
+.col-head { padding: 4px 8px; }
+.col-head.focused { box-shadow: inset 0 -2px 0 var(--tx-1); }
+.col-head.focused.engaged { box-shadow: inset 0 2px 0 var(--tx-2), inset 0 -2px 0 var(--tx-1); }
+.col-label { font-size: var(--fs-3); font-weight: 600; letter-spacing: 0; line-height: 16px; }
+.col-count { font-size: var(--fs-1); color: var(--tx-3); background: rgba(15,23,42,.07); border-radius: 999px; line-height: 14px; min-width: 18px; text-align: center; border: 1px solid transparent; }
+.col-count.narrowed { color: var(--accent); background: #fff; border-color: var(--accent); }
+.review-mark { font-size: var(--fs-caps); letter-spacing: .05em; color: var(--tx-3); line-height: 10px; }
+.gate-badge { font-size: var(--fs-caps); line-height: 10px; }
+.gate-badge.opened { opacity: 1; }
+.col-totals { margin-top: 3px; padding-top: 3px; }
+.ct-row { font-size: var(--fs-1); line-height: 12px; color: var(--tx-3); }
+.ct-row b { font-weight: 600; }
+.ct-row b i { font-size: var(--fs-1); color: var(--tx-3); margin-left: 2px; }
+.ct-row.cap { margin-top: 1px; padding-top: 1px; border-top: none; }
+.ct-role { font-size: var(--fs-1); color: var(--tx-3); }
+.col-label-v { font-size: var(--fs-2); color: var(--tx-1); }
+.col-collapse { color: var(--tx-3); }
+
+/* ---------- Canaux ---------- */
+.lane-name { font-size: var(--fs-3); color: var(--tx-1); letter-spacing: 0; }
+.lane-nature { font-size: var(--fs-1); color: var(--tx-3); text-transform: none; letter-spacing: 0; }
+.lane-totals { font-size: var(--fs-1); color: var(--tx-3); }
+.lane-totals b { font-weight: 600; }
+.lane-label.collapsed .lane-name { font-size: var(--fs-3); box-shadow: none; border: 1px solid var(--bd); }
+.lane-label.collapsed:hover .lane-name { box-shadow: none; border-color: var(--tx-3); color: var(--tx-1); background: #fff; }
+
+/* ---------- Cases ---------- */
+.cell-head { height: 13px; }
+.wip { font-size: var(--fs-1); color: var(--tx-3); }
+.wip.warn { color: var(--warn-text); }
+.cell-blocked, .cblk { font-size: var(--fs-1); background: var(--danger-strong); line-height: 12px; }
+/* Encours dépassé : aplat + anneau, sans dégradé. */
+.cell[data-wip="over"], .cell.focused[data-wip="over"] { background: #f7d0d0; box-shadow: inset 0 0 0 2px var(--danger); }
+.gate-line { background: var(--gate); opacity: .5; }
+.scroll-hint { color: var(--tx-3); }
+.scroll-hint svg { filter: none; }
+.ccount { font-size: var(--fs-3); color: var(--tx-1); }
+
+/* ---------- Barres (radiateur) : 16px, inchangé ---------- */
+.mini { box-shadow: 0 0 0 1px rgba(15,23,42,.16); }
+.mini:hover { box-shadow: 0 0 0 1px var(--tx-3); }
+.mini-name, .mini-code { font-size: var(--fs-1); line-height: 16px; }
+.type-tag { font-size: var(--fs-caps); line-height: 14px; min-width: 4ch; text-align: center; letter-spacing: .02em; }
+/* Âge : texte coloré seul, sans fond teinté — quand la plupart des cartes
+   sont anciennes, une pastille teintée sur chacune devient un papier peint
+   et noie le rouge du blocage. */
+.age { font-size: var(--fs-1); min-width: 3.2ch; text-align: right; line-height: 16px; }
+.age.aging { color: var(--warn-text); }
+.age.stale { color: var(--blocked-bar); }
+.crit-star { color: var(--tx-1); }
+.dec-pill { font-size: var(--fs-caps); }
+.absent-pill { font-size: var(--fs-caps); }
+
+/* ---------- Carte dépliée ---------- */
+.focus-card { box-shadow: 0 0 0 1px rgba(15,23,42,.16); }
+.focus-card:hover { box-shadow: 0 0 0 1px var(--tx-3); }
+.focus-name { font-size: var(--fs-3); }
+.muted, .focus-block, .ec-stat, .met-line, .met-none { font-size: var(--fs-2); }
+.met-cap { font-size: var(--fs-1); font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--tx-3); }
+.dom-pill, .badge { font-size: var(--fs-caps); }
+.type-tag.big { font-size: var(--fs-1); }
+.focus-code { font-size: var(--fs-2); }
+.sort-tag { font-size: var(--fs-1); }
+
+/* ---------- Colonne des totaux du tableau ---------- */
+.gut-caption { font-size: var(--fs-3); }
+.gut-flag { background: none; color: var(--accent); font-size: var(--fs-2); font-weight: 600; padding: 0; }
+.gut-flag.year { background: none; color: var(--tx-3); }
+.gut-scope { font-size: var(--fs-2); }
+.gut-label { font-size: var(--fs-2); color: var(--tx-2); }
+.gut-line b i, .gut-big i { font-size: var(--fs-2); color: var(--tx-3); }
+.gut-legend, .gut-money { border-top: none; padding-top: 0; }
+.gut-note { color: var(--warn-text); }
+
+/* ---------- Barre latérale ---------- */
+.sb-label, .asection-label { font-size: var(--fs-1); font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--tx-3); }
+.mini-act { font-size: var(--fs-1); text-transform: none; letter-spacing: 0; }
+.cat-sep { font-size: var(--fs-1); }
+.pill { font-size: var(--fs-2); border-radius: 999px; }
+.pill.sub { font-size: var(--fs-1); }
+.pill small { font-size: var(--fs-1); opacity: 1; color: var(--tx-3); }
+.stat-row { font-size: var(--fs-2); }
+.stat-row b .ref { font-size: var(--fs-1); color: var(--tx-3); }
+.sb-shortcuts span, .code-hint, .sort-current, .sort-note { font-size: var(--fs-1); color: var(--tx-3); }
+.sort-note { font-style: normal; }
+.sort-opt { font-size: var(--fs-2); }
+kbd { font-size: var(--fs-1); }
+
+/* ---------- Fenêtres, fiche, panneaux ---------- */
+.overlay { backdrop-filter: none; }
+.empty-overlay { backdrop-filter: none; background: rgba(223,227,233,.85); }
+.kv span, .field-label, .sec-note, .rdr-label, .delay span, .prof-sub, .cpop-head { font-size: var(--fs-1); font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--tx-3); }
+.dtag { font-size: var(--fs-1); }
+.scf { font-size: var(--fs-1); color: var(--tx-3); }
+.kv b.warm { color: var(--warn-text); }
+.btn.primary { background: var(--ink); border-color: var(--ink); }
+.btn.primary:hover { background: #0f172a; }
+.atab.on { color: var(--tx-1); border-bottom-color: var(--tx-1); }
+.conflict-head, .conflict-k { text-transform: none; letter-spacing: 0; }
+
+/* ---------- Analytics ---------- */
+.an-table th, .cap-table thead th { font-size: var(--fs-1); font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--tx-3); }
+.mkpi-lab, .m2-stat-lab { font-size: var(--fs-1); text-transform: none; letter-spacing: 0; color: var(--tx-3); }

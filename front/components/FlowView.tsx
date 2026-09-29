@@ -13,6 +13,7 @@ import { stageDwell } from "../../core/stage-dwell.ts";
 import type { StageDwell } from "../../core/stage-dwell.ts";
 import { terminalColumnIds } from "../../core/flow.ts";
 import { Panel } from "./capacityPanels.tsx";
+import { fmtNum } from "../format.ts";
 
 const DAY_MS = 86_400_000;
 const TOP_BLOCKAGES = 8;
@@ -29,7 +30,7 @@ function Kpi({ num, unit, label, tone }: { num: string | number; unit?: string |
 }
 
 function days(value: number | null): string {
-  return value === null ? "—" : `${value.toLocaleString("fr-FR")} j`;
+  return value === null ? "—" : `${fmtNum(value)} j`;
 }
 
 function Kpis({ flow, inFlow, blocked }: { flow: FlowSummary; inFlow: number; blocked: number }) {

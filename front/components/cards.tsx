@@ -49,8 +49,8 @@ function cardAccent(
 ): { root: CSSProperties; accent: CSSProperties } {
   if (card.blocked) {
     return {
-      root: { background: "#f9c0c0", boxShadow: "inset 0 0 0 1px #dc2626, inset 3px 0 0 #b91c1c" },
-      accent: { background: "#b91c1c", width: 4 },
+      root: { background: "var(--blocked-wash, #f9c0c0)", boxShadow: "inset 0 0 0 1px #dc2626, inset 3px 0 0 var(--blocked-bar, #b91c1c)" },
+      accent: { background: "var(--blocked-bar, #b91c1c)", width: 4 },
     };
   }
   const domain = domainById(config)[card.domain];

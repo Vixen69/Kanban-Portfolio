@@ -15,6 +15,10 @@ import "./styles/cards.css";
 import "./styles/modal.css";
 import "./styles/admin.css";
 import "./styles/metrics.css";
+// Proposition de passe graphique v13 (branche proposition-design) : chargée
+// en dernier, elle ne fait que surcharger ; retirer cette ligne rend le
+// tableau d'avant.
+import "./styles/design-v13.css";
 
 const root = document.getElementById("root");
 if (!root) throw new Error("élément #root introuvable");

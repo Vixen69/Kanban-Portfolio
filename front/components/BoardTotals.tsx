@@ -184,18 +184,14 @@ export function LaneTotals({ totals, rafTotals, config, open, laneName, read }: 
  * Output: the button. Failure modes: none.
  */
 export function TotalsToggle({ open, onToggle, what }: { open: boolean; onToggle: () => void; what: "colonne" | "canal" | "tableau" }) {
+  // v13: the arrow points at what the button unfolds and never turns —
+  // right for the header row, down for a gutter below; the state is the
+  // pressed style (.on) and aria-expanded.
   const verb = open ? "Replier" : "Déplier";
-  if (what === "tableau") {
-    return (
-      <button className={"totals-toggle" + (open ? " on" : "")} onClick={onToggle}
-        title={`${verb} la colonne des totaux du tableau et des métiers`} aria-expanded={open}>
-        Σ {open ? "▴" : "▾"}
-      </button>
-    );
-  }
+  const title = what === "tableau" ? `${verb} la colonne des totaux du tableau et des métiers` : `${verb} les totaux par ${what}`;
   return (
-    <button className="totals-toggle" onClick={onToggle} title={`${verb} les totaux par ${what}`} aria-expanded={open}>
-      {open ? "▾" : "▸"} Σ
+    <button className={"totals-toggle" + (open ? " on" : "")} onClick={onToggle} title={title} aria-expanded={open}>
+      Σ {what === "colonne" ? "▸" : "▾"}
     </button>
   );
 }

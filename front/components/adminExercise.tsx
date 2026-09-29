@@ -50,7 +50,8 @@ export function ExerciseTab({ config, cards, onSwitch }: ExerciseTabProps) {
         Je confirme : {current} se clôt, {next} devient l’année en cours.
       </label>
       <div className="import-actions">
-        <button className="btn primary" disabled={!confirmed || busy} onClick={run}>Passer à l’exercice {next}</button>
+        <button className="btn danger" disabled={!confirmed || busy} onClick={run}>Passer à l’exercice {next}</button>
+
         {busy && <span className="m2-note">Bascule en cours…</span>}
       </div>
     </div>

@@ -5,7 +5,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { fmtNum, fmtUnit } from "./format.ts";
 
-const NBSP = String.fromCharCode(0x202f);
+// The no-break space the bundled font carries (the narrow one it lacks is replaced).
+const NBSP = String.fromCharCode(0x00a0);
 
 test("fmtUnit rounds to whole units and groups in French", () => {
   assert.equal(fmtUnit(1250), `1${NBSP}250`);

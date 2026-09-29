@@ -17,7 +17,7 @@ const DEC = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 });
  * none — a non-finite value renders as "—" rather than "NaN".
  */
 export function fmtUnit(value: number): string {
-  return Number.isFinite(value) ? UNIT.format(value) : "—";
+  return Number.isFinite(value) ? group(UNIT.format(value)) : "—";
 }
 
 /**
@@ -26,5 +26,12 @@ export function fmtUnit(value: number): string {
  * non-finite value renders as "—".
  */
 export function fmtNum(value: number): string {
-  return Number.isFinite(value) ? DEC.format(value) : "—";
+  return Number.isFinite(value) ? group(DEC.format(value)) : "—";
+}
+
+// fr-FR groups thousands with a narrow no-break space (U+202F), which the
+// bundled DM Sans does not carry — a fallback font drew it, of another
+// width. The plain no-break space (U+00A0) is in the font and never wraps.
+function group(text: string): string {
+  return text.replace(/ /g, " ");
 }
