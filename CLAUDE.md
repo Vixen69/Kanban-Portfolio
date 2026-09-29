@@ -291,7 +291,10 @@ Diacritics in display names come from the config as-is.
 
 Aesthetic: industrial control panel. Dense, sober, professional. No
 decoration, no gradients-for-style, no animation except the blocked pulse
-and the scroll-hint bob (accepted v11 exception). (Implemented in
+and the scroll-hint bob (accepted v11 exception). Brief transitions are
+allowed under a strict budget (ADR 050, author 2026-09-29): 200 ms at most,
+only in response to a gesture (focus/collapse, switches, inline edit),
+cut under prefers-reduced-motion — never ambient motion. (Implemented in
 hand-written CSS now; adapted to Tailwind/Radix later.)
 
 - Grid: lanes as horizontal swimlanes (canaux), columns as vertical stages;
@@ -369,8 +372,12 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
   No « NMO » label; the title never wraps — the chips shrink first. On
   the right: ONE gear button (ADR 049, author 2026-09-29) whose menu holds,
   in three groups, Analytics and Archives (with count); Importer,
-  Exercice, Instantanés; Configuration du tableau.
-- Sidebar: search (title + codename), **« Trier les cartes »** (ADR 044,
+  Exercice, Instantanés; Configuration du tableau. Before the gear, a
+  full-screen button (F too — the browser's Fullscreen API, every control
+  and the cursor kept; ADR 050).
+- Sidebar: search (title + codename; accents, case and apostrophes ignored,
+  « securite » finds « Sécurité »; Entrée opens the fiche when only one card
+  is left — ADR 050, core/text-search.ts), **« Trier les cartes »** (ADR 044,
   author 2026-09-21 — the arbitration session looks at what costs the
   scarce métiers, all domains mixed): folded by default, one key at a time
   — ordre du tableau / reste à faire j.h (on the métiers the gutter's
@@ -395,10 +402,13 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
   and each column header counts them (« retenus/total » while narrowed).
   No nature filter (v11): nature is the canal.
 - All UI strings in French, exactly as written in config.
-- Card movement: drag and drop plus keyboard fallback. Every move POSTs an
+- Card movement: drag and drop (no keyboard move — the author dropped it,
+  2026-09-29, ADR 050). Every move POSTs an
   intent; the middle writes the event with server-assigned actor/ts.
   Dropping a card ON another card inserts it just before it (ADR 019).
-- Card detail: charge j.h + budget k€ bars (budget before plan de charge),
+- Card detail: « ‹ 3 / 12 › » in its header and ← → move to the previous /
+  next card of the SAME cell, in the order on screen (sort, filters and lens
+  included; a canal-less column is one cell — ADR 050); charge j.h + budget k€ bars (budget before plan de charge),
   no canal tag (v12: the canal is read spatially from the board row),
   per-profile consumed editing, ressources, commentaires (event-backed),
   BLOCAGE section (mandatory motif, « Lever »), Décision section (D1–D6

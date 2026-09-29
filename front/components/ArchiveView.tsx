@@ -5,6 +5,7 @@
 
 import { useState } from "react";
 import type { BoardConfig, CardState } from "../../core/types.ts";
+import { cardMatchesQuery } from "../../core/text-search.ts";
 
 /** Props of the archives overlay. All state and actions live in App. */
 export interface ArchiveViewProps {
@@ -75,11 +76,7 @@ function ArchHead({ count, query, setQuery, onClose }: {
  */
 export function ArchiveView({ cards, config, onUnarchive, onOpen, onClose }: ArchiveViewProps) {
   const [query, setQuery] = useState("");
-  const needle = query.trim().toLowerCase();
-  const list = cards.filter((card) =>
-    needle === "" ||
-    card.title.toLowerCase().includes(needle) ||
-    (card.codename ?? "").toLowerCase().includes(needle));
+  const list = cards.filter((card) => cardMatchesQuery(card, query));
   return (
     <div className="overlay" onClick={onClose}>
       <div className="modal archive-modal" onClick={(event) => event.stopPropagation()}>

@@ -17,6 +17,7 @@ import type { DecisionInput } from "../api.ts";
 import { ConstraintEditor, InlineEdit } from "./modalEditors.tsx";
 import { ContentionSection, OwnerStrip, PlanDeCharge, RdrStrip } from "./DetailPlan.tsx";
 import { BudgetGraph, RisksSection } from "./DetailRisk.tsx";
+import { useArrowKeys, type CellNav } from "../cellNav.ts";
 
 /** Props of the card detail modal — all intents flow up to App. */
 export interface CardDetailProps {
@@ -46,17 +47,33 @@ export interface CardDetailProps {
   onArchive: () => void;
   /** Restores an archived subject to the board (fiche opened from Archives). */
   onUnarchive: () => void;
+  /** The open card's place in its cell and the ← → moves (ADR 050); null for an archived fiche. */
+  nav: CellNav | null;
 }
 
-// Title and code projet, both inline-editable, plus the close button.
-function TopBar({ card, onClose, onPatch }: { card: CardState; onClose: () => void; onPatch: (patch: CardPatch) => void }) {
+// « ‹ 3 / 12 › » — the previous and next card of the cell (← → too).
+function CellNavControl({ nav }: { nav: CellNav }) {
+  return (
+    <div className="fiche-nav" title={`${nav.label} · carte précédente / suivante de la case : ← →`}>
+      <button onClick={nav.onPrev ?? undefined} disabled={nav.onPrev === null} aria-label="Carte précédente de la case">‹</button>
+      <span className="fiche-nav-pos">{nav.position} / {nav.total}</span>
+      <button onClick={nav.onNext ?? undefined} disabled={nav.onNext === null} aria-label="Carte suivante de la case">›</button>
+    </div>
+  );
+}
+
+// Title and code projet, both inline-editable, the cell navigation, the close button.
+function TopBar({ card, nav, onClose, onPatch }: { card: CardState; nav: CellNav | null; onClose: () => void; onPatch: (patch: CardPatch) => void }) {
   return (
     <div className="modal-top">
       <div>
         <h2 className="modal-name"><InlineEdit value={card.title} onCommit={(v) => { if (v.trim()) onPatch({ title: v.trim() }); }} /></h2>
         <span className="modal-code"><InlineEdit value={card.codename} placeholder="code" onCommit={(v) => onPatch({ codename: v.trim() })} /></span>
       </div>
-      <button className="x" onClick={onClose}>✕</button>
+      <div className="modal-top-right">
+        {nav !== null && nav.total > 1 && <CellNavControl nav={nav} />}
+        <button className="x" onClick={onClose}>✕</button>
+      </div>
     </div>
   );
 }
@@ -229,6 +246,7 @@ export function CardDetail(props: CardDetailProps) {
   const { card, config, onPatch } = props;
   const [constraintEdit, setConstraintEdit] = useState(false);
   useEffect(() => { setConstraintEdit(false); }, [card.id]);
+  useArrowKeys(props.nav);
   const refs = reconcileCardRefs(card, config);
   const domain = config.domains.find((entry) => entry.id === refs.domain)!;
   return (
@@ -236,7 +254,7 @@ export function CardDetail(props: CardDetailProps) {
       <div className="modal" onClick={(event) => event.stopPropagation()}>
         <span className="modal-bar" style={{ background: card.blocked ? "#b91c1c" : domain.color }} />
         <div className="modal-body">
-          <TopBar card={card} onClose={props.onClose} onPatch={onPatch} />
+          <TopBar card={card} nav={props.nav} onClose={props.onClose} onPatch={onPatch} />
           <TagRow card={card} config={config} onToggleConstraints={() => setConstraintEdit((open) => !open)} />
           <AbsentBanner card={card} />
           {constraintEdit && <ConstraintPop card={card} config={config} onPatch={onPatch} onClose={() => setConstraintEdit(false)} />}

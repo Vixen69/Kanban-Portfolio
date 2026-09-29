@@ -100,7 +100,7 @@ export function useBoardHandlers(ui: UiState, lanes: Lane[]) {
  * → focused column → collapsed lanes. While typing in a field, only Escape
  * acts. Inputs: the UiState and the sidebar search input ref. Failure: none.
  */
-export function useShortcuts(ui: UiState, searchRef: RefObject<HTMLInputElement | null>): void {
+export function useShortcuts(ui: UiState, searchRef: RefObject<HTMLInputElement | null>, onFullscreen: () => void): void {
   const { detailId, adding, archive, sidebar, focusCol, collapsedLanes, setDetailId, setEditing,
     setAdding, setArchive, setSidebar, setFocusCol, setCollapsedLanes } = ui;
   useEffect(() => {
@@ -123,11 +123,12 @@ export function useShortcuts(ui: UiState, searchRef: RefObject<HTMLInputElement 
         setTimeout(() => searchRef.current?.focus(), 60);
       } else if (event.key.toLowerCase() === "n") { event.preventDefault(); setAdding(true); }
       else if (event.key.toLowerCase() === "s") setSidebar((open) => !open);
+      else if (event.key.toLowerCase() === "f") { event.preventDefault(); onFullscreen(); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [detailId, adding, archive, sidebar, focusCol, collapsedLanes, setDetailId, setEditing,
-    setAdding, setArchive, setSidebar, setFocusCol, setCollapsedLanes, searchRef]);
+    setAdding, setArchive, setSidebar, setFocusCol, setCollapsedLanes, searchRef, onFullscreen]);
 }
 
 /**

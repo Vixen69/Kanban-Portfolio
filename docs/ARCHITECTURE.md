@@ -637,6 +637,19 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-29 (après-midi) — Plein écran, fiches enchaînées, recherche sans accents (ADR 050)
+
+- **Demande de l'auteur**, en revue des idées de finition : le plein écran
+  (en gardant le curseur et les commandes), passer d'une carte à l'autre de
+  la case avec ← → la fiche ouverte, une recherche insensible aux accents ;
+  les animations gardées « à strict budget » ; pas de déplacement au
+  clavier, pas de rideau, pas de décision éclair.
+- **Fait** : touche F et bouton plein écran ; « ‹ 3 / 12 › » et ← → dans la
+  fiche, dans l'ordre affiché ; `core/text-search.ts` (accents, casse,
+  apostrophes) dans la recherche et les Archives, Entrée ouvre la fiche
+  quand il ne reste qu'un sujet ; transitions à 200 ms au plus, coupées
+  sous « réduire les animations ».
+
 ### 2026-09-29 — Un seul menu « Paramètres » ; le Σ de la colonne des totaux dans le coin (ADR 049)
 
 - **Demande de l'auteur** : le titre passait sur deux lignes ; l'import,

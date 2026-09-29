@@ -10,7 +10,7 @@
 
 /* ---------- Board grid ---------- */
 .board-area { grid-area: board; position: relative; overflow: hidden; }
-.board { height: 100%; width: 100%; display: grid; gap: 1px; background: var(--bd); transition: grid-template-columns .22s ease, grid-template-rows .2s ease; }
+.board { height: 100%; width: 100%; display: grid; gap: 1px; background: var(--bd); transition: grid-template-columns .2s ease, grid-template-rows .2s ease; }
 .corner { background: var(--bg-page); display: flex; flex-direction: column; align-items: stretch; justify-content: center; gap: 3px; padding: 3px; }
 /* Le coin du tableau (ADR 049) : deux Σ empilés, à leur largeur, calés à gauche. */
 .grid-corner { align-items: flex-start; padding: 3px 4px; }
@@ -119,7 +119,13 @@
 .scroll-hint svg { width: 26px; height: 26px; filter: drop-shadow(0 1px 1px rgba(15,23,42,.18)); }
 .cell.focused .scroll-hint { background: linear-gradient(to top, color-mix(in oklab, var(--bg-cell-2) 96%, transparent) 30%, transparent); }
 @keyframes hint-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(3px); } }
-@media (prefers-reduced-motion: reduce) { .scroll-hint.on { animation: none; } }
+/* Budget de mouvement (ADR 050) : des transitions de 200 ms au plus, seulement en
+   réponse à un geste ; coupées quand le poste demande moins de mouvement. Seule
+   la pulsation du blocage (§1, non négociable) reste. */
+@media (prefers-reduced-motion: reduce) {
+  .scroll-hint.on { animation: none; }
+  .board, .scroll-hint, .switch, .knob, .inline-val { transition: none; }
+}
 
 .ccell { background: var(--bg-cell); display: flex; align-items: center; justify-content: center; gap: 6px; }
 .ccount { font-size: 11px; font-weight: 600; color: var(--tx-2); font-variant-numeric: tabular-nums; }

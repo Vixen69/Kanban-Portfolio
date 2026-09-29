@@ -10,6 +10,7 @@ import { reviewOverdue } from "./decisions.ts";
 import type { BoardConfig, Card, CardState, Criticality } from "./types.ts";
 import type { ResourceDraw } from "./resource-draw.ts";
 import { isStale } from "./aging.ts";
+import { cardMatchesQuery } from "./text-search.ts";
 
 export type { ResourceDraw } from "./resource-draw.ts";
 
@@ -203,7 +204,7 @@ function constraintPasses(card: Card, filters: FilterState): boolean {
 
 /**
  * Whether one card stays lit: the search matches its title OR codename
- * (trimmed, case-insensitive) AND it is blocked when blockedOnly is on AND
+ * (case, accents and apostrophes ignored — core/text-search.ts) AND it is blocked when blockedOnly is on AND
  * every group passes. A group passes when the card's key is missing from
  * the map or mapped to true; a null typeId always passes the type group,
  * a null subDomain always passes the sub-domain group (the card follows its
@@ -214,12 +215,7 @@ function constraintPasses(card: Card, filters: FilterState): boolean {
  * Output: true when the card passes everything. Failure: none.
  */
 export function cardMatches(card: Card, filters: FilterState, draw?: ResourceDraw): boolean {
-  const query = filters.search.trim().toLowerCase();
-  const matchesSearch =
-    query === "" ||
-    card.title.toLowerCase().includes(query) ||
-    (card.codename ?? "").toLowerCase().includes(query);
-  if (!matchesSearch) return false;
+  if (!cardMatchesQuery(card, filters.search)) return false;
   if (filters.blockedOnly && !card.blocked) return false;
   if (filters.crit[card.criticality] === false) return false;
   if (filters.domain[card.domain] === false) return false;
