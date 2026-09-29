@@ -22,6 +22,8 @@ import {
   type UiState,
 } from "./useInteractions.ts";
 import { useNow } from "./useNow.ts";
+import { useCellNav } from "./cellNav.ts";
+import { useFullscreen, type Fullscreen } from "./useFullscreen.ts";
 import { useBoardLens, type BoardLens } from "./useRafLens.ts";
 import { scopeLabel, scopeTitle } from "./rafLabels.ts";
 import { AdminPanel } from "./components/AdminPanel.tsx";
@@ -67,6 +69,8 @@ interface Ctx {
   sortPanel: SortPanel;
   /** The métier lens of the reste à faire (ADR 048), a session state. */
   lens: BoardLens;
+  /** Full screen for the meeting room (ADR 050). */
+  fullscreen: Fullscreen;
 }
 
 
@@ -88,6 +92,8 @@ async function saveEdit(
 function CardModals({ ctx }: { ctx: Ctx }) {
   const { store, config, ui, detailCard } = ctx;
   const { history, flow, anchors, undone } = useDetailProjection(store, config, detailCard, ctx.nowMs);
+  // ← → move through the open card's cell (ADR 050); none while editing.
+  const nav = useCellNav(ctx.cards, ctx.derived.hidden, config, ui.editing ? null : detailCard, ui.setDetailId);
   if (!detailCard) return null;
 
   const closeAll = () => { ui.setDetailId(null); ui.setEditing(false); };
@@ -105,7 +111,7 @@ function CardModals({ ctx }: { ctx: Ctx }) {
   }
   return (
     <CardDetail card={detailCard} config={config} now={ctx.nowMs} history={history} undone={undone}
-      flow={flow} anchors={anchors}
+      flow={flow} anchors={anchors} nav={nav}
       onClose={closeAll}
       onEdit={() => ui.setEditing(true)}
       onPatch={(patch: CardPatch) => void store.editCard(detailCard.id, patch)}
@@ -168,6 +174,12 @@ function BoardArea({ ctx }: { ctx: Ctx }) {
   );
 }
 
+// Entrée dans la recherche : quand un seul sujet reste affiché, sa fiche s'ouvre.
+function openIfSingle(ctx: Ctx): void {
+  const shown = ctx.cards.filter((card) => !ctx.derived.hidden.has(card.id));
+  if (shown.length === 1 && shown[0] !== undefined) ctx.ui.setDetailId(shown[0].id);
+}
+
 function Screen({ ctx }: { ctx: Ctx }) {
   const { config, ui, filters, derived } = ctx;
   return (
@@ -184,9 +196,10 @@ function Screen({ ctx }: { ctx: Ctx }) {
         onImport={() => ui.openAdmin("importer")} onExercise={() => ui.openAdmin("exercice")}
         onSnapshots={() => ui.openAdmin("instantanes")}
         onArchive={() => ui.setArchive(true)} archivedCount={ctx.archivedCards.length}
+        fullscreen={ctx.fullscreen}
         onAdd={() => ui.setAdding(true)} />
       <Sidebar open={ui.sidebar} config={config} search={filters.state.search} draw={ctx.draw}
-        setSearch={filters.setSearch} filters={filters.state} onToggle={filters.toggle}
+        setSearch={filters.setSearch} onSearchEnter={() => openIfSingle(ctx)} filters={filters.state} onToggle={filters.toggle}
         onToggleBlockedOnly={filters.toggleBlockedOnly}
         onToggleNoConstraint={filters.toggleNoConstraint}
         onSetGroup={filters.setGroup} stats={derived.all} view={derived.view}
@@ -221,7 +234,8 @@ function Shell({ store, config }: { store: BoardStore; config: BoardConfig }) {
   const lens = useBoardLens(config, viewYear); // ADR 048: session only, a reload returns to « tous métiers »
   const drag = useDragHandlers(store, ui, !sorting.active); // ADR 044: a sorted board has no manual insertion point
   const handlers = useBoardHandlers(ui, config.lanes);
-  useShortcuts(ui, searchRef);
+  const fullscreen = useFullscreen(); // ADR 050: F or the header button
+  useShortcuts(ui, searchRef, fullscreen.toggle);
   const allCards = useDisplayCards(store.cards, config, viewYear);
   // The detail lookup searches ALL cards so an archived fiche opens from the archive.
   const { cards, archivedCards } = useBoardCards(allCards, viewYear, config.exercise.year, sorting.sort, lens);
@@ -242,6 +256,7 @@ function Shell({ store, config }: { store: BoardStore; config: BoardConfig }) {
   const ctx: Ctx = {
     store, config, ui, nowMs, filters, cards, archivedCards, derived, drag,
     handlers, searchRef, detailCard, focusLabel, viewYear, exercise, capacity, draw, bumpCapacity, sorting, sortPanel, lens,
+    fullscreen,
   };
 
   return <Screen ctx={ctx} />;

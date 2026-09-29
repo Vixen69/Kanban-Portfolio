@@ -10,6 +10,14 @@
 .modal-name { font-size: 16px; font-weight: 700; color: var(--tx-1); line-height: 1.25; }
 .modal-code { font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: var(--tx-3); display: block; margin-top: 3px; }
 .x { background: none; border: none; color: var(--tx-3); cursor: pointer; font-size: 14px; }
+/* Fiche : carte précédente / suivante de la case (ADR 050), « ‹ 3 / 12 › ». */
+.modal-top-right { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.fiche-nav { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--bd); border-radius: 6px; padding: 1px; background: #fff; }
+.fiche-nav button { background: none; border: none; width: 22px; height: 20px; border-radius: 4px; cursor: pointer; font-size: 15px; line-height: 1; color: var(--tx-2); font-family: inherit; }
+.fiche-nav button:hover:not(:disabled) { background: #eef2f7; color: var(--tx-1); }
+.fiche-nav button:disabled { color: var(--bd); cursor: default; }
+.fiche-nav-pos { font-size: 11px; font-weight: 600; color: var(--tx-2); font-variant-numeric: tabular-nums; padding: 0 4px; white-space: nowrap; }
+
 .x:hover { color: var(--tx-1); }
 .tag-row { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 13px; }
 .dtag { font-size: 9px; font-weight: 600; border: 1px solid; border-radius: 4px; padding: 2px 7px; letter-spacing: .02em; }

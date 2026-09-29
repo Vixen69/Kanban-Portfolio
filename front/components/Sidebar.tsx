@@ -22,6 +22,8 @@ export interface SidebarProps {
   config: BoardConfig;
   search: string;
   setSearch: (value: string) => void;
+  /** Entrée dans la recherche : ouvre la fiche quand un seul sujet reste affiché. */
+  onSearchEnter: () => void;
   filters: FilterState;
   onToggle: (group: FilterGroup, key: string) => void;
   onToggleBlockedOnly: () => void;
@@ -71,6 +73,8 @@ function SearchSection(props: SidebarProps) {
         placeholder="Rechercher un sujet…"
         value={props.search}
         onChange={(event) => props.setSearch(event.target.value)}
+        onKeyDown={(event) => { if (event.key === "Enter") props.onSearchEnter(); }}
+        title="Accents et majuscules ignorés · Entrée ouvre la fiche quand un seul sujet reste"
       />
       {props.search && (
         <button className="search-x" onClick={() => props.setSearch("")} title="Effacer" aria-label="Effacer la recherche"><Icon name="x" /></button>

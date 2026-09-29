@@ -52,7 +52,7 @@ body {
 .header { background: var(--ink); border-bottom: 1px solid #000; color: #e2e8f0; gap: 16px; padding: 0 14px 0 10px; }
 .hd-title { font-family: 'Inter', sans-serif; font-size: var(--fs-4); font-weight: 700; letter-spacing: -.01em; color: #fff; }
 .header .icon-btn { background: transparent; border: 1px solid transparent; color: #cbd5e1; width: 28px; height: 28px; border-radius: var(--r-2); display: inline-flex; align-items: center; justify-content: center; font-size: 16px; }
-.header .icon-btn:hover, .header .gear-btn.on { background: rgba(255,255,255,.1); color: #fff; border-color: transparent; }
+.header .icon-btn:hover, .header .gear-btn.on, .header .fullscreen-btn.on { background: rgba(255,255,255,.1); color: #fff; border-color: transparent; }
 .hd-year { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16); color: #fff; font-size: var(--fs-3); font-weight: 600; border-radius: var(--r-2); height: 26px; }
 .hd-year:hover { border-color: rgba(255,255,255,.34); }
 .hd-year.preparing { color: #fcd34d; border-color: rgba(252,211,77,.5); }
@@ -213,6 +213,8 @@ kbd { font-size: var(--fs-1); border-radius: 4px; }
 .modal-name { font-size: 17px; letter-spacing: -.015em; }
 .x { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: var(--r-2); font-size: 15px; }
 .x:hover { background: #f1f5f9; }
+.fiche-nav { border-radius: var(--r-2); }
+.fiche-nav button { display: inline-flex; align-items: center; justify-content: center; font-size: 13px; }
 .cpop { border: none; border-radius: var(--r-3); box-shadow: var(--shadow-float); }
 .kv { border-radius: 8px; }
 .kv span, .field-label, .sec-note, .rdr-label, .delay span, .prof-sub, .cpop-head { font-size: var(--fs-1); font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--tx-4); }

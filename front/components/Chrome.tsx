@@ -8,6 +8,8 @@ import { YearPicker } from "./YearPicker.tsx";
 import type { YearPickerProps } from "./YearPicker.tsx";
 import { HeaderMenu } from "./HeaderMenu.tsx";
 import { Icon } from "./icons.tsx";
+import { FullscreenButton } from "./FullscreenButton.tsx";
+import type { Fullscreen } from "../useFullscreen.ts";
 
 /** Props of the app header. All data flows down from App — no context. */
 export interface HeaderProps {
@@ -47,6 +49,8 @@ export interface HeaderProps {
   onAdd: () => void;
   /** The exercise shown and the selector's data (ADR 035). */
   exercise: YearPickerProps;
+  /** Full screen for the meeting room (ADR 050): the button hides where the browser refuses it. */
+  fullscreen: Fullscreen;
 }
 
 // Domain legend: one colored dot + short code per RDOM, full name on hover.
@@ -117,6 +121,7 @@ export function Header(props: HeaderProps) {
           <span className="blk-dot-static" /> <b>{stats.blocked}</b> bloqués
         </div>
         <Legend config={props.config} />
+        {props.fullscreen.supported && <FullscreenButton full={props.fullscreen.full} onToggle={props.fullscreen.toggle} />}
         <HeaderMenu archivedCount={props.archivedCount} onMetrics={props.onMetrics} onArchive={props.onArchive}
           onImport={props.onImport} onExercise={props.onExercise} onSnapshots={props.onSnapshots} onAdmin={props.onAdmin} />
         <button className="add-btn" onClick={props.onAdd} title="Nouveau sujet (N)"><Icon name="plus" /> Sujet</button>
