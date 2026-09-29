@@ -42,7 +42,8 @@ function UnifiedColumn({ col, index, cards, rows, props, read }: {
 }) {
   const style = span(index + 2, rows);
   if (props.collapsedCols.has(col.id)) {
-    return <CollapsedColCell cards={cards} config={props.config} onOpen={props.onOpen} style={style} />;
+    return <CollapsedColCell cards={cards} config={props.config} onOpen={props.onOpen} style={style}
+      onDragOver={(event) => props.onDragOverCell(event, UNIFIED_LANE, col.id)} onDrop={(event) => props.onDrop(event, UNIFIED_LANE, col.id)} />;
   }
   const wipLimit = cellWipLimit(props.config, UNIFIED_LANE, col.id);
   return (

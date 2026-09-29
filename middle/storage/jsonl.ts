@@ -87,12 +87,18 @@ function doRestoreCards(fd: number, state: State, cards: Card[]): void {
 }
 
 function doAppend(fd: number, state: State, input: CardEventInput): CardEvent {
-  const seq = state.maxSeq + 1;
-  const { line, event } = buildEvent(seq, input);
-  appendLines(fd, [line]);
-  state.events.push(event);
-  state.maxSeq = seq;
-  return event;
+  const [event] = doAppendMany(fd, state, [input]);
+  return event!;
+}
+
+// Appends several events in ONE write (ADR 052): every line is built — and
+// may throw — before anything reaches the file, so a batch is all or none.
+function doAppendMany(fd: number, state: State, inputs: CardEventInput[]): CardEvent[] {
+  const built = inputs.map((input, index) => buildEvent(state.maxSeq + 1 + index, input));
+  appendLines(fd, built.map((entry) => entry.line));
+  for (const entry of built) state.events.push(entry.event);
+  state.maxSeq += built.length;
+  return built.map((entry) => entry.event);
 }
 
 // The read side of the port: copies of the projection, never the live state.
@@ -172,6 +178,10 @@ function buildStorage(fd: number, state: State): BoardStorage {
     async appendEvent(input) {
       assertOpen();
       return doAppend(fd, state, input);
+    },
+    async appendEvents(inputs) {
+      assertOpen();
+      return doAppendMany(fd, state, inputs);
     },
     ...readers(state, assertOpen),
     ...snapshotReaders(state, assertOpen),

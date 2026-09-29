@@ -59,7 +59,8 @@ export interface BoardStore {
   reload(): Promise<void>;
   /** Card actions resolve true when persisted, false when refused. */
   createCard(input: NewCardInput): Promise<boolean>;
-  moveCard(cardId: string, to: MoveTarget): Promise<boolean>;
+  /** A move, with the decisions it carries when it is one (ADR 052). */
+  moveCard(cardId: string, to: MoveTarget, decisions?: DecisionInput[]): Promise<boolean>;
   blockCard(cardId: string, reason: string): Promise<boolean>;
   unblockCard(cardId: string): Promise<boolean>;
   editCard(cardId: string, patch: CardPatch): Promise<boolean>;
@@ -186,7 +187,7 @@ function useCardActions(reload: () => Promise<void>, setLastError: (m: string | 
   return useMemo(
     () => ({
       createCard: (input: NewCardInput) => perform(() => postCard(input)),
-      moveCard: (cardId: string, to: MoveTarget) => perform(() => postMove(cardId, to)),
+      moveCard: (cardId: string, to: MoveTarget, decisions?: DecisionInput[]) => perform(() => postMove(cardId, to, decisions)),
       blockCard: (cardId: string, reason: string) => perform(() => postBlock(cardId, reason)),
       unblockCard: (cardId: string) => perform(() => postUnblock(cardId)),
       editCard: (cardId: string, patch: CardPatch) => perform(() => postEdit(cardId, patch)),

@@ -87,3 +87,14 @@ test("an unknown or self beforeId leaves the fold order unchanged", () => {
     assert.deepEqual(states.map((s) => s.id), ["S001", "S002"], beforeId);
   }
 });
+
+test("a canal change inside a stage keeps the aging clock; a stage change resets it (ADR 052)", () => {
+  const card = testCard({ id: "S1", laneId: "laneA", columnId: "col2", createdAt: "2026-01-01T00:00:00.000Z" });
+  const [requalified] = foldEvents([card], [
+    event({ id: "evt-1", ts: "2026-03-01T00:00:00.000Z", type: "moved", cardId: "S1", fromColumn: "col2", toColumn: "col3", payload: { fromLaneId: "laneA", laneId: "laneA" } }),
+    event({ id: "evt-2", ts: "2026-04-01T00:00:00.000Z", type: "moved", cardId: "S1", fromColumn: "col3", toColumn: "col3", payload: { fromLaneId: "laneA", laneId: "laneB" } }),
+  ]);
+  assert.equal(requalified?.laneId, "laneB");
+  assert.equal(requalified?.columnId, "col3");
+  assert.equal(requalified?.enteredColumnAt, "2026-03-01T00:00:00.000Z"); // entered col3 then, not at the canal change
+});

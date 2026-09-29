@@ -4,14 +4,7 @@
 // validation — the client posts intents, never stored shapes.
 
 import type { DomainDecision, ImportAuditResult, ImportFilePayload, ImportLoadResult } from "../core/import-types.ts";
-import type {
-  CapacitySnapshot,
-  BoardConfig,
-  Card,
-  CardEvent,
-  CardPatch,
-  Criticality,
-} from "../core/types.ts";
+import type { CapacitySnapshot, BoardConfig, Card, CardEvent, CardPatch, Criticality, DecisionFrees, DecisionInstance, PauseKind } from "../core/types.ts";
 
 /** What GET /api/board returns: import snapshots + the full event log. */
 export interface BoardData {
@@ -199,13 +192,15 @@ export function postCard(input: NewCardInput): Promise<CreatedCard> {
 
 /**
  * POST a move intent. Inputs: card id, target lane/column and the optional
- * insertion target (beforeId, ADR 019).
+ * insertion target (beforeId, ADR 019); the decisions the move IS, when it
+ * enters Pause or changes a chosen canal (ADR 052 — written with it).
  * Output: the stored CardEvent. Failure: throws ApiError.
  */
-export function postMove(cardId: string, to: MoveTarget): Promise<CardEvent> {
+export function postMove(cardId: string, to: MoveTarget, decisions: DecisionInput[] = []): Promise<CardEvent> {
   return postIntent({
     type: "moved", cardId, toLaneId: to.laneId, toColumnId: to.columnId,
     ...(to.beforeId === undefined ? {} : { beforeId: to.beforeId }),
+    ...(decisions.length === 0 ? {} : { decisions }),
   });
 }
 
@@ -229,13 +224,22 @@ export function postComment(cardId: string, text: string): Promise<CardEvent> {
   return postIntent({ type: "commented", cardId, text });
 }
 
-/** A decision to record on a card (ADR 026): D-code, grid terms, reason, review day. */
+/** A decision to record on a card (ADR 026): D-code, grid terms, reason, review day — and the fiche's other blocks (ADR 052). */
 export interface DecisionInput {
   decisionId: string;
   grounds: string[];
   reason: string;
   /** ISO day (YYYY-MM-DD) or null. */
   reviewDate: string | null;
+  instance?: DecisionInstance | null;
+  options?: string;
+  frees?: DecisionFrees;
+  liftCondition?: string;
+  pauseKind?: PauseKind | null;
+  natureChange?: string;
+  architectValidated?: boolean;
+  /** The day a paper decision was taken (YYYY-MM-DD), traced afterwards. */
+  decidedOn?: string | null;
 }
 
 /**
@@ -260,7 +264,6 @@ export function postImportLoad(
 ): Promise<ImportLoadResult> {
   return request<ImportLoadResult>("/api/import/load", jsonInit("POST", { files, exercise, decisions }));
 }
-
 
 /** POST a decision intent. Inputs: card id, the DecisionInput. Output: the stored event. Failure: throws ApiError. */
 export function postDecision(cardId: string, input: DecisionInput): Promise<CardEvent> {

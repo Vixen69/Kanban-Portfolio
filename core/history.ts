@@ -6,6 +6,8 @@
 
 import type { BoardConfig, CardEvent } from "./types.ts";
 import { isReorder } from "./events.ts";
+import { gestureTrail, IMPORT_ACTOR, type Gesture } from "./gesture.ts";
+import { readDecision } from "./decision-record.ts";
 
 /** What a history line narrates — a movement or a blocking event. */
 export type HistoryKind = "move" | "block" | "unblock" | "decision" | "unlisted" | "relisted";
@@ -21,6 +23,12 @@ export interface HistoryEntry {
   reason: string | null;
   /** Decision code and name, grid terms, review date — decision lines only. */
   detail: string | null;
+  /**
+   * What a movement means (ADR 052): « Faire entrer », « Qualifiée : Petits
+   * Projets », « Requalifiée : Projets → Petits Projets », « Mise en pause »,
+   * « Reprise » — null for a plain move.
+   */
+  gesture: string | null;
   ts: string;
   actor: string;
 }
@@ -52,23 +60,62 @@ function frDay(isoDate: string): string {
   return `${day}/${month}/${year}`;
 }
 
-// A decision line (ADR 026): code and name, the known grid terms in config
-// order, the review date; the free-text reason travels in `reason`.
-function decisionEntry(config: BoardConfig, event: CardEvent, base: Omit<HistoryEntry, "kind">): HistoryEntry {
-  const id = typeof event.payload["decisionId"] === "string" ? event.payload["decisionId"] : "?";
-  const decision = config.decisions.find((d) => d.id === id);
-  const raw = event.payload["grounds"];
-  const wanted = new Set(Array.isArray(raw) ? raw.filter((g): g is string => typeof g === "string") : []);
-  const parts = [decision === undefined ? id : `${decision.short} ${decision.name}`];
-  for (const ground of config.decisionGrounds) if (wanted.has(ground.id)) parts.push(ground.name);
-  const review = event.payload["reviewDate"];
-  if (typeof review === "string" && review !== "") parts.push(`réexamen le ${frDay(review)}`);
-  const reason = event.payload["reason"];
-  return { ...base, kind: "decision", detail: parts.join(" · "), reason: typeof reason === "string" && reason !== "" ? reason : null };
+function laneName(config: BoardConfig, laneId: string | null): string {
+  if (laneId === null) return "?";
+  return config.lanes.find((lane) => lane.id === laneId)?.name ?? laneId;
 }
 
-function toEntry(config: BoardConfig, event: CardEvent): HistoryEntry {
-  const base = { fromName: null, toName: null, reason: null, detail: null, ts: event.ts, actor: event.actor };
+/**
+ * The words of a movement's gesture (ADR 052), or null for a plain move.
+ * Inputs: the config (canal names), the recorded event, its gesture.
+ * Output: « Faire entrer », « Qualifiée : X », « Requalifiée : X → Y »,
+ * « Mise en pause », « Reprise », joined by « · » when two apply.
+ * Failure: none.
+ */
+export function gestureWords(config: BoardConfig, event: CardEvent, gesture: Gesture): string | null {
+  const from = event.payload["fromLaneId"];
+  const to = event.payload["laneId"];
+  const words: string[] = [];
+  if (gesture.stage === "entry") words.push("Faire entrer");
+  if (gesture.stage === "pause") words.push("Mise en pause");
+  if (gesture.stage === "resume") words.push("Reprise");
+  if (gesture.canal === "qualification") words.push(`Qualifiée : ${laneName(config, typeof to === "string" ? to : null)}`);
+  if (gesture.canal === "requalification") {
+    words.push(`Requalifiée : ${laneName(config, typeof from === "string" ? from : null)} → ${laneName(config, typeof to === "string" ? to : null)}`);
+  }
+  return words.length === 0 ? null : words.join(" · ");
+}
+
+// The fiche's blocks worth a history line (ADR 052), in reading order.
+function decisionParts(config: BoardConfig, event: CardEvent): { parts: string[]; reason: string | null } {
+  const decision = readDecision(event);
+  if (decision === null) return { parts: ["?"], reason: null };
+  const type = config.decisions.find((d) => d.id === decision.decisionId);
+  const parts = [type === undefined ? decision.decisionId : `${type.short} ${type.name}`];
+  if (decision.pauseKind !== null) parts.push(decision.pauseKind === "tactique" ? "pause tactique" : "pause parking");
+  if (decision.fromLaneId !== null && decision.toLaneId !== null) {
+    parts.push(`${laneName(config, decision.fromLaneId)} → ${laneName(config, decision.toLaneId)}`);
+  }
+  const wanted = new Set(decision.grounds);
+  for (const ground of config.decisionGrounds) if (wanted.has(ground.id)) parts.push(ground.name);
+  if (decision.reviewDate !== null) parts.push(`réexamen le ${frDay(decision.reviewDate)}`);
+  if (decision.architectValidated) parts.push("validée par un architecte");
+  if (decision.decidedOn !== null) parts.push(`décidée le ${frDay(decision.decidedOn)}`);
+  const texts = [decision.natureChange, decision.reason, decision.liftCondition === "" ? "" : `Pour la lever : ${decision.liftCondition}`];
+  const reason = texts.filter((t) => t !== "").join(" — ");
+  return { parts, reason: reason === "" ? null : reason };
+}
+
+// A decision line (ADR 026/052): code and name, pause kind, canal change,
+// the known grid terms in config order, the review date; the texts
+// (what changed, the reason, what lifts the pause) travel in `reason`.
+function decisionEntry(config: BoardConfig, event: CardEvent, base: Omit<HistoryEntry, "kind">): HistoryEntry {
+  const { parts, reason } = decisionParts(config, event);
+  return { ...base, kind: "decision", detail: parts.join(" · "), reason };
+}
+
+function toEntry(config: BoardConfig, event: CardEvent, trail: ReadonlyMap<string, Gesture>): HistoryEntry {
+  const base = { fromName: null, toName: null, reason: null, detail: null, gesture: null, ts: event.ts, actor: event.actor };
   if (event.type === "decided") return decisionEntry(config, event, base);
   if (event.type === "unlisted") return { ...base, kind: "unlisted" };
   if (event.type === "relisted") return { ...base, kind: "relisted" };
@@ -77,12 +124,18 @@ function toEntry(config: BoardConfig, event: CardEvent): HistoryEntry {
     return { ...base, kind: "block", reason: typeof reason === "string" ? reason : null };
   }
   if (event.type === "unblocked") return { ...base, kind: "unblock" };
+  const gesture = trail.get(event.id);
   return {
     ...base,
     kind: "move",
     fromName: event.type === "moved" ? columnName(config, event.fromColumn) : null,
     toName: columnName(config, event.toColumn) ?? ENTRY_LABEL,
+    gesture: gesture === undefined || event.actor === IMPORT_ACTOR ? null : gestureWords(config, event, gesture),
   };
+}
+
+function oldestFirst(a: CardEvent, b: CardEvent): number {
+  return -newestFirst(a, b);
 }
 
 /**
@@ -97,11 +150,15 @@ function toEntry(config: BoardConfig, event: CardEvent): HistoryEntry {
  * column ids fall back to the raw id; a missing destination becomes
  * "Entrée"; created/imported entries always have fromName null; block and
  * unblock entries carry no columns. Same-cell reorders (ADR 019) are not
- * movements and are not narrated. Failure: none.
+ * movements and are not narrated. A hand movement carries its gesture's
+ * words (ADR 052); the import's moves carry none. Failure: none.
  */
 export function cardHistory(events: CardEvent[], cardId: string, config: BoardConfig): HistoryEntry[] {
-  return events
-    .filter((event) => event.cardId === cardId && NARRATED_TYPES.has(event.type) && !isReorder(event))
+  const mine = events.filter((event) => event.cardId === cardId).sort(oldestFirst);
+  const trail = gestureTrail(config, mine);
+  return mine
+    .filter((event) => NARRATED_TYPES.has(event.type) && !isReorder(event))
     .sort(newestFirst)
-    .map((event) => toEntry(config, event));
+    .map((event) => toEntry(config, event, trail));
 }
+

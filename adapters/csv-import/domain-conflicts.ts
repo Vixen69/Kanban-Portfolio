@@ -11,11 +11,12 @@
 import type { BoardConfig, CardEvent, CardState } from "../../core/types.ts";
 import type { CardEventInput } from "../../core/events.ts";
 import { lifecycleEvent } from "../../core/events.ts";
+import { IMPORT_ACTOR } from "../../core/gesture.ts";
 import type { DomainConflict, DomainDecision, DomainRef } from "../../core/import-types.ts";
 import type { EnrichedCard } from "./enrich.ts";
 
-/** Actor written on every event the loader produces. */
-export const IMPORT_ACTOR = "import-csv";
+/** Actor written on every event the loader produces — one definition, in core: its moves choose no canal (ADR 052). */
+export { IMPORT_ACTOR };
 
 /** What the log last said about a card's domain. */
 export interface PriorDecision {

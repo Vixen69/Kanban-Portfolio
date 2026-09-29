@@ -190,3 +190,23 @@ test("diacritics in payloads round-trip through the text file", () =>
       await reopened.close();
     }
   }));
+
+test("appendEvents writes a batch in order, and a bad event in it writes nothing (ADR 052)", () =>
+  withFile(async (path) => {
+    const store = createJsonlStorage(path);
+    const stored = await store.appendEvents([
+      lifecycleEvent("created", "S001", "local", TS),
+      lifecycleEvent("blocked", "S001", "local", TS, { reason: "attente" }),
+    ]);
+    assert.deepEqual(stored.map((event) => event.id), ["evt-1", "evt-2"]);
+    await assert.rejects(() => store.appendEvents([
+      lifecycleEvent("commented", "S001", "local", TS, { text: "ok" }),
+      lifecycleEvent("commented", "S001", "local", TS, { text: 1n as unknown as string }), // not serializable
+    ]));
+    assert.deepEqual((await store.listEvents()).map((event) => event.id), ["evt-1", "evt-2"]);
+    await store.close();
+    const reopened = createJsonlStorage(path);
+    assert.equal((await reopened.listEvents()).length, 2);
+    assert.equal((await reopened.appendEvent(lifecycleEvent("unblocked", "S001", "local", TS))).id, "evt-3");
+    await reopened.close();
+  }));

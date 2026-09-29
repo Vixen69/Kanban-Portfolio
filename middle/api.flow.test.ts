@@ -38,6 +38,7 @@ function stubStorage(cards: Card[] = [testCard({ id: "S001" })]): BoardStorage {
     async appendEvent(input: CardEventInput): Promise<CardEvent> {
       return append(input);
     },
+    appendEvents: async (inputs: CardEventInput[]): Promise<CardEvent[]> => inputs.map(append),
     async listEvents() {
       return events.slice();
     },

@@ -80,9 +80,10 @@ function typing(target: EventTarget | null): boolean {
 }
 
 // True while an editor of the fiche holds a draft a move would drop: the
-// blocking, decision and checklist forms, or an unsent comment.
+// blocking, decision and checklist forms, the fiche « Décision et Raison »
+// (ADR 052), or an unsent comment.
 function draftOpen(): boolean {
-  if (document.querySelector(".modal .block-form, .modal .dec-form, .modal .charge-editor") !== null) return true;
+  if (document.querySelector(".modal .block-form, .modal .dec-form, .modal .charge-editor, .modal.fd") !== null) return true;
   const comment = document.querySelector<HTMLInputElement>(".modal .cm-add input");
   return comment !== null && comment.value.trim() !== "";
 }

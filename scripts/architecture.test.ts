@@ -30,10 +30,12 @@ function* walk(dir: string): Generator<string> {
 
 const rel = (file: string) => file.slice(ROOT.length).replace(/\\/g, "/").replace(/^\//, "");
 
-// Every static import/export specifier in a file ("./x.ts", "react", "node:fs"…).
+// Every static import/export specifier in a file ("./x.ts", "react", "node:fs"…),
+// read at the start of a statement — so French text such as « l'import » in a
+// string or a comment is not taken for an import (ADR 052).
 function specifiers(file: string): string[] {
   const source = readFileSync(file, "utf8");
-  const re = /\b(?:import|export)\b[^"';]*?from\s*["']([^"']+)["']|\bimport\s*["']([^"']+)["']/g;
+  const re = /^\s*(?:import|export)\b[^"';]*?from\s*["']([^"']+)["']|^\s*import\s*["']([^"']+)["']/gm;
   const out: string[] = [];
   for (let m = re.exec(source); m !== null; m = re.exec(source)) out.push(m[1] ?? m[2] ?? "");
   return out;

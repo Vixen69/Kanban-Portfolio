@@ -1,0 +1,48 @@
+/* Fiche « Décision et Raison » (ADR 052) — la fiche papier V0.1 en fenêtre :
+   blocs numérotés, sobres ; rien ne bouge (ADR 051). Au-dessus de la fiche
+   de la carte quand on trace une pause depuis elle. */
+.fd-overlay { z-index: 70; }
+.modal.fd { width: 560px; }
+.fd-head { display: flex; flex-direction: column; gap: 3px; margin-bottom: 10px; }
+.fd-move { font-size: 11px; color: var(--tx-2); margin-top: 4px; }
+.fd-chip { font-size: 10px; font-weight: 700; color: #fff; border-radius: 4px; padding: 2px 8px; }
+.fd-sec { border: 1px solid var(--bd); border-radius: 7px; padding: 9px 11px; margin-bottom: 8px; display: flex; flex-direction: column; gap: 6px; }
+.fd-sec-head { display: flex; align-items: center; gap: 7px; font-size: 9px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--tx-2); }
+.fd-num { width: 16px; height: 16px; border-radius: 50%; background: #1e3a5f; color: #fff; font-size: 9px; display: inline-flex; align-items: center; justify-content: center; }
+.fd-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.fd-pill { font: inherit; font-size: 10px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--bd); background: #fff; color: var(--tx-2); cursor: pointer; }
+.fd-pill.on { background: #1e3a5f; border-color: #1e3a5f; color: #fff; }
+.fd-inline { display: inline-flex; align-items: center; gap: 6px; font-size: 10px; color: var(--tx-2); }
+.fd-date { width: auto; padding: 4px 7px; }
+.fd-grounds { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.fd-hint { font-size: 9px; color: var(--tx-4); }
+.fd-check { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--tx-2); }
+.fd-more { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.fd-free { display: grid; grid-template-columns: 70px 1fr; align-items: center; font-size: 10px; color: var(--tx-2); gap: 6px; }
+.fd-miss { margin: 0 0 8px; padding-left: 16px; font-size: 10px; color: #b45309; }
+.fd-err { font-size: 11px; color: var(--danger-strong); background: #fef2f2; border: 1px solid #f3c4c4; border-radius: 5px; padding: 6px 9px; margin-bottom: 8px; }
+/* La marque de pause sur les tickets de la colonne Pause (ADR 052). */
+.dec-pill.untraced { background: #fff !important; color: #7c3aed; box-shadow: inset 0 0 0 1px #7c3aed; border: 1px dashed #7c3aed; }
+.dec-status.untraced { background: #fff; color: #7c3aed; border: 1px dashed #7c3aed; }
+.dec-block { font-size: 10px; color: var(--tx-2); }
+.hist-gesture { color: #6d28d9; font-weight: 600; }
+.ccol-cell.dragover { background: #ede9fe; box-shadow: inset 0 0 0 2px #7c3aed; }
+/* Journal (Analytics › Journal, ADR 052) : dense, une ligne par geste. */
+.jr { display: flex; flex-direction: column; gap: 8px; padding: 12px 16px; overflow: auto; }
+.jr-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.jr-period { width: auto; }
+.jr-search { width: 220px; margin-left: auto; }
+.jr-head { font-size: 11px; color: var(--tx-2); }
+.jr-table { border-collapse: collapse; width: 100%; font-size: 11px; }
+.jr-table td { padding: 3px 6px; border-bottom: 1px solid #eef1f5; vertical-align: top; }
+.jr-day td { padding-top: 10px; font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--tx-3); border-bottom: 1px solid var(--bd); }
+.jr-time { color: var(--tx-4); white-space: nowrap; width: 44px; }
+.jr-link { background: none; border: none; padding: 0; font: inherit; color: var(--tx-1); cursor: pointer; text-align: left; }
+.jr-link:hover { text-decoration: underline; }
+.jr-code { font-family: ui-monospace, Menlo, monospace; font-size: 10px; color: var(--tx-3); margin-right: 6px; }
+.jr-label { font-weight: 600; white-space: nowrap; }
+.jr-decision .jr-label { color: #6d28d9; }
+.jr-block .jr-label { color: var(--danger-strong); }
+.jr-move { color: var(--tx-2); }
+.jr-detail { color: var(--tx-2); max-width: 420px; }
+.jr-actor { color: var(--tx-4); white-space: nowrap; }

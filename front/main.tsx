@@ -13,6 +13,7 @@ import "./styles/board.css";
 import "./styles/lens.css";
 import "./styles/cards.css";
 import "./styles/modal.css";
+import "./styles/decision.css";
 import "./styles/admin.css";
 import "./styles/metrics.css";
 

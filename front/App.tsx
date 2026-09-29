@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import type { BoardConfig, CardPatch, CardState } from "../core/types.ts";
 import type { ResourceDraw } from "../core/filters.ts";
-import type { DecisionInput, MoveTarget } from "./api.ts";
+import type { MoveTarget } from "./api.ts";
 import { columnById } from "./lookup.ts";
 import { adminWrites } from "./adminWrites.ts";
 import { useBoardStore, type BoardStore } from "./useBoardStore.ts";
@@ -14,17 +14,12 @@ import { useCardSort, useSortPanel, type CardSorting, type SortPanel } from "./u
 import { useDetailProjection } from "./useDetailProjection.ts";
 import { useResourceDraw, type CapacityFetch } from "./useCapacity.ts";
 import { useFilters, type Filters } from "./useFilters.ts";
-import {
-  useBoardHandlers,
-  useDragHandlers,
-  useShortcuts,
-  useUiState,
-  type UiState,
-} from "./useInteractions.ts";
+import { useBoardHandlers, useShortcuts, useUiState, type UiState } from "./useInteractions.ts";
+import { useBoardMoves, type BoardMoves } from "./useBoardMoves.ts";
+import { DecisionDialog } from "./components/DecisionDialog.tsx";
 import { useNow } from "./useNow.ts";
 import { useCellNav } from "./cellNav.ts";
 import { useFullscreen, type Fullscreen } from "./useFullscreen.ts";
-import { useMoveFlash, type MoveFlashState } from "./useMoveFlash.ts";
 import { MoveFlash } from "./components/MoveFlash.tsx";
 import { useBoardLens, type BoardLens } from "./useRafLens.ts";
 import { scopeLabel, scopeTitle } from "./rafLabels.ts";
@@ -53,7 +48,8 @@ interface Ctx {
   /** The archived cards (design v11 Archives view), remapped for display. */
   archivedCards: CardState[];
   derived: ReturnType<typeof useDerived>;
-  drag: ReturnType<typeof useDragHandlers>;
+  /** Every move of the board: drag, decision gate (ADR 052), 4-second signal (ADR 050), edit save. */
+  moves: BoardMoves;
   handlers: ReturnType<typeof useBoardHandlers>;
   searchRef: React.RefObject<HTMLInputElement>;
   detailCard: CardState | null;
@@ -73,24 +69,6 @@ interface Ctx {
   lens: BoardLens;
   /** Full screen for the meeting room (ADR 050). */
   fullscreen: Fullscreen;
-  /** The last move, outlined for 4 s and read to screen readers (ADR 050). */
-  moveFlash: MoveFlashState | null;
-}
-
-
-// One edit-form save, decomposed into its API intents in order: field
-// patch, then move. The sequence stops at the first refused intent so a
-// failed patch never lets the move half-apply; the store surfaces the
-// failure via lastError. (Blocked state is not part of the edit form —
-// design v11 governs it through the BLOCAGE section of the detail.)
-async function saveEdit(
-  store: BoardStore,
-  card: CardState,
-  patch: CardPatch,
-  move: MoveTarget | null,
-): Promise<void> {
-  if (Object.keys(patch).length > 0 && !(await store.editCard(card.id, patch))) return;
-  if (move) await store.moveCard(card.id, move);
 }
 
 function CardModals({ ctx }: { ctx: Ctx }) {
@@ -107,7 +85,7 @@ function CardModals({ ctx }: { ctx: Ctx }) {
         onClose={closeAll}
         onCancel={() => ui.setEditing(false)}
         onSave={(patch: CardPatch, move: MoveTarget | null) => {
-          void saveEdit(store, detailCard, patch, move);
+          void ctx.moves.saveEdit(detailCard, patch, move); // the move passes the decision gate (ADR 052)
           ui.setEditing(false);
         }}
         onDelete={(id: string) => { void store.deleteCard(id); closeAll(); }} />
@@ -122,7 +100,7 @@ function CardModals({ ctx }: { ctx: Ctx }) {
       onBlock={(reason: string) => void store.blockCard(detailCard.id, reason)}
       onUnblock={() => void store.unblockCard(detailCard.id)}
       onComment={(text: string) => void store.commentCard(detailCard.id, text)}
-      onDecide={(input: DecisionInput) => void store.decideCard(detailCard.id, input)}
+      onTracePause={() => ctx.moves.gate.tracePause(detailCard)}
       onArchive={() => { void store.archiveCard(detailCard.id); closeAll(); }}
       onUnarchive={() => void store.unarchiveCard(detailCard.id)} />
   );
@@ -143,9 +121,13 @@ function ShellModals({ ctx }: { ctx: Ctx }) {
       )}
       {ui.metrics && (
         <AnalyticsView cards={ctx.cards} events={store.events} config={config} now={ctx.nowMs} year={ctx.viewYear} capacity={ctx.capacity}
+          allCards={[...ctx.cards, ...ctx.archivedCards]} onOpenCard={(id) => { ui.setMetrics(false); ui.setDetailId(id); }}
           onClose={() => ui.setMetrics(false)} />
       )}
-
+      {ctx.moves.gate.pending !== null && (
+        <DecisionDialog key={ctx.moves.gate.pending.card.id + (ctx.moves.gate.pending.to?.columnId ?? "")} pending={ctx.moves.gate.pending}
+          config={config} now={ctx.nowMs} error={store.lastError} onConfirm={ctx.moves.gate.confirm} onCancel={ctx.moves.gate.cancel} />
+      )}
       {ui.archive && (
         <ArchiveView cards={ctx.archivedCards} config={config}
           onUnarchive={(id: string) => void store.unarchiveCard(id)}
@@ -157,7 +139,8 @@ function ShellModals({ ctx }: { ctx: Ctx }) {
 }
 
 function BoardArea({ ctx }: { ctx: Ctx }) {
-  const { config, ui, derived, drag, handlers } = ctx;
+  const { config, ui, derived, handlers } = ctx;
+  const { drag } = ctx.moves;
   return (
     <div className="board-area">
       <BoardGrid config={config} cards={ctx.cards} hiddenIds={derived.hidden} filterHiddenIds={derived.filterHidden}
@@ -173,7 +156,7 @@ function BoardArea({ ctx }: { ctx: Ctx }) {
         onDragLeaveCell={drag.onDragLeaveCell}
         onCardOver={drag.onCardOver} onCardDrop={drag.onCardDrop} />
       {derived.view.shown === 0 && <EmptyOverlay onReset={() => { ctx.filters.reset(); ctx.lens.all(); }} />}
-      <MoveFlash current={ctx.moveFlash} />
+      <MoveFlash current={ctx.moves.flash} />
     </div>
   );
 }
@@ -236,8 +219,7 @@ function Shell({ store, config }: { store: BoardStore; config: BoardConfig }) {
   const sorting = useCardSort();
   const { viewYear, exercise } = useExerciseShown(store.cards, config.exercise.year); // ADR 035: the year shown
   const lens = useBoardLens(config, viewYear); // ADR 048: session only, a reload returns to « tous métiers »
-  const moveFlash = useMoveFlash(config); // ADR 050: the last move signalled for 4 s
-  const drag = useDragHandlers(store, ui, !sorting.active, moveFlash.flash); // ADR 044: a sorted board has no manual insertion point
+  const moves = useBoardMoves(store, config, ui, !sorting.active); // ADR 052 gate, ADR 050 signal; ADR 044: sorted = no insertion point
   const handlers = useBoardHandlers(ui, config.lanes);
   const fullscreen = useFullscreen(); // ADR 050: F or the header button
   useShortcuts(ui, searchRef, fullscreen.toggle);
@@ -259,9 +241,9 @@ function Shell({ store, config }: { store: BoardStore; config: BoardConfig }) {
   }, [detailId, setDetailId, setEditing, store.cards]);
   const focusLabel = ui.focusCol ? (columnById(config)[ui.focusCol]?.name ?? null) : null;
   const ctx: Ctx = {
-    store, config, ui, nowMs, filters, cards, archivedCards, derived, drag,
+    store, config, ui, nowMs, filters, cards, archivedCards, derived, moves,
     handlers, searchRef, detailCard, focusLabel, viewYear, exercise, capacity, draw, bumpCapacity, sorting, sortPanel, lens,
-    fullscreen, moveFlash: moveFlash.current,
+    fullscreen,
   };
 
   return <Screen ctx={ctx} />;

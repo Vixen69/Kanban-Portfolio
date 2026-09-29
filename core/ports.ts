@@ -72,6 +72,12 @@ export interface BoardStorage {
    */
   appendEvent(input: CardEventInput): Promise<CardEvent>;
   /**
+   * Appends several events together — all or none (ADR 052: a move and the
+   * decision it carries). Output: the stored copies, in order.
+   * Failure: rejects on storage errors (store closed, I/O); never partial.
+   */
+  appendEvents(inputs: CardEventInput[]): Promise<CardEvent[]>;
+  /**
    * Returns the events in append order (seq ascending): all of them, or
    * the ones a filter keeps (ADR 040 — `afterSeq` for the incremental
    * refresh, `cardIds` for the per-action validation fold).

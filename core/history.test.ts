@@ -23,10 +23,10 @@ const EVENTS: CardEvent[] = [
 
 test("history narrates movements and blockages, most recent first (design v11)", () => {
   assert.deepEqual(cardHistory(EVENTS, "S001", CONFIG), [
-    { kind: "unblock", fromName: null, toName: null, reason: null, detail: null, ts: "2026-03-05T00:00:00.000Z", actor: "sciforma-sync" },
-    { kind: "block", fromName: null, toName: null, reason: "attente", detail: null, ts: "2026-03-01T00:00:00.000Z", actor: "sciforma-sync" },
-    { kind: "move", fromName: "Colonne 1", toName: "Colonne 2", reason: null, detail: null, ts: "2026-02-01T00:00:00.000Z", actor: "anonymous" },
-    { kind: "move", fromName: null, toName: "Colonne 1", reason: null, detail: null, ts: "2026-01-01T00:00:00.000Z", actor: "sciforma-sync" },
+    { kind: "unblock", fromName: null, toName: null, reason: null, detail: null, gesture: null, ts: "2026-03-05T00:00:00.000Z", actor: "sciforma-sync" },
+    { kind: "block", fromName: null, toName: null, reason: "attente", detail: null, gesture: null, ts: "2026-03-01T00:00:00.000Z", actor: "sciforma-sync" },
+    { kind: "move", fromName: "Colonne 1", toName: "Colonne 2", reason: null, detail: null, gesture: "Faire entrer", ts: "2026-02-01T00:00:00.000Z", actor: "anonymous" },
+    { kind: "move", fromName: null, toName: "Colonne 1", reason: null, detail: null, gesture: null, ts: "2026-01-01T00:00:00.000Z", actor: "sciforma-sync" },
   ]);
 });
 
@@ -37,7 +37,7 @@ test("created behaves like imported: fromName null, destination named", () => {
     CONFIG,
   );
   assert.deepEqual(history, [
-    { kind: "move", fromName: null, toName: "Colonne 2", reason: null, detail: null, ts: "2026-05-01T00:00:00.000Z", actor: "anonymous" },
+    { kind: "move", fromName: null, toName: "Colonne 2", reason: null, detail: null, gesture: null, ts: "2026-05-01T00:00:00.000Z", actor: "anonymous" },
   ]);
 });
 
@@ -48,7 +48,7 @@ test("a blocked event without a string reason yields reason null", () => {
     CONFIG,
   );
   assert.deepEqual(history, [
-    { kind: "block", fromName: null, toName: null, reason: null, detail: null, ts: "2026-05-01T00:00:00.000Z", actor: "sciforma-sync" },
+    { kind: "block", fromName: null, toName: null, reason: null, detail: null, gesture: null, ts: "2026-05-01T00:00:00.000Z", actor: "sciforma-sync" },
   ]);
 });
 
@@ -98,4 +98,31 @@ test("a same-cell reorder is not narrated (ADR 019)", () => {
 
 test("a card with no narrated events yields an empty history", () => {
   assert.deepEqual(cardHistory(EVENTS, "S999", CONFIG), []);
+});
+
+test("hand moves carry their gesture's words; the import's do not (ADR 052)", () => {
+  const config = { ...CONFIG, lanes: [...CONFIG.lanes] };
+  const move = (id: number, from: [string, string], to: [string, string], actor = "anonymous") => event({
+    id: `evt-${id}`, ts: `2026-0${id}-01T00:00:00.000Z`, type: "moved", actor,
+    fromColumn: from[1], toColumn: to[1], payload: { fromLaneId: from[0], laneId: to[0] },
+  });
+  const history = cardHistory([
+    move(1, ["laneA", "col2"], ["laneB", "col3"]),
+    move(2, ["laneB", "col3"], ["laneA", "col3"]),
+    move(3, ["laneA", "col3"], ["laneB", "col3"], "import-csv"),
+  ], "S001", config);
+  assert.deepEqual(history.map((entry) => entry.gesture), [
+    null,
+    "Requalifiée : Lane B → Lane A",
+    "Qualifiée : Lane B",
+  ]);
+});
+
+test("a decision line reads the fiche's blocks (ADR 052)", () => {
+  const history = cardHistory([event({
+    id: "evt-1", ts: "2026-05-01T00:00:00.000Z", type: "decided",
+    payload: { decisionId: "D4", grounds: ["n_avance_pas"], reason: "Plus de sponsor.", reviewDate: "2026-11-02", pauseKind: "tactique", liftCondition: "Un sponsor nommé", decidedOn: "2026-10-01" },
+  })], "S001", CONFIG);
+  assert.equal(history[0]?.detail, "D4 Mettre en pause · pause tactique · N’avance pas · réexamen le 02/11/2026 · décidée le 01/10/2026");
+  assert.equal(history[0]?.reason, "Plus de sponsor. — Pour la lever : Un sponsor nommé");
 });

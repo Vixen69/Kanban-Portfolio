@@ -51,7 +51,7 @@ test("unknown decisions, unknown grid terms, bad dates and long reasons are refu
   await assert.rejects(() => post({ grounds: ["x"] }), /Terme de la grille inconnu/);
   await assert.rejects(() => post({ grounds: "fin_proche" }), /Termes de la grille invalides/);
   await assert.rejects(() => post({ reviewDate: "01/10/2026" }), /Date de réexamen invalide/);
-  await assert.rejects(() => post({ reason: "x".repeat(1001) }), /Raison trop longue/);
+  await assert.rejects(() => post({ reason: "x".repeat(1001) }), /Raison : texte trop long/);
 });
 
 test("grid terms are deduplicated and ordered as the config declares them", async () => {

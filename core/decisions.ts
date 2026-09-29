@@ -5,6 +5,7 @@
 // Pure; no React, no Node.
 
 import type { BoardConfig, CardDecision, CardState, DecisionGround, DecisionType } from "./types.ts";
+import { PAUSE_COLUMN_ID, PAUSE_DECISION_ID } from "./gesture.ts";
 
 const DAY_MS = 86_400_000;
 
@@ -69,14 +70,41 @@ export function groundsOf(config: BoardConfig, ids: readonly string[]): Decision
   return config.decisionGrounds.filter((ground) => wanted.has(ground.id));
 }
 
+function daysUntil(isoDate: string | null, now: Date): number | null {
+  if (isoDate === null || !isIsoDate(isoDate)) return null;
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  return Math.round((Date.parse(`${isoDate}T00:00:00.000Z`) - today) / DAY_MS);
+}
+
+/** The pause a card in Pause is under (ADR 052). */
+export interface PauseStatus {
+  /** The « Mettre en pause » decision in force; null = the pause is not traced. */
+  entry: CardDecision | null;
+  /** Whole days until the review (negative = overdue), null without a date. */
+  daysToReview: number | null;
+  overdue: boolean;
+}
+
 /**
- * Whether a card's last decision has a review date already past.
+ * The pause in force on a card sitting in Pause: the last « Mettre en
+ * pause » recorded since it entered the stage (with the move, or traced
+ * — or renewed — later from the fiche). Only a card in Pause shows a
+ * decision on the board (ADR 052).
+ * Inputs: the card state, now. Output: the PauseStatus, or null when the
+ * card is not in Pause. Failure: none.
+ */
+export function pauseStatus(card: CardState, now: Date): PauseStatus | null {
+  if (card.columnId !== PAUSE_COLUMN_ID) return null;
+  const current = card.decisions.filter((d) => d.decisionId === PAUSE_DECISION_ID && d.ts >= card.enteredColumnAt);
+  const entry = current.length === 0 ? null : (current[current.length - 1] ?? null);
+  const daysToReview = daysUntil(entry?.reviewDate ?? null, now);
+  return { entry, daysToReview, overdue: daysToReview !== null && daysToReview < 0 };
+}
+
+/**
+ * Whether a card in Pause is past its review date (the sidebar counter).
  * Inputs: the card state, now. Output: boolean. Failure: none.
  */
 export function reviewOverdue(card: CardState, now: Date): boolean {
-  const entry = lastDecision(card);
-  if (entry === null || entry.reviewDate === null || !isIsoDate(entry.reviewDate)) return false;
-  const review = Date.parse(`${entry.reviewDate}T00:00:00.000Z`);
-  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  return review < today;
+  return pauseStatus(card, now)?.overdue === true;
 }

@@ -32,6 +32,9 @@ test("the fold projects decided events in order and reads the last one", () => {
   assert.deepEqual(lastDecision(state), {
     actor: "test", ts: "2026-09-01T10:00:00.000Z", decisionId: "D4",
     grounds: ["n_avance_pas"], reason: "Bloqué depuis deux mois.", reviewDate: "2026-09-30",
+    // A decision recorded before ADR 052 reads with the fiche's other blocks empty.
+    instance: null, options: "", frees: { people: "", budget: "", capacity: "" }, liftCondition: "",
+    pauseKind: null, natureChange: "", fromLaneId: null, toLaneId: null, architectValidated: false, decidedOn: null,
   });
   const status = decisionStatus(state, CONFIG, NOW);
   assert.equal(status?.decision?.name, "Mettre en pause");
@@ -45,7 +48,7 @@ test("a past review date reads as overdue; no decision reads as null", () => {
   const status = decisionStatus(state, CONFIG, NOW);
   assert.equal(status?.daysToReview, -7);
   assert.equal(status?.overdue, true);
-  assert.equal(reviewOverdue(state, NOW), true);
+  assert.equal(reviewOverdue(state, NOW), false); // only a card in Pause is counted (ADR 052)
   assert.equal(decisionStatus(fold([]), CONFIG, NOW), null);
   assert.equal(lastDecision(fold([])), null);
 });

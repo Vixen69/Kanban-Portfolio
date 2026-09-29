@@ -8,6 +8,9 @@ import type { CardState, Lane } from "../core/types.ts";
 import { UNIFIED_LANE, unifiedColumnIds } from "../core/layout.ts";
 
 import type { MoveTarget } from "./api.ts";
+
+/** The board's single way to move a card: resolves true once the move is written (ADR 052). */
+export type MoveRequest = (card: CardState, to: MoveTarget) => Promise<boolean>;
 import type { BoardStore } from "./useBoardStore.ts";
 import { createDragHoverStore } from "./dragHover.ts";
 
@@ -144,15 +147,15 @@ export function useShortcuts(ui: UiState, searchRef: RefObject<HTMLInputElement 
  * Inputs: the board store, the UiState (dragOver highlight + dropCardId),
  * reorder: false while the board is sorted (ADR 044) — a drop onto a card
  * is then a plain move into that card's cell, with no beforeId and no
- * insertion mark; onMoved: called with the card as it was and its target
- * once the move is written (the 4-second signal, ADR 050).
+ * insertion mark; move: the board's single way to move a card (the
+ * decision gate, ADR 052, then the 4-second signal, ADR 050).
  * Output: the seven handlers BoardGrid expects. Failure: a refused move is
  * logged by the store; the board simply does not change.
  */
-export function useDragHandlers(store: BoardStore, ui: UiState, reorder: boolean, onMoved: (card: CardState, to: MoveTarget) => void) {
+export function useDragHandlers(store: BoardStore, ui: UiState, reorder: boolean, move: MoveRequest) {
   const dragId = useRef<string | null>(null);
   const { dragHover } = ui;
-  const { cards, moveCard } = store;
+  const { cards } = store;
   const onDragStart = useCallback((event: DragEvent, card: CardState) => {
     dragId.current = card.id;
     event.dataTransfer.effectAllowed = "move";
@@ -173,11 +176,10 @@ export function useDragHandlers(store: BoardStore, ui: UiState, reorder: boolean
     // A unified cell (before the RDO, ADR 039) has no canal: the card keeps its own.
     const target = laneId === UNIFIED_LANE ? card.laneId : laneId;
     if (card.laneId === target && card.columnId === columnId) return;
-    const to = { laneId: target, columnId };
-    void moveCard(id, to).then((ok) => { if (ok) onMoved(card, to); });
-  }, [cards, moveCard, dragHover, onMoved]);
+    void move(card, { laneId: target, columnId });
+  }, [cards, dragHover, move]);
   const cellHover = useCellHoverHandlers(ui);
-  const cardLevel = useCardDropHandlers(dragId, store, ui, reorder, onMoved);
+  const cardLevel = useCardDropHandlers(dragId, store, ui, reorder, move);
   return { onDragStart, onDragEnd, onDrop, ...cellHover, ...cardLevel };
 }
 
@@ -221,10 +223,9 @@ function useCardDropHandlers(
   store: BoardStore,
   ui: UiState,
   reorder: boolean,
-  onMoved: (card: CardState, to: MoveTarget) => void,
+  move: MoveRequest,
 ) {
   const { dragHover } = ui;
-  const { moveCard } = store;
   const onCardOver = useCallback((event: DragEvent, card: CardState) => {
     event.preventDefault();
     event.stopPropagation();
@@ -242,9 +243,9 @@ function useCardDropHandlers(
     dragId.current = null;
     dragHover.set({ over: null, dropCardId: null });
     if (!id || id === target.id) return;
-    const move = cardDropMove(id, target, store, reorder);
+    const to = cardDropMove(id, target, store, reorder);
     const dragged = store.cards.find((candidate) => candidate.id === id);
-    if (move !== null) void moveCard(id, move).then((ok) => { if (ok && dragged !== undefined) onMoved(dragged, move); });
-  }, [dragId, moveCard, reorder, dragHover, store, onMoved]);
+    if (to !== null && dragged !== undefined) void move(dragged, to);
+  }, [dragId, reorder, dragHover, store, move]);
   return { onCardOver, onCardDrop };
 }
