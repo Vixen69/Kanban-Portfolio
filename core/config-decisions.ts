@@ -28,7 +28,7 @@ export const DEFAULT_DECISION_GROUNDS: readonly DecisionGround[] = [
   { id: "strategique", name: "Stratégique", family: "proteger" },
   { id: "n_avance_pas", name: "N’avance pas", family: "pause" },
   { id: "valeur_faible", name: "Valeur faible au regard du reste à faire", family: "pause" },
-  { id: "affame", name: "Affame un fournisseur saturé", family: "pause" },
+  { id: "affame", name: "Contention sur une ressource interne limitée", family: "pause" },
   { id: "peut_attendre", name: "Peut attendre", family: "pause" },
 ];
 

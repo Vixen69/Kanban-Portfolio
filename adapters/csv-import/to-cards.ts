@@ -208,13 +208,14 @@ function refreshExisting(
   return input.stored === undefined ? null : { fresh: placed, stored: input.stored };
 }
 
-// A new card: its snapshot plus the « imported » event.
+// A new card: its snapshot plus the « imported » event, dated at its
+// entry and carrying the load instant (importedAt, ADR 052 journal).
 function createCard(plan: LoadPlan, id: string, card: EnrichedCard, config: BoardConfig, now: Date): void {
   plan.cards.push(toCard(id, card, config, plan, plan.exercise));
   if (card.domainId === null) plan.domainMissing.push(id);
   plan.created++;
   plan.events.push({
-    ...lifecycleEvent("imported", id, IMPORT_ACTOR, entryTs(card, now), { laneId: card.laneId }),
+    ...lifecycleEvent("imported", id, IMPORT_ACTOR, entryTs(card, now), { laneId: card.laneId, importedAt: now.toISOString() }),
     toColumn: card.columnId,
   });
 }

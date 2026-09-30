@@ -1,16 +1,18 @@
 // Analytics (☷, author 2026-09-16): one full-screen view, a tab bar on
 // top — « Capacité » (the arbitration read-out, ADR 024/025) and « Flux »
 // (débit, délais, temps par étape, encours, blocages — the v11/v12 flow
-// diagnostics back, computed from the event log). Both tabs read the
-// exercise the header points at.
+// diagnostics back, computed from the event log) and « Journal » (every
+// move and decision, ADR 052). The tabs read the exercise the header
+// points at.
 
 import { useState } from "react";
 import type { BoardConfig, CardEvent, CardState } from "../../core/types.ts";
 import { CapacityTab } from "./CapacityView.tsx";
 import { FlowTab } from "./FlowView.tsx";
+import { JournalTab } from "./JournalView.tsx";
 import type { CapacityFetch } from "../useCapacity.ts";
 
-type Tab = "capacite" | "flux";
+type Tab = "capacite" | "flux" | "journal";
 
 /** Props of the analytics view. */
 export interface AnalyticsViewProps {
@@ -25,11 +27,19 @@ export interface AnalyticsViewProps {
   year: number;
   /** The capacity snapshot of that exercise, fetched by the app (ADR 041). */
   capacity: CapacityFetch;
+  /** The log as written, restores included (the journal's restore lines). */
+  log: CardEvent[];
+  /** Every card of the exercise, archived ones included (the journal). */
+  allCards: CardState[];
+  /** Opens a card's fiche from the journal. */
+  onOpenCard: (cardId: string) => void;
+  /** Hidden while a fiche opened from it is shown: tab, period and filters survive. */
+  hidden: boolean;
   onClose: () => void;
 }
 
 function TabBar({ tab, onTab }: { tab: Tab; onTab: (tab: Tab) => void }) {
-  const tabs: Array<[Tab, string]> = [["capacite", "Capacité"], ["flux", "Flux"]];
+  const tabs: Array<[Tab, string]> = [["capacite", "Capacité"], ["flux", "Flux"], ["journal", "Journal"]];
   return (
     <div className="an-tabs" role="tablist">
       {tabs.map(([id, label]) => (
@@ -42,14 +52,14 @@ function TabBar({ tab, onTab }: { tab: Tab; onTab: (tab: Tab) => void }) {
 }
 
 /**
- * Full-screen analytics view with its two tabs.
+ * Full-screen analytics view with its three tabs.
  * Inputs: AnalyticsViewProps. Output: the overlay DOM. Failure modes:
  * none — each tab handles its own empty state.
  */
 export function AnalyticsView(props: AnalyticsViewProps) {
   const [tab, setTab] = useState<Tab>("capacite");
   return (
-    <div className="metrics-view m2">
+    <div className="metrics-view m2" style={{ display: props.hidden ? "none" : undefined }}>
       <div className="metrics-head">
         <div>
           <h2 className="metrics-title">Analytics</h2>
@@ -58,9 +68,11 @@ export function AnalyticsView(props: AnalyticsViewProps) {
         <TabBar tab={tab} onTab={setTab} />
         <button className="btn ghost" onClick={props.onClose}>Fermer ✕</button>
       </div>
-      {tab === "capacite"
-        ? <CapacityTab cards={props.cards} config={props.config} now={props.now} fetch={props.capacity} />
-        : <FlowTab cards={props.cards} events={props.events} config={props.config} now={props.now} />}
+      {tab === "capacite" && <CapacityTab cards={props.cards} config={props.config} now={props.now} fetch={props.capacity} />}
+      {tab === "flux" && <FlowTab cards={props.cards} events={props.events} config={props.config} now={props.now} />}
+      {tab === "journal" && (
+        <JournalTab cards={props.allCards} events={props.events} log={props.log} config={props.config} now={props.now} onOpen={props.onOpenCard} />
+      )}
     </div>
   );
 }

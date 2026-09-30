@@ -141,8 +141,8 @@ test("cardHistory: a domain line among the others, with its actor and date, in t
     { id: "evt-4", ts: "2026-09-25T09:00:00.000Z", actor: "pmo", cardId: "S001", type: "edited", fromColumn: null, toColumn: null, payload: { patch: { domain: "beta", subDomain: "b1" } } },
   ];
   assert.deepEqual(cardHistory(events, "S001", CONFIG), [
-    { kind: "domain", fromName: null, toName: null, reason: null, detail: "Domaine confirmé : Beta · Beta 1", ts: "2026-09-25T09:00:00.000Z", actor: "pmo" },
-    { kind: "domain", fromName: null, toName: null, reason: null, detail: "Domaine : Sans domaine → Beta · Beta 1", ts: "2026-09-20T09:00:00.000Z", actor: "pmo" },
-    { kind: "move", fromName: null, toName: "Colonne 1", reason: null, detail: null, ts: "2026-09-01T00:00:00.000Z", actor: "import-csv" },
+    { kind: "domain", fromName: null, toName: null, reason: null, detail: "Domaine confirmé : Beta · Beta 1", gesture: null, ts: "2026-09-25T09:00:00.000Z", actor: "pmo" },
+    { kind: "domain", fromName: null, toName: null, reason: null, detail: "Domaine : Sans domaine → Beta · Beta 1", gesture: null, ts: "2026-09-20T09:00:00.000Z", actor: "pmo" },
+    { kind: "move", fromName: null, toName: "Colonne 1", reason: null, detail: null, gesture: null, ts: "2026-09-01T00:00:00.000Z", actor: "import-csv" },
   ]);
 });

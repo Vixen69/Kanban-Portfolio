@@ -23,7 +23,7 @@ export interface ViewCounts {
   normal: number;
   /** Cards the last import did not list (ADR 026). */
   absent: number;
-  /** Cards whose last decision's review date is past (ADR 026). */
+  /** Cards in Pause whose pause in force is past its review date (ADR 026, ADR 052 — core/decisions.ts pauseStatus). */
   toReview: number;
   /** Cards without domain (ADR 061) — the « Sans domaine » pill. */
   noDomain: number;

@@ -58,9 +58,8 @@ export interface Card {
   id: string;
   title: string;
   /**
-   * Domain id — see BoardConfig.domains. "" = no domain (ADR 061): an
-   * imported project whose export resolves none waits for a hand
-   * assignment — never a default domain.
+   * Domain id — see BoardConfig.domains. "" = no domain (ADR 061): an imported
+   * project whose export resolves none waits for a hand assignment — never a default domain.
    */
   domain: string;
   /**
@@ -194,6 +193,19 @@ export interface CardComment {
   text: string;
 }
 
+/** Where a decision was taken — the paper fiche's bloc 1 (ADR 052). */
+export type DecisionInstance = "revue" | "synchro";
+
+/** A pause's kind (ADR 052, optional): tactique = rediscussed at the next synchro; parking = later. */
+export type PauseKind = "tactique" | "parking";
+
+/** What a decision frees or commits — bloc 4 of the fiche (ADR 052). */
+export interface DecisionFrees {
+  people: string;
+  budget: string;
+  capacity: string;
+}
+
 /** One decision on a card (D1–D6, ADR 026), projected from a "decided" event. */
 export interface CardDecision {
   actor: string;
@@ -205,6 +217,21 @@ export interface CardDecision {
   reason: string;
   /** Planned review, ISO day (YYYY-MM-DD); null when none. */
   reviewDate: string | null;
+  // The fiche's other blocks (ADR 052) — empty on decisions recorded before it.
+  instance: DecisionInstance | null;
+  /** Options set aside, and why (bloc 3). */
+  options: string;
+  frees: DecisionFrees;
+  /** What is expected to lift the pause (bloc 5). */
+  liftCondition: string;
+  pauseKind: PauseKind | null;
+  /** What changed in the subject's nature (bloc 6), and the canal from → to. */
+  natureChange: string;
+  fromLaneId: string | null;
+  toLaneId: string | null;
+  architectValidated: boolean;
+  /** The day the decision was taken when traced after the fact (YYYY-MM-DD). */
+  decidedOn: string | null;
 }
 
 /**
@@ -223,6 +250,8 @@ export interface CardState extends Card {
   archived: boolean;
   /** Decisions in chronological order, from "decided" events (ADR 026). */
   decisions: CardDecision[];
+  /** ISO ts the card last LEFT Pause (ADR 052); absent = never left it. The pause in force is the last one decided after it. */
+  pauseLeftAt?: string;
   /** ISO ts of the import that did not list the card (ADR 026); null when listed. */
   absentFromLastImport: string | null;
 }

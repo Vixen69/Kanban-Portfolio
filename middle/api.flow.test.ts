@@ -35,9 +35,8 @@ function stubStorage(cards: Card[] = [testCard({ id: "S001" })]): BoardStorage {
       baseCards.push({ ...card });
       return append(created);
     },
-    async appendEvent(input: CardEventInput): Promise<CardEvent> {
-      return append(input);
-    },
+    appendEvent: async (input: CardEventInput): Promise<CardEvent> => append(input),
+    appendEvents: async (inputs: CardEventInput[]): Promise<CardEvent[]> => inputs.map(append),
     async listEvents() {
       return events.slice();
     },
@@ -53,7 +52,6 @@ function stubStorage(cards: Card[] = [testCard({ id: "S001" })]): BoardStorage {
     async clearCapacity() {},
     ...stubSnapshots(baseCards, () => seq),
     async close() {},
-
   };
 }
 

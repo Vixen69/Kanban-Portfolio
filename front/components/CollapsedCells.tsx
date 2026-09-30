@@ -4,7 +4,7 @@
 // 300-line file cap once the v12 totals moved in.
 
 import { useState } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, DragEvent } from "react";
 import type { BoardConfig, CardState } from "../../core/types.ts";
 import { isStale } from "../../core/aging.ts";
 import { CollapsedTicketList } from "./CollapsedTicketList.tsx";
@@ -45,32 +45,41 @@ export function CollapsedCell({ cards, config, now, onOpen }: {
       <span className="ccount">{cards.length || ""}</span>
       {blocked > 0 && <span className="cblk">{blocked}</span>}
       {stale > 0 && <span className="cstale" title={stale + " stagnant(s)"} />}
-      {pop.rect && <CollapsedTicketList anchorRect={pop.rect} list={cards} config={config} onOpen={onOpen} onClose={pop.close} />}
+      {pop.rect && <CollapsedTicketList anchorRect={pop.rect} list={cards} config={config} now={now} onOpen={onOpen} onClose={pop.close} />}
     </div>
   );
 }
 
 /**
  * Collapsed-column strip cell: count and blocked badge, plus the same
- * one-click ticket popover (design v11).
+ * one-click ticket popover (design v11) — and a drop target: Pause starts
+ * collapsed, and a card dropped on its strip goes into Pause (ADR 052).
  * Inputs: the cards of this cell (pre-filtered), the config, the
- * open-card callback. Output: the narrow strip content.
+ * open-card callback, the drop callbacks. Output: the narrow strip content.
  * Failure modes: none.
  */
-export function CollapsedColCell({ cards, config, onOpen, style }: {
+export function CollapsedColCell({ cards, config, now, onOpen, style, onDragOver, onDrop }: {
   cards: CardState[];
   config: BoardConfig;
+  /** Epoch ms: the pause marks of the ticket list (ADR 052). */
+  now: number;
   onOpen: (card: CardState) => void;
   /** Grid placement (a unified column's strip spans the lane rows, ADR 039). */
   style?: CSSProperties;
+  onDragOver: (event: DragEvent) => void;
+  onDrop: (event: DragEvent) => void;
 }) {
   const blocked = cards.filter((card) => card.blocked).length;
   const pop = useCellPopover(cards.length);
+  const [over, setOver] = useState(false);
   return (
-    <div className={"ccol-cell" + (cards.length ? " has" : "")} style={style} onMouseEnter={pop.open} onMouseLeave={pop.close} onClick={pop.open}>
+    <div className={"ccol-cell" + (cards.length ? " has" : "") + (over ? " dragover" : "")} style={style}
+      onMouseEnter={pop.open} onMouseLeave={pop.close} onClick={pop.open}
+      onDragOver={(event) => { setOver(true); onDragOver(event); }} onDragLeave={() => setOver(false)}
+      onDrop={(event) => { setOver(false); onDrop(event); }}>
       <span className="ccount">{cards.length || ""}</span>
       {blocked > 0 && <span className="cblk">{blocked}</span>}
-      {pop.rect && <CollapsedTicketList anchorRect={pop.rect} list={cards} config={config} onOpen={onOpen} onClose={pop.close} />}
+      {pop.rect && <CollapsedTicketList anchorRect={pop.rect} list={cards} config={config} now={now} onOpen={onOpen} onClose={pop.close} />}
     </div>
   );
 }

@@ -69,3 +69,7 @@ déjà présentes sans décision écrite.
 - Écartée ensuite : la palette de commandes (« on n'en a pas besoin »).
   Reste à trancher : « depuis la dernière synchro » (bouton de filtre ancré
   sur un instantané) et un journal global des déplacements.
+
+**Amendé par l'ADR 052 (2026-09-30)** : la « décision éclair » écartée au
+§5 revient sous une autre forme — la décision naît du geste (mise en pause,
+requalification) dans la fiche « Décision et Raison ».

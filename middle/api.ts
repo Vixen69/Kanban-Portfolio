@@ -6,17 +6,18 @@
 
 import type { BoardStorage } from "../core/ports.ts";
 import type { CardEventInput } from "../core/events.ts";
-import { lifecycleEvent, movedEvent } from "../core/events.ts";
+import { lifecycleEvent } from "../core/events.ts";
 import { foldEvents } from "../core/state.ts";
-import { RESTORE_CARD_ID } from "../core/restore.ts";
-import { unifiedColumnIds } from "../core/layout.ts";
+import { effectiveEvents, RESTORE_CARD_ID } from "../core/restore.ts";
 import { validateBoardConfig } from "../core/config.ts";
 import { domainPrevious } from "../core/domain-history.ts";
-import type { BoardConfig, CardEventType, CardState } from "../core/types.ts";
+import type { BoardConfig, CardEvent, CardEventType, CardState } from "../core/types.ts";
 import type { ConfigStore } from "./config-store.ts";
 import { validatePatch } from "./validation.ts";
 import { BadRequest } from "./errors.ts";
 import { buildDecided } from "./decisions.ts";
+import { buildMoves } from "./moves.ts";
+import { PAUSE_COLUMN_ID, PAUSE_DECISION_ID } from "../core/gesture.ts";
 
 export { isCriticality } from "./validation.ts";
 
@@ -103,7 +104,8 @@ export async function getBoard(storage: BoardStorage): Promise<ApiResult> {
  * serializedWrite) so concurrent intents validate against each other's
  * results, never against a shared stale fold.
  * Inputs: the storage, the runtime board config, the parsed JSON body.
- * Output: 201 with the stored CardEvent.
+ * Output: 201 with the stored CardEvent (a move carrying decisions —
+ * ADR 052 — appends them with it, all or none; the move is returned).
  * Failure: throws BadRequest (→ 400) on an invalid intent; propagates storage
  * errors (→ 500).
  */
@@ -112,8 +114,9 @@ export function postEvent(storage: BoardStorage, config: BoardConfig, raw: unkno
     const cardIds = involvedCardIds(raw);
     const [cards, events] = await Promise.all([storage.listBaseCards(), storage.listEvents({ cardIds })]);
     const states = foldEvents(cards.filter((card) => cardIds.includes(card.id)), events);
-    const input = buildValidatedEvent(config, states, raw);
-    return { status: 201, body: await storage.appendEvent(input) };
+    const inputs = buildValidatedEvent(config, states, effectiveEvents(events), raw);
+    const stored = inputs.length === 1 ? [await storage.appendEvent(inputs[0]!)] : await storage.appendEvents(inputs);
+    return { status: 201, body: stored[0] };
   });
 }
 
@@ -147,8 +150,9 @@ export function asObject(raw: unknown): Record<string, unknown> {
 function buildValidatedEvent(
   config: BoardConfig,
   states: CardState[],
+  events: readonly CardEvent[],
   raw: unknown,
-): CardEventInput {
+): CardEventInput[] {
   const body = asObject(raw);
   const type = body["type"];
   if (typeof type !== "string" || !POSTABLE.has(type)) {
@@ -157,7 +161,9 @@ function buildValidatedEvent(
   const cardId = body["cardId"];
   const state = typeof cardId === "string" ? states.find((card) => card.id === cardId) : undefined;
   if (!state) throw new BadRequest("Carte inconnue.");
-  return buildByType(config, type as CardEventType, state, body, new Date().toISOString(), states);
+  const ts = new Date().toISOString();
+  if (type === "moved") return buildMoves(config, state, body, { states, events, ts, actor: SERVER_ACTOR });
+  return [buildByType(config, type as CardEventType, state, body, ts)];
 }
 
 function buildByType(
@@ -166,11 +172,8 @@ function buildByType(
   state: CardState,
   body: Record<string, unknown>,
   ts: string,
-  states: CardState[],
 ): CardEventInput {
   switch (type) {
-    case "moved":
-      return buildMoved(config, state, body, ts, states);
     case "blocked":
       return buildBlocked(state, body, ts);
     case "unblocked":
@@ -189,62 +192,15 @@ function buildByType(
     case "deleted":
       return lifecycleEvent("deleted", state.id, SERVER_ACTOR, ts);
     case "decided":
+      // Decisions are taken by the gesture (ADR 052): alone, only the pause
+      // of a card in Pause is traced (decided on paper) or renewed.
+      if (body["decisionId"] !== PAUSE_DECISION_ID || state.columnId !== PAUSE_COLUMN_ID) {
+        throw new BadRequest("Les décisions se prennent au geste : seule la pause d’une carte en Pause se trace depuis la fiche.");
+      }
       return buildDecided(config, state, body, ts, SERVER_ACTOR);
     default:
       throw new BadRequest("Type d’évènement non autorisé.");
   }
-}
-
-// A move's optional insertion target (ADR 019): a card of the target cell — the whole column without canal (ADR 039).
-function validBeforeId(
-  states: CardState[],
-  state: CardState,
-  body: Record<string, unknown>,
-  to: { laneId: string; columnId: string; anyLane: boolean },
-): string | undefined {
-  const beforeId = body["beforeId"];
-  if (beforeId === undefined) return undefined;
-  if (typeof beforeId !== "string" || beforeId === state.id) {
-    throw new BadRequest("Carte cible de l’insertion invalide.");
-  }
-  // An archived target is off the board: no legitimate drop can land on it.
-  const target = states.find((card) => card.id === beforeId);
-  if (!target || target.archived || (!to.anyLane && target.laneId !== to.laneId) || target.columnId !== to.columnId) {
-    throw new BadRequest("Carte cible de l’insertion hors de la cellule visée.");
-  }
-  return beforeId;
-}
-
-// "from" is the card's authoritative current cell (server-derived, not
-// client-supplied); "to" must reference known topology. A same-cell move is
-// only accepted as a reorder (beforeId present, ADR 019) — a plain same-cell
-// move would reset the aging clock for nothing.
-function buildMoved(
-  config: BoardConfig,
-  state: CardState,
-  body: Record<string, unknown>,
-  ts: string,
-  states: CardState[],
-): CardEventInput {
-  // An archived card is off the board (ADR 017): its position may not
-  // change until it is unarchived — the log must never record board moves
-  // of invisible cards.
-  if (state.archived) throw new BadRequest("Carte archivée : désarchiver avant de déplacer.");
-  const toColumnId = body["toColumnId"];
-  const toLaneId = body["toLaneId"];
-  if (typeof toColumnId !== "string" || !config.columns.some((c) => c.id === toColumnId)) {
-    throw new BadRequest("Colonne cible inconnue.");
-  }
-  if (typeof toLaneId !== "string" || !config.lanes.some((lane) => lane.id === toLaneId)) {
-    throw new BadRequest("Canal cible inconnu.");
-  }
-  const to = { laneId: toLaneId, columnId: toColumnId };
-  const beforeId = validBeforeId(states, state, body, { ...to, anyLane: unifiedColumnIds(config).has(toColumnId) });
-  if (state.laneId === toLaneId && state.columnId === toColumnId && beforeId === undefined) {
-    throw new BadRequest("Carte déjà dans cette cellule.");
-  }
-  const from = { laneId: state.laneId, columnId: state.columnId };
-  return movedEvent(state.id, from, to, SERVER_ACTOR, ts, beforeId);
 }
 
 function buildBlocked(

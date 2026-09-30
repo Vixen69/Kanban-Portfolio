@@ -1,8 +1,8 @@
 # Proposition — les décisions par le geste (sans code)
 
-Date : 2026-09-29 · Statut : **proposition, rien n'est construit** · À
-trancher par l'auteur après la RSP du 1er octobre. Deviendra l'ADR 052
-« Décisions par le geste » une fois les questions tranchées.
+Date : 2026-09-29 · Statut : **adoptée le 2026-09-30, construite (ADR 052)**, avec
+ces écarts voulus par l'auteur : pas de « Stopper » (pause, puis archiver) ;
+le type de pause (tactique / parking) facultatif ; board.json inchangé.
 
 Demande de l'auteur (2026-09-29) : quatre décisions seulement — Faire
 entrer, Requalifier, Mettre en pause, Stopper ; « Continuer » et

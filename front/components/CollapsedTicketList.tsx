@@ -8,6 +8,7 @@
 
 import type { BoardConfig, CardState } from "../../core/types.ts";
 import { typeById } from "../lookup.ts";
+import { DecisionMark } from "./cardMarks.tsx";
 
 /** Props of the collapsed-cell ticket popover. */
 export interface CollapsedTicketListProps {
@@ -16,20 +17,23 @@ export interface CollapsedTicketListProps {
   /** The cards of that cell (pre-filtered). */
   list: CardState[];
   config: BoardConfig;
+  /** Epoch ms (App's clock): the pause marks read their review date (ADR 052). */
+  now: number;
   onOpen: (card: CardState) => void;
   onClose: () => void;
 }
 
 /**
  * The ticket popover of a collapsed cell: count header + one row per card
- * (type badge, name, blocked mark). Clicking a row closes the popover and
+ * (type badge, name, the pause mark of a card in Pause — ADR 052 —, blocked
+ * mark). Clicking a row closes the popover and
  * opens the card detail; leaving the cell AND the popover closes it (the
  * owning cell's mouseleave).
  * Inputs: CollapsedTicketListProps. Output: the fixed-position anchor
  * holding div.cpop.
  * Failure modes: none.
  */
-export function CollapsedTicketList({ anchorRect, list, config, onOpen, onClose }: CollapsedTicketListProps) {
+export function CollapsedTicketList({ anchorRect, list, config, now, onOpen, onClose }: CollapsedTicketListProps) {
   const types = typeById(config);
   const belowSpace = window.innerHeight - anchorRect.bottom;
   const openUp = belowSpace < 220 && anchorRect.top > belowSpace;
@@ -52,6 +56,7 @@ export function CollapsedTicketList({ anchorRect, list, config, onOpen, onClose 
               onClick={(event) => { event.stopPropagation(); onClose(); onOpen(card); }}>
               {type && <span className="cpop-type" style={{ background: type.color }}>{type.short}</span>}
               <span className="cpop-name">{card.title}</span>
+              <DecisionMark card={card} config={config} now={now} />
               {card.blocked && <span className="cpop-blk" title="Bloqué">!</span>}
             </button>
           );

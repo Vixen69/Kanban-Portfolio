@@ -17,7 +17,7 @@ import { filterEvents } from "../../core/event-filter.ts";
 import type { CardEventInput } from "../../core/events.ts";
 import type { CapacitySnapshot, Card, CardEvent } from "../../core/types.ts";
 import { summarizeSnapshot, type BoardSnapshot } from "../../core/snapshot.ts";
-import { appendLines, buildCard, buildEvent, headerLine, loadState } from "./jsonl-format.ts";
+import { appendLines, buildCard, buildEvent, buildEventsLine, headerLine, loadState } from "./jsonl-format.ts";
 import type { CapacityClearedRecord, CapacityRecord, CardsRecord, SnapshotRecord, State } from "./jsonl-format.ts";
 
 function doImport(fd: number, state: State, cards: Card[], events: CardEventInput[]): void {
@@ -95,12 +95,27 @@ function doRestoreCards(fd: number, state: State, cards: Card[]): void {
 }
 
 function doAppend(fd: number, state: State, input: CardEventInput): CardEvent {
-  const seq = state.maxSeq + 1;
+  const [event] = doAppendMany(fd, state, [input]);
+  return event!;
+}
+
+// One event, its own "event" record.
+function singleLine(seq: number, input: CardEventInput): { line: string; events: CardEvent[] } {
   const { line, event } = buildEvent(seq, input);
-  appendLines(fd, [line]);
-  state.events.push(event);
-  state.maxSeq = seq;
-  return event;
+  return { line, events: [event] };
+}
+
+// Appends several events on ONE line in one write (ADR 052): the line is
+// built — and may throw — before anything reaches the file, and a crash
+// that tears it loses the whole batch on reopen: all or none, even then.
+// A single event keeps its own "event" record.
+function doAppendMany(fd: number, state: State, inputs: CardEventInput[]): CardEvent[] {
+  const first = state.maxSeq + 1;
+  const built = inputs.length === 1 ? singleLine(first, inputs[0]!) : buildEventsLine(first, inputs);
+  appendLines(fd, [built.line]);
+  for (const event of built.events) state.events.push(event);
+  state.maxSeq += built.events.length;
+  return built.events;
 }
 
 // The read side of the port: copies of the projection, never the live state.
@@ -186,6 +201,10 @@ function buildStorage(fd: number, state: State): BoardStorage {
     async appendEvent(input) {
       assertOpen();
       return doAppend(fd, state, input);
+    },
+    async appendEvents(inputs) {
+      assertOpen();
+      return doAppendMany(fd, state, inputs);
     },
     ...readers(state, assertOpen),
     ...snapshotReaders(state, assertOpen),

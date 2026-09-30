@@ -155,7 +155,7 @@ function histBody(entry: HistoryEntry) {
     // With the load's reason: « Absente de l’import — état « Reporté »… »; older events read as before.
     case "unlisted": return entry.reason ? <><b>Absente de l’import</b> — {entry.reason}</> : <b>Absente du dernier import</b>;
     case "relisted": return <><b>De retour dans l’import</b>{entry.reason ? ` — ${entry.reason}` : ""}</>;
-    default: return <>{entry.fromName ? `${entry.fromName} → ` : ""}<b>{entry.toName}</b>{entry.reason ? ` — ${entry.reason}` : ""}</>;
+    default: return <>{entry.gesture !== null && <span className="hist-gesture">{entry.gesture} · </span>}{entry.fromName && entry.fromName !== entry.toName ? `${entry.fromName} → ` : ""}<b>{entry.toName}</b>{entry.reason ? ` — ${entry.reason}` : ""}</>;
   }
 }
 

@@ -30,14 +30,38 @@ function* walk(dir: string): Generator<string> {
 
 const rel = (file: string) => file.slice(ROOT.length).replace(/\\/g, "/").replace(/^\//, "");
 
-// Every static import/export specifier in a file ("./x.ts", "react", "node:fs"…).
-function specifiers(file: string): string[] {
-  const source = readFileSync(file, "utf8");
-  const re = /\b(?:import|export)\b[^"';]*?from\s*["']([^"']+)["']|\bimport\s*["']([^"']+)["']/g;
+// Every import/export specifier in a source ("./x.ts", "react", "node:fs"…):
+// static ones read at the start of a statement — a line start, after « ; »
+// or after a closing comment — so French text such as « l'import » in a
+// string or a comment is not taken for an import (ADR 052); dynamic
+// import("…") of a quoted string too.
+const IMPORTS = /(?:^|;|\*\/)\s*(?:import|export)\b[^"';]*?from\s*["']([^"']+)["']|(?:^|;|\*\/)\s*import\s*["']([^"']+)["']|\bimport\s*\(\s*["']([^"']+)["']/gm;
+
+function specifiersIn(source: string): string[] {
   const out: string[] = [];
-  for (let m = re.exec(source); m !== null; m = re.exec(source)) out.push(m[1] ?? m[2] ?? "");
+  const re = new RegExp(IMPORTS.source, IMPORTS.flags);
+  for (let m = re.exec(source); m !== null; m = re.exec(source)) out.push(m[1] ?? m[2] ?? m[3] ?? "");
   return out;
 }
+
+function specifiers(file: string): string[] {
+  return specifiersIn(readFileSync(file, "utf8"));
+}
+
+test("the scanner reads every import form, and no French text as one", () => {
+  const cases: Array<[string, string[]]> = [
+    ["import {\n  a,\n  b,\n} from \"./multi.ts\";", ["./multi.ts"]],
+    ["export * from \"./all.ts\";", ["./all.ts"]],
+    ["export { x } from \"./x.ts\";", ["./x.ts"]],
+    ["import type { T } from \"./types.ts\";", ["./types.ts"]],
+    ["import \"./side-effect.css\";", ["./side-effect.css"]],
+    ["import a from \"./a.ts\"; import b from \"react\";", ["./a.ts", "react"]],
+    ["/* x */ import b from \"react\";", ["react"]],
+    ["const m = await import(\"node:fs\");", ["node:fs"]],
+    ["// réexamen de l'import, puis from \"react\"\nconst label = \"Déplacée par l'import\", from = 1;", []],
+  ];
+  for (const [source, expected] of cases) assert.deepEqual(specifiersIn(source), expected, source);
+});
 
 // "<rel path> → \"<specifier>\"" for each import in dir matching the predicate.
 function offenders(dir: string, bad: (spec: string) => boolean): string[] {
