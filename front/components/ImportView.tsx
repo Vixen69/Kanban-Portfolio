@@ -136,6 +136,19 @@ function Summary({ result }: { result: ImportAuditResult }) {
   );
 }
 
+// ADR 054: the facts the files leave blank on cards already on the board —
+// the stored value stands. Said before the load (audit) and after it.
+function KeptFacts({ result }: { result: ImportAuditResult }) {
+  if (result.factsKept.length === 0) return null;
+  const verb = "load" in result ? "ont été gardées" : "seront gardées";
+  return (
+    <div className="import-summary">
+      Absentes des fichiers, les valeurs déjà sur le tableau {verb} (jamais effacées) :{" "}
+      {result.factsKept.map((f) => `${f.label} (${f.cards} carte${f.cards > 1 ? "s" : ""})`).join(" · ")}
+    </div>
+  );
+}
+
 function LoadSummary({ result }: { result: ImportLoadResult }) {
   const l = result.load;
   return (
@@ -184,6 +197,7 @@ function Outcome({ phase, error, shown, config, decisions, setDecisions, acknowl
       {busy && <div className="m2-note">{phase.what === "audit" ? "Audit en cours…" : "Chargement en cours…"}</div>}
       {phase.kind === "loaded" && <LoadSummary result={phase.result} />}
       {shown !== null && <Summary result={shown} />}
+      {shown !== null && <KeptFacts result={shown} />}
       {phase.kind === "audited" && (
         <ImportConflicts conflicts={conflicts} decisions={decisions} config={config}
           onDecide={(cardId, decision) => setDecisions({ ...decisions, [cardId]: decision })}

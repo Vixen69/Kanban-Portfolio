@@ -17,4 +17,5 @@ export type { OwnerStats } from "./owners.ts";
 export type { CapacityBuild, CapacityStats } from "./capacity.ts";
 export type { CardCharge, ChargeStats } from "./charges.ts";
 export { IMPORT_ACTOR, baseCardId, cardId, planLoad, withLegacyIds } from "./to-cards.ts";
+export { keepStoredCapacity } from "./keep-capacity.ts";
 export type { LoadPlan } from "./to-cards.ts";

@@ -637,6 +637,27 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-30 (nuit) — Le chef de projet : le responsable de domaine quand il est le seul nom
+
+- **Règle de l'auteur** : le chef de projet est Responsable 1, ou Responsable 2 quand le 1 est un responsable de domaine ; « des fois c'est le responsable de domaine, s'il a son nom et qu'il n'y a pas d'autre nom ».
+- **Fait** : quand tous les noms donnés sont des responsables de domaine, le premier devient chef de projet (avant : case vide). Même règle pour l'onglet Projets et ProjetsCdP (`owner-rule.ts`).
+
+### 2026-09-30 (soir) — Un import n'efface jamais une information absente (ADR 054)
+
+- **Incident** : un rechargement partiel (Coût, Projets, SP 2026, PdC
+  Ressources, sans ProjetsCdP) a vidé tous les chefs de projet : la carte de
+  base était reconstruite des seuls fichiers reçus, un champ absent
+  remplaçait la valeur stockée.
+- **Règle de l'auteur** : « s'il y avait une info et que le nouvel import,
+  il n'y a pas l'info, on garde ».
+- **Fait** : un champ laissé vide par les fichiers garde la valeur stockée
+  (chef de projet, type, codes, argent, charges, date RDR ; le plan de
+  charge est gardé ou remplacé en entier ; zéro est une valeur) ; la
+  capacité garde ses parties laissées vides (lecture COUT PREV sans fichier
+  Coût, domaine ou capacité d'une personne). L'audit annonce ce qui sera
+  gardé, le chargement dit ce qu'il a gardé. Un seul mode d'import :
+  complet ou partiel, même chemin.
+
 ### 2026-09-30 — Comparer un instantané avec maintenant (ADR 053)
 
 - **Inquiétude de l'auteur** : un réimport des mêmes fichiers fait apparaître

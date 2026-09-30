@@ -15,7 +15,7 @@ import { dirname, join, resolve } from "node:path";
 import { validateBoardConfig } from "../core/config.ts";
 import { loadServerConfig } from "../middle/config.ts";
 import { createConfigStore } from "../middle/config-store.ts";
-import { planLoad, renderReport, runImportAudit, withLegacyIds } from "../adapters/csv-import/index.ts";
+import { keepStoredCapacity, planLoad, renderReport, runImportAudit, withLegacyIds } from "../adapters/csv-import/index.ts";
 import type { CardAssembly } from "../adapters/csv-import/index.ts";
 import type { DomainDecision } from "../core/import-types.ts";
 import type { InputFile, LoadPlan } from "../adapters/csv-import/index.ts";
@@ -108,7 +108,10 @@ async function load(
     const [events, baseCards] = await Promise.all([storage.listEvents(), storage.listBaseCards()]);
     const plan = planWithDecisions(deck, config, baseCards, events, year, domaines);
     await storage.importCards(plan.cards, plan.events);
-    if (capacity !== null) await storage.importCapacity(withLegacyIds(capacity.snapshot, plan.aliases));
+    if (capacity !== null) {
+      const fresh = withLegacyIds(capacity.snapshot, plan.aliases);
+      await storage.importCapacity(keepStoredCapacity(fresh, await storage.getCapacity(year)));
+    }
     return plan;
   } finally {
     await storage.close();
@@ -166,7 +169,9 @@ function loadSummary(plan: LoadPlan): string {
     ` · ${plan.moved} déplacée(s) par l'export` +
     ` · ${plan.unlisted} absente(s) de l'export (marquées, jamais supprimées) · ${plan.relisted} de retour` +
     ` · ${plan.kept} position(s) conservée(s) (export sans jalon)` +
-    ` · domaines : ${plan.domainReplaced} remplacé(s), ${plan.domainKept} gardé(s)${divergences}`;
+    ` · domaines : ${plan.domainReplaced} remplacé(s), ${plan.domainKept} gardé(s)${divergences}` +
+    (plan.factsKept.length === 0 ? "" : "\nAbsents des fichiers, gardés du tableau (ADR 054) : " +
+      plan.factsKept.map((f) => `${f.label} ${f.cards} carte(s)`).join(" · "));
 }
 
 const args = parseArgs(process.argv.slice(2));

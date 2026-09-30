@@ -218,3 +218,19 @@ test("ADR 036: no conflict when the export resolved no domain — the board's va
   const fresh = planLoad([blank], CONFIG, [], [], NOW);
   assert.equal(fresh.cards[0]?.domain, CONFIG.domains[0]?.id, "a new card without domain takes the first configured one");
 });
+
+test("ADR 054: a partial re-import (no CdP, no SP, no plan de charge) never erases the stored facts", () => {
+  const before = stored("actifs");
+  const partial = card({ owner: null, budgetEstimated: null, budgetRdli: null, charges: [], budgetConsumed: 95 });
+  const plan = planLoad([partial], CONFIG, before.cards, before.events, NOW);
+  const refreshed = plan.cards[0];
+  assert.equal(refreshed?.owner, "Alice MERLE");
+  assert.equal(refreshed?.budgetEstimated, 120.5);
+  assert.equal(refreshed?.budgetRdli, 150);
+  assert.deepEqual(refreshed?.chargeByProfile, [{ profileId: "pmo", jh: 40, done: 25 }]);
+  assert.equal(refreshed?.budgetConsumed, 95, "a fact the files carry still replaces");
+  assert.deepEqual(plan.factsKept.map((f) => [f.label, f.cards]), [
+    ["chef de projet", 1], ["enveloppe RDLI k€", 1], ["estimé k€", 1], ["plan de charge par métier", 1],
+  ]);
+  assert.deepEqual(planLoad([partial], CONFIG, [], [], NOW).factsKept, [], "a first load has nothing to keep");
+});
