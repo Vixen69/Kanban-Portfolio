@@ -9,6 +9,8 @@ import { isReorder } from "./events.ts";
 import { eventSequence } from "./event-sequence.ts";
 import { effectiveEvents } from "./restore.ts";
 import { foldOrder } from "./fold-order.ts";
+import { readDecision } from "./decision-record.ts";
+import { PAUSE_COLUMN_ID } from "./gesture.ts";
 
 // Validators of the fields an "edited" event may patch (CardPatch, v2).
 // Anything else in the payload is silently ignored — replays must never
@@ -106,17 +108,22 @@ export function toCard(subject: Subject, financials: Financials | null): Card {
 // toColumn (when present), lane from payload.laneId (unchanged when absent),
 // aging clock reset to the event timestamp — EXCEPT a recorded reorder
 // (ADR 019): rank change, not a stage change, so position and clock are
-// left alone entirely. Classifying by the RECORDED transition (isReorder,
+// left alone entirely; and a "moved" inside one column (a canal change,
+// ADR 052) moves the lane but leaves the clock running. Leaving Pause is
+// dated (pauseLeftAt): a pause decided before it no longer counts. Classifying by the RECORDED transition (isReorder,
 // same predicate as history/Délais/metrics) keeps every projection
 // consistent even when a raced log holds a reorder whose replayed state
 // diverged from its record.
 function applyPosition(state: CardState, event: CardEvent): void {
   if (isReorder(event)) return;
   if (event.type !== "moved") state.absentFromLastImport = null; // a (re)import lists the card
+  const sameStage = event.type === "moved" && event.fromColumn === event.toColumn;
+  if (event.type === "moved" && event.fromColumn === PAUSE_COLUMN_ID && !sameStage) state.pauseLeftAt = event.ts;
   if (event.toColumn !== null) state.columnId = event.toColumn;
   const laneId = event.payload["laneId"];
   if (typeof laneId === "string") state.laneId = laneId;
-  state.enteredColumnAt = event.ts;
+  // A canal change inside a stage is no stage entry (ADR 052): the clock runs on.
+  if (!sameStage) state.enteredColumnAt = event.ts;
 }
 
 function applyBlocked(state: CardState, event: CardEvent): void {
@@ -168,17 +175,11 @@ function applyEdited(state: CardState, event: CardEvent): void {
   }
 }
 
-// A decision (ADR 026): the payload is re-checked on read so a malformed
-// row can never corrupt the projection (grounds keep their string ids).
+// A decision (ADR 026, ADR 052): the payload is re-checked on read
+// (core/decision-record.ts) so a malformed row never corrupts the projection.
 function applyDecided(state: CardState, event: CardEvent): void {
-  const { decisionId, grounds, reason, reviewDate } = event.payload;
-  if (typeof decisionId !== "string") return;
-  state.decisions.push({
-    actor: event.actor, ts: event.ts, decisionId,
-    grounds: Array.isArray(grounds) ? grounds.filter((g): g is string => typeof g === "string") : [],
-    reason: typeof reason === "string" ? reason : "",
-    reviewDate: typeof reviewDate === "string" ? reviewDate : null,
-  });
+  const decision = readDecision(event);
+  if (decision !== null) state.decisions.push(decision);
 }
 
 function applyEvent(state: CardState, event: CardEvent): void {

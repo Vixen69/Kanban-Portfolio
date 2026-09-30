@@ -20,7 +20,8 @@ export interface ChargeCounter {
  * keeps (settleDomain, ADR 036) and its creation instant; a new one takes
  * the export's domain, else NO domain (ADR 061, author 2026-09-30: never
  * a default domain — the card waits for a hand assignment, signalled on
- * the board and named by the import report).
+ * the board and named by the import report). A positioned card records
+ * whether the Sciforma done state placed it (`doneByState`, ADR 060).
  * Inputs: the board id, the deck card, the config, the charge counter
  * (mutated), the exercise year, the stored creation instant and domain of
  * an existing card. Output: the Card. Failure modes: none.
@@ -59,6 +60,7 @@ export function toCard(
     createdAt: keepCreatedAt ?? `${card.createdAt ?? new Date(0).toISOString().slice(0, 10)}T00:00:00.000Z`,
     source: "csv",
     exercise: year,
+    ...(card.positioned ? { doneByState: card.doneByState === true } : {}),
   };
 }
 

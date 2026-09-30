@@ -142,6 +142,7 @@ export function loadOutcomes(load: ImportLoadResult["load"]): string[] {
   if (load.replaced > 0) out.push(`${load.replaced} correction(s) manuelle(s) remplacée(s) par l’export`);
   if (load.advanced > 0) out.push(`${load.advanced} placement(s) à la main dépassé(s) par un nouveau jalon`);
   if ((load.paused ?? 0) > 0) out.push(`${load.paused ?? 0} en pause, nouveau jalon non appliqué`);
+  if ((load.unpaused ?? 0) > 0) out.push(`${load.unpaused ?? 0} sortie(s) de Pause : état Sciforma terminé`);
   if (load.adopted > 0) out.push(`${load.adopted} carte(s) saisie(s) à la main adoptée(s)`);
   if (load.deletedSkipped > 0) out.push(`${load.deletedSkipped} supprimée(s) du tableau, ignorée(s)`);
   if ((load.settled ?? 0) > 0) out.push(`${load.settled ?? 0} choix de doute tracé(s) dans le journal`);

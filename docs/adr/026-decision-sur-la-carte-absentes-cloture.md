@@ -66,3 +66,9 @@
 - À revoir avec les utilisateurs : la liste des termes de la grille,
   l'opportunité d'un filtre « décision » dans la barre latérale, et le
   rôle autorisé à tracer quand l'authentification arrivera (RP3).
+
+**Amendé par l'ADR 052 (2026-09-30)** : les décisions naissent du geste —
+entrer en Pause (D4), changer un canal déjà choisi (D5) — et s'écrivent
+avec le déplacement, dans la fiche « Décision et Raison » ; le formulaire
+manuel D1–D6 de la fiche disparaît ; seule la pause en cours se voit au
+tableau.

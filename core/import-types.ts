@@ -136,6 +136,8 @@ export interface ImportLoadResult extends ImportAuditResult {
     paused?: number;
     /** Choices traced in the log by this load (ADR 062: one `settled` event per choice sent); absent from a server that predates it. */
     settled?: number;
+    /** Cards in Pause a new Sciforma done state took out to the terminal column (ADR 060, 2026-09-30; counted in moved); absent from a server that predates it. */
+    unpaused?: number;
     /** The capacity snapshot stored with the load, when the files carried one. */
     capacity: { persons: number; assignments: number } | null;
   };

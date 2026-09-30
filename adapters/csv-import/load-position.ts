@@ -12,11 +12,21 @@
 // the load adopts (ADR 059) has no previous import: any jalon further
 // than its column places it. A card in Pause is never taken out by a jalon
 // (ADR 060 amendment, 2026-09-30): Pause is an arbitration decision, the
-// divergence is said « en pause — nouveau jalon non appliqué ». Pure.
+// divergence is said « en pause — nouveau jalon non appliqué ». A Sciforma
+// done state does take it out (second amendment, author 2026-09-30: « si
+// statut c'est terminé, c'est que c'est terminé ») when that state is NEW
+// since the previous import (the base card's `doneByState`: the previous
+// positioned load did not place it by its state, even when an RDR had
+// put it in the terminal column) — said « sorti de Pause : état Sciforma
+// terminé »; a repeat after a human put the card back in Pause leaves it
+// there (a divergence: the hand wins on repeats). Pure.
 
 import type { BoardConfig, Card, CardState } from "../../core/types.ts";
 import type { CardEventInput } from "../../core/events.ts";
 import { movedEvent } from "../../core/events.ts";
+// The Pause column, one id for the importer, the gesture gate and the fold:
+// a card there was put by a human (D4), no jalon undoes it.
+import { PAUSE_COLUMN_ID } from "../../core/gesture.ts";
 import type { EnrichedCard } from "./enrich.ts";
 import { IMPORT_ACTOR } from "./domain-conflicts.ts";
 import type { BoardReading } from "./board-reading.ts";
@@ -29,12 +39,6 @@ export interface AdvancedCard {
   toColumn: string;
 }
 
-/**
- * The Pause column of the model (config/board.json, by id): a card there
- * was put by a human — an arbitration decision (D4) no jalon undoes.
- */
-export const PAUSE_COLUMN_ID = "pause";
-
 /** What the position step records on the plan. */
 export interface PositionLedger {
   events: CardEventInput[];
@@ -44,6 +48,8 @@ export interface PositionLedger {
   advanced: AdvancedCard[];
   /** Cards in Pause a NEW jalon would move past it: left in Pause, said (counted in divergences too). */
   paused: AdvancedCard[];
+  /** Cards in Pause a NEW Sciforma done state sent to the terminal column (counted in moved): « sorti de Pause : état Sciforma terminé ». */
+  unpaused: AdvancedCard[];
 }
 
 /** One existing card as the position step reads it. */
@@ -61,44 +67,82 @@ export interface PositionInput {
 /**
  * The base card of an existing card placed as the load leaves it: the
  * stored canal and nature always (the export never places an existing
- * card's canal), the export's column when the files positioned the card,
- * else the stored column (ADR 060).
+ * card's canal), the export's column and `doneByState` when the files
+ * positioned the card, else the stored ones (ADR 060) — so that the next
+ * load still compares with the last import that positioned it.
  * Inputs: the refreshed base card, the stored base card (undefined for a
  * new card: returned as is), whether the files positioned the card.
  * Output: the base card to write — a copy. Failure modes: none.
  */
 export function placedLikeStored(fresh: Card, stored: Card | undefined, positioned: boolean): Card {
   if (stored === undefined) return fresh;
-  return {
-    ...fresh, laneId: stored.laneId, nature: stored.nature,
-    columnId: positioned ? fresh.columnId : stored.columnId,
-  };
+  const { doneByState: _fresh, ...rest } = fresh;
+  const placedBy = positioned ? fresh : stored;
+  const placed: Card = { ...rest, laneId: stored.laneId, nature: stored.nature, columnId: placedBy.columnId };
+  return placedBy.doneByState === undefined ? placed : { ...placed, doneByState: placedBy.doneByState };
 }
 
 function flowIndex(config: BoardConfig, columnId: string): number {
   return config.columns.findIndex((column) => column.id === columnId);
 }
 
+// The export's position is new since the previous import: the stored base
+// card held another column, or there is no previous import (a card adopted
+// now, or nothing stored under that id).
+function isNewPosition(input: PositionInput): boolean {
+  const { stored, card, adopted } = input;
+  return adopted || stored === undefined || stored.columnId !== card.columnId;
+}
+
 // A hand placement the jalons go past: a position new since the previous
 // import (or a card adopted now) and further along the flow. A column the
 // config no longer declares is never « further ».
 function jalonGoesPast(input: PositionInput, config: BoardConfig): boolean {
-  const { existing, stored, card, adopted } = input;
-  const fresh = adopted || stored === undefined || stored.columnId !== card.columnId;
-  const from = flowIndex(config, existing.columnId);
-  const to = flowIndex(config, card.columnId);
-  return fresh && from !== -1 && to !== -1 && to > from;
+  const from = flowIndex(config, input.existing.columnId);
+  const to = flowIndex(config, input.card.columnId);
+  return isNewPosition(input) && from !== -1 && to !== -1 && to > from;
+}
+
+// The done STATE is new since the previous import: the previous positioned
+// load did not place the card by its state (its jalons did — an RDR
+// approved before the closure), or there is no previous import (a card
+// adopted now, nothing stored under that id). A base card stored before
+// `doneByState` existed is read by its column, the rule it was placed
+// under: already in the terminal column = not new (no card leaves Pause
+// in bulk at the first load after the upgrade; the flag rules after it).
+function isNewDoneState(input: PositionInput): boolean {
+  const { stored, card, adopted } = input;
+  if (adopted || stored === undefined) return true;
+  if (stored.doneByState !== undefined) return !stored.doneByState;
+  return stored.columnId !== card.columnId;
+}
+
+// A card in Pause: true when it stays there. Only a Sciforma done state
+// NEW since the previous import takes it out (listed in unpaused; the move
+// follows). A staying card is a divergence, listed in paused when a new
+// jalon goes past Pause — the only case where a jalon would have moved it.
+function staysInPause(plan: PositionLedger, input: PositionInput, config: BoardConfig): boolean {
+  const { id, existing, card } = input;
+  const divergence = { title: card.title, fromColumn: existing.columnId, toColumn: card.columnId };
+  if (card.doneByState === true && isNewDoneState(input)) {
+    plan.unpaused.push({ cardId: id, ...divergence });
+    return false;
+  }
+  plan.divergences.push(divergence);
+  if (jalonGoesPast(input, config)) plan.paused.push({ cardId: id, ...divergence });
+  return true;
 }
 
 /**
  * Applies the position rule to one existing card of a load (ADR 026, 058,
  * 060): nothing without a position (kept); nothing when the card already
- * stands there; a divergence when the card is in Pause, whatever the
- * jalon — listed in paused (« en pause, nouveau jalon non appliqué ») only
- * when the jalon is new and goes past Pause, the only case where it would
- * have moved the card; a divergence when a human
- * placed it and the jalons do not go past that placement; nothing when the log's last word is already
- * this import move (ADR 058); else a `moved` event of the import actor.
+ * stands there; a card in Pause leaves it only for a Sciforma done state
+ * new since the previous import (listed in unpaused, then moved) — any
+ * other position is a divergence, listed in paused (« en pause, nouveau
+ * jalon non appliqué ») only when a new jalon goes past Pause; a
+ * divergence when a human placed it and the jalons do not go past that
+ * placement; nothing when the log's last word is already this import
+ * move (ADR 058); else a `moved` event of the import actor.
  * Inputs: the plan's position ledger (mutated), the card, the board
  * reading, the config (the flow order), now. Output: none (the ledger).
  * Failure modes: none.
@@ -112,13 +156,9 @@ export function refreshPosition(
     return;
   }
   if (existing.columnId === card.columnId) return;
-  if (existing.columnId === PAUSE_COLUMN_ID) {
-    const divergence = { title: card.title, fromColumn: existing.columnId, toColumn: card.columnId };
-    plan.divergences.push(divergence);
-    if (jalonGoesPast(input, config)) plan.paused.push({ cardId: id, ...divergence });
-    return;
-  }
-  const handPlaced = reading.movedByHand.has(id);
+  const inPause = existing.columnId === PAUSE_COLUMN_ID;
+  if (inPause && staysInPause(plan, input, config)) return;
+  const handPlaced = !inPause && reading.movedByHand.has(id);
   if (handPlaced && !jalonGoesPast(input, config)) {
     plan.divergences.push({ title: card.title, fromColumn: existing.columnId, toColumn: card.columnId });
     return;

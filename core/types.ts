@@ -58,9 +58,8 @@ export interface Card {
   id: string;
   title: string;
   /**
-   * Domain id — see BoardConfig.domains. "" = no domain (ADR 061): an
-   * imported project whose export resolves none waits for a hand
-   * assignment — never a default domain.
+   * Domain id — see BoardConfig.domains. "" = no domain (ADR 061): an imported
+   * project whose export resolves none waits for a hand assignment — never a default domain.
    */
   domain: string;
   /**
@@ -71,6 +70,16 @@ export interface Card {
    * Absent (never true) on every other card.
    */
   domainUnresolved?: boolean;
+  /**
+   * How the last load that POSITIONED this card placed it (ADR 060
+   * amendment): true = a Sciforma done state sent it to the terminal
+   * column (ADR 043), false = its jalons placed it. Written by the import
+   * on the base card, kept by a load without position; it tells a done
+   * state NEW since the previous import — the one position that takes a
+   * card out of Pause — from a repeat. Absent on a card no load
+   * positioned since the field exists, and on a hand-made card.
+   */
+  doneByState?: boolean;
   /**
    * Sub-domain id within `domain` (see Domain.subDomains), null when the
    * domain is not detailed or the card carries none (ADR 022).
@@ -141,19 +150,9 @@ export interface Card {
 
 /** Event types of the append-only `card_events` log. */
 export type CardEventType =
-  | "created"
-  | "moved"
-  | "blocked"
-  | "unblocked"
-  | "edited"
-  | "commented"
-  | "archived"
-  | "unarchived"
-  | "deleted"
-  | "imported"
-  | "decided"
-  | "unlisted"
-  | "relisted"
+  | "created" | "moved" | "blocked" | "unblocked" | "edited"
+  | "commented" | "archived" | "unarchived" | "deleted"
+  | "imported" | "decided" | "unlisted" | "relisted"
   /** The card's exercise became the current one (ADR 035): its aging clock starts now. */
   | "activated"
   /** Board-wide (cardId "*", ADR 042): the log is read again from payload.toSeq — a snapshot was restored. */
@@ -161,8 +160,9 @@ export type CardEventType =
   /**
    * An import doubt settled by the PMO (ADR 062): payload { doubtId, kind,
    * fingerprint, option, label, proposed, sticky, forget? }. Read by the
-   * importer's memory only; the board fold, the history and the flow
-   * metrics ignore it. Its card id may name a project not on the board.
+   * importer's memory only; the board fold (hence the decisions and the
+   * ticket marks), the history, the journal and the flow metrics ignore it.
+   * Its card id may name a project not on the board.
    */
   | "settled";
 
@@ -191,6 +191,19 @@ export interface CardComment {
   text: string;
 }
 
+/** Where a decision was taken — the paper fiche's bloc 1 (ADR 052). */
+export type DecisionInstance = "revue" | "synchro";
+
+/** A pause's kind (ADR 052, optional): tactique = rediscussed at the next synchro; parking = later. */
+export type PauseKind = "tactique" | "parking";
+
+/** What a decision frees or commits — bloc 4 of the fiche (ADR 052). */
+export interface DecisionFrees {
+  people: string;
+  budget: string;
+  capacity: string;
+}
+
 /** One decision on a card (D1–D6, ADR 026), projected from a "decided" event. */
 export interface CardDecision {
   actor: string;
@@ -202,6 +215,21 @@ export interface CardDecision {
   reason: string;
   /** Planned review, ISO day (YYYY-MM-DD); null when none. */
   reviewDate: string | null;
+  // The fiche's other blocks (ADR 052) — empty on decisions recorded before it.
+  instance: DecisionInstance | null;
+  /** Options set aside, and why (bloc 3). */
+  options: string;
+  frees: DecisionFrees;
+  /** What is expected to lift the pause (bloc 5). */
+  liftCondition: string;
+  pauseKind: PauseKind | null;
+  /** What changed in the subject's nature (bloc 6), and the canal from → to. */
+  natureChange: string;
+  fromLaneId: string | null;
+  toLaneId: string | null;
+  architectValidated: boolean;
+  /** The day the decision was taken when traced after the fact (YYYY-MM-DD). */
+  decidedOn: string | null;
 }
 
 /**
@@ -220,6 +248,8 @@ export interface CardState extends Card {
   archived: boolean;
   /** Decisions in chronological order, from "decided" events (ADR 026). */
   decisions: CardDecision[];
+  /** ISO ts the card last LEFT Pause (ADR 052); absent = never left it. The pause in force is the last one decided after it. */
+  pauseLeftAt?: string;
   /** ISO ts of the import that did not list the card (ADR 026); null when listed. */
   absentFromLastImport: string | null;
 }

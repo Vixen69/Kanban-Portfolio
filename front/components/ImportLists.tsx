@@ -98,7 +98,8 @@ export function ReplacedLists({ replaced, loaded }: { replaced: ImportKeptFact[]
 /**
  * What the load met on the board beyond the refreshed values: hand
  * placements a new jalon overtook (from → to, ADR 060), cards left in
- * Pause whatever the jalon (ADR 060 amendment), hand-made cards
+ * Pause whatever the jalon (ADR 060 amendment), cards a new Sciforma
+ * done state took out of Pause (ADR 060, 2026-09-30), hand-made cards
  * adopted by their code or name (ADR 059), cards deleted on the board
  * that the files still carry — ignored, never re-created (ADR 058) — and
  * the identity doubts the load could not settle alone, always unfolded.
@@ -108,7 +109,9 @@ export function ReplacedLists({ replaced, loaded }: { replaced: ImportKeptFact[]
 export function HandLists({ changes, config }: { changes: ImportChanges; config: BoardConfig }) {
   const { advanced, adopted, deletedSkipped, identityDoubts } = changes;
   const paused = changes.paused ?? []; // absent in reports made before
-  if (advanced.length + paused.length + adopted.length + deletedSkipped.length + identityDoubts.length === 0) return null;
+  const unpaused = changes.unpaused ?? []; // idem
+  const total = advanced.length + paused.length + unpaused.length + adopted.length + deletedSkipped.length + identityDoubts.length;
+  if (total === 0) return null;
   return (
     <>
       <h3 className="chg-h">Gestes faits à la main, rencontrés par l’import</h3>
@@ -122,6 +125,8 @@ export function HandLists({ changes, config }: { changes: ImportChanges; config:
         rows={advanced.map((entry) => ({ ref: entry, reason: advancedReason(config, entry), warning: null }))} />
       <RefList title="En pause — nouveau jalon non appliqué"
         rows={paused.map((entry) => ({ ref: entry, reason: `export : ${advancedReason(config, entry)}`, warning: null }))} />
+      <RefList title="Sortis de Pause : état Sciforma terminé"
+        rows={unpaused.map((entry) => ({ ref: entry, reason: advancedReason(config, entry), warning: null }))} />
       <RefList title="Cartes saisies à la main adoptées par l’export"
         rows={adopted.map((entry) => ({ ref: entry, reason: adoptedReason(entry), warning: null }))} />
       <RefList title="Supprimées du tableau, ignorées par l’import" rows={deletedSkipped.map(plain)} />

@@ -123,9 +123,12 @@ export function filesText(changes: ImportChanges): string[] {
 /** How a card in Pause a jalon would move is said (ADR 060 amendment). */
 const PAUSED_WORDS = "en pause — nouveau jalon non appliqué";
 
+/** How a card a new Sciforma done state took out of Pause is said, card by card (ADR 060, 2026-09-30); the summary counts them « sortie(s) de Pause (état Sciforma terminé) », as the server log does. */
+const UNPAUSED_WORDS = "sorti de Pause : état Sciforma terminé";
+
 /** The load plan's parts the CLI's load summary reads (adapters/csv-import LoadPlan). */
 export type LoadTextInput = Pick<LoadPlan,
-  "created" | "updated" | "moved" | "advanced" | "paused" | "replaced" | "unlisted" | "relisted" | "kept" |
+  "created" | "updated" | "moved" | "advanced" | "paused" | "unpaused" | "replaced" | "unlisted" | "relisted" | "kept" |
   "domainReplaced" | "domainKept" | "divergences" | "factsKept" | "adopted" | "deletedSkipped" | "identityDoubts">;
 
 // The divergences left in place, the cards in Pause said as such (ADR 060 amendment).
@@ -143,7 +146,8 @@ function divergenceLines(plan: LoadTextInput, config: BoardConfig): string[] {
  * The summary of what a load wrote (--charger), from its plan: the counts,
  * then the ADR 058/059/060 outcomes — adopted hand cards, deleted cards
  * skipped, identity doubts, hand corrections replaced, hand placements
- * overtaken, cards left in Pause — and the divergences.
+ * overtaken, cards left in Pause or taken out of it by a Sciforma done
+ * state — and the divergences.
  * Inputs: the plan, the config (column names). Output: the text lines
  * (French). Failure: none.
  */
@@ -156,7 +160,8 @@ export function loadText(plan: LoadTextInput, config: BoardConfig): string[] {
     ` · ${plan.kept} position(s) conservée(s) (export sans jalon)` +
     ` · domaines : ${plan.domainReplaced} remplacé(s), ${plan.domainKept} gardé(s)`;
   const outcomes = `adoptées (saisies à la main) : ${plan.adopted.length} · supprimées du tableau, ignorées : ${plan.deletedSkipped.length}` +
-    ` · doutes d'identité : ${plan.identityDoubts.length} · en pause, jalon non appliqué : ${plan.paused.length}`;
+    ` · doutes d'identité : ${plan.identityDoubts.length} · en pause, jalon non appliqué : ${plan.paused.length}` +
+    ` · sortie(s) de Pause (état Sciforma terminé) : ${plan.unpaused.length}`;
   const kept = plan.factsKept.length === 0 ? []
     : [`Absents des fichiers, gardés du tableau (ADR 054) : ${plan.factsKept.map((f) => `${f.label} ${f.cards} carte(s)`).join(" · ")}`];
   return [head, outcomes, ...divergenceLines(plan, config), ...kept];
@@ -186,6 +191,7 @@ export function boardText(changes: ImportChanges, config: BoardConfig): string[]
   const replaced = factLines(changes.replaced);
   const advanced = changes.advanced.map((a) => `  ${named(a)} : ${transition(config, a)}`);
   const paused = (changes.paused ?? []).map((a) => `  ‖ ${named(a)} : reste en Pause (export : ${transition(config, a)})`);
+  const unpaused = (changes.unpaused ?? []).map((a) => `  ▸ ${named(a)} : ${UNPAUSED_WORDS} (${transition(config, a)})`);
   const adopted = changes.adopted.map((a) => `  ⇄ ${a.code ?? "?"} : « ${a.manualTitle} » (${a.cardId}, saisie à la main) → « ${a.title} »`);
   return [
     head,
@@ -197,6 +203,7 @@ export function boardText(changes: ImportChanges, config: BoardConfig): string[]
     ...(replaced.length === 0 ? [] : ["Correction manuelle remplacée par la nouvelle valeur de l’export (ADR 060) :", ...replaced]),
     ...section("Placement à la main dépassé par un nouveau jalon (ADR 060) :", advanced),
     ...section("En pause — nouveau jalon non appliqué (ADR 060) :", paused),
+    ...section("Sortis de Pause — état Sciforma terminé (ADR 060) :", unpaused),
     ...section("Cartes saisies à la main adoptées par l’export — même code (ADR 059), vérifier que c’est bien le même projet :", adopted),
     ...section("Supprimées du tableau, non recréées (ADR 058) :", changes.deletedSkipped.map((d) => `  ✕ ${named(d)}`)),
     ...section("Doutes d’identité :", changes.identityDoubts.map((q) => `  ⚠ ${q}`)),

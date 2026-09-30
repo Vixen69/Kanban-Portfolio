@@ -263,3 +263,17 @@ test("[pg] listEvents honours the filter: after a sequence, of some cards, both 
     assert.deepEqual(await s.listEvents({ cardIds: [] }), []);
   }));
 
+
+test("[pg] appendEvents: one transaction — a batch lands whole or not at all (ADR 052)", { skip: SKIP }, () =>
+  withStore(async (s) => {
+    const stored = await s.appendEvents([
+      lifecycleEvent("created", "S001", "local", TS),
+      lifecycleEvent("decided", "S001", "local", TS, { decisionId: "D4" }),
+    ]);
+    assert.deepEqual(stored.map((e) => e.id), ["evt-1", "evt-2"]);
+    await assert.rejects(() => s.appendEvents([
+      lifecycleEvent("commented", "S001", "local", TS, { text: "ok" }),
+      lifecycleEvent("commented", "S001", "local", TS, { text: 1n as unknown as string }), // not serializable
+    ]));
+    assert.deepEqual((await s.listEvents()).map((e) => e.id), ["evt-1", "evt-2"]);
+  }));

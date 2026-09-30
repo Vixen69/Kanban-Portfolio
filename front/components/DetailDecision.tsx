@@ -1,20 +1,19 @@
-// Décision section of the card detail (ADR 026): the trace of the
-// portfolio decisions D1–D6 taken on the subject — the last one with its
-// review date, the list, and the form to record one with its reason in
-// the grid's terms. Every decision is a "decided" event; nothing is stored
-// elsewhere. « Non tracée = non prise » (Référentiel V3.1, 7.8). Also the
-// « absente du dernier import » banner (same ADR).
+// Décision section of the card detail (ADR 026, ADR 052): the trace of the
+// portfolio decisions taken on the subject — each with the blocks of its
+// fiche « Décision et Raison ». Decisions are taken by the gesture (into
+// Pause, a chosen canal changed); here, a card sitting in Pause can have
+// its pause traced (decided on paper) or renewed — « prolonger est une
+// décision : nouvelle fiche ». Every decision is a "decided" event;
+// nothing is stored elsewhere. « Non tracée = non prise » (Référentiel
+// V3.1, 7.8). Also the « absente du dernier import » banner (same ADR).
 
 import { useState } from "react";
-import type { BoardConfig, CardDecision, CardState, DecisionGroundFamily } from "../../core/types.ts";
-import { decisionStatus, groundsOf } from "../../core/decisions.ts";
-import type { DecisionStatus } from "../../core/decisions.ts";
-import type { DecisionInput } from "../api.ts";
+import type { BoardConfig, CardDecision, CardState } from "../../core/types.ts";
+import { groundsOf, pauseStatus, type PauseStatus } from "../../core/decisions.ts";
 import { displayActor } from "../lookup.ts";
 
 /** Decisions listed before the « … de plus » toggle. */
 const SHOWN = 5;
-const FAMILY_LABEL: Record<DecisionGroundFamily, string> = { proteger: "Protéger", pause: "Mettre en pause" };
 
 function frDate(iso: string): string {
   return new Date(iso).toLocaleDateString("fr-FR");
@@ -25,113 +24,78 @@ function frDay(isoDate: string): string {
   return `${day}/${month}/${year}`;
 }
 
-function StatusPill({ status }: { status: DecisionStatus }) {
-  const { entry, decision, overdue } = status;
+function laneName(config: BoardConfig, id: string): string {
+  return config.lanes.find((lane) => lane.id === id)?.name ?? id;
+}
+
+function PauseLine({ status }: { status: PauseStatus }) {
+  const { entry, overdue } = status;
+  if (entry === null) return <span className="dec-status untraced">Pause non tracée</span>;
+  const kind = entry.pauseKind === null ? "" : entry.pauseKind === "tactique" ? " tactique" : " parking";
   const review = entry.reviewDate === null ? "" : ` · réexamen ${frDay(entry.reviewDate)}${overdue ? " (dépassé)" : ""}`;
-  return (
-    <span className={"dec-status" + (overdue ? " overdue" : "")} style={{ background: decision?.color ?? "#94a3b8" }}>
-      {decision === null ? entry.decisionId : `${decision.short} ${decision.name}`}{review}
-    </span>
-  );
+  return <span className={"dec-status" + (overdue ? " overdue" : "")} style={{ background: "#7c3aed" }}>Pause{kind}{review}</span>;
+}
+
+// The fiche's blocks worth reading back, in the paper's order.
+function blocksOf(entry: CardDecision, config: BoardConfig): string[] {
+  const lines: string[] = [];
+  if (entry.fromLaneId !== null && entry.toLaneId !== null) lines.push(`Canal : ${laneName(config, entry.fromLaneId)} → ${laneName(config, entry.toLaneId)}`);
+  if (entry.natureChange !== "") lines.push(`Ce qui a changé : ${entry.natureChange}${entry.architectValidated ? " (validée par un architecte)" : ""}`);
+  if (entry.liftCondition !== "") lines.push(`Pour la lever : ${entry.liftCondition}`);
+  if (entry.options !== "") lines.push(`Options écartées : ${entry.options}`);
+  const frees = [["Personnes", entry.frees.people], ["Budget", entry.frees.budget], ["Capacité", entry.frees.capacity]].filter(([, v]) => v !== "");
+  if (frees.length > 0) lines.push(`Libère ou engage — ${frees.map(([k, v]) => `${k} : ${v}`).join(" · ")}`);
+  return lines;
 }
 
 function DecisionRow({ entry, config }: { entry: CardDecision; config: BoardConfig }) {
   const decision = config.decisions.find((d) => d.id === entry.decisionId);
   const grounds = groundsOf(config, entry.grounds);
+  const where = entry.instance === null ? "" : entry.instance === "revue" ? " · Revue Stratégique" : " · Synchro";
+  const when = entry.decidedOn === null ? "" : ` · décidée le ${frDay(entry.decidedOn)}`;
   return (
     <div className="cm dec-item">
-      <div className="cm-meta"><b>{displayActor(entry.actor)}</b> · {frDate(entry.ts)}</div>
+      <div className="cm-meta"><b>{displayActor(entry.actor)}</b> · {frDate(entry.ts)}{where}{when}</div>
       <div className="dec-line">
-        <b style={{ color: decision?.color }}>{decision === undefined ? entry.decisionId : `${decision.short} ${decision.name}`}</b>
+        <b style={{ color: decision?.color }}>{decision === undefined ? entry.decisionId : decision.name}</b>
+        {entry.pauseKind !== null && <span className="dec-chip">{entry.pauseKind === "tactique" ? "Tactique" : "Parking"}</span>}
         {grounds.map((ground) => <span key={ground.id} className="dec-chip">{ground.name}</span>)}
         {entry.reviewDate !== null && <span className="dec-review">réexamen le {frDay(entry.reviewDate)}</span>}
       </div>
       {entry.reason !== "" && <div className="cm-text">{entry.reason}</div>}
-    </div>
-  );
-}
-
-function GroundsPicker({ config, selected, onToggle }: { config: BoardConfig; selected: ReadonlySet<string>; onToggle: (id: string) => void }) {
-  const families: DecisionGroundFamily[] = ["proteger", "pause"];
-  return (
-    <div className="dec-grounds">
-      {families.map((family) => (
-        <div key={family} className="dec-family">
-          <span className="field-label">{FAMILY_LABEL[family]}</span>
-          {config.decisionGrounds.filter((ground) => ground.family === family).map((ground) => (
-            <label key={ground.id} className={"dec-opt" + (selected.has(ground.id) ? " on" : "")}>
-              <input type="checkbox" checked={selected.has(ground.id)} onChange={() => onToggle(ground.id)} />
-              {ground.name}
-            </label>
-          ))}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function DecisionForm({ config, onSubmit, onCancel }: { config: BoardConfig; onSubmit: (input: DecisionInput) => void; onCancel: () => void }) {
-  const [decisionId, setDecisionId] = useState("");
-  const [grounds, setGrounds] = useState<ReadonlySet<string>>(new Set());
-  const [reason, setReason] = useState("");
-  const [reviewDate, setReviewDate] = useState("");
-  const decision = config.decisions.find((d) => d.id === decisionId);
-  const missingReason = decision !== undefined && decision.traced && grounds.size === 0 && reason.trim() === "";
-  const toggle = (id: string) => setGrounds((prev) => {
-    const next = new Set(prev);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    return next;
-  });
-  return (
-    <div className="dec-form">
-      <select className="inp" value={decisionId} onChange={(event) => setDecisionId(event.target.value)}>
-        <option value="">Choisir la décision…</option>
-        {config.decisions.map((d) => (
-          <option key={d.id} value={d.id}>{d.short} — {d.name}{d.traced ? " (raison obligatoire)" : ""}</option>
-        ))}
-      </select>
-      <GroundsPicker config={config} selected={grounds} onToggle={toggle} />
-      <textarea className="inp" rows={2} placeholder="Raison, dans les termes de la grille…"
-        value={reason} onChange={(event) => setReason(event.target.value)} />
-      <div className="dec-form-row">
-        <label className="dec-date">Réexamen le <input type="date" className="inp" value={reviewDate} onChange={(event) => setReviewDate(event.target.value)} /></label>
-        <span className="card-fill" />
-        <button className="btn ghost sm" onClick={onCancel}>Annuler</button>
-        <button className="btn sm" disabled={decision === undefined || missingReason}
-          onClick={() => onSubmit({ decisionId, grounds: [...grounds], reason: reason.trim(), reviewDate: reviewDate === "" ? null : reviewDate })}>
-          Tracer la décision
-        </button>
-      </div>
-      {missingReason && <div className="dec-warn">Décision tracée : indiquer au moins un terme de la grille ou une raison.</div>}
+      {blocksOf(entry, config).map((line) => <div key={line} className="cm-text dec-block">{line}</div>)}
     </div>
   );
 }
 
 /**
- * The Décision section: the last decision as a pill, the traced list
- * (newest first, folded past SHOWN) and the record form.
- * Inputs: the card, the config (decisions, grid terms), now (ms), the
- * decide callback. Output: the div.decisions block.
- * Failure modes: none — a card without decision shows the referential's rule.
+ * The Décision section: the pause in force (for a card in Pause) with its
+ * « Tracer la pause » / « Reconduire la pause » button, then the traced
+ * list, newest first, folded past SHOWN.
+ * Inputs: the card, the config (decisions, grid terms, canals), now (ms),
+ * the callback opening the fiche for the pause. Output: the div.decisions
+ * block. Failure modes: none — a card without decision says how they are taken.
  */
-export function DecisionSection({ card, config, now, onDecide }: {
-  card: CardState; config: BoardConfig; now: number; onDecide: (input: DecisionInput) => void;
+export function DecisionSection({ card, config, now, onTracePause }: {
+  card: CardState; config: BoardConfig; now: number; onTracePause: () => void;
 }) {
-  const [open, setOpen] = useState(false);
   const [showAll, setShowAll] = useState(false);
-  const status = decisionStatus(card, config, new Date(now));
+  const pause = pauseStatus(card, new Date(now));
   const entries = [...card.decisions].reverse();
   const shown = showAll ? entries : entries.slice(0, SHOWN);
   return (
     <div className="decisions">
       <div className="dec-head">
         <span className="field-label">Décision</span>
-        {status !== null && <StatusPill status={status} />}
+        {pause !== null && <PauseLine status={pause} />}
         <span className="card-fill" />
-        {!open && <button className="btn ghost sm" onClick={() => setOpen(true)}>Tracer une décision</button>}
+        {pause !== null && !card.archived && (
+          <button className="btn ghost sm" onClick={onTracePause}>{pause.entry === null ? "Tracer la pause" : "Reconduire la pause"}</button>
+        )}
       </div>
-      {open && <DecisionForm config={config} onCancel={() => setOpen(false)} onSubmit={(input) => { onDecide(input); setOpen(false); }} />}
-      {entries.length === 0 && <div className="cm-empty">Aucune décision tracée — « non tracée = non prise ».</div>}
+      {entries.length === 0 && (
+        <div className="cm-empty">Aucune décision tracée. Elles se prennent au geste : déposer en Pause, ou changer le canal d’un sujet déjà qualifié.</div>
+      )}
       {shown.map((entry, index) => <DecisionRow key={index} entry={entry} config={config} />)}
       {entries.length > SHOWN && (
         <button className="btn ghost sm" onClick={() => setShowAll((s) => !s)}>{showAll ? "Réduire" : `… ${entries.length - SHOWN} de plus`}</button>

@@ -82,3 +82,28 @@ sa couleur, ses chiffres et dans l'arbitrage des responsables de domaine.
   `sync/import-text.ts`, `front/domainMark.ts`,
   `front/components/DomainAssign.tsx` et les vues qui lisent un domaine, et
   leurs tests.
+
+## Amendement 2026-09-30 — le domaine dans l'Historique de la fiche
+
+Décision de l'auteur : « une ligne dans la fiche Historique quand quelqu'un
+assigne ou change un domaine à la main, oui, complètement ». Chaque
+événement `edited` dont le patch porte un domaine devient une ligne de
+l'Historique, avec l'auteur et la date comme les autres : « Domaine : Sans
+domaine → INFRA » (bandeau « Attribuer », « Modifier »), « Domaine confirmé :
+INFRA » (même domaine, « Confirmer ce domaine »), et pour les décisions de
+l'ADR 036 « Domaine remplacé par l'export (décision à l'import) : A&D →
+INFRA » / « Domaine gardé (décision à l'import) : A&D — l'export proposait
+INFRA ». Les noms viennent de la configuration (vide ou inconnu = « Sans
+domaine ») ; un sous-domaine se lit « INFRA · Réseau » dans la même ligne.
+Le « avant » est le domaine que la carte avait juste avant : la carte de
+base ne peut pas servir de départ (chaque chargement y réécrit le domaine
+plié, donc la valeur mise à la main) ; le serveur note donc désormais, dans
+l'événement d'une modification qui touche le domaine, le domaine d'avant
+(`previous`) ; une décision de l'ADR 036 portait déjà le sien (`board`) ;
+à défaut, la lecture suit les lignes de domaine précédentes de la carte,
+dans l'ordre du pli (`core/fold-order.ts`). Une première modification d'un
+journal plus ancien, qui n'a rien noté, se lit « Domaine fixé : INFRA ».
+Rien n'est réécrit dans le journal. Fichiers : `core/domain-history.ts`
+(+ tests), `core/history.ts`, `middle/api.ts` (+
+`api.domain-history.test.ts`), `front/components/DetailSections.tsx`,
+`front/styles/modal.css`.

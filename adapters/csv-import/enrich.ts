@@ -48,6 +48,8 @@ export interface EnrichedCard {
   columnId: string;
   /** True when the export positioned the card — ProjetsJalons, or a done state (ADR 043); else entry column. */
   positioned: boolean;
+  /** True when the process state (a config done state), not a jalon, put the card in the terminal column (ADR 043) — the one position that takes a card out of Pause (ADR 060); absent = false. */
+  doneByState?: boolean;
   createdAt: string | null;
   dateRdr: string | null;
   budgetRdli: number | null;
@@ -175,14 +177,15 @@ function domainOf(ctx: JoinContext, entry: ProjetEntry): DomainPart {
 // Where the card lands (ADR 043): a project whose process state is a done
 // state goes to the terminal column whatever its milestones — a missing or
 // unapproved RDR is said in the report, the state wins. Else the last
-// milestone passed; else the entry column, unpositioned.
-function positionOf(ctx: JoinContext, entry: ProjetEntry, jalon: JalonEntry | null): { columnId: string; positioned: boolean } {
+// milestone passed; else the entry column, unpositioned. doneByState says
+// the state placed it (even when an approved RDR agrees).
+function positionOf(ctx: JoinContext, entry: ProjetEntry, jalon: JalonEntry | null): Pick<EnrichedCard, "columnId" | "positioned" | "doneByState"> {
   if (ctx.doneColumnId !== null && isFinished(ctx, entry)) {
     ctx.stats.doneByState++;
     if (jalon?.stage !== "done") {
       tallyInto(ctx.tallies, `état « ${entry.state.trim()} » sans RDR approuvé — carte placée dans Terminé par l'état (ADR 043)`, entry.ref.line);
     }
-    return { columnId: ctx.doneColumnId, positioned: true };
+    return { columnId: ctx.doneColumnId, positioned: true, doneByState: true };
   }
   return { columnId: jalon?.columnId ?? ctx.entryColumnId, positioned: jalon !== null };
 }

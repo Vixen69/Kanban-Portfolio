@@ -17,6 +17,10 @@ const VERSION = 2;
 
 type CardRecord = { kind: "card"; card: Card };
 type EventRecord = { kind: "event"; seq: number; event: CardEvent };
+// Several events written together (ADR 052: a move and its decisions) on
+// ONE line: a crash that tears the line loses the whole batch on reopen
+// (the torn final line is dropped) — never the move without its decision.
+type EventsRecord = { kind: "events"; events: Array<{ seq: number; event: CardEvent }> };
 // The capacity snapshot (ADR 024): appended whole at each import; the last
 // record of each exercise year wins (ADR 035).
 export type CapacityRecord = { kind: "capacity"; snapshot: CapacitySnapshot };
@@ -121,16 +125,22 @@ function idSequence(id: unknown): number {
   return Number(id.slice(id.lastIndexOf("-") + 1));
 }
 
+function applyEvent(state: State, rec: { seq?: unknown; event?: unknown }): void {
+  const event = rec.event as CardEvent;
+  state.events.push(freezeEvent(event));
+  const seq = typeof rec.seq === "number" ? rec.seq : idSequence(event.id);
+  if (Number.isFinite(seq) && seq > state.maxSeq) state.maxSeq = seq;
+}
+
 function applyRecord(state: State, rec: unknown, lineNo: number): void {
   if (!isRecord(rec)) throw new Error(`Stockage JSONL corrompu : ligne ${lineNo} invalide.`);
   if (rec["kind"] === "card") {
     const card = rec["card"] as Card;
     state.cards.set(card.id, card);
   } else if (rec["kind"] === "event") {
-    const event = rec["event"] as CardEvent;
-    state.events.push(freezeEvent(event));
-    const seq = typeof rec["seq"] === "number" ? (rec["seq"] as number) : idSequence(event.id);
-    if (Number.isFinite(seq) && seq > state.maxSeq) state.maxSeq = seq;
+    applyEvent(state, rec);
+  } else if (rec["kind"] === "events") {
+    for (const entry of (rec as unknown as EventsRecord).events) applyEvent(state, entry);
   } else if (rec["kind"] === "capacity") {
     const snapshot = rec["snapshot"] as CapacitySnapshot;
     state.capacity.set(snapshot.exerciseYear, snapshot);
@@ -192,4 +202,18 @@ export function loadState(content: string): {
     endsClean = !isLast;
   }
   return { state, hasHeader, validBytes, endsClean };
+}
+
+/**
+ * One line holding several events, numbered from firstSeq (ADR 052): the
+ * batch is written, and survives a crash, all or none.
+ * Inputs: the first sequence number, the inputs in order. Output: the line
+ * and the stored events (read-back clones). Failure: throws before any
+ * write when a payload is not serializable.
+ */
+export function buildEventsLine(firstSeq: number, inputs: CardEventInput[]): { line: string; events: CardEvent[] } {
+  const entries = inputs.map((input, index) => ({ seq: firstSeq + index, event: { ...input, id: `evt-${firstSeq + index}` } }));
+  const line = JSON.stringify({ kind: "events", events: entries });
+  const read = (JSON.parse(line) as EventsRecord).events;
+  return { line, events: read.map((entry) => freezeEvent(entry.event)) };
 }

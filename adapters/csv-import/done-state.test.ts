@@ -74,3 +74,19 @@ test("without `doneStates` the milestones alone position the cards", () => {
   assert.deepEqual([finished.columnId, finished.positioned], ["demandes", false]);
   assert.equal(deck.stats.doneByState, 0);
 });
+
+// ADR 060, amendment 2026-09-30: the deck says WHO put a card in Terminé —
+// the state (it takes a card out of Pause) or an approved RDR (it does not).
+test("the deck card flags a done state, never a jalon alone — even when an approved RDR agrees", () => {
+  const atRdr = `${FINISHED};Étude connectivité site B;Terminé;VRAI;Approuvé;VRAI;Approuvé;VRAI;Approuvé;`;
+  const cases: Array<{ name: string; config: BoardConfig; flag: boolean | undefined }> = [
+    { name: "state + approved RDR", config: CONFIG, flag: true },
+    { name: "approved RDR, no done state configured", config: { ...CONFIG, exercise: { year: CONFIG.exercise.year, states: CONFIG.exercise.states! } }, flag: undefined },
+  ];
+  for (const c of cases) {
+    const deck = assembleCards(perimeter(c.config), jalons([atRdr]), null, c.config, createReport())!;
+    const card = deck.cards.find((entry) => entry.codename === FINISHED)!;
+    assert.deepEqual([card.columnId, card.doneByState], ["done", c.flag], c.name);
+    assert.ok(deck.cards.filter((entry) => entry !== card).every((entry) => entry.doneByState === undefined), c.name);
+  }
+});

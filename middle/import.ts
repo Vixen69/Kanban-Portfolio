@@ -211,7 +211,7 @@ function loadFigures(plan: LoadPlan, audit: AuditResult, settled: number): Impor
     domainReplaced: plan.domainReplaced, domainKept: plan.domainKept, domainKeptByPrior: plan.domainKeptByPrior,
     deletedSkipped: plan.deletedSkipped.length, adopted: plan.adopted.length,
     replaced: new Set(plan.replaced.flatMap((fact) => fact.cardIds)).size, advanced: plan.advanced.length, paused: plan.paused.length,
-    settled,
+    settled, unpaused: plan.unpaused.length,
     capacity: audit.capacity === null ? null
       : { persons: audit.capacity.snapshot.persons.length, assignments: audit.capacity.snapshot.assignments.length },
   };
@@ -293,7 +293,7 @@ function logLoad(now: Date, year: number, plan: LoadPlan, doubts: number, settle
       `${plan.deletedSkipped.length} supprimée(s) du tableau ignorée(s), ${plan.adopted.length} adoptée(s), ` +
       `${new Set(plan.replaced.flatMap((fact) => fact.cardIds)).size} correction(s) manuelle(s) remplacée(s), ` +
       `${plan.advanced.length} placement(s) à la main dépassé(s) par un nouveau jalon, ${plan.paused.length} en pause (jalon non appliqué), ` +
-      `${doubts} doute(s) à trancher dont ${settled} réponse(s) tracée(s)` +
+      `${plan.unpaused.length} sortie(s) de Pause (état Sciforma terminé), ${doubts} doute(s) à trancher dont ${settled} réponse(s) tracée(s)` +
       plan.factsKept.map((f) => ` · ${f.label} gardé (absent des fichiers) : ${f.cards}`).join(""),
   );
 }

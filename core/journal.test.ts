@@ -1,0 +1,151 @@
+// The global journal (ADR 052): what it narrates, in which words, and how
+// its filters keep rows — table-driven over a small NMO-shaped log.
+
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import type { BoardConfig, CardEvent } from "./types.ts";
+import { testConfig } from "./test-helpers.ts";
+import { filterJournal, journalAll, journalCounts, journalRows, placeName, type JournalKind } from "./journal.ts";
+
+function board(): BoardConfig {
+  const base = testConfig();
+  const column = (id: string, name: string) => ({ id, name, gate: null, review: null, gateStart: null, note: "" });
+  return {
+    ...base,
+    columns: [column("demandes", "Demandes"), column("qualification", "Qualification"), column("etudes", "Études"), column("pause", "Pause"), column("actifs", "Actifs")],
+  };
+}
+
+const ALL: ReadonlySet<JournalKind> = new Set(["move", "decision", "block", "archive", "import"]);
+
+function ev(seq: number, cardId: string, type: CardEvent["type"], extra: Partial<CardEvent> = {}): CardEvent {
+  return {
+    id: `evt-${seq}`, ts: `2026-09-${String(seq).padStart(2, "0")}T10:00:00.000Z`, actor: "anonymous", cardId, type,
+    fromColumn: null, toColumn: null, payload: {}, ...extra,
+  };
+}
+
+function move(seq: number, cardId: string, from: [string, string], to: [string, string], actor = "anonymous"): CardEvent {
+  return ev(seq, cardId, "moved", { actor, fromColumn: from[1], toColumn: to[1], payload: { fromLaneId: from[0], laneId: to[0] } });
+}
+
+const LOG: CardEvent[] = [
+  ev(1, "S1", "imported", { actor: "import-csv", toColumn: "demandes", payload: { laneId: "laneA" } }),
+  move(2, "S1", ["laneA", "demandes"], ["laneA", "qualification"]),
+  move(3, "S1", ["laneA", "qualification"], ["laneB", "etudes"]),
+  ev(4, "S1", "blocked", { payload: { reason: "Attente du sponsor" } }),
+  move(5, "S1", ["laneB", "etudes"], ["laneB", "pause"]),
+  ev(6, "S1", "decided", { payload: { decisionId: "D4", grounds: ["n_avance_pas"], reason: "Plus de sponsor.", reviewDate: "2026-11-02", pauseKind: "tactique" } }),
+  move(7, "S1", ["laneB", "pause"], ["laneB", "pause"]),
+  ev(8, "S1", "commented", { payload: { text: "vu" } }),
+  move(9, "S2", ["laneA", "etudes"], ["laneA", "actifs"], "import-csv"),
+  ev(10, "S2", "archived"),
+];
+
+test("journalRows: newest first, gestures in words, reorders / comments left out", () => {
+  const rows = journalRows(board(), LOG, { kinds: ALL });
+  assert.deepEqual(rows.map((row) => [row.id, row.kind, row.label]), [
+    ["evt-10", "archive", "Archivée"],
+    ["evt-9", "import", "Déplacée par l'import"],
+    ["evt-6", "decision", "Mettre en pause (tactique)"],
+    ["evt-5", "move", "Mise en pause"],
+    ["evt-4", "block", "Bloqué"],
+    ["evt-3", "move", "Qualifiée : Lane B"],
+    ["evt-2", "move", "Faire entrer"],
+    ["evt-1", "import", "Importée"],
+  ]);
+  const pause = rows.find((row) => row.id === "evt-5");
+  assert.equal(pause?.from, "Études · Lane B");
+  assert.equal(pause?.to, "Pause · Lane B");
+  assert.equal(rows.find((row) => row.id === "evt-2")?.to, "Qualification"); // no canal before the RDO
+  assert.equal(rows.find((row) => row.id === "evt-6")?.detail, "N’avance pas · réexamen le 02/11/2026 · Plus de sponsor.");
+  assert.equal(rows.find((row) => row.id === "evt-4")?.detail, "Attente du sponsor");
+});
+
+test("journalRows: filters by kind, log position, instant and card", () => {
+  const config = board();
+  const decisions = journalRows(config, LOG, { kinds: new Set(["decision"]) });
+  assert.deepEqual(decisions.map((row) => row.id), ["evt-6"]);
+  const sinceSnapshot = journalRows(config, LOG, { kinds: ALL, afterSeq: 5 });
+  assert.deepEqual(sinceSnapshot.map((row) => row.id), ["evt-10", "evt-9", "evt-6"]);
+  const sinceDay = journalRows(config, LOG, { kinds: ALL, sinceTs: "2026-09-09T00:00:00.000Z" });
+  assert.deepEqual(sinceDay.map((row) => row.id), ["evt-10", "evt-9"]);
+  const oneCard = journalRows(config, LOG, { kinds: ALL, cardIds: new Set(["S2"]) });
+  assert.deepEqual(oneCard.map((row) => row.id), ["evt-10", "evt-9"]);
+});
+
+test("journalCounts and placeName", () => {
+  const config = board();
+  const counts = journalCounts(journalRows(config, LOG, { kinds: ALL }));
+  assert.deepEqual(counts, { move: 3, decision: 1, block: 1, archive: 1, import: 2, restore: 0 });
+  assert.equal(placeName(config, "laneA", "actifs"), "Actifs · Lane A");
+  assert.equal(placeName(config, "laneA", "demandes"), "Demandes");
+  assert.equal(placeName(config, null, "ghost"), "ghost");
+});
+
+test("a pause renewed in Pause reads « Pause reconduite »; a paper decision says its day and instance", () => {
+  const log = [
+    move(1, "S3", ["laneA", "etudes"], ["laneA", "pause"]),
+    ev(2, "S3", "decided", { payload: { decisionId: "D4", grounds: [], reason: "x", reviewDate: "2026-10-01" } }),
+    ev(3, "S3", "decided", { payload: { decisionId: "D4", grounds: [], reason: "encore", reviewDate: "2026-11-01", decidedOn: "2026-09-02", instance: "synchro" } }),
+    move(4, "S3", ["laneA", "pause"], ["laneA", "actifs"]),
+    move(5, "S3", ["laneA", "actifs"], ["laneA", "pause"]),
+    ev(6, "S3", "decided", { payload: { decisionId: "D4", grounds: [], reason: "de nouveau", reviewDate: "2026-12-01" } }),
+  ];
+  const decisions = journalRows(board(), log, { kinds: new Set(["decision"]) });
+  assert.deepEqual(decisions.map((row) => [row.id, row.label]), [
+    ["evt-6", "Mettre en pause"],
+    ["evt-3", "Pause reconduite"],
+    ["evt-2", "Mettre en pause"],
+  ]);
+  assert.equal(decisions[1]?.detail, "réexamen le 01/11/2026 · décidée le 02/09/2026 · Synchro · encore");
+});
+
+test("a restore is a board-wide row with the gestures it undid; it passes the card filter (ADR 042)", () => {
+  const raw = [...LOG, ev(11, "*", "restored", { actor: "anonymous", payload: { toSeq: 8, snapshotId: "x", label: "avant chargement 2026" } })];
+  const rows = journalAll(board(), LOG, { raw });
+  const restore = rows.find((row) => row.kind === "restore");
+  assert.equal(restore?.label, "Instantané restauré « avant chargement 2026 »");
+  assert.equal(restore?.detail, "2 geste(s) défait(s), gardé(s) au journal"); // evt-9, evt-10
+  const kept = filterJournal(rows, { kinds: new Set<JournalKind>(["restore"]), cardIds: new Set(["S1"]) });
+  assert.deepEqual(kept.map((row) => row.id), ["evt-11"]);
+});
+
+test("an « Importée » line is dated when the import ran, not at the project start", () => {
+  const imported = (seq: number, payload: Record<string, unknown>) =>
+    ev(seq, "S9", "imported", { ts: "2025-01-15T00:00:00.000Z", toColumn: "actifs", payload: { laneId: "laneA", ...payload } });
+  const now = journalAll(board(), [imported(20, { importedAt: "2026-09-30T08:00:00.000Z" })]);
+  assert.equal(now[0]?.ts, "2026-09-30T08:00:00.000Z");
+  const older = journalAll(board(), [imported(21, {})], { importMarks: [{ logSeq: 15, ts: "2026-09-16T09:00:00.000Z" }, { logSeq: 30, ts: "2026-09-29T09:00:00.000Z" }] });
+  assert.equal(older[0]?.ts, "2026-09-16T09:00:00.000Z");
+  assert.equal(journalAll(board(), [imported(22, {})])[0]?.ts, "2025-01-15T00:00:00.000Z"); // nothing better known
+});
+
+test("the load's reason reads on imported, unlisted and relisted rows, as on the fiche (ADR 055)", () => {
+  const log = [
+    ev(1, "S4", "imported", { actor: "import-csv", toColumn: "demandes", payload: { laneId: "laneA", reason: "nouveau dans le périmètre" } }),
+    ev(2, "S4", "unlisted", { actor: "import-csv", payload: { reason: "état « Reporté »" } }),
+    ev(3, "S4", "relisted", { actor: "import-csv", payload: { reason: "de nouveau dans le périmètre" } }),
+    ev(4, "S5", "unlisted", { actor: "import-csv" }),
+    ev(5, "S5", "relisted", { actor: "import-csv", payload: { reason: "  " } }),
+  ];
+  const rows = journalRows(board(), log, { kinds: ALL });
+  assert.deepEqual(rows.map((row) => [row.id, row.label, row.detail]), [
+    ["evt-5", "De retour dans l'import", null],
+    ["evt-4", "Absente du dernier import", null],
+    ["evt-3", "De retour dans l'import", "de nouveau dans le périmètre"],
+    ["evt-2", "Absente de l'import", "état « Reporté »"],
+    ["evt-1", "Importée", "nouveau dans le périmètre"],
+  ]);
+});
+
+test("an import doubt's answer (`settled`, ADR 062) is no journal row and never breaks a pause renewal", () => {
+  const settled = (seq: number, cardId: string) =>
+    ev(seq, cardId, "settled", { actor: "import-csv", payload: { doubtId: `d-${seq}`, option: "a", sticky: true, fingerprint: "f" } });
+  const log = [...LOG, settled(11, "S1"), settled(12, "S9")];
+  assert.deepEqual(journalAll(board(), log).map((row) => row.id), journalAll(board(), LOG).map((row) => row.id));
+  const renewal = [move(1, "S3", ["laneA", "actifs"], ["laneA", "pause"]), settled(2, "S3"),
+    ev(3, "S3", "decided", { payload: { decisionId: "D4", grounds: [], reason: "x", reviewDate: null } }), settled(4, "S3"),
+    ev(5, "S3", "decided", { payload: { decisionId: "D4", grounds: [], reason: "y", reviewDate: null } })];
+  assert.deepEqual(journalAll(board(), renewal).map((row) => row.label), ["Pause reconduite", "Mettre en pause", "Mise en pause"]);
+});

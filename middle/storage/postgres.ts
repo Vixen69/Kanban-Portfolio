@@ -230,9 +230,10 @@ function buildStorage(pool: Pool, runTx: Tx): BoardStorage {
       assertOpen();
       return pgInsert(runTx, card, created);
     },
-    async appendEvent(input) {
+    async appendEvent(input) { assertOpen(); return runTx((client) => insertEvent(client, input)); },
+    async appendEvents(inputs) { // one transaction: all or none (ADR 052)
       assertOpen();
-      return runTx((client) => insertEvent(client, input));
+      return runTx(async (client) => { const stored: CardEvent[] = []; for (const input of inputs) stored.push(await insertEvent(client, input)); return stored; });
     },
     ...pgReaders(pool, assertOpen),
     ...pgSnapshots(pool, runTx, assertOpen),

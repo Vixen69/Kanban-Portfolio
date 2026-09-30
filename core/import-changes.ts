@@ -172,6 +172,12 @@ export interface ImportChanges {
    * divergences). Absent in reports made before.
    */
   paused?: ImportAdvanced[];
+  /**
+   * « Sorti de Pause : état Sciforma terminé » (ADR 060, 2026-09-30):
+   * cards in Pause a done state NEW since the previous import sent to the
+   * terminal column (counted in moved). Absent in reports made before.
+   */
+  unpaused?: ImportAdvanced[];
   /** Hand-made cards the load adopts instead of creating a duplicate (ADR 059). */
   adopted: ImportAdopted[];
   /** Cards deleted on the board that the files still carry: « supprimées du tableau, ignorées » — never re-created (ADR 058). */

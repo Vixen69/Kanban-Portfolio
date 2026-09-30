@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import type { CardDecision, CardEvent, CardState } from "./types.ts";
 import { foldEvents } from "./state.ts";
 import { cardHistory } from "./history.ts";
-import { decisionStatus, groundsOf, isIsoDate, lastDecision, reviewOverdue } from "./decisions.ts";
+import { groundsOf, isIsoDate, reviewOverdue } from "./decisions.ts";
 import { testCard, testConfig } from "./test-helpers.ts";
 
 const CONFIG = testConfig(); // decisions D2 (free) and D4 (traced); grounds fin_proche, n_avance_pas
@@ -23,31 +23,26 @@ function fold(events: CardEvent[]): CardState {
   return state;
 }
 
-test("the fold projects decided events in order and reads the last one", () => {
+test("the fold projects decided events in order", () => {
   const state = fold([
     decided("evt-1", "2026-08-01T10:00:00.000Z", { decisionId: "D2", reason: "On continue." }),
     decided("evt-2", "2026-09-01T10:00:00.000Z", { grounds: ["n_avance_pas"], reason: "Bloqué depuis deux mois.", reviewDate: "2026-09-30" }),
   ]);
   assert.equal(state.decisions.length, 2);
-  assert.deepEqual(lastDecision(state), {
+  assert.deepEqual(state.decisions[1], {
     actor: "test", ts: "2026-09-01T10:00:00.000Z", decisionId: "D4",
     grounds: ["n_avance_pas"], reason: "Bloqué depuis deux mois.", reviewDate: "2026-09-30",
+    // A decision recorded before ADR 052 reads with the fiche's other blocks empty.
+    instance: null, options: "", frees: { people: "", budget: "", capacity: "" }, liftCondition: "",
+    pauseKind: null, natureChange: "", fromLaneId: null, toLaneId: null, architectValidated: false, decidedOn: null,
   });
-  const status = decisionStatus(state, CONFIG, NOW);
-  assert.equal(status?.decision?.name, "Mettre en pause");
-  assert.equal(status?.daysToReview, 22);
-  assert.equal(status?.overdue, false);
   assert.equal(reviewOverdue(state, NOW), false);
 });
 
-test("a past review date reads as overdue; no decision reads as null", () => {
+test("a past review date out of Pause is not counted (ADR 052); no decision folds to an empty list", () => {
   const state = fold([decided("evt-1", "2026-07-01T10:00:00.000Z", { reviewDate: "2026-09-01" })]);
-  const status = decisionStatus(state, CONFIG, NOW);
-  assert.equal(status?.daysToReview, -7);
-  assert.equal(status?.overdue, true);
-  assert.equal(reviewOverdue(state, NOW), true);
-  assert.equal(decisionStatus(fold([]), CONFIG, NOW), null);
-  assert.equal(lastDecision(fold([])), null);
+  assert.equal(reviewOverdue(state, NOW), false); // only a card in Pause is counted
+  assert.deepEqual(fold([]).decisions, []);
 });
 
 test("a malformed decided payload is skipped, never corrupting the state", () => {
@@ -55,11 +50,9 @@ test("a malformed decided payload is skipped, never corrupting the state", () =>
   assert.deepEqual(state.decisions, []);
 });
 
-test("an unknown decision id keeps the entry but yields no decision type", () => {
+test("an unknown decision id keeps the entry", () => {
   const state = fold([decided("evt-1", "2026-08-01T10:00:00.000Z", { decisionId: "D9" })]);
-  const status = decisionStatus(state, CONFIG, NOW);
-  assert.equal(status?.decision, null);
-  assert.equal(status?.entry.decisionId, "D9");
+  assert.equal(state.decisions[0]?.decisionId, "D9");
 });
 
 test("unlisted marks the card absent from the last import, relisted and imported clear it", () => {

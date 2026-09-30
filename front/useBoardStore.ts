@@ -10,26 +10,9 @@ import { effectiveEvents, undoneEvents } from "../core/restore.ts";
 import { useExerciseSwitch, useSnapshotWrites } from "./useAdminWrites.ts";
 
 import {
-  fetchBoard,
-  fetchConfig,
-  fetchDefaultConfig,
-  postArchive,
-  postBlock,
-  fetchEventsAfter,
-  messageOf,
-  postCard,
-  postComment,
-  postDecision,
-  postDelete,
-  postEdit,
-  postMove,
-  postUnarchive,
-  postUnblock,
-  putConfig,
-  type BoardData,
-  type DecisionInput,
-  type MoveTarget,
-  type NewCardInput,
+  fetchBoard, fetchConfig, fetchDefaultConfig, fetchEventsAfter, messageOf, postArchive, postBlock, postCard,
+  postComment, postDecision, postDelete, postEdit, postMove, postUnarchive, postUnblock, putConfig,
+  type BoardData, type DecisionInput, type MoveTarget, type NewCardInput,
 } from "./api.ts";
 
 /** Lifecycle of the initial config + board fetch. */
@@ -56,11 +39,14 @@ export interface BoardStore {
   events: CardEvent[];
   /** The events a snapshot restore undid: in the log, no longer read (ADR 042). */
   undone: CardEvent[];
+  /** The log as written, restores included — the journal reads them (ADR 052). */
+  log: CardEvent[];
   reload(): Promise<void>;
   /** Card actions resolve true when persisted, false when refused. */
   /** Resolves the new card's id (App opens its « Modifier » form, ADR 057), null when refused. */
   createCard(input: NewCardInput): Promise<string | null>;
-  moveCard(cardId: string, to: MoveTarget): Promise<boolean>;
+  /** A move, with the decisions it carries when it is one (ADR 052). */
+  moveCard(cardId: string, to: MoveTarget, decisions?: DecisionInput[]): Promise<boolean>;
   blockCard(cardId: string, reason: string): Promise<boolean>;
   unblockCard(cardId: string): Promise<boolean>;
   editCard(cardId: string, patch: CardPatch): Promise<boolean>;
@@ -167,7 +153,9 @@ function useRefresh(
 
 // The card actions: await the API call, then refresh the log. A
 // failed write simply did not happen (logged, ids only — no titles) — the
-// French message lands in lastError so the shell can show it.
+// French message lands in lastError so the shell can show it — and the log
+// is refreshed too: a refusal often means the board shown was stale (another
+// hand moved or decided), and the next gesture must read the truth (ADR 052).
 function useCardActions(reload: () => Promise<void>, setLastError: (m: string | null) => void) {
   const perform = useCallback(
     async (call: () => Promise<unknown>): Promise<boolean> => {
@@ -177,6 +165,7 @@ function useCardActions(reload: () => Promise<void>, setLastError: (m: string | 
         const message = messageOf(cause);
         console.error("action refusée :", message);
         setLastError(message);
+        await reload().catch(() => undefined);
         return false;
       }
       setLastError(null);
@@ -191,7 +180,7 @@ function useCardActions(reload: () => Promise<void>, setLastError: (m: string | 
         const created: string[] = [];
         return (await perform(async () => created.push((await postCard(input)).card.id))) ? (created[0] ?? null) : null;
       },
-      moveCard: (cardId: string, to: MoveTarget) => perform(() => postMove(cardId, to)),
+      moveCard: (cardId: string, to: MoveTarget, decisions?: DecisionInput[]) => perform(() => postMove(cardId, to, decisions)),
       blockCard: (cardId: string, reason: string) => perform(() => postBlock(cardId, reason)),
       unblockCard: (cardId: string) => perform(() => postUnblock(cardId)),
       editCard: (cardId: string, patch: CardPatch) => perform(() => postEdit(cardId, patch)),
@@ -277,7 +266,7 @@ export function useBoardStore(): BoardStore {
   // The log as read (ADR 042): restores applied once here for every reader.
   const log = useMemo(() => {
     const raw = load.board?.events ?? NO_EVENTS;
-    return { events: effectiveEvents(raw), undone: undoneEvents(raw) };
+    return { raw, events: effectiveEvents(raw), undone: undoneEvents(raw) };
   }, [load.board]);
   return {
     status: load.status,
@@ -289,6 +278,7 @@ export function useBoardStore(): BoardStore {
     cards,
     events: log.events,
     undone: log.undone,
+    log: log.raw,
     reload,
     ...cardActions,
     ...configWrites,

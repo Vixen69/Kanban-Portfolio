@@ -140,21 +140,22 @@ export function DelaysSection({ flow, anchors }: { flow: FlowTimes; anchors: Flo
   );
 }
 
-// One history line: a movement (from → to) or a block/unblock event.
+// One history line: a movement (from → to), a block/unblock event, a decision, an import absence, a domain set.
 const DOT_CLASS: Record<HistoryEntry["kind"], string> = {
-  move: "", block: " blk", unblock: " okd", decision: " dec", unlisted: " abs", relisted: " okd",
+  move: "", block: " blk", unblock: " okd", decision: " dec", unlisted: " abs", relisted: " okd", domain: " dom",
 };
 
-// The narrated text of one history line (movement, blockage, decision, import absence).
+// The narrated text of one history line (movement, blockage, decision, import absence, domain).
 function histBody(entry: HistoryEntry) {
   switch (entry.kind) {
+    case "domain": return <><b>{entry.detail}</b>{entry.reason ? ` — ${entry.reason}` : ""}</>;
     case "block": return <><b>Bloqué</b>{entry.reason ? ` — ${entry.reason}` : ""}</>;
     case "unblock": return <b>Blocage levé</b>;
     case "decision": return <><b>Décision {entry.detail}</b>{entry.reason ? ` — ${entry.reason}` : ""}</>;
     // With the load's reason: « Absente de l’import — état « Reporté »… »; older events read as before.
     case "unlisted": return entry.reason ? <><b>Absente de l’import</b> — {entry.reason}</> : <b>Absente du dernier import</b>;
     case "relisted": return <><b>De retour dans l’import</b>{entry.reason ? ` — ${entry.reason}` : ""}</>;
-    default: return <>{entry.fromName ? `${entry.fromName} → ` : ""}<b>{entry.toName}</b>{entry.reason ? ` — ${entry.reason}` : ""}</>;
+    default: return <>{entry.gesture !== null && <span className="hist-gesture">{entry.gesture} · </span>}{entry.fromName && entry.fromName !== entry.toName ? `${entry.fromName} → ` : ""}<b>{entry.toName}</b>{entry.reason ? ` — ${entry.reason}` : ""}</>;
   }
 }
 

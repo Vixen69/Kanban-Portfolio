@@ -57,7 +57,8 @@ test("first load: one card, one imported event aged at the project start", () =>
   assert.equal(event?.toColumn, "actifs");
   assert.equal(event?.ts, "2025-01-12T00:00:00.000Z");
   assert.equal(event?.actor, IMPORT_ACTOR);
-  assert.deepEqual(event?.payload, { laneId: "projets" });
+  // Aged at the project start; the import itself dated for the journal (ADR 052).
+  assert.deepEqual(event?.payload, { laneId: "projets", importedAt: NOW.toISOString() });
 });
 
 test("a card without PE code gets a stable name-based id", () => {
