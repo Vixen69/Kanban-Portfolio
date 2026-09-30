@@ -87,13 +87,27 @@ test("Projets duplicate rows: the option ids and the fingerprint leave the Respo
     const first = doubtOf((await auditImport(storage, CONFIG, files("MARTIN Eva", "DURAND Luc"), NOW)).doubts, id);
     const other = doubtOf((await auditImport(storage, CONFIG, files("BLANC Paul", "NOIR Anne"), NOW)).doubts, id);
     assert.deepEqual([other.options.map((o) => o.id), other.fingerprint], [first.options.map((o) => o.id), first.fingerprint], "names change nothing");
-    assert.equal(first.askedEachTime, undefined, "told apart by their names: remembered as before");
+    assert.equal(first.askedEachTime, true, "the Responsables differ: asked at each import, never remembered");
     const bis = first.options.find((o) => /Alpha bis/.test(o.label))?.id ?? "?";
     await loadImport(storage, CONFIG, files("MARTIN Eva", "DURAND Luc"), NOW, 2026, choice(id, bis));
     const events = await storage.listEvents();
-    assert.equal(events.filter((e) => e.type === "settled").length, 1);
+    assert.deepEqual(events.filter((e) => e.type === "settled").map((e) => e.payload["sticky"]), [false]);
     assertNoName(events);
-    assert.equal(doubtOf((await auditImport(storage, CONFIG, files("MARTIN Eva", "DURAND Luc"), NOW)).doubts, id).how, "mémorisé");
+    assert.equal(doubtOf((await auditImport(storage, CONFIG, files("BLANC Paul", "NOIR Anne"), NOW)).doubts, id).how, "proposé",
+      "another pair of names never inherits the earlier choice");
+  });
+});
+
+test("Projets duplicate rows with the same Responsables: the choice is remembered", async () => {
+  const id = "duplicate-row|2026|PE30001|projets";
+  const files = sampleFiles({ projets: [projetsRow("PE30001", "Alpha bis", "MARTIN Eva"), projetsRow("PE30001", "Alpha", "MARTIN Eva")] });
+  await withBoard(async (storage) => {
+    const first = doubtOf((await auditImport(storage, CONFIG, files, NOW)).doubts, id);
+    assert.equal(first.askedEachTime, undefined);
+    const bis = first.options.find((o) => /Alpha bis/.test(o.label))?.id ?? "?";
+    await loadImport(storage, CONFIG, files, NOW, 2026, choice(id, bis));
+    assertNoName(await storage.listEvents());
+    assert.equal(doubtOf((await auditImport(storage, CONFIG, files, NOW)).doubts, id).how, "mémorisé");
   });
 });
 
@@ -117,7 +131,7 @@ test("Projets rows differing only in their Responsables: by line number, asked a
 // fingerprint leaves the Responsables out, so a remembered choice keeps the
 // same row when only the chef de projet named on it changes — and the owner
 // follows that row, like any owner the export refreshes (CLAUDE.md §4).
-test("Projets duplicate rows: a remembered choice survives a change of Responsable, the owner follows the kept row", async () => {
+test("Projets duplicate rows: after a change of Responsable the question comes back, never a silent other chef de projet", async () => {
   const id = "duplicate-row|2026|PE30001|projets";
   const files = (a: string, b: string) => sampleFiles({ projets: [projetsRow("PE30001", "Alpha bis", a), projetsRow("PE30001", "Alpha", b)] });
   const ownerOf = async (storage: BoardStorage) => (await storage.listBaseCards()).find((c) => c.codename === "PE30001")?.owner;
@@ -128,9 +142,9 @@ test("Projets duplicate rows: a remembered choice survives a change of Responsab
     assert.equal(await ownerOf(storage), "MARTIN Eva");
     const swapped = files("DURAND Luc", "MARTIN Eva");
     const next = doubtOf((await auditImport(storage, CONFIG, swapped, NOW)).doubts, id);
-    assert.deepEqual([next.how, next.applied], ["mémorisé", bis], "not asked again: the names are no part of the doubt");
+    assert.deepEqual([next.how, next.askedEachTime], ["proposé", true], "asked again: the names may have changed since the choice");
     await loadImport(storage, CONFIG, swapped, NOW, 2026, { choices: new Map() });
-    assert.equal(await ownerOf(storage), "DURAND Luc", "the kept row's current Responsable");
+    assert.equal(await ownerOf(storage), "MARTIN Eva", "the tool's row, not a remembered choice applied to other people");
     assertNoName(await storage.listEvents());
   });
 });

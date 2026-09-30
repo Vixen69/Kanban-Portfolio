@@ -138,12 +138,13 @@ n'est ajouté pour autant ; la règle est de ne rien dériver d'un nom.
   inconnue qui pourrait en contenir. Si deux lignes ne diffèrent que par
   ces colonnes-là, les choix passent au numéro de ligne et le doute est
   posé à chaque import, comme ci-dessus. Les mots écrits au journal
-  (`label`) omettent toujours les Responsables. Conséquence assumée : un
-  choix mémorisé garde la même ligne même quand le chef de projet nommé
-  dessus change d'un export à l'autre (la question ne revient pas) ; le
-  chef de projet de la carte suit alors cette ligne, comme tout chef de
-  projet que l'export rafraîchit (CLAUDE.md §4). « Déjà tranchés » montre
-  la ligne avec ses noms du jour.
+  (`label`) omettent toujours les Responsables. Et dès que les lignes
+  diffèrent **aussi** par un Responsable, le doute est posé à chaque
+  import, jamais mémorisé : le journal ne peut pas savoir si les noms ont
+  changé depuis le choix, et un choix mémorisé donnerait sans rien dire un
+  autre chef de projet à la carte (même règle que ProjetsCdP ; revue du
+  2026-09-30). Seules des lignes aux mêmes Responsables gardent la case
+  « Ne plus me demander ».
 - Revue des autres doutes : états, types, portefeuilles, noms de projet,
   cellules ME, montants, Id et titres de cartes — aucun nom de personne.
   Le nom reste montré au PMO à l'écran, jamais écrit.

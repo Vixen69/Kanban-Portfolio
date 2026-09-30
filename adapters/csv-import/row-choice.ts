@@ -8,8 +8,12 @@
 // derived from a name enters the log, and an unknown column may hold
 // one). When two distinct rows differ only elsewhere (a Responsable, an
 // unlisted column), the options fall back to their line numbers and the
-// doubt is asked at each import, never remembered. Shared by the Projets
-// onglet and SP readers. Pure.
+// doubt is asked at each import, never remembered. And whenever the rows
+// differ in a people's-name column, the doubt is asked at each import too:
+// the log cannot tell whether the names changed since the PMO chose, so a
+// remembered choice could silently give the card another chef de projet
+// (author's rule for the chefs de projet, 2026-09-30). Shared by the
+// Projets onglet and SP readers. Pure.
 
 import { fnv1a } from "./hash.ts";
 import { KEPT_ROW_RULE, keptRow } from "./duplicate-rows.ts";
@@ -63,6 +67,8 @@ interface Options<T> {
   byId: Map<string, T>;
   /** True when the options are told apart by line number only (never remembered). */
   byLine: boolean;
+  /** True when the rows differ in a people's-name column (never remembered). */
+  personalDiffers: boolean;
 }
 
 // One option per distinct content (its first line), labelled with the
@@ -78,6 +84,7 @@ function options<T extends ChoiceRow>(input: RowChoiceInput<T>): Options<T> {
     return byLine ? `ligne:${first.line}` : safeId(first);
   };
   const differing = input.columns.filter(([, index]) => new Set(distinct.map((row) => value(row, index))).size > 1);
+  const personalDiffers = differing.some(([label]) => input.personal?.has(label) === true);
   const specs = distinct.map((row): DoubtOptionSpec => {
     const parts = differing.map(([label, index]) => [label, `${label} « ${value(row, index) || "(vide)"} »`] as const);
     const shown = (keep: (label: string) => boolean): string => {
@@ -86,7 +93,7 @@ function options<T extends ChoiceRow>(input: RowChoiceInput<T>): Options<T> {
     };
     return { id: idOf(row), label: shown(() => true), trace: shown((label) => input.personal?.has(label) !== true), consequence: null };
   });
-  return { specs, idOf, byId: new Map(distinct.map((row) => [idOf(row), row])), byLine };
+  return { specs, idOf, byId: new Map(distinct.map((row) => [idOf(row), row])), byLine, personalDiffers };
 }
 
 /**
@@ -98,7 +105,7 @@ function options<T extends ChoiceRow>(input: RowChoiceInput<T>): Options<T> {
  */
 export function chooseRow<T extends ChoiceRow>(input: RowChoiceInput<T>, book: DoubtBook | undefined): T {
   const proposed = keptRow(input.rows);
-  const { specs, idOf, byId, byLine } = options(input);
+  const { specs, idOf, byId, byLine, personalDiffers } = options(input);
   if (specs.length < 2) return proposed;
   const differs = specs[0]?.label.includes(" : ") === true ? "" : " (seules d'autres colonnes diffèrent)";
   const applied = askOrPropose(book, {
@@ -106,7 +113,7 @@ export function chooseRow<T extends ChoiceRow>(input: RowChoiceInput<T>, book: D
     why: `${input.rows.length} lignes de ${input.source} portent ${input.code === null ? "ce nom" : `l'Id « ${input.code} »`}` +
       ` et ne disent pas la même chose${differs}. L'outil garde ${KEPT_ROW_RULE}.`,
     options: specs, proposed: idOf(proposed), ...(input.joinKeys === undefined ? {} : { joinKeys: input.joinKeys }),
-    ...(byLine ? { askedEachTime: true as const } : {}),
+    ...(byLine || personalDiffers ? { askedEachTime: true as const } : {}),
   });
   return applied === idOf(proposed) ? proposed : byId.get(applied) ?? proposed;
 }
