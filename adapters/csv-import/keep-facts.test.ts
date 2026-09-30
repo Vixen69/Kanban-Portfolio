@@ -30,7 +30,7 @@ const CASES: Array<{ name: string; fresh: Partial<Card>; expect: Partial<Card>; 
     name: "a new plan replaces the old one whole", fresh: { chargeByProfile: [{ profileId: "pmo", jh: 50, done: 30 }] },
     expect: { chargeByProfile: [{ profileId: "pmo", jh: 50, done: 30 }] }, kept: [],
   },
-  { name: "no jalons: the RDR date stands", fresh: { dateRdr: null }, expect: { dateRdr: "2026-09-15" }, kept: ["date RDR"] },
+  { name: "no Projets onglet (COUT PREV carries no « Fin »): the RDR date stands", fresh: { dateRdr: null }, expect: { dateRdr: "2026-09-15" }, kept: ["date RDR"] },
   { name: "no code: code and Sciforma id stand", fresh: { codename: null, sciformaId: null }, expect: { codename: "PE1", sciformaId: "PE1" }, kept: ["code projet", "identifiant Sciforma"] },
 ];
 

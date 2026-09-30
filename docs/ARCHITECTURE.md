@@ -647,9 +647,11 @@ de son ADR.
   il n'y a pas l'info, on garde ».
 - **Fait** : un champ laissé vide par les fichiers garde la valeur stockée
   (chef de projet, type, codes, argent, charges, date RDR ; le plan de
-  charge est gardé ou remplacé en entier ; zéro est une valeur). L'audit
-  annonce ce qui sera gardé, le chargement dit ce qu'il a gardé. Un seul
-  mode d'import : complet ou partiel, même chemin.
+  charge est gardé ou remplacé en entier ; zéro est une valeur) ; la
+  capacité garde ses parties laissées vides (lecture COUT PREV sans fichier
+  Coût, domaine ou capacité d'une personne). L'audit annonce ce qui sera
+  gardé, le chargement dit ce qu'il a gardé. Un seul mode d'import :
+  complet ou partiel, même chemin.
 
 ### 2026-09-30 — Comparer un instantané avec maintenant (ADR 053)
 

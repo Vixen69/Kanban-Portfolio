@@ -13,7 +13,7 @@ import { win32 } from "node:path";
 import type { BoardStorage } from "../core/ports.ts";
 import type { BoardConfig } from "../core/types.ts";
 import type { DomainDecision, ImportAuditResult, ImportLoadResult, ImportSummary } from "../core/import-types.ts";
-import { planLoad, renderReport, runImportAudit, withLegacyIds } from "../adapters/csv-import/index.ts";
+import { keepStoredCapacity, planLoad, renderReport, runImportAudit, withLegacyIds } from "../adapters/csv-import/index.ts";
 import type { AuditResult, EnrichedCard, InputFile, LoadPlan } from "../adapters/csv-import/index.ts";
 import { BadRequest } from "./errors.ts";
 import { exerciseOrCurrent } from "./validation.ts";
@@ -188,7 +188,10 @@ export async function loadImport(
   }
   if (hooks.beforeWrite !== undefined) await hooks.beforeWrite();
   await storage.importCards(plan.cards, plan.events);
-  if (audit.capacity !== null) await storage.importCapacity(withLegacyIds(audit.capacity.snapshot, plan.aliases));
+  if (audit.capacity !== null) {
+    const fresh = withLegacyIds(audit.capacity.snapshot, plan.aliases);
+    await storage.importCapacity(keepStoredCapacity(fresh, await storage.getCapacity(year)));
+  }
   console.log(
     `${now.toISOString()} import (outil, exercice ${year}) : ${plan.created} créée(s), ${plan.updated} mise(s) à jour, ` +
       `${plan.moved} déplacée(s), ${plan.unlisted} absente(s), ${plan.relisted} de retour, ` +

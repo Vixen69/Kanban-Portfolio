@@ -5,8 +5,9 @@
 // leaves the field blank in the rebuilt card; the stored value stands
 // instead. Only a value the files DO carry replaces the stored one — zero
 // included, since zero is a figure. The plan de charge is one fact: when
-// the files carry any line for the card, the new plan replaces the old one
-// whole; when they carry none, the old plan stands whole.
+// the files carry any usable line for the card, the new plan replaces the
+// old one whole; when they carry none — or only lines whose métier stayed
+// unresolved, counted in the report — the old plan stands whole.
 
 import type { Card } from "../../core/types.ts";
 

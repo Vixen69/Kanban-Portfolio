@@ -147,6 +147,22 @@ test("ADR 054: a partial set without any chef de projet source (no CdP, no Proje
   });
 });
 
+test("ADR 054: a load without the Coût file keeps the stored COUT PREV demand of the capacity", async () => {
+  await withTempDir(async (dir) => {
+    const storage = createJsonlStorage(join(dir, "board.jsonl"));
+    try {
+      await loadImport(storage, CONFIG, fixtureFiles(), NOW);
+      const before = (await storage.getCapacity(2026))?.coutsDemand ?? [];
+      assert.ok(before.length > 0, "the fixtures carry COUT PREV charge rows");
+      const withoutCouts = fixtureFiles(readdirSync(FIXTURES).filter((n) => n.endsWith(".csv") && n !== "Couts.csv"));
+      await loadImport(storage, CONFIG, withoutCouts, new Date("2026-09-30T09:00:00.000Z"));
+      assert.deepEqual((await storage.getCapacity(2026))?.coutsDemand, before);
+    } finally {
+      await storage.close();
+    }
+  });
+});
+
 async function withImportServer(work: (base: string) => Promise<void>): Promise<void> {
   await withTempDir(async (dir) => {
     const storage = createJsonlStorage(join(dir, "board.jsonl"));
