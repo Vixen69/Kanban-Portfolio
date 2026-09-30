@@ -669,6 +669,8 @@ de son ADR.
 - **Puis** : moins de rendu React pour les mêmes pixels — les cartes lisent
   l'horloge au jour, ne reçoivent plus tri ni loupe, index domaine / type
   mis en cache, survol du glisser hors de l'état de l'application.
+- **Fin de l'audit** : recherche plus légère à la frappe (texte des cartes
+  replié une fois, grille mémoïsée), polices préchargées au chargement.
 
 ### 2026-09-29 (après-midi) — Plein écran, fiches enchaînées, recherche sans accents (ADR 050)
 

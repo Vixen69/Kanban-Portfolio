@@ -23,7 +23,7 @@
 // top-left corner under the header-totals one, pointing down to the
 // gutter it unfolds (author, 2026-09-29) — not inside the gutter.
 
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import type { DragEvent } from "react";
 import type { BoardConfig, CardState, Column, Lane } from "../../core/types.ts";
 import { cellCards } from "../../core/board.ts";
@@ -220,7 +220,7 @@ function GridCorner({ columns, second, secondWhat }: {
  * state and the interaction callbacks).
  * Output: the .board grid element. Failure modes: none.
  */
-export function BoardGrid(props: BoardGridProps) {
+function BoardGridBody(props: BoardGridProps) {
   const { config } = props;
   const [columnsOpen, toggleColumns] = useStoredFlag(COLUMN_TOTALS_KEY, false);
   const [lanesOpen, toggleLanes] = useStoredFlag(LANE_TOTALS_KEY, false);
@@ -258,3 +258,6 @@ export function BoardGrid(props: BoardGridProps) {
     </div>
   );
 }
+
+/** The grid, memoised (ADR 051): a keystroke or a fiche opened re-renders it only when its props change. */
+export const BoardGrid = memo(BoardGridBody);
