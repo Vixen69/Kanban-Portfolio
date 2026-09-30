@@ -39,14 +39,16 @@ export function coutsVerdict(facts: CoutsFacts, motive: PerimeterVerdict["motive
 
 /**
  * The verdict of the Projets onglet on one row: every row is a card (the
- * PMO's list rules), except a second row carrying an Id already read.
+ * PMO's list rules), except a row whose Id another row kept carries
+ * (duplicate-rows.ts: the same row kept whatever the row order).
  * Inputs: the code, the name, the type as written, the process state,
- * the line of the first row when this one repeats its Id (null = kept).
+ * the line of the row kept for this Id when this one is set aside (null =
+ * this row is kept).
  * Output: a PerimeterVerdict. Failure: none.
  */
-export function projetsVerdict(code: string, name: string, type: string, state: string, firstLine: number | null): PerimeterVerdict {
-  if (firstLine !== null) {
-    return { code, name, motive: "duplicate", reason: `Id déjà porté par la ligne ${firstLine} — première ligne gardée` };
+export function projetsVerdict(code: string, name: string, type: string, state: string, keptLine: number | null): PerimeterVerdict {
+  if (keptLine !== null) {
+    return { code, name, motive: "duplicate", reason: `Id en double — la ligne ${keptLine} est gardée` };
   }
   const etat = state === "" ? "" : `état ${quoted(state)}, `;
   return { code, name, motive: "retained", reason: `${etat}type ${quoted(typeBaseLabel(type))} (l’onglet Projets fait foi)` };

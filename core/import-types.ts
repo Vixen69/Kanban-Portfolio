@@ -62,8 +62,16 @@ export interface ImportAuditResult {
   exercise: number;
   report: string;
   summary: ImportSummary;
-  /** True when the perimeter assembled — a load would write cards. */
+  /** True when a load of these files would be accepted — it would write cards (`refusal` null). */
   loadable: boolean;
+  /**
+   * Why a load of these files would be refused, plain French — a closed
+   * exercise, files that block (ADR 056), no perimeter, no project on the
+   * exercise (files of another year); null when loadable. The audit and
+   * the load share the rule: what the audit previews is what the load
+   * does. Absent from a server that predates it.
+   */
+  refusal?: string | null;
   /** The domain conflicts a load would raise (ADR 036) — each needs a decision before the load. */
   conflicts: DomainConflict[];
   /**

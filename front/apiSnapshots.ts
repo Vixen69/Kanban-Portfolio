@@ -22,11 +22,42 @@ export function postSnapshot(label: string): Promise<SnapshotSummary> {
   return request<SnapshotSummary>("/api/snapshots", jsonInit("POST", { label }));
 }
 
-/** What a restore returns: the snapshot, the `restored` event, the runtime config. */
+/**
+ * What a restore returns: the snapshot, the `restored` event, the runtime
+ * config; whether the snapshot's applied config was set aside because the
+ * versioned model changed since (ADR 038/058), and the exercise years
+ * whose capacity was removed because the snapshot held none (ADR 058) —
+ * both absent from a middle older than ADR 058.
+ */
 export interface RestoreResult {
   snapshot: SnapshotSummary;
   event: CardEvent;
   config: BoardConfig;
+  configSetAside?: boolean;
+  capacityCleared?: number[];
+}
+
+/**
+ * What the admin must be told after a restore, beyond « the board is
+ * back »: the snapshot's applied config set aside (its WIP limits,
+ * category names and fields stay in the history, the versioned model
+ * runs), the capacity removed for the years the snapshot held none.
+ * Input: the restore's result. Output: the French notice, null when
+ * neither happened. Failure modes: none.
+ */
+export function restoreNotice(result: Pick<RestoreResult, "configSetAside" | "capacityCleared">): string | null {
+  const parts: string[] = [];
+  if (result.configSetAside === true) {
+    parts.push(
+      "Configuration de l’instantané mise de côté : le modèle versionné (board.json) a changé depuis — " +
+        "ses limites WIP, libellés et champs restent dans l’historique de configuration, le modèle versionné s’applique.",
+    );
+  }
+  const cleared = result.capacityCleared ?? [];
+  if (cleared.length > 0) {
+    parts.push(`Capacité retirée (l’instantané n’en avait pas) : ${[...cleared].sort((a, b) => a - b).join(", ")}.`);
+  }
+  return parts.length === 0 ? null : `Instantané restauré. ${parts.join(" ")}`;
 }
 
 /**

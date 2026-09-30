@@ -5,12 +5,24 @@
 // screen shows them, the archiving after. Shared by the import report and
 // « Comparer avec maintenant ». Also the words and numbers of one row: ids
 // into the config's names, ISO days into French dates, the signed delta
-// and its direction. Pure; no React.
+// and its direction, at the engine's precision (the hundredth). Pure; no
+// React.
 
 import type { BoardConfig } from "../core/types.ts";
 import type { CardChange, CardPlanFigures, ChangeKind, FigureFact, PlanChange, PlanFigures } from "../core/snapshot-diff.ts";
 import { FIGURE_FACTS } from "../core/snapshot-diff.ts";
-import { fmtNum } from "./format.ts";
+
+/**
+ * The numbers of a change row: French, at most two decimals — the
+ * precision the change engine compares at (core/figure-changes.ts), so a
+ * listed change never reads « 12,3 → 12,3 ». The board keeps its one
+ * decimal (./format.ts).
+ */
+const CHANGE_NUM = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 });
+
+function fmtChange(value: number): string {
+  return Number.isFinite(value) ? CHANGE_NUM.format(value) : "—";
+}
 
 /** One section of grouped changes: its key, its French title, its rows. */
 export interface ChangeSection {
@@ -125,11 +137,12 @@ export function changeWords(config: BoardConfig, kind: ChangeKind, value: string
 }
 
 /**
- * A figure of a row: at most one decimal, French. Input: the value or null.
- * Output: the text, « — » for none. Failure modes: none.
+ * A figure of a row: at most two decimals (the engine's precision),
+ * French. Input: the value or null. Output: the text, « — » for none.
+ * Failure modes: none.
  */
 export function fmtFigure(value: number | null): string {
-  return value === null ? "—" : fmtNum(value);
+  return value === null ? "—" : fmtChange(value);
 }
 
 /** The direction of a change: up, down, or none (no delta, or zero once rounded). */
@@ -141,8 +154,17 @@ export type Trend = "up" | "down" | null;
  * text is empty when there is no direction. Failure modes: none.
  */
 export function signedDelta(delta: number | null): { trend: Trend; text: string } {
-  if (delta === null || fmtNum(Math.abs(delta)) === "0") return { trend: null, text: "" };
-  return delta > 0 ? { trend: "up", text: `+${fmtNum(delta)}` } : { trend: "down", text: `−${fmtNum(-delta)}` };
+  if (delta === null || fmtChange(Math.abs(delta)) === "0") return { trend: null, text: "" };
+  return delta > 0 ? { trend: "up", text: `+${fmtChange(delta)}` } : { trend: "down", text: `−${fmtChange(-delta)}` };
+}
+
+/**
+ * The delta of two plan figures at the engine's precision (the hundredth),
+ * so float noise (0.1 + 0.2) never decides a direction. Inputs: before,
+ * after. Output: after − before, rounded. Failure modes: none.
+ */
+export function planDelta(before: number, after: number): number {
+  return Math.round((after - before) * 100) / 100;
 }
 
 /**
@@ -158,11 +180,11 @@ export function profileName(config: BoardConfig, profileId: string): string {
  * after, the figure read. Output: the text. Failure modes: none.
  */
 export function planPair(before: PlanFigures, after: PlanFigures, key: keyof PlanFigures): string {
-  return `${fmtNum(before[key])} → ${fmtNum(after[key])}`;
+  return `${fmtChange(before[key])} → ${fmtChange(after[key])}`;
 }
 
 function planSide(figures: CardPlanFigures, key: "planned" | "raf"): string {
-  return figures.breakdown ? fmtNum(figures[key]) : "sans ventilation";
+  return figures.breakdown ? fmtChange(figures[key]) : "sans ventilation";
 }
 
 /**

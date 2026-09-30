@@ -22,8 +22,19 @@ import { discard, doubt, warn } from "./report.ts";
 import type { ImportReport, RowRef } from "./report.ts";
 import type { DomainShape, PerimeterVerdict, ProjetEntry, ProjetsCounts, ProjetsTable } from "./projets-types.ts";
 import { projetsVerdict } from "./couts-verdicts.ts";
+import { KEPT_ROW_RULE, keptRow } from "./duplicate-rows.ts";
 
 export type { DomainShape, PerimeterVerdict, ProjetEntry, ProjetsCounts, ProjetsTable } from "./projets-types.ts";
+
+/** A row past the structural gates, waiting for the other rows of its Id. */
+interface Candidate {
+  row: CsvRow;
+  line: number;
+  cells: string[];
+  id: string;
+  nom: string;
+  normalizedName: string;
+}
 
 interface ProjetsContext {
   match: HeaderMatch;
@@ -34,6 +45,9 @@ interface ProjetsContext {
   domainLookup: Lookup;
   subLookups: Map<string, Lookup>;
   typeLookup: Lookup;
+  /** The rows past the gates, grouped by Id in the order the Ids first came (one group per row without Id). */
+  groups: Candidate[][];
+  groupById: Map<string, Candidate[]>;
   entries: ProjetEntry[];
   verdicts: PerimeterVerdict[];
   byId: Map<string, ProjetEntry>;
@@ -66,13 +80,14 @@ export function parseProjets(
     match, report, fileName, param, shape: detectShape(match, param, report, fileName),
     domainLookup: createDomainLookup(config), subLookups: createSubDomainLookups(config),
     typeLookup: createTypeLookup(config),
-    entries: [], verdicts: [], byId: new Map(), byName: new Map(), typeCounts: new Map(),
+    groups: [], groupById: new Map(), entries: [], verdicts: [], byId: new Map(), byName: new Map(), typeCounts: new Map(),
     counts: { domainDirect: 0, domainViaParam: 0, domainMissing: 0, subDetailed: 0, subFolded: 0, withOwner: 0, leadsExcluded: 0 },
     unknownTypes: new Map(), unknownDomains: new Map(), unknownSubs: new Map(),
     unknownPaths: new Map(), states: new Map(), tallies: new Map(),
   };
   if (param === null) warn(report, "PARAM absent — responsables de domaine non exclus du chef de projet", fileName);
   for (const row of rows) readRow(ctx, row);
+  for (const group of ctx.groups) takeGroup(ctx, group);
   finalize(ctx);
   return {
     fileName, entries: ctx.entries, verdicts: ctx.verdicts, byId: ctx.byId, byName: ctx.byName, shape: ctx.shape,
@@ -95,8 +110,8 @@ function cell(ctx: ProjetsContext, row: CsvRow, column: string): string {
   return index === undefined ? "" : (row.cells[index] ?? "").trim();
 }
 
-// Structural gates (empty, nameless, total rows, duplicate ids), then the
-// entry build. A duplicate name with another id is kept — but questioned.
+// Structural gates (empty, nameless, total rows), then the row joins the
+// group of its Id: the entries are built once every row was read.
 function readRow(ctx: ProjetsContext, row: CsvRow): void {
   const ref: RowRef = { file: ctx.fileName, line: row.line };
   if (row.cells.every((c) => c.trim() === "")) {
@@ -115,20 +130,43 @@ function readRow(ctx: ProjetsContext, row: CsvRow): void {
   }
   const id = cell(ctx, row, "Id");
   if (id === "") tallyInto(ctx.tallies, "« Id » vide — identité dérivée du nom", row.line);
-  const sameId = id === "" ? undefined : ctx.byId.get(id);
-  if (sameId !== undefined) {
-    ctx.verdicts.push(projetsVerdict(id, nom, cell(ctx, row, "Type"), cell(ctx, row, "État du processus"), sameId.ref.line));
-    doubt(ctx.report, ctx.fileName,
-      `Id « ${id}» porté par « ${sameId.name} » (ligne ${sameId.ref.line}) et « ${nom} » (ligne ${row.line}) — première conservée`, { ref });
+  const candidate: Candidate = { row, line: row.line, cells: row.cells, id, nom, normalizedName };
+  const group = id === "" ? undefined : ctx.groupById.get(id);
+  if (group !== undefined) {
+    group.push(candidate);
     return;
   }
+  ctx.groups.push([candidate]);
+  if (id !== "") ctx.groupById.set(id, ctx.groups[ctx.groups.length - 1] ?? []);
+}
+
+// One Id: the row kept whatever the order the rows came in (ADR 056 —
+// duplicate-rows.ts), the others named, then the entry build. A duplicate
+// name with another id is kept — but questioned.
+function takeGroup(ctx: ProjetsContext, group: Candidate[]): void {
+  const kept = keptRow(group);
+  const { row, id, nom, normalizedName } = kept;
+  const ref: RowRef = { file: ctx.fileName, line: row.line };
   const entry = buildEntry(ctx, row, ref, id, nom, normalizedName);
   ctx.entries.push(entry);
   ctx.verdicts.push(projetsVerdict(entry.codename ?? "", nom, cell(ctx, row, "Type"), entry.state, null));
+  if (group.length > 1) sayDuplicates(ctx, group, kept);
   if (id !== "") ctx.byId.set(id, entry);
   const sameName = ctx.byName.get(normalizedName);
   if (sameName === undefined) ctx.byName.set(normalizedName, entry);
   else doubt(ctx.report, ctx.fileName, `nom « ${nom} » porté par deux Id (${sameName.id || "vide"}, ${id || "vide"}) — jointures par nom ambiguës`, { ref });
+}
+
+// The rows of one Id beside the kept one: a verdict each, one douteux.
+function sayDuplicates(ctx: ProjetsContext, group: Candidate[], kept: Candidate): void {
+  const others = group.filter((c) => c !== kept).sort((a, b) => a.line - b.line);
+  for (const c of others) {
+    ctx.verdicts.push(projetsVerdict(c.id, c.nom, cell(ctx, c.row, "Type"), cell(ctx, c.row, "État du processus"), kept.line));
+  }
+  const lines = [...group].sort((a, b) => a.line - b.line).map((c) => `« ${c.nom} » (ligne ${c.line})`).join(", ");
+  doubt(ctx.report, ctx.fileName,
+    `Id « ${kept.id} » porté par ${group.length} lignes : ${lines} — ligne ${kept.line} gardée (${KEPT_ROW_RULE})`,
+    { ref: { file: ctx.fileName, line: kept.line } });
 }
 
 function buildEntry(

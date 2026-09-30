@@ -7,6 +7,7 @@
 
 import type { BoardConfig } from "../../core/types.ts";
 import type { ImportAuditResult, ImportLoadResult } from "../../core/import-types.ts";
+import { loadOutcomes } from "../importReport.ts";
 import { ImportChanges } from "./ImportChanges.tsx";
 import { ImportConflicts } from "./ImportConflicts.tsx";
 import type { Decisions } from "./ImportConflicts.tsx";
@@ -19,14 +20,18 @@ export type ImportPhase =
   | { kind: "loaded"; result: ImportLoadResult };
 
 // What the load wrote that the key numbers do not say: the placements and
-// domains left alone, the domain decisions, the capacity stored.
+// domains left alone, the domain decisions, the hand corrections and
+// placements the export's new information replaced, the adoptions, the
+// deleted cards ignored (ADR 058/059/060), the capacity stored.
 function LoadSummary({ result }: { result: ImportLoadResult }) {
   const l = result.load;
+  const outcomes = loadOutcomes(l);
   return (
     <div className="import-summary ok">
       Chargé dans l’exercice {result.exercise} (cartes et évènements en un lot) · {l.divergences} divergence(s) conservée(s) ·
       {" "}{l.kept} position(s) conservée(s) (sans jalon) · domaines : {l.domainReplaced} remplacé(s), {l.domainKept} gardé(s)
       {l.domainKeptByPrior > 0 && <>, {l.domainKeptByPrior} déjà tranché(s)</>}
+      {outcomes.length > 0 && <> · {outcomes.join(" · ")}</>}
       {l.capacity !== null && <> · capacité : {l.capacity.persons} personne(s), {l.capacity.assignments} affectation(s)</>}
     </div>
   );

@@ -92,6 +92,7 @@
 .sd-head { display: flex; align-items: center; gap: 8px; font-size: 12px; }
 .sd-sec summary { cursor: pointer; font-size: 12px; padding: 3px 0; }
 .sd-sec ul { margin: 2px 0 6px; padding-left: 16px; display: flex; flex-direction: column; gap: 2px; }
+.sd-sec.warn > summary b { color: var(--warn); }
 .sd-item { font-size: 11.5px; display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
 .sd-code { font-family: ui-monospace, Menlo, monospace; font-size: 10.5px; color: var(--tx-3); }
 .sd-year { font-size: 10px; color: var(--tx-4); }

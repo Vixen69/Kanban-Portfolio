@@ -54,6 +54,7 @@
 .qa-more > summary:hover { color: var(--accent); }
 .qa-more[open] > summary { margin-bottom: 7px; }
 .qa-more-note { font-size: 9px; color: var(--tx-4); margin: 0 0 9px; }
+.qa-error { font-size: 11px; font-weight: 500; color: #991b1b; background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 7px 10px; margin-bottom: 11px; }
 /* ---------- Card detail: charge, ressources, docs, comments, history ---------- */
 .charge-box { background: #f1f4f9; border: 1px solid var(--bd-sub); border-radius: 6px; padding: 9px 11px; margin-bottom: 11px; }
 .charge-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; }

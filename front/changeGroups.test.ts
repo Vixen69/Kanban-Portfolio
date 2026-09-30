@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { testConfig } from "../core/test-helpers.ts";
 import type { CardChange, FigureFact, PlanChange } from "../core/snapshot-diff.ts";
 import {
-  capitalized, changeKey, changeWords, fmtFigure, frDay, groupChanges, planPair, planSummary, profileName, sectionOpen, signedDelta,
+  capitalized, changeKey, changeWords, fmtFigure, frDay, groupChanges, planDelta, planPair, planSummary, profileName, sectionOpen, signedDelta,
 } from "./changeGroups.ts";
 
 const NBSP = String.fromCharCode(0x202f);
@@ -74,21 +74,35 @@ test("changeWords: config names, French dates, texts, and a dash for none", () =
 test("signedDelta: the direction and the signed French text, nothing when flat or unknown", () => {
   const cases: Array<[number | null, ReturnType<typeof signedDelta>]> = [
     [12.5, { trend: "up", text: "+12,5" }], [-3, { trend: "down", text: "−3" }], [1250, { trend: "up", text: `+1${NBSP}250` }],
-    [0, { trend: null, text: "" }], [0.04, { trend: null, text: "" }], [null, { trend: null, text: "" }],
+    [0, { trend: null, text: "" }], [0.004, { trend: null, text: "" }], [null, { trend: null, text: "" }],
+    // The engine lists a change from the hundredth: its direction shows (« ça bouge à chaque fois un petit peu »).
+    [0.03, { trend: "up", text: "+0,03" }], [-0.01, { trend: "down", text: "−0,01" }],
   ];
   for (const [delta, expected] of cases) assert.deepEqual(signedDelta(delta), expected, String(delta));
 });
 
-test("fmtFigure and planPair: one decimal at most, a dash for none", () => {
-  assert.equal(fmtFigure(null), "—");
-  assert.equal(fmtFigure(24.52), "24,5");
-  assert.equal(planPair(PLAN.before, PLAN.after, "planned"), "100 → 120,3");
+test("fmtFigure and planPair: two decimals at most — the engine's precision — a dash for none", () => {
+  const cases: Array<[number | null, string]> = [[null, "—"], [24.52, "24,52"], [12.31, "12,31"], [12.34, "12,34"], [24.526, "24,53"], [7, "7"]];
+  for (const [value, expected] of cases) assert.equal(fmtFigure(value), expected, String(value));
+  assert.equal(planPair(PLAN.before, PLAN.after, "planned"), "100 → 120,25");
+  const small = { planned: 1.04, done: 0, raf: 1.04 };
+  assert.equal(planPair(small, { ...small, planned: 1.01 }, "planned"), "1,04 → 1,01", "a listed change never reads « 1 → 1 »");
 });
 
 test("planSummary: prévu and RAF, « sans ventilation » for a side without plan", () => {
-  assert.equal(planSummary(PLAN), "prévu 100 → 120,3 j.h · RAF 80 → 90,3 j.h");
+  assert.equal(planSummary(PLAN), "prévu 100 → 120,25 j.h · RAF 80 → 90,25 j.h");
   const fresh: PlanChange = { ...PLAN, before: { planned: 0, done: 0, raf: 0, breakdown: false } };
-  assert.equal(planSummary(fresh), "prévu sans ventilation → 120,3 j.h · RAF sans ventilation → 90,3 j.h");
+  assert.equal(planSummary(fresh), "prévu sans ventilation → 120,25 j.h · RAF sans ventilation → 90,25 j.h");
+  const nudge: PlanChange = {
+    before: { planned: 10.25, done: 0, raf: 10.25, breakdown: true }, after: { planned: 10.3, done: 0, raf: 10.3, breakdown: true }, profiles: [],
+  };
+  assert.equal(planSummary(nudge), "prévu 10,25 → 10,3 j.h · RAF 10,25 → 10,3 j.h");
+});
+
+test("planDelta: rounded to the hundredth, float noise never decides a direction", () => {
+  const cases: Array<[number, number, number]> = [[0.1, 0.3, 0.2], [10.25, 10.3, 0.05], [0.3, 0.1 + 0.2, 0], [5, 2, -3]];
+  for (const [before, after, expected] of cases) assert.equal(planDelta(before, after), expected, `${before} → ${after}`);
+  assert.deepEqual(signedDelta(planDelta(0.3, 0.1 + 0.2)), { trend: null, text: "" });
 });
 
 test("profileName and changeKey", () => {

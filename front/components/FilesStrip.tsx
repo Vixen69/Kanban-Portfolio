@@ -6,10 +6,10 @@
 // read, how many projects it kept, which it left out and why.
 
 import type { ImportChanges } from "../../core/import-types.ts";
-import { fileChip } from "../importReport.ts";
+import { fileChip, noPerimeterLine } from "../importReport.ts";
 
-function Perimeter({ perimeter }: { perimeter: ImportChanges["perimeter"] }) {
-  if (perimeter.source === null) return <div className="chg-line warn">Aucun fichier de périmètre : rien ne peut être chargé.</div>;
+function Perimeter({ perimeter, files }: { perimeter: ImportChanges["perimeter"]; files: ImportChanges["files"] }) {
+  if (perimeter.source === null) return <div className="chg-line warn">{noPerimeterLine(files)}</div>;
   const excluded = perimeter.excluded;
   return (
     <details className="sd-sec">
@@ -61,7 +61,7 @@ export function FilesStrip({ changes }: { changes: ImportChanges }) {
         })}
         {unknown > 0 && <li className="chg-chip warn">{unknown} fichier(s) non reconnu(s)</li>}
       </ul>
-      <Perimeter perimeter={changes.perimeter} />
+      <Perimeter perimeter={changes.perimeter} files={changes.files} />
       <FileDetails changes={changes} />
     </div>
   );

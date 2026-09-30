@@ -42,7 +42,7 @@ import { resolveIdentity } from "./load-identity.ts";
 import type { AdoptedCard } from "./load-identity.ts";
 import { keepStoredFacts, keptFactCards, keptFactCounts } from "./keep-facts.ts";
 import type { KeptFactCards, KeptFactCount, KeptTally } from "./keep-facts.ts";
-import { toCard } from "./card-row.ts";
+import { keepLivedFields, toCard } from "./card-row.ts";
 import { placedLikeStored, refreshPosition } from "./load-position.ts";
 import type { AdvancedCard, PositionInput } from "./load-position.ts";
 import { newerFactEvents } from "./newer-facts.ts";
@@ -154,7 +154,7 @@ export function planLoad(
     }
     const domain = settleDomain(plan, existing, card, config, reading.priors.get(identity.id), decisions.get(identity.id), now);
     const base = stored.get(identity.id);
-    const fresh = keepStoredFacts(toCard(identity.id, card, config, plan, year, existing.createdAt, domain), base, tally);
+    const fresh = rebuiltBase(toCard(identity.id, card, config, plan, year, existing.createdAt, domain), base, tally);
     refreshed.push(refreshExisting(plan, { id: identity.id, existing, stored: base, card, adopted: false }, fresh, reading, config, now));
   }
   takeBackHandCorrections(plan, refreshed, existingEvents, now);
@@ -162,6 +162,14 @@ export function planLoad(
   plan.factsKept = keptFactCounts(tally);
   plan.factsKeptCards = keptFactCards(tally);
   return plan;
+}
+
+// The refreshed base of an existing card: the export rebuilds the facts it
+// carries (a blank one keeps the stored value, ADR 054); what it never
+// carries — criticality, notes, resources... — stays the stored card's
+// (a hand-made card holds them in its base, ADR 057/059).
+function rebuiltBase(rebuilt: Card, base: Card | undefined, tally: KeptTally): Card {
+  return keepLivedFields(keepStoredFacts(rebuilt, base, tally), base);
 }
 
 // ADR 060: the export's new values take back the hand corrections.

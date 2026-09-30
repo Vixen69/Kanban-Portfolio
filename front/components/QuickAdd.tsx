@@ -5,7 +5,8 @@
 // asks for none — the canal is chosen by the qualification drag. ADR 057:
 // a folded « Plus d'informations » block takes the facts an import would
 // carry (code, sous-domaine, efforts, budgets, date RDR…); App then opens
-// the new card's « Modifier » form.
+// the new card's « Modifier » form. The modal closes only once the card
+// exists: a refusal keeps everything typed and says why inside it.
 
 import { useState } from "react";
 import type { BoardConfig, Criticality } from "../../core/types.ts";
@@ -13,6 +14,7 @@ import { unifiedColumnIds } from "../../core/layout.ts";
 import { CARD_TEXT_LIMITS as CAP } from "../../core/card-input.ts";
 import type { CreationFacts } from "../api.ts";
 import { creationFactsOf, EMPTY_FACTS, type FactsDraft } from "../cardFacts.ts";
+import { closedExerciseNotice } from "../quickAddFlow.ts";
 import { CodeField, EffortGrid, SubDomainField } from "./CardEdit.tsx";
 import { CRITICALITY_KEYS, Field, SelectField } from "./modalParts.tsx";
 
@@ -32,7 +34,12 @@ export interface QuickAddInput extends CreationFacts {
 export interface QuickAddProps {
   config: BoardConfig;
   onClose: () => void;
-  onCreate: (input: QuickAddInput) => void;
+  /** Resolves true once the card exists (the shell then closes the modal); false when refused. */
+  onCreate: (input: QuickAddInput) => Promise<boolean>;
+  /** The store's last refusal, shown inside the modal after a refused « Créer ». */
+  error: string | null;
+  /** The exercise shown: a closed one is said at once and « Créer » is disabled. */
+  viewYear: number;
 }
 
 // Design defaults: first domain, « Mise en œuvre » type when present,
@@ -90,17 +97,37 @@ function MoreInfo({ config, domain, facts, setFacts }: {
   );
 }
 
+// One « Créer » at a time: pending while the POST is in flight (no double
+// submit); failed once refused, so the modal shows the store's message. On
+// success the shell unmounts the modal, so no state is set after it.
+function useSubmit(onCreate: (input: QuickAddInput) => Promise<boolean>) {
+  const [pending, setPending] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const submit = (input: QuickAddInput) => {
+    setPending(true);
+    setFailed(false);
+    void onCreate(input).then((created) => {
+      if (created) return;
+      setPending(false);
+      setFailed(true);
+    });
+  };
+  return { pending, failed, submit };
+}
+
 /**
  * The QuickAdd modal (« Nouveau sujet »).
- * Inputs: QuickAddProps — the runtime config and the close/create
- * callbacks.
+ * Inputs: QuickAddProps — the runtime config, the exercise shown, the
+ * store's last refusal and the close/create callbacks.
  * Output: overlay + modal; the bar wears the selected domain color; Créer
- * stays disabled until the title is non-blank, then calls onCreate with
+ * stays disabled until the title is non-blank (and while a creation is in
+ * flight, or when the exercise shown is closed), then calls onCreate with
  * the trimmed title and the typed facts (the server puts the card in the
  * first column). Changing the domain clears the sub-domain.
- * Failure modes: none.
+ * Failure modes: a refused creation keeps the modal and its draft, and
+ * shows the refusal (error) above the buttons.
  */
-export function QuickAdd({ config, onClose, onCreate }: QuickAddProps) {
+export function QuickAdd({ config, onClose, onCreate, error, viewYear }: QuickAddProps) {
   const [draft, setDraft] = useState<QuickAddInput>(() => initialInput(config));
   const [facts, setFactsState] = useState<FactsDraft>(EMPTY_FACTS);
   const set = (patch: Partial<QuickAddInput>) => {
@@ -108,7 +135,9 @@ export function QuickAdd({ config, onClose, onCreate }: QuickAddProps) {
     if (patch.domain !== undefined) setFactsState((current) => ({ ...current, subDomain: "" }));
   };
   const setFacts = (patch: Partial<FactsDraft>) => setFactsState((current) => ({ ...current, ...patch }));
-  const valid = draft.title.trim().length > 0;
+  const { pending, failed, submit } = useSubmit(onCreate);
+  const closedNotice = closedExerciseNotice(viewYear, config.exercise.year);
+  const valid = draft.title.trim().length > 0 && closedNotice === null && !pending;
   const domain = config.domains.find((entry) => entry.id === draft.domain);
   return (
     <div className="overlay" onClick={onClose}>
@@ -119,14 +148,16 @@ export function QuickAdd({ config, onClose, onCreate }: QuickAddProps) {
             <h2 className="modal-name">Nouveau sujet</h2>
             <button className="x" onClick={onClose}>✕</button>
           </div>
+          {closedNotice !== null && <div className="qa-error" role="alert">{closedNotice}</div>}
           <div className="intake-note">Entre dans <b>{config.columns[0]!.name}</b> — tout sujet arrive par la gauche.</div>
           <Field label="Nom du sujet *"><input className="inp" autoFocus maxLength={CAP.title} value={draft.title} onChange={(e) => set({ title: e.target.value })} /></Field>
           <SelectGrid draft={draft} config={config} set={set} />
           <Field label="Chef de projet"><input className="inp" maxLength={CAP.owner} value={draft.owner} onChange={(e) => set({ owner: e.target.value })} /></Field>
           <MoreInfo config={config} domain={draft.domain} facts={facts} setFacts={setFacts} />
+          {failed && error !== null && <div className="qa-error" role="alert">{error}</div>}
           <div className="modal-actions">
             <button className="btn ghost" onClick={onClose}>Annuler</button>
-            <button className="btn primary" disabled={!valid} onClick={() => onCreate({ ...draft, title: draft.title.trim(), ...creationFactsOf(facts) })}>Créer</button>
+            <button className="btn primary" disabled={!valid} onClick={() => submit({ ...draft, title: draft.title.trim(), ...creationFactsOf(facts) })}>Créer</button>
           </div>
         </div>
       </div>

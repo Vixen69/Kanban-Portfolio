@@ -60,8 +60,9 @@ affichée (estimé × 1,05), un champ vidé valait 0, le plan de charge tronquai
   complet.
 - Hors périmètre, en attente de l'auteur : placer ou antidater une carte à
   la création, carte sans type, étiquettes / alertes / dépendances, capacité
-  des cartes manuelles, priorité saisie vs réimport, adoption d'une carte
-  manuelle par l'import.
+  des cartes manuelles. Tranchés depuis : l'adoption d'une carte manuelle
+  par l'import (ADR 059) et la priorité saisie vs réimport (ADR 060 :
+  l'information nouvelle de l'export l'emporte).
 - `core/card-input.ts` (+ tests), `middle/cards.ts`, `middle/validation.ts`,
   `middle/api.ts` (+ `cards.test.ts`), `front/cardFacts.ts` (+ tests),
   `front/detailModel.ts`, `QuickAdd`, `CardEdit`, `CardDetail`,

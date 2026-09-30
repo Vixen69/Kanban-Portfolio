@@ -1,12 +1,13 @@
 // ADR 059 — a hand-made card whose code the export carries is ADOPTED by
 // the load: its id kept (aliased for the capacity snapshot), its base card
 // becomes the import's, its hand edits still read on top; two hand-made
-// cards on one code are a question, never an adoption.
+// cards on one code are a question, never an adoption. What the export
+// never carries (criticality, notes, resources...) stays the hand card's.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import type { BoardConfig, Card, CardEvent } from "../../core/types.ts";
+import type { BoardConfig, Card, CardEvent, Risk } from "../../core/types.ts";
 import { lifecycleEvent } from "../../core/events.ts";
 import { foldEvents } from "../../core/state.ts";
 import { testCard } from "../../core/test-helpers.ts";
@@ -92,4 +93,24 @@ test("no adoption of an archived, a deleted or another exercise's hand-made card
   const log = first.events.map((e, i) => ({ ...e, id: `evt-${i + 1}` }) as CardEvent);
   const both = planLoad([deckCard()], CONFIG, [...first.cards, manual()], [...log, created(manual(), 9)], NOW);
   assert.deepEqual([both.adopted.length, both.updated, both.cards[0]?.id], [0, 1, "PE10001@2026"]);
+});
+
+test("adoption keeps what was typed at the hand card's creation — in its BASE card, no event behind it (ADR 057)", () => {
+  const risk: Risk = { type: "fournisseur", desc: "fournisseur unique" };
+  const hand = manual({
+    criticality: "top", resources: ["Bob"], loadPlan: "PdC v2", tags: ["x"], risks: [risk], alerts: ["à revoir"],
+    projectConstraints: ["c1"], contentionProfiles: ["archi"], contentionNote: "partagé", custom: { f: 1 },
+  });
+  const plan = planLoad([deckCard()], CONFIG, [hand], [created(hand, 1)], NOW);
+  assert.equal(plan.adopted.length, 1);
+  const board = foldEvents(plan.cards, [created(hand, 1), ...plan.events.map((e, i) => ({ ...e, id: `evt-${2 + i}` }) as CardEvent)]);
+  const card = board[0]!;
+  assert.deepEqual(
+    [card.criticality, card.notes, card.resources, card.loadPlan, card.tags, card.risks, card.alerts,
+      card.projectConstraints, card.contentionProfiles, card.contentionNote, card.custom],
+    ["top", "saisi en séance", ["Bob"], "PdC v2", ["x"], [risk], ["à revoir"], ["c1"], ["archi"], "partagé", { f: 1 }],
+  );
+  assert.deepEqual([card.title, card.budgetEstimated, card.source], ["Modernisation atelier", 120.5, "csv"], "the export's facts still win");
+  const again = planLoad([deckCard()], CONFIG, plan.cards, [created(hand, 1), ...plan.events.map((e, i) => ({ ...e, id: `evt-${2 + i}` }) as CardEvent)], NOW);
+  assert.deepEqual([again.events.length, again.cards[0]?.criticality], [0, "top"], "idempotent: the next load writes nothing");
 });

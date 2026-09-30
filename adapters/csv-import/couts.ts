@@ -39,6 +39,7 @@ import { readRow } from "./couts-rows.ts";
 import type { RowContext, Seen } from "./couts-rows.ts";
 import { resolveFacts } from "./couts-facts.ts";
 import type { ProjectFacts } from "./couts-facts.ts";
+import { roundBucket } from "./day-sums.ts";
 import type { Tally } from "./tallies.ts";
 
 export { checkPerimeters, excludedSummary } from "./couts-stats.ts";
@@ -202,7 +203,10 @@ function decide(ctx: CoutsContext, seen: Seen): ProjetEntry | null {
 }
 
 function buildEntry(ctx: CoutsContext, seen: Seen, facts: ProjectFacts, typeId: string): ProjetEntry {
-  for (const c of seen.charges.values()) ctx.charges.push({ projectId: seen.id, centre: c.centre, jh: c.jh, done: c.done });
+  for (const c of seen.charges.values()) {
+    roundBucket(c); // the exact sums of the rows, rounded once (ADR 058)
+    ctx.charges.push({ projectId: seen.id, centre: c.centre, jh: c.jh, done: c.done });
+  }
   const hit = ctx.resolve(facts.portfolio);
   const portfolio = ctx.portfolios.get(facts.portfolio) ?? { count: 0, hit };
   portfolio.count++;

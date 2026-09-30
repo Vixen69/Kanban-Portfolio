@@ -1,8 +1,11 @@
 // The readable import report (ADR 055) as compact French text for the
 // import CLI: the files taken, the perimeter and what it left out, the
 // counts, the projects entering / leaving / back with their reasons, the
-// refreshed values grouped by fact, the facts kept from the board. The
-// same ImportChanges object the tool shows; only the wording lives here.
+// refreshed values grouped by fact, the facts kept from the board, the
+// hand-made cards the export adopts (ADR 059 — two cards become one: each
+// is said with both titles), the cards deleted on the board it skips and
+// the identity questions. The same ImportChanges object the tool shows;
+// only the wording lives here.
 
 import type { BoardConfig } from "../core/types.ts";
 import type { ImportChanges, ImportKeptFact, ImportLeft } from "../core/import-types.ts";
@@ -128,6 +131,7 @@ export function boardText(changes: ImportChanges, config: BoardConfig): string[]
   const replaced = factLines(changes.replaced);
   const advanced = changes.advanced.map((a) =>
     `  ${named(a)} : ${columnName(config, a.fromColumn)} → ${columnName(config, a.toColumn)}`);
+  const adopted = changes.adopted.map((a) => `  ⇄ ${a.code ?? "?"} : « ${a.manualTitle} » (${a.cardId}, saisie à la main) → « ${a.title} »`);
   return [
     head,
     ...section("Entrent :", entered),
@@ -137,5 +141,8 @@ export function boardText(changes: ImportChanges, config: BoardConfig): string[]
     ...(kept.length === 0 ? [] : ["Absents des fichiers, gardés du tableau (ADR 054) :", ...kept]),
     ...(replaced.length === 0 ? [] : ["Correction manuelle remplacée par la nouvelle valeur de l’export (ADR 060) :", ...replaced]),
     ...section("Placement à la main dépassé par un nouveau jalon (ADR 060) :", advanced),
+    ...section("Cartes saisies à la main adoptées par l’export — même code (ADR 059), vérifier que c’est bien le même projet :", adopted),
+    ...section("Supprimées du tableau, non recréées (ADR 058) :", changes.deletedSkipped.map((d) => `  ✕ ${named(d)}`)),
+    ...section("Doutes d’identité :", changes.identityDoubts.map((q) => `  ⚠ ${q}`)),
   ];
 }

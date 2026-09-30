@@ -1,7 +1,8 @@
 # ADR 058 — Les mêmes fichiers donnent le même tableau
 
 Date : 2026-09-30 · Statut : proposé (branche import-lisible) · Précise les
-ADR 019, 026, 032, 035, 038, 042 et 054
+ADR 019, 026, 032, 035, 038, 042 et 054 · Amendé par l'ADR 060 (§3,
+position)
 
 ## Contexte
 
@@ -35,7 +36,8 @@ chargements simultanés qui créaient chacun toutes les cartes.
    emprunté. Un Id en double dans ProjetsJalons : l'étape la plus avancée
    lue sur ses lignes, quel que soit leur ordre, et un douteux.
 3. **Position** : seul un déplacement **vers une autre colonne**, à la main,
-   fige une carte (ADR 026). Un reclassement dans la cellule ou un
+   fige une carte (ADR 026) — sauf jalon nouveau et plus avancé, qui la
+   déplace (amendé par l'ADR 060). Un reclassement dans la cellule ou un
    changement de canal ne la fige pas ; l'export ne place que la colonne,
    jamais le canal d'une carte existante. L'import lit le journal **relu
    à travers les restaurations** pour tout : déplacements à la main,
@@ -69,8 +71,12 @@ chargements simultanés qui créaient chacun toutes les cartes.
   cette décision) gardent la carte dans sa colonne d'entrée jusqu'à cette
   date ; l'import ne les réécrit plus, mais le pli par date les applique
   encore en dernier — le corriger toucherait le pli (décision de l'auteur).
-- Une carte d'identité tirée d'un nom qui se heurtait change d'identité une
-  fois : l'ancienne est marquée absente, les deux projets sont créés à part.
+- L'identité tirée d'un nom ne dépend pas des autres projets du lot : le
+  chargement retrouve d'abord celle que le tableau porte déjà pour ce
+  projet (avec ou sans suffixe, le titre fait foi). Un projet chargé seul
+  puis avec un homonyme garde sa carte ; l'homonyme prend l'identité
+  suffixée. Un dépôt partiel qui omet l'un des deux ne crée plus de
+  doublon et ne fait plus alterner absente / de retour.
 - Stockage : une méthode `clearCapacity` (JSONL et PostgreSQL) ; les
   instantanés notent le modèle sur lequel leur configuration était
   appliquée.

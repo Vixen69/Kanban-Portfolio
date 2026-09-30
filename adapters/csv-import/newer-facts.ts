@@ -52,6 +52,13 @@ function same(a: unknown, b: unknown): boolean {
   return canonical(a) === canonical(b);
 }
 
+// A fact's value as the rule compares it: the RDR date at day precision —
+// before ADR 057 the fiche stored a full timestamp
+// ("2026-12-15T00:00:00.000Z") where the import writes the day.
+function comparable(fact: keyof CardPatch, value: unknown): unknown {
+  return fact === "dateRdr" && typeof value === "string" ? value.slice(0, 10) : value;
+}
+
 /**
  * The `edited` events that let the export's new values win over the hand
  * corrections (ADR 060). A fact is written for a card when the base the
@@ -76,7 +83,8 @@ export function newerFactEvents(refreshed: readonly RefreshedCard[], log: readon
     if (state === undefined) continue;
     const patch: Record<string, unknown> = {};
     for (const [fact] of NEWER_FACTS) {
-      if (same(fresh[fact], stored[fact]) || same(state[fact], fresh[fact])) continue;
+      const now = comparable(fact, fresh[fact]);
+      if (same(now, comparable(fact, stored[fact])) || same(comparable(fact, state[fact]), now)) continue;
       patch[fact] = fresh[fact];
       tally.set(fact, [...(tally.get(fact) ?? []), fresh.id]);
     }

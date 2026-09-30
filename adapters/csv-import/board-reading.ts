@@ -32,6 +32,8 @@ export interface BoardReading {
   manualByCode: Map<string, CardState[]>;
   /** The exercise's imported cards living under another id than their code's (adopted earlier, ADR 059), by normalized code. */
   adoptedByCode: Map<string, CardState>;
+  /** The stored base cards' titles by id — the title the last import wrote, before any hand edit (ADR 058 name ids). */
+  baseTitles: Map<string, string>;
 }
 
 /**
@@ -119,5 +121,6 @@ export function readBoard(cards: Card[], events: CardEvent[], year: number, curr
     deleted: deletedOf(log, cards, year, currentYear),
     lastPosition: lastPositions(log),
     ...codeIndexes(current, year),
+    baseTitles: new Map(cards.map((card) => [card.id, card.title])),
   };
 }

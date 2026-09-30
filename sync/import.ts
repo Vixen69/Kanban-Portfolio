@@ -19,9 +19,9 @@ import { validateBoardConfig } from "../core/config.ts";
 import { loadServerConfig } from "../middle/config.ts";
 import { createConfigStore } from "../middle/config-store.ts";
 import {
-  importChanges, importConfig, keepStoredCapacity, planLoad, renderReport, runImportAudit, withLegacyIds,
+  importChanges, importConfig, keepStoredCapacity, loadRefusal, planLoad, renderReport, runImportAudit, withLegacyIds,
 } from "../adapters/csv-import/index.ts";
-import type { AuditResult, CardAssembly } from "../adapters/csv-import/index.ts";
+import type { AuditResult } from "../adapters/csv-import/index.ts";
 import type { DomainDecision, ImportChanges } from "../core/import-types.ts";
 import type { InputFile, LoadPlan } from "../adapters/csv-import/index.ts";
 import type { EnrichedCard } from "../adapters/csv-import/index.ts";
@@ -171,13 +171,6 @@ function planWithDecisions(
   return planLoad(deck, config, baseCards, events, new Date(), year, decisions);
 }
 
-// Why a load is refused, in plain French (ADR 026/035).
-function refusal(cards: CardAssembly | null, year: number, currentYear: number): string {
-  if (year < currentYear) return `chargement refusé : exercice ${year} clos.`;
-  if (cards === null) return "chargement refusé : aucune carte assemblée (le fichier `projets` manque ?).";
-  return `chargement refusé : aucun projet retenu pour l'exercice ${year} (fichiers d'une autre année ?).`;
-}
-
 // Where the cards are about to land, in plain French.
 function storageLabel(driver: string, dataPath: string): string {
   if (driver === "postgres") {
@@ -235,15 +228,12 @@ try {
   );
   const noBoard = importChanges({ audit, config: boardConfig, year, plan: null, baseCards: [], events: [] });
   console.log(filesText(noBoard).join("\n"));
-  // ADR 056: two files of one kind, one name twice, a Coût-like file not recognized.
-  const blocked = audit.blockers.length === 0 ? null : `chargement refusé : ${audit.blockers.map((b) => b.message).join(" ")}`;
-  if (blocked !== null) console.error(blocked);
+  // The tool's own rule (load-refusal.ts): a closed year, blocking files
+  // (ADR 056), no perimeter, no project on the year.
+  const refused = loadRefusal(audit, year, boardConfig.exercise.year);
+  if (refused !== null) console.error(refused);
   if (args.charger) {
-    if (blocked !== null) process.exit(1);
-    if (cards === null || cards.cards.length === 0 || year < boardConfig.exercise.year) {
-      console.error(refusal(cards, year, boardConfig.exercise.year));
-      process.exit(1);
-    }
+    if (refused !== null || cards === null) process.exit(1);
     const loaded = await load(audit, cards.cards, boardConfig, year, args.domaines);
     console.log(`${loadSummary(loaded.plan)}\n${boardText(loaded.changes, boardConfig).join("\n")}`);
 
@@ -251,10 +241,10 @@ try {
       const { persons, assignments } = capacity.snapshot;
       console.log(`capacité ${capacity.snapshot.exerciseYear} : ${persons.length} personne(s), ${assignments.length} affectation(s) enregistrées.`);
     }
-  } else if (args.comparer && blocked === null && cards !== null && cards.cards.length > 0) {
+  } else if (args.comparer && refused === null && cards !== null) {
     console.log(boardText(await compare(audit, cards.cards, boardConfig, year), boardConfig).join("\n"));
   } else if (args.comparer) {
-    console.log("comparaison : aucune carte assemblée pour cet exercice — rien à comparer.");
+    console.log("comparaison : un chargement de ces fichiers serait refusé (ci-dessus) — rien à comparer.");
   } else {
     console.log("Ce qu'un chargement changerait sur le tableau : relancer avec --comparer (lecture seule).");
   }

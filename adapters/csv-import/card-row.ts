@@ -71,3 +71,34 @@ function chargesOf(card: EnrichedCard, counter: ChargeCounter): ChargeEntry[] {
     return [{ profileId: charge.profileId, jh: charge.jh, done: charge.done }];
   });
 }
+
+/**
+ * The fields an export never carries: lived in the tool — typed at the
+ * creation of a hand-made card (ADR 057) or since. A load never rebuilds
+ * them (ADR 054/059).
+ */
+const LIVED_FIELDS = [
+  "criticality", "tags", "dependencies", "blocked", "blockedReason", "blockedSince", "loadPlan", "resources", "notes",
+  "contentionProfiles", "contentionNote", "risks", "projectConstraints", "alerts", "custom",
+] as const satisfies ReadonlyArray<keyof Card>;
+
+/**
+ * The refreshed card with the fields the export never carries taken back
+ * from the stored base card. A hand-made card holds what was typed at its
+ * creation in its BASE card, with no event behind it (ADR 057): rebuilding
+ * that base from the export alone would erase its criticality, notes,
+ * resources, risks, custom fields... when a load adopts it (ADR 059). An
+ * imported card holds these fields at their empty defaults, so for it
+ * nothing changes.
+ * Inputs: the card the load rebuilt, the stored base card (undefined for a
+ * new card). Output: a copy with the lived fields of the stored card (a
+ * field the stored card lacks keeps its default) —
+ * the fresh card itself when nothing was stored. Failure modes: none.
+ */
+export function keepLivedFields(fresh: Card, stored: Card | undefined): Card {
+  if (stored === undefined) return fresh;
+  const card: Card = { ...fresh };
+  // A card stored by an older version may lack a field: the default stands.
+  for (const field of LIVED_FIELDS) if (stored[field] !== undefined) Object.assign(card, { [field]: stored[field] });
+  return card;
+}

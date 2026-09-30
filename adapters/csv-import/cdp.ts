@@ -3,7 +3,9 @@
 // onglet carries none. Same rule as Projets (R6): the chef de projet is the
 // first Responsable that is not a PARAM domain lead. Rows are keyed by Id
 // (the card's codename) with the name as fallback; owners.ts attaches them
-// to the assembled cards that still lack an owner.
+// to the assembled cards that still lack an owner. Rows sharing an Id (or
+// a name) keep the same one whatever their order (duplicate-rows.ts, ADR
+// 056): the row order of the export never decides the chef de projet.
 
 import { normalizeLabel } from "./normalize.ts";
 import { isDomainLead } from "./domains.ts";
@@ -14,6 +16,8 @@ import type { HeaderMatch } from "./contract.ts";
 import type { ParamTable } from "./param.ts";
 import { discard, warn } from "./report.ts";
 import type { ImportReport, RowRef } from "./report.ts";
+import { KEPT_ROW_RULE, keptRow } from "./duplicate-rows.ts";
+import type { DuplicateRow } from "./duplicate-rows.ts";
 
 const RESPONSABLE_COLUMNS = ["Responsable 1", "Responsable 2", "Responsable 3"];
 
@@ -26,6 +30,11 @@ export interface CdpTable {
   counts: { rows: number; withOwner: number; leadsExcluded: number };
 }
 
+/** A read row and the chef de projet it names. */
+interface OwnerRow extends DuplicateRow {
+  owner: string | null;
+}
+
 interface CdpContext {
   match: HeaderMatch;
   param: ParamTable | null;
@@ -33,6 +42,13 @@ interface CdpContext {
   fileName: string;
   table: CdpTable;
   tallies: Map<string, Tally>;
+  /** The rows by normalized Id, then by normalized name, until every row was read. */
+  rowsById: Map<string, OwnerRow[]>;
+  rowsByName: Map<string, OwnerRow[]>;
+}
+
+function group(groups: Map<string, OwnerRow[]>, key: string, row: OwnerRow): void {
+  groups.set(key, [...(groups.get(key) ?? []), row]);
 }
 
 function cell(ctx: CdpContext, row: CsvRow, column: string): string {
@@ -70,11 +86,21 @@ function readRow(ctx: CdpContext, row: CsvRow): void {
   ctx.table.counts.rows++;
   if (owner === null) tallyInto(ctx.tallies, "ligne sans chef de projet (responsables vides ou tous responsables de domaine)", row.line);
   else ctx.table.counts.withOwner++;
-  if (id !== "") {
-    if (ctx.table.byId.has(id)) tallyInto(ctx.tallies, "Id en double — première ligne conservée", row.line, id);
-    else ctx.table.byId.set(id, owner);
+  const read: OwnerRow = { line: row.line, cells: row.cells, owner };
+  if (id !== "") group(ctx.rowsById, id, read);
+  if (name !== "") group(ctx.rowsByName, name, read);
+}
+
+// Every row read: one owner per Id and per name, from the row kept.
+function settleOwners(ctx: CdpContext): void {
+  for (const [id, rows] of ctx.rowsById) {
+    const kept = keptRow(rows);
+    ctx.table.byId.set(id, kept.owner);
+    for (const row of [...rows].sort((a, b) => a.line - b.line)) {
+      if (row !== kept) tallyInto(ctx.tallies, `Id en double — ligne gardée : ${KEPT_ROW_RULE}`, row.line, id);
+    }
   }
-  if (name !== "" && !ctx.table.byName.has(name)) ctx.table.byName.set(name, owner);
+  for (const [name, rows] of ctx.rowsByName) ctx.table.byName.set(name, keptRow(rows).owner);
 }
 
 /**
@@ -91,10 +117,11 @@ export function parseCdp(
   const ctx: CdpContext = {
     match, param, report, fileName,
     table: { byId: new Map(), byName: new Map(), counts: { rows: 0, withOwner: 0, leadsExcluded: 0 } },
-    tallies: new Map(),
+    tallies: new Map(), rowsById: new Map(), rowsByName: new Map(),
   };
   if (param === null) warn(report, "table PARAM absente — les responsables de domaine ne sont pas exclus du chef de projet", fileName);
   for (const row of rows) readRow(ctx, row);
+  settleOwners(ctx);
   for (const [message, t] of ctx.tallies) warn(report, `${message} : ${tallyLabel(t)}`, fileName);
   return ctx.table;
 }

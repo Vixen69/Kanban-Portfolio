@@ -7,7 +7,7 @@
 import type { BoardConfig } from "../../core/types.ts";
 import type { CardChange, FigureChange, PlanChange } from "../../core/snapshot-diff.ts";
 import {
-  changeWords, fmtFigure, planPair, planSummary, profileName, signedDelta,
+  changeWords, fmtFigure, planDelta, planPair, planSummary, profileName, signedDelta,
 } from "../changeGroups.ts";
 
 /**
@@ -58,7 +58,7 @@ function PlanProfiles({ plan, config }: { plan: PlanChange; config: BoardConfig 
             <th scope="row">{profileName(config, line.profileId)}</th>
             <td>{planPair(line.before, line.after, "planned")}</td>
             <td>{planPair(line.before, line.after, "done")}</td>
-            <td>{planPair(line.before, line.after, "raf")} <TrendMark delta={line.after.raf - line.before.raf} /></td>
+            <td>{planPair(line.before, line.after, "raf")} <TrendMark delta={planDelta(line.before.raf, line.after.raf)} /></td>
           </tr>
         ))}
       </tbody>
@@ -73,7 +73,7 @@ function PlanRow({ change, plan, config, showYear }: { change: CardChange; plan:
         <summary>
           <Who change={change} showYear={showYear} />
           <span className="sd-move">{planSummary(plan)}</span>
-          <TrendMark delta={plan.after.raf - plan.before.raf} unit="j.h de RAF" />
+          <TrendMark delta={planDelta(plan.before.raf, plan.after.raf)} unit="j.h de RAF" />
         </summary>
         <PlanProfiles plan={plan} config={config} />
       </details>

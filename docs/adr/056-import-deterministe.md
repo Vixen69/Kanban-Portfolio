@@ -71,6 +71,10 @@ montré que les mêmes exports pouvaient donner un autre tableau :
 
 - Mêmes fichiers → même tableau, quels que soient leur nom, leur ordre,
   l'ordre des lignes du Coût ou un renommage dans ⚙.
+- Un même Id sur plusieurs lignes de l'onglet Projets ou de ProjetsCdP :
+  la ligne gardée ne dépend plus de l'ordre des lignes — la plus
+  fréquente, puis la plus complète, puis la première par ordre
+  alphabétique ; les autres restent dites (douteux, signalement).
 - Le PMO doit parfois retirer un fichier avant de charger : le refus dit
   lequel. L'audit reste possible (rapport lisible), il ne prévisualise rien.
 - `AuditResult.blockers` porte les refus ; le middle et le CLI refusent le

@@ -89,9 +89,16 @@ export function planChange(before: CardState, after: CardState, config: BoardCon
   return { before: cardPlanFigures(before, config), after: cardPlanFigures(after, config), profiles };
 }
 
+// The RDR date at day precision: before ADR 057 the fiche stored a full
+// timestamp ("2026-12-15T00:00:00.000Z") where the import writes the day.
+function rdrDay(value: string | null): string | null {
+  return value === null ? null : value.slice(0, 10);
+}
+
 /**
  * The refreshed values that differ on one card between two boards: chef de
- * projet, the six figures (FIGURE_FACTS order), date RDR, plan de charge.
+ * projet, the six figures (FIGURE_FACTS order), date RDR (compared by
+ * its day, the raw values kept in the change), plan de charge.
  * Inputs: the card on each board (same id), the config. Output: the
  * changes, in that order (empty when none). Failure: none.
  */
@@ -102,7 +109,7 @@ export function valueChanges(before: CardState, after: CardState, config: BoardC
     if (sameFigure(before[fact], after[fact])) continue;
     out.push({ ...base(after), kind: "figure", from: null, to: null, figure: figureChange(fact, unit, before[fact], after[fact]) });
   }
-  if (before.dateRdr !== after.dateRdr) out.push({ ...base(after), kind: "dateRdr", from: before.dateRdr, to: after.dateRdr });
+  if (rdrDay(before.dateRdr) !== rdrDay(after.dateRdr)) out.push({ ...base(after), kind: "dateRdr", from: before.dateRdr, to: after.dateRdr });
   const plan = planChange(before, after, config);
   if (plan !== null) out.push({ ...base(after), kind: "plan", from: null, to: null, plan });
   return out;

@@ -6,7 +6,9 @@
 // with instance ids, is remapped onto them (withLegacyIds). ADR 058: a
 // name-derived id is cut at 48 characters, so two long names may share one
 // — those, and only those, take a short hash of their full name
-// (disambiguateIds): the ids that do not collide never change. Pure.
+// (disambiguateIds): the ids that do not collide never change. Which of
+// the two a load lands on is then settled against the board, never by the
+// rest of the deck alone (nameIdCandidates, load-identity.ts). Pure.
 
 import type { CapacitySnapshot } from "../../core/types.ts";
 import { instanceId } from "../../core/exercise.ts";
@@ -47,6 +49,21 @@ function fingerprint(text: string): string {
     hash = Math.imul(hash, 0x01000193) >>> 0;
   }
   return hash.toString(16).padStart(8, "0");
+}
+
+/**
+ * The two ids a code-less card may carry (ADR 058): the plain slug of its
+ * name, and the same followed by a short hash of the full name — the one
+ * it takes when a namesake of the deck is cut to the same slug. The load
+ * lands on whichever the board already holds for this project
+ * (load-identity.ts), so the id never depends on the rest of the deck.
+ * Input: the enriched card. Output: both base ids, null for a card with a
+ * code. Failure modes: none.
+ */
+export function nameIdCandidates(card: EnrichedCard): { plain: string; hashed: string } | null {
+  if (card.codename !== null) return null;
+  const plain = nameId(card.normalizedName);
+  return { plain, hashed: `${plain}-${fingerprint(card.normalizedName)}` };
 }
 
 /**

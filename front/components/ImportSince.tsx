@@ -3,13 +3,14 @@
 // changé depuis l'import »): the instantané the middle takes before every
 // load (« avant chargement <année> », ADR 042) compared with the board
 // now — the same comparison and sections as « Comparer avec maintenant »
-// (ADR 053). A read: nothing is written.
+// (ADR 053), whose head names the instantané and its date, so an older
+// reference (a load that took none) shows. A read: nothing is written.
 
 import { useState } from "react";
 import type { BoardConfig } from "../../core/types.ts";
 import { messageOf } from "../api.ts";
 import { fetchSnapshotDiff, fetchSnapshots, type SnapshotDiffResult } from "../apiSnapshots.ts";
-import { importSnapshotLabel, lastImportSnapshot } from "../importReport.ts";
+import { importSnapshotLabel, lastImportSnapshot, noImportSnapshotNote } from "../importReport.ts";
 import { SnapshotDiffView } from "./SnapshotDiffView.tsx";
 
 type Since =
@@ -21,9 +22,7 @@ type Since =
 // Finds the last load's instantané of the year, then its comparison.
 async function sinceLastImport(year: number): Promise<Since> {
   const snapshot = lastImportSnapshot(await fetchSnapshots(), year);
-  if (snapshot === null) {
-    return { kind: "note", text: `Aucun instantané « ${importSnapshotLabel(year)} » : l’exercice ${year} n’a pas encore été chargé depuis l’outil.` };
-  }
+  if (snapshot === null) return { kind: "note", text: noImportSnapshotNote(year) };
   return { kind: "shown", result: await fetchSnapshotDiff(snapshot.id) };
 }
 
@@ -47,7 +46,7 @@ export function ImportSince({ config, exercise }: { config: BoardConfig; exercis
     <div className="import-since">
       <div className="import-actions">
         <button className="btn ghost" disabled={since.kind === "busy"} onClick={show}
-          title={`Compare le tableau d’aujourd’hui à l’instantané pris avant le dernier chargement de l’exercice ${exercise}`}>
+          title={`Compare le tableau d’aujourd’hui au dernier instantané « ${importSnapshotLabel(exercise)} » — sa date est rappelée en tête de la comparaison`}>
           Voir ce qui a changé depuis le dernier import
         </button>
         {since.kind === "busy" && <span className="m2-note">Comparaison en cours…</span>}

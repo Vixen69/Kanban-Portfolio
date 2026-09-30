@@ -18,7 +18,9 @@ import { win32 } from "node:path";
 import type { BoardStorage } from "../core/ports.ts";
 import type { BoardConfig } from "../core/types.ts";
 import type { DomainDecision, ImportAuditResult, ImportLoadResult, ImportSummary } from "../core/import-types.ts";
-import { importChanges, keepStoredCapacity, planLoad, renderReport, runImportAudit, withLegacyIds } from "../adapters/csv-import/index.ts";
+import {
+  importChanges, keepStoredCapacity, loadRefusal, planLoad, renderReport, runImportAudit, withLegacyIds,
+} from "../adapters/csv-import/index.ts";
 import type { AuditResult, EnrichedCard, InputFile, LoadPlan } from "../adapters/csv-import/index.ts";
 import { BadRequest } from "./errors.ts";
 import { exerciseOrCurrent } from "./validation.ts";
@@ -96,18 +98,11 @@ export function parseDecisions(body: unknown): Map<string, DomainDecision> {
   return decisions;
 }
 
-// The cards a load may write. Refuses an empty deck BEFORE anything could
-// be marked absent: no perimeter at all, or a file set with no project on
-// the requested year — the files of another exercise (ADR 035).
-function loadableDeck(audit: AuditResult, year: number): EnrichedCard[] {
-  // ADR 056: two files of one kind, one name twice, a Coût-like file not recognized.
-  if (audit.blockers.length > 0) throw new BadRequest(`Chargement refusé : ${audit.blockers.map((b) => b.message).join(" ")}`);
-  if (audit.cards === null) {
-    throw new BadRequest("Chargement refusé : aucune carte assemblée (le fichier « projets » manque ?).");
-  }
-  if (audit.cards.cards.length === 0) {
-    throw new BadRequest(`Chargement refusé : aucun projet retenu pour l’exercice ${year} (fichiers d’une autre année ?).`);
-  }
+// The cards a load may write, or the refusal (BadRequest, French) — the
+// rule the audit previews with (loadRefusal).
+function loadableDeck(audit: AuditResult, year: number, config: BoardConfig): EnrichedCard[] {
+  const refusal = loadRefusal(audit, year, config.exercise.year);
+  if (refusal !== null || audit.cards === null) throw new BadRequest(refusal ?? "Chargement refusé.");
   return audit.cards.cards;
 }
 
@@ -126,14 +121,14 @@ function summarize(audit: AuditResult): ImportSummary {
 
 // The conflicts a load would raise, the facts it would keep and what it
 // would change, read without writing: the audit is a dry run of the plan
-// against the exercise's stored cards (ADR 036, ADR 054, ADR 055). A deck
-// the load would refuse (none, or empty on that year) previews nothing:
-// no card would be written, none marked absent.
+// against the exercise's stored cards (ADR 036, ADR 054, ADR 055). Files
+// the load would refuse (loadRefusal) preview nothing: no card would be
+// written, none marked absent.
 async function dryRun(
-  storage: BoardStorage, config: BoardConfig, audit: AuditResult, now: Date, year: number,
+  storage: BoardStorage, config: BoardConfig, audit: AuditResult, now: Date, year: number, refused: boolean,
 ): Promise<Pick<ImportAuditResult, "conflicts" | "factsKept" | "changes">> {
   const [events, baseCards] = await Promise.all([storage.listEvents(), storage.listBaseCards()]);
-  if (audit.cards === null || audit.cards.cards.length === 0 || audit.blockers.length > 0) {
+  if (refused || audit.cards === null) {
     return { conflicts: [], factsKept: [], changes: importChanges({ audit, config, year, plan: null, baseCards, events }) };
   }
   const plan = planLoad(audit.cards.cards, config, baseCards, events, now, year);
@@ -150,17 +145,19 @@ async function dryRun(
  * Inputs: the storage (read only), the runtime config, the files, now, the
  * exercise year read (default: the current one, ADR 035). Output: the
  * rendered report (Markdown, French), its counts, whether a load would
- * write cards, the conflicts, the facts kept, the changes. Failure: none —
+ * be accepted and else why (loadRefusal — the load's own rule), the
+ * conflicts, the facts kept, the changes. Failure: none —
  * every anomaly lands in the report; storage errors propagate (→ 500).
  */
 export async function auditImport(
   storage: BoardStorage, config: BoardConfig, files: InputFile[], now: Date, year: number = config.exercise.year,
 ): Promise<ImportAuditResult> {
   const audit = runImportAudit(files, config, now, year);
-  const dry = await dryRun(storage, config, audit, now, year);
+  const refusal = loadRefusal(audit, year, config.exercise.year);
+  const dry = await dryRun(storage, config, audit, now, year, refusal !== null);
   return {
     exercise: year, report: renderReport(audit.report, now), summary: summarize(audit),
-    loadable: audit.cards !== null && audit.blockers.length === 0, ...dry,
+    loadable: refusal === null, refusal, ...dry,
   };
 }
 
@@ -208,9 +205,9 @@ async function loadNow(
   storage: BoardStorage, config: BoardConfig, files: InputFile[], now: Date,
   year: number, decisions: ReadonlyMap<string, DomainDecision>, hooks: LoadHooks,
 ): Promise<ImportLoadResult> {
-  if (year < config.exercise.year) throw new BadRequest(`Exercice ${year} clos : chargement refusé.`);
+  if (year < config.exercise.year) throw new BadRequest(`Exercice ${year} clos : chargement refusé.`); // before reading the files
   const audit = runImportAudit(files, config, now, year);
-  const deck = loadableDeck(audit, year);
+  const deck = loadableDeck(audit, year, config);
   const [events, baseCards] = await Promise.all([storage.listEvents(), storage.listBaseCards()]);
   const plan = planLoad(deck, config, baseCards, events, now, year, decisions);
   const changes = importChanges({ audit, config, year, plan, baseCards, events });
@@ -233,7 +230,7 @@ async function loadNow(
       plan.factsKept.map((f) => ` · ${f.label} gardé (absent des fichiers) : ${f.cards}`).join(""),
   );
   return {
-    exercise: year, report: renderReport(audit.report, now), summary: summarize(audit), loadable: true,
+    exercise: year, report: renderReport(audit.report, now), summary: summarize(audit), loadable: true, refusal: null,
     conflicts: plan.domainConflicts, factsKept: plan.factsKept, changes, load: loadFigures(plan, audit),
   };
 }

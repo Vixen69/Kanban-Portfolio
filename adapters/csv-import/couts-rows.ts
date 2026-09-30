@@ -9,6 +9,7 @@
 import { normalizeLabel } from "./normalize.ts";
 import { parseFrenchAmount, parseFrenchDate, parseYearCell } from "./values.ts";
 import { sampleOf } from "./cell-sample.ts";
+import { addDays } from "./day-sums.ts";
 import { tallyInto } from "./tallies.ts";
 import type { Tally } from "./tallies.ts";
 import type { CsvRow } from "./csv.ts";
@@ -58,13 +59,11 @@ export function cell(ctx: RowContext, row: CsvRow, column: string): string {
   return index === undefined ? "" : (row.cells[index] ?? "").trim();
 }
 
-function round2(value: number): number {
-  return Math.round(value * 100) / 100;
-}
-
 // A « Charge » row (« Type de centre de coût ») adds its days to the
 // project's cost centre — the macro's « appel de charges » (ADR 034): days
 // = « Charge finale ME (Res) (J) », done = « Charge réelle ME (Res) (J) ».
+// The days are added exactly and rounded once, when the project's entry is
+// built (couts.ts, day-sums.ts — ADR 058), never at every row.
 function foldCharge(ctx: RowContext, row: CsvRow, seen: Seen): void {
   if (!normalizeLabel(cell(ctx, row, "Type de centre de coût")).startsWith("charge")) return;
   const centre = cell(ctx, row, "Centre de coût") || "(Sans centre de coût)";
@@ -72,8 +71,8 @@ function foldCharge(ctx: RowContext, row: CsvRow, seen: Seen): void {
   const done = parseFrenchAmount(cell(ctx, row, "Charge réelle ME (Res) (J)"));
   const key = normalizeLabel(centre);
   const bucket = seen.charges.get(key) ?? { centre, jh: 0, done: 0 };
-  bucket.jh = round2(bucket.jh + (jh.kind === "value" ? jh.value : 0));
-  bucket.done = round2(bucket.done + (done.kind === "value" ? done.value : 0));
+  bucket.jh = addDays(bucket.jh, jh.kind === "value" ? jh.value : 0);
+  bucket.done = addDays(bucket.done, done.kind === "value" ? done.value : 0);
   seen.charges.set(key, bucket);
 }
 

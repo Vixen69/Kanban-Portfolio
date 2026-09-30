@@ -1,12 +1,104 @@
 # Spécification du mapping d'import — exports PPM (Sciforma)
 
 > Document de travail, préparé avec le PMO. Version du 2026-07-29,
-> **révisée le 2026-09-04** (retours PMO — la révision, en tête, prime sur
-> tout ce qui la contredit plus bas ; les sections de juillet sont
-> conservées comme historique des décisions).
+> **révisée le 2026-09-04** (retours PMO) **puis le 2026-09-30** (ADR 055
+> à 060) — les révisions, en tête, priment sur tout ce qui les contredit
+> plus bas, la plus récente d'abord ; les sections de juillet sont
+> conservées comme historique des décisions.
 > Contrat de l'adaptateur `csv-import` (phase RP4). Évoluera au fil des
 > séances d'analyse des exports ; les questions ouvertes sont en fin de
 > document. L'ADR de l'adaptateur sera rédigé au moment de sa construction.
+
+## Révision 2026-09-30 — mêmes fichiers, même tableau (ADR 055 à 060)
+
+L'enquête du 30 septembre sur l'import (fichiers synthétiques) a resserré
+les règles. Elles priment sur tout ce qui les contredit plus bas.
+
+- **Un fichier par sorte (ADR 056).** Deux fichiers reconnus pour un même
+  contrat (deux Coût, deux ProjetsJalons, deux SP…), ou un même nom de
+  fichier reçu deux fois : aucun n'est lu, l'audit les nomme et le
+  chargement est **refusé** (« n'en déposer qu'un »). Seul couple admis :
+  l'onglet Projets **sans** « Responsable 1 » (le périmètre) et l'export
+  complet qui en porte (les chefs de projet) ; deux fichiers de la même
+  forme refusent aussi. Plus d'élection par le nom, l'ordre ou le nombre
+  d'écarts d'en-têtes.
+- **Garde du fichier Coût (ADR 056).** Un fichier qui ressemble à l'export
+  Coût sans être reconnu (au moins 3 des 5 colonnes obligatoires, ou un
+  fichier UTF-16 illisible sans autre export Coût) refuse le chargement :
+  le périmètre ne bascule jamais en silence sur l'onglet Projets. Sans
+  aucun fichier de type Coût, l'onglet Projets reste le périmètre (ADR
+  030), et un douteux le dit.
+- **Vocabulaire du modèle versionné (ADR 056).** Types et domaines se
+  reconnaissent par l'id, le nom, le code court, les alias, sous-domaines
+  et marqueurs de `config/board.json` ; un nom renommé dans ⚙ › Catégories
+  ne répond qu'en dernier recours, et le rapport le dit. Un renommage ne
+  change donc ni le périmètre ni les domaines. Même règle dans l'outil et
+  dans le CLI.
+- **Encodage (ADR 056).** Quelques octets invalides (au plus un pour 20
+  caractères accentués valides) laissent le fichier en UTF-8 : octets
+  remplacés par « � » et signalés en douteux. Au-delà, Windows-1252.
+- **Nombres et années (ADR 056).** Sont lus « 1,234.50 », « €1,234.50 »,
+  « 1.234,50 », « (1 234,50 €) », « 1,2345E+03 » ; en Année « 2 026 »,
+  « 2026,00 », « 2,026 », « 01/01/2026 ». La forme ambiguë (virgule seule
+  suivie de trois chiffres : « 1,035 ») garde la lecture française et
+  devient un douteux dans les colonnes en k€. Une cellule ME illisible
+  garde le projet et devient un douteux (jamais un zéro muet) ; « - € »
+  vaut zéro. « arbitrage » s'écarte comme mot entier du nom.
+- **Faits COUT PREV et lignes en double (ADR 056).** Nom, type, état,
+  portefeuille d'un projet se lisent sur toutes ses lignes de l'exercice
+  (des autres années seulement s'il n'y en a aucune) : la valeur la plus
+  fréquente, puis la « Date d'export » la plus récente, puis l'ordre
+  alphabétique ; tout désaccord entre les lignes d'un Id est un douteux.
+  Un Id sur plusieurs lignes de Projets ou de ProjetsCdP : la ligne la plus
+  fréquente, puis la plus complète, puis la première par ordre
+  alphabétique. L'ordre des lignes du fichier ne décide plus rien.
+- **Jour de référence des jalons (ADR 058 §1).** Une date de jalon sans
+  statut est comparée à la plus récente cellule « Date d'export » /
+  « Date export » des fichiers reçus, à défaut au jour du chargement —
+  toujours un jour calendaire **Europe/Paris**, jamais le fuseau du
+  serveur. Le rapport dit lequel. *Remplace* « le jour de l'audit » (R7 et
+  plus bas).
+- **Jointures ProjetsJalons et SP (ADR 058 §2).** L'Id d'abord. Le nom
+  (ou, pour SP, le code dans le nom) ne sert que si la carte n'a trouvé
+  **aucune** ligne par son Id, que ce nom (ou ce code) n'est porté que par
+  une seule ligne, et que cette ligne ne porte pas un **autre** Id — sinon
+  pas de jointure, rien d'emprunté, un signalement. Deux Id sous un même
+  nom sont deux projets. Un Id en double dans ProjetsJalons : l'étape la
+  plus avancée de ses lignes, et un douteux. (ProjetsCdP garde sa
+  jointure Id, puis nom — section `ProjetsCdP` plus bas.)
+- **Cartes supprimées (ADR 058 §4).** Un projet dont la carte importée a
+  été supprimée au tableau n'est pas recréé : ignoré, compté et nommé au
+  rapport, aucun événement écrit.
+- **Adoption des cartes à la main (ADR 059).** Une carte créée à la main,
+  du même exercice, ni archivée ni supprimée, dont le code projet est
+  celui d'un projet de l'export (casse et espaces ignorés), devient la
+  carte de ce projet : elle garde son identifiant, son journal et son
+  instant de création, et prend les faits de l'export ; ce que l'export ne
+  porte jamais (criticité, notes, ressources, étiquettes, risques…) reste
+  le sien. Deux cartes à la main de même code : aucune n'est adoptée, la
+  question est dite. Le rapport nomme les cartes adoptées.
+- **L'information nouvelle de l'export l'emporte (ADR 060).** « Nouvelle »
+  = différente de ce que l'import précédent a écrit (la carte de base
+  stockée). **Faits** (ceux de l'ADR 054) : une valeur nouvelle de l'export
+  remplace une correction faite à la main (un événement `edited` signé
+  `import-csv`) ; un export qui répète l'ancienne valeur laisse la
+  correction. Hors règle : le titre, l'identifiant Sciforma et le domaine
+  (conflit tranché par le PMO, ADR 036). **Positions** : une carte déplacée
+  à la main vers une autre colonne est déplacée par un jalon **nouveau et
+  plus avancé** dans le flux que sa colonne ; un jalon répété ou en retrait
+  laisse la carte, et la divergence est dite. Un chargement sans position
+  pour une carte garde la colonne de l'import précédent ; l'export ne
+  place jamais le canal d'une carte existante (ADR 058 §3).
+- **Rapport lisible et refus (ADR 055).** L'audit et le chargement rendent
+  le même rapport structuré : fichiers pris ou absents et ce que le
+  chargement fait sans eux, périmètre et projets écartés avec leur motif,
+  projets qui entrent, sortent, reviennent, valeurs actualisées, faits
+  gardés, cartes adoptées ou supprimées. Le rapport Markdown devient le
+  « rapport technique ». Un chargement est refusé sur un exercice clos,
+  des fichiers bloquants, aucun périmètre ou aucun projet retenu sur
+  l'année — une seule règle pour l'outil et le CLI.
+- **Un chargement à la fois (ADR 058 §9)** dans l'outil : il passe dans la
+  file des écritures du tableau.
 
 ## Révision 2026-09-04 — retours PMO : le classeur de consolidation
 
@@ -43,10 +135,13 @@ forme Projets (Id, Nom, Type, État du processus), le périmètre est celui
 **sans** colonne « Responsable 1 » : l'onglet Projets du PMO n'en porte
 jamais, l'export complet qui en porte est la source ProjetsCdP (en
 septembre, 1 357 lignes contre 138 — l'ancienne règle « en-tête le plus
-propre » l'avait élu). À égalité : le fichier qui porte « Domaine (Orga) »,
-puis le moins d'écarts d'en-têtes, puis le nom. Les autres candidats sont
-signalés douteux avec la raison ; la ligne « périmètre » de l'état
-d'assemblage nomme le fichier élu.
+propre » l'avait élu). La ligne « périmètre » de l'état d'assemblage
+nomme le fichier retenu ; l'export complet est signalé en douteux (il
+prête ses chefs de projet). **Révision 2026-09-30 (ADR 056)** : il n'y a
+plus de départage — deux fichiers de la même forme (deux onglets sans
+« Responsable 1 », ou deux exports qui en portent) ne sont pas lus et
+refusent le chargement ; l'ancien départage (« Domaine (Orga) », puis le
+moins d'écarts d'en-têtes, puis le nom) est retiré.
 
 **Périmètre depuis COUT PREV (2026-09-11, ADR 030).** Quand l'export brut
 « Coût » de Sciforma est déposé, il **est** le périmètre (projets uniques
@@ -129,7 +224,10 @@ autre valeur → non franchi. La date du jalon (colonnes « RDO », « RDLI »,
 « RDR ») et la cellule « … franchi » (o/n) ne font que **confirmer** : un
 désaccord est signalé, le statut gagne. Sans statut (colonne absente ou
 cellule vide), l'ancienne règle s'applique : la date passée au jour de
-l'audit (2026-09-08), sinon la cellule « franchi ». Règle ordonnée : RDR
+référence (2026-09-08 : le jour de l'audit ; **depuis l'ADR 058** : la
+plus récente « Date d'export » / « Date export » des fichiers reçus, à
+défaut le jour du chargement, un jour Europe/Paris), sinon la cellule
+« franchi ». Règle ordonnée : RDR
 franchi → **Done** (« RDR approuvé = done », auteur) ; sinon RDLI franchi →
 **Actifs** ; sinon RDO franchi → **Études** ; sinon **Demandes**.
 « Prêts » et « Exploitation » ne sont jamais dérivés. Les valeurs de
@@ -182,11 +280,15 @@ entiers, matricules ignorés). `projets` : reconnu par Id + Nom + Type +
 État du processus (les deux formes) ; type par liste blanche des quatre
 (suffixe retiré), inconnu gardé et questionné ; sous-domaine résolu
 seulement dans A&D et CORPORATE, replié ailleurs et compté.
-`projets_jalons` : dates RDO / RDLI / RDR ≤ jour de l'audit = franchi ; à
+`projets_jalons` : dates RDO / RDLI / RDR ≤ jour de référence (date
+d'export des fichiers, à défaut jour du chargement, Europe/Paris — ADR
+058 ; le jour de l'audit avant) = franchi ; à
 défaut, « franchi » : VRAI / oui / o / x / 1 / date = franchi (date future
 signalée), FAUX / non / n / 0 / vide = non ; valeurs brutes relevées (Q21).
 `sp` : Nom + trois coûts requis, Id optionnel (jointure Id > nom > code
-PE) ; **montants en euros convertis en k€** et signalés, k€ ou sans unité
+PE ; depuis l'ADR 058, le nom ou le code ne servent que si aucune ligne
+n'a l'Id de la carte, qu'une seule ligne les porte et qu'elle ne porte
+pas un autre Id — sinon rien n'est emprunté) ; **montants en euros convertis en k€** et signalés, k€ ou sans unité
 pris tels quels. **Q23 tranchée (2026-09-10)** : les quatre montants k€
 de la carte (estimé, réel, engagé, enveloppe RDLI) viennent de SP_2026
 seul ; « Budget RDLI Total Coût (Res+Trans) » de Projets, pluriannuelle,
@@ -444,6 +546,10 @@ plan de charge dans la vue ☷ — jamais dans les cartes) ; tout le reste (enti
 payeuses, nature, criticité, priorité, score, **« Projet.Responsable 1 »**,
 date d'export) est déclaré ignoré : **jamais lu**. Les espaces autour d'un
 point sont ignorés dans les en-têtes (« Projet. Id » ≡ « Projet.Id »).
+**Révision 2026-09-30** : la « Date d'export » est désormais lue (colonne
+facultative) — elle départage les lignes d'un Id qui divergent (ADR 056)
+et donne le jour de référence des jalons (ADR 058) ; elle n'entre jamais
+dans une carte.
 
 Règle de périmètre (auteur, 2026-09-11, resserrée l'après-midi) — un projet
 **unique par Id** est retenu si, dans cet ordre (le premier motif
@@ -465,7 +571,9 @@ d'exclusion est compté) :
    l'exercice — tout vide ou tout zéro = annulé de fait, jamais marqué.
 
 « Projet.Actif » faux est compté, jamais exclu. Un Id sous plusieurs noms
-est questionné (premier nom conservé). Contrôle attendu : presque uniquement
+est questionné (depuis l'ADR 056 : le nom le plus fréquent sur les lignes
+de l'exercice, puis la « Date d'export » la plus récente, puis l'ordre
+alphabétique — plus le premier nom lu). Contrôle attendu : presque uniquement
 des codes PE — les codes retenus hors PE sont listés en douteux (l'auteur en
 attend 4 ou 5). Aucun montant de ce fichier n'entre dans une carte : SP
 reste la source des k€ (Q23), le plan de charge celle des j.h.
@@ -645,10 +753,22 @@ drapeau explicite `--charger` (`node sync/import.ts <dossier> --charger`).
   qu'il **porte** — un fichier absent ou une cellule vide ne vide jamais
   une valeur déjà sur la carte (chef de projet, budgets, charges, plan de
   charge, date RDR, codes) ; l'audit dit ce qui sera gardé.
+  **Révision 2026-09-30 (ADR 060)** : une carte déplacée à la main est
+  déplacée par un jalon **nouveau** (différent de celui de l'import
+  précédent) **et plus avancé** que sa colonne ; un jalon répété ou en
+  retrait la laisse, la divergence est dite.
 - Les champs que les exports ne portent pas (tags, risques, contraintes,
   blocage, notes, ressources) restent vides : ils se vivent dans l'outil.
   Une édition faite dans l'outil (`edited`) prime sur le rafraîchissement
   de la ligne d'import — c'est la logique du journal, assumée.
+  **Révision 2026-09-30 (ADR 060)** : elle prime tant que l'export répète
+  la valeur de l'import précédent ; une valeur **nouvelle** de l'export
+  la remplace (un `edited` signé `import-csv`). Le titre et le domaine
+  restent hors règle.
+- **Cartes supprimées et adoptées (ADR 058/059, 2026-09-30)** : une carte
+  importée supprimée au tableau n'est pas recréée ; une carte créée à la
+  main qui porte le code d'un projet de l'export devient sa carte (même
+  identifiant, même journal).
 
 ## Constantes de référence
 
@@ -961,7 +1081,7 @@ office de vérification sur site.
 | Q27 | Domaines Orga vus dans PARAM / Ress.Profils hors vocabulaire du tableau : « CONTROLE DE GESTION », « ING & PLM » — à ajouter, ou à rattacher à un domaine existant ? | PMO |
 | Q28 | `Projets` d'août : « Responsable » vide sur toutes les lignes — l'export peut-il porter le chef de projet ? | PMO |
 | Q29 | `SP_2026` d'août : « Engagé Achats » et « * Budget validé RDLI » — **tranchée** : les cellules portent l'unité « ke » (« 400 ke »), lue comme k€ depuis le 2026-09-08 ; l'export de septembre écrit un « k » nu (« 501 k », « 1 736 k »), lu comme k€ depuis le 2026-09-10 (264 cellules « Coût prév (ME) » étaient illisibles) | — |
-| Q21 | `ProjetsJalons` — **tranchée par l'auteur (2026-09-08)** : la position vient des **dates** des colonnes RDO / RDLI / RDR, passées ou non au jour de l'audit ; les cellules « franchi » (« o » / « n » dans l'export d'août) ne servent qu'en repli quand la date manque, et un désaccord date / franchi est signalé | — |
+| Q21 | `ProjetsJalons` — **tranchée par l'auteur (2026-09-08)** : la position vient des **dates** des colonnes RDO / RDLI / RDR, passées ou non au jour de l'audit (au jour de référence depuis l'ADR 058 : la date d'export des fichiers) ; les cellules « franchi » (« o » / « n » dans l'export d'août) ne servent qu'en repli quand la date manque, et un désaccord date / franchi est signalé | — |
 | Q25 | `Ress.Profils` « Int/Ext » : valeurs exactes (Interne/Externe ? O/N ?) | PMO |
 | Q26 | Matricule joint au plan de charge : « Id » ou « pk Contact » ? (les deux sont acceptés, l'un des deux doit correspondre) | PMO |
 

@@ -202,6 +202,7 @@ export function importChanges(input: ChangesInput): ImportChanges {
   const head = {
     ...importFiles(audit),
     perimeter: { source: perimeter.source, file: perimeter.file, retained: perimeter.verdicts.length - excluded.length, excluded },
+    blockers: audit.blockers.map((blocker) => blocker.message),
   };
   if (plan === null) {
     return { ...head, counts: NO_COUNTS, entered: [], left: [], back: [], cardChanges: [], kept: [], replaced: [], advanced: [], adopted: [], deletedSkipped: [], identityDoubts: [] };

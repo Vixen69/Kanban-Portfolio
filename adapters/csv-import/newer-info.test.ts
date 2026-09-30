@@ -73,6 +73,14 @@ const FACT_CASES: Array<{ name: string; hand: CardPatch; reload: Partial<Enriche
   { name: "a new chef de projet replaces the hand's", hand: { owner: "Carl NOYER" }, reload: { owner: "Bruno DIAZ" }, shows: { owner: "Bruno DIAZ" }, written: ["chef de projet"] },
   { name: "a new RDR date replaces the hand's", hand: { dateRdr: "2026-12-01" }, reload: { dateRdr: "2027-01-15" }, shows: { dateRdr: "2027-01-15" }, written: ["date RDR"] },
   {
+    name: "an older full-timestamp hand RDR and a new export on the same day: nothing to write",
+    hand: { dateRdr: "2026-12-15T00:00:00.000Z" }, reload: { dateRdr: "2026-12-15" }, shows: { dateRdr: "2026-12-15T00:00:00.000Z" }, written: [],
+  },
+  {
+    name: "an older full-timestamp hand RDR and a new export on another day: replaced",
+    hand: { dateRdr: "2026-12-15T00:00:00.000Z" }, reload: { dateRdr: "2027-01-15" }, shows: { dateRdr: "2027-01-15" }, written: ["date RDR"],
+  },
+  {
     name: "a new plan de charge replaces the hand's per-métier edit whole",
     hand: { chargeByProfile: [{ profileId: "pmo", jh: 40, done: 30 }] }, reload: { charges: [{ profileId: "pmo", jh: 60, done: 10 }] },
     shows: { chargeByProfile: [{ profileId: "pmo", jh: 60, done: 10 }] }, written: ["plan de charge par métier"],

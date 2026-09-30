@@ -139,7 +139,7 @@ test("structural gates: empty, nameless and total rows are discarded; duplicate 
   assert.deepEqual(report.discarded.map((d) => d.reason), [
     "ligne vide", "nom vide", "ligne de total/sous-total — exclue (risque de double compte)",
   ]);
-  assert.ok(report.doubtful.some((d) => /Id « PE3» porté par/.test(d.question)));
+  assert.ok(report.doubtful.some((d) => /^Id « PE3 » porté par 2 lignes : « Trois » \(ligne 5\), « Trois bis » \(ligne 6\) — ligne 5 gardée \(la plus fréquente/.test(d.question)));
 });
 
 test("the card title drops the leading project code the name repeats (author, 2026-09-09)", () => {
@@ -166,7 +166,7 @@ test("types: a keyword alias is found inside any spelling of the label, as a who
   assert.deepEqual(table.entries.map((e) => e.typeId), ["obsolescence", "obsolescence", "obsolescence", "ia", null, null]);
 });
 
-test("ADR 055: every kept row is retained by the onglet, a repeated Id names its first line; no Id, no code", () => {
+test("ADR 055: every kept row is retained by the onglet, a repeated Id names the line kept; no Id, no code", () => {
   const { table } = run(ORGA_HEADER, [
     "PE3;Trois;INFRA;;Etude (Projet);Nouveau;;;;;;;;;",
     "PE3;Trois bis;INFRA;;Etude;Nouveau;;;;;;;;;",
@@ -174,7 +174,24 @@ test("ADR 055: every kept row is retained by the onglet, a repeated Id names its
   ], null);
   assert.deepEqual(table.verdicts.map((v) => [v.code, v.motive, v.reason]), [
     ["PE3", "retained", "état « Nouveau », type « Etude » (l’onglet Projets fait foi)"],
-    ["PE3", "duplicate", "Id déjà porté par la ligne 2 — première ligne gardée"],
+    ["PE3", "duplicate", "Id en double — la ligne 2 est gardée"],
     ["", "retained", "type « Inconnu » (l’onglet Projets fait foi)"],
   ]);
+});
+
+test("ADR 056: a repeated Id keeps the same row whatever the row order — title, type, domain and chef de projet never flip", () => {
+  const a = "PE20050;Projet A;INFRA;;Etude;Nouveau;Alice MERLE;;;;;;;;";
+  const b = "PE20050;Projet B;CORPORATE;ACHATS;Projet de mise en oeuvre (Projet);Budget validé;Bruno DIAZ;;;;;;;;";
+  const read = (rows: string[]): unknown => {
+    const { table, report } = run(ORGA_HEADER, rows, null);
+    const entries = table.entries.map((e) => [e.id, e.title, e.typeId, e.domainId, e.subDomainId, e.owner]);
+    const kept = table.byId.get("PE20050");
+    return { entries, kept: [kept?.title, kept?.domainId], doubts: report.doubtful.filter((d) => d.question.startsWith("Id ")).length };
+  };
+  const forward = read([a, b]);
+  assert.deepEqual(read([b, a]), forward);
+  assert.deepEqual(forward, { entries: [["PE20050", "Projet B", "mise_en_oeuvre", "corporate", "achats", "Bruno DIAZ"]], kept: ["Projet B", "corporate"], doubts: 1 },
+    "the most complete row (a sub-domain more) is kept");
+  assert.deepEqual(read([a, b, a]), read([a, a, b]), "three rows: the content two rows repeat wins, in any order");
+  assert.equal((read([b, a, a]) as { kept: unknown[] }).kept[0], "Projet A");
 });

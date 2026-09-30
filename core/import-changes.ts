@@ -164,4 +164,11 @@ export interface ImportChanges {
   deletedSkipped: ImportCardRef[];
   /** Identity questions the load could not settle alone (ADR 058/059), plain French, one per case. */
   identityDoubts: string[];
+  /**
+   * The refusals that forbid the load (ADR 056: two competing exports, one
+   * file name received twice…), plain French, one per case — the screen
+   * says them instead of a generic « périmètre non assemblé ». Empty when
+   * nothing is refused; absent in reports made before.
+   */
+  blockers?: string[];
 }

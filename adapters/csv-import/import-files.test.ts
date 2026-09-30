@@ -49,3 +49,9 @@ test("ADR 055: without any perimeter file, both perimeter sources say the load i
   assert.equal(consequence("projets"), "aucun périmètre — chargement impossible");
   assert.equal(files.find((f) => f.source === "param")?.status, "pris");
 });
+
+test("without COUT PREV, the chip says the perimeter comes from the Projets onglet, in the PMO's words (no ADR number)", () => {
+  const { files } = importFiles(runImportAudit([fixture("PARAM.csv"), fixture("Projets.csv")], CONFIG, NOW));
+  const couts = files.find((f) => f.source === "couts");
+  assert.deepEqual([couts?.status, couts?.consequence], ["absent", "périmètre lu dans l’onglet Projets"]);
+});

@@ -21,4 +21,5 @@ export { IMPORT_ACTOR, baseCardId, cardId, planLoad, withLegacyIds } from "./to-
 export { keepStoredCapacity } from "./keep-capacity.ts";
 export type { LoadPlan } from "./to-cards.ts";
 export { importChanges } from "./import-changes.ts";
+export { loadRefusal } from "./load-refusal.ts";
 export type { ChangesInput } from "./import-changes.ts";

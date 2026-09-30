@@ -38,6 +38,7 @@ import { EmptyOverlay } from "./components/EmptyOverlay.tsx";
 import { AnalyticsView } from "./components/AnalyticsView.tsx";
 import type { YearPickerProps } from "./components/YearPicker.tsx";
 import { QuickAdd, type QuickAddInput } from "./components/QuickAdd.tsx";
+import { runCreation } from "./quickAddFlow.ts";
 import { Sidebar } from "./components/Sidebar.tsx";
 
 // Everything the screen pieces read, built once per render in Shell.
@@ -126,19 +127,19 @@ function CardModals({ ctx }: { ctx: Ctx }) {
   );
 }
 
-// « + Sujet » (ADR 057): created in the exercise shown, then its « Modifier »
-// form opens at once; a refused creation opens nothing (lastError says why).
-async function createThenEdit(ctx: Ctx, input: QuickAddInput): Promise<void> {
-  const id = await ctx.store.createCard({ ...input, exercise: ctx.viewYear });
-  if (id !== null) { ctx.ui.setDetailId(id); ctx.ui.setEditing(true); }
-}
+// « + Sujet » (ADR 057): created in the exercise shown, then « Modifier » opens;
+// the modal closes only on success, a refusal keeps the draft (quickAddFlow.ts).
+const createThenEdit = (ctx: Ctx, input: QuickAddInput): Promise<boolean> => runCreation({
+  create: (intent: QuickAddInput) => ctx.store.createCard({ ...intent, exercise: ctx.viewYear }),
+  close: () => ctx.ui.setAdding(false), openEdit: (id: string) => { ctx.ui.setDetailId(id); ctx.ui.setEditing(true); },
+}, input);
 function ShellModals({ ctx }: { ctx: Ctx }) {
   const { store, config, ui } = ctx;
   return (
     <>
       {ui.adding && (
-        <QuickAdd config={config} onClose={() => ui.setAdding(false)}
-          onCreate={(input) => { void createThenEdit(ctx, input); ui.setAdding(false); }} />
+        <QuickAdd config={config} viewYear={ctx.viewYear} error={store.lastError} onClose={() => ui.setAdding(false)}
+          onCreate={(input) => createThenEdit(ctx, input)} />
       )}
       {ui.admin && (
         <AdminPanel config={config} cards={store.cards} {...adminWrites(store, ui, ctx.bumpCapacity)} onClose={() => ui.setAdmin(false)}
@@ -148,7 +149,6 @@ function ShellModals({ ctx }: { ctx: Ctx }) {
         <AnalyticsView cards={ctx.cards} events={store.events} config={config} now={ctx.nowMs} year={ctx.viewYear} capacity={ctx.capacity}
           onClose={() => ui.setMetrics(false)} />
       )}
-
       {ui.archive && (
         <ArchiveView cards={ctx.archivedCards} config={config}
           onUnarchive={(id: string) => void store.unarchiveCard(id)}

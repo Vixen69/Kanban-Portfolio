@@ -24,6 +24,8 @@ interface Row {
   etat?: string;
   me?: string;
   exported?: string;
+  /** Days on a « Charge » row (cost centre « Architecte »); absent = a « Prestation » row. */
+  charge?: string;
 }
 
 // One COUT PREV line on the fixture's header (24 columns).
@@ -33,6 +35,7 @@ function line(r: Row): string {
     "Coût final ME (Res ouTrans)": r.me ?? "1 000,00 €", "Projet. Id": r.id, "Projet. Nom": r.name,
     "Projet.Portefeuille": r.portfolio ?? "DSI NEXTER.INFRASTRUCTURE OPE", "Projet.Type": r.type ?? "Etude (Projet)",
     "Projet.Etat du processus": r.etat ?? "Budget validé", "Projet.Actif": "VRAI", "Date d'export": r.exported ?? "10/09/2026",
+    ...(r.charge === undefined ? {} : { "Type de centre de coût": "Charge", "Centre de coût": "Architecte", "Charge finale ME (Res) (J)": r.charge }),
   };
   return HEADER.map((column) => values[column] ?? "").join(";");
 }
@@ -137,4 +140,12 @@ test("« Année » is read whatever its rendering; the values seen are listed, a
   assert.deepEqual(ids(result), ["PE50001", "PE50002", "PE50003", "PE50004"]);
   assert.ok(result.report.warnings.some((w) => w.message === "valeurs d'« Année » lues : 2026 (4) · 2025 (1)"));
   assert.ok(result.report.doubtful.some((d) => /^« Année » illisible : 1 cellule\(s\), ligne\(s\) 7 — ex\. « vingt-six » — ces lignes comptent hors 2026$/.test(d.question)));
+});
+
+test("ADR 058: the « Charge » days of a cost centre are added exactly and rounded once, in any row order", () => {
+  const charges = (values: readonly string[]): unknown =>
+    couts(values.map((charge) => ({ id: "PE60001", name: "Charge fine", charge }))).couts?.charges.map((c) => [c.centre, c.jh]);
+  assert.deepEqual(charges(Array.from({ length: 8 }, () => "0,125")), [["Architecte", 1]], "8 × 0,125 j.h = 1, not 1,04");
+  assert.deepEqual(charges(["0,125", "0,125", "0,005", "0,005"]), [["Architecte", 0.26]]);
+  assert.deepEqual(charges(["0,005", "0,005", "0,125", "0,125"]), [["Architecte", 0.26]], "the row order never decides the last hundredth");
 });

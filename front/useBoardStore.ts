@@ -267,7 +267,8 @@ export function useBoardStore(): BoardStore {
   const cardActions = useCardActions(refresh, setLastError);
   const configWrites = useConfigWrites(load.setConfig, load.defaults, reload);
   const switchExercise = useExerciseSwitch(load.setConfig, reload);
-  const snapshots = useSnapshotWrites(load.setConfig, reload);
+  // A restore's notice (config set aside, capacity removed) rides the banner.
+  const snapshots = useSnapshotWrites(load.setConfig, reload, setLastError);
   const dismissError = useCallback(() => setLastError(null), []);
   const cards = useMemo(
     () => (load.board ? foldEvents(load.board.cards, load.board.events) : []),

@@ -28,7 +28,8 @@ const NO_PERIMETER = "aucun périmètre — chargement impossible";
 const SPECS: readonly SourceSpec[] = [
   {
     source: "couts", label: "Coût prévisionnel (COUT PREV)", contracts: [COUTS_CONTRACT.id],
-    missing: (s) => (s.projets === null ? NO_PERIMETER : "périmètre lu dans l’onglet Projets (ADR 030)"),
+    // ADR 030: without COUT PREV, the Projets onglet is the perimeter.
+    missing: (s) => (s.projets === null ? NO_PERIMETER : "périmètre lu dans l’onglet Projets"),
   },
   {
     source: "param", label: "PARAM", contracts: [PARAM_CONTRACT.id, RDOM_CONTRACT.id],

@@ -2,7 +2,8 @@
 
 Date : 2026-09-30 · Statut : proposé (branche import-lisible) · Amende
 l'ADR 035 (identité « code@année ») ; suit l'ADR 057 (tout se saisit à la
-main)
+main) · Amendé par l'ADR 060 (corrections à la main et position d'une
+carte adoptée)
 
 ## Contexte
 
@@ -26,11 +27,18 @@ est **adoptée** :
 - sa carte de base devient celle de l'import : source « import »,
   référence Sciforma = le code, faits de l'export (ADR 054 : un fait que
   les fichiers laissent vide garde la valeur saisie) ; son **instant de
-  création est gardé** ;
+  création est gardé** ; seuls les faits de l'export sont remplacés : ce
+  que l'export ne porte jamais — criticité, notes, ressources, libellé du
+  plan de charge, étiquettes, risques, contraintes, alertes, contention,
+  champs de carte — saisi à la création (ADR 057) **reste celui de la
+  carte** ;
 - ses modifications à la main (événements `edited`) continuent de
   s'appliquer par-dessus ; son domaine suit l'ADR 036 (un écart est un
   conflit que le PMO tranche) ; sa position suit l'ADR 026 (déplacée à la
-  main vers une autre colonne : elle y reste) ;
+  main vers une autre colonne : elle y reste) — **amendé par l'ADR 060** :
+  une valeur de l'export qui diffère de la saisie reprend aussi la
+  correction à la main, et un jalon qui la place plus loin que sa colonne
+  la déplace ;
 - le rapport d'import la nomme parmi les **adoptées** (titre saisi, titre
   de l'export) ; les chargements suivants la retrouvent par son code.
 

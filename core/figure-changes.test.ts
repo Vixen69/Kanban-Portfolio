@@ -40,6 +40,12 @@ const CASES: Array<{ name: string; before: Partial<Card>; after: Partial<Card>; 
   },
   { name: "zero is a figure", before: { budgetConsumed: null }, after: { budgetConsumed: 0 }, expect: [["figure", { fact: "budgetConsumed", unit: "k€", before: null, after: 0, delta: null }]] },
   { name: "date RDR", before: { dateRdr: "2026-09-15" }, after: { dateRdr: "2026-12-15" }, expect: [["dateRdr", "2026-09-15", "2026-12-15"]] },
+  { name: "an older full-timestamp RDR and the same day is no change", before: { dateRdr: "2026-12-15T00:00:00.000Z" }, after: { dateRdr: "2026-12-15" }, expect: [] },
+  {
+    name: "an older full-timestamp RDR and another day keeps the raw values",
+    before: { dateRdr: "2026-12-15T00:00:00.000Z" }, after: { dateRdr: "2027-01-15" }, expect: [["dateRdr", "2026-12-15T00:00:00.000Z", "2027-01-15"]],
+  },
+  { name: "a RDR date appearing", before: { dateRdr: null }, after: { dateRdr: "2027-01-15" }, expect: [["dateRdr", null, "2027-01-15"]] },
 ];
 
 for (const c of CASES) {
