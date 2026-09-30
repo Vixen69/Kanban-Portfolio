@@ -120,9 +120,14 @@ function decisionEntry(config: BoardConfig, event: CardEvent, base: Omit<History
   return { ...base, kind: "decision", detail: parts.join(" · "), reason };
 }
 
-// The load's reason an entry / exit / return event carries, when a
-// non-empty one (events written before carry none).
-function importReason(event: CardEvent): string | null {
+/**
+ * The load's reason an entry / exit / return event carries (ADR 055),
+ * read the same way by the fiche's Historique and the journal.
+ * Input: an event. Output: the non-empty reason of an imported, unlisted
+ * or relisted event, else null. Failure: none — events written before
+ * ADR 055 carry none and read null.
+ */
+export function importReason(event: CardEvent): string | null {
   if (event.type !== "imported" && event.type !== "unlisted" && event.type !== "relisted") return null;
   const reason = event.payload["reason"];
   return typeof reason === "string" && reason.trim() !== "" ? reason : null;

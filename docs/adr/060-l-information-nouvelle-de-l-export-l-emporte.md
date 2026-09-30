@@ -87,7 +87,7 @@ La liste « en pause — nouveau jalon non appliqué » ne cite que les cartes
 qu'un jalon **nouveau** et **plus avancé que la Pause** aurait déplacées
 (revue, 2026-09-30) : le même jalon qu'au chargement précédent, ou un jalon
 en arrière, reste une simple divergence.
-Fichiers : `adapters/csv-import/load-position.ts` (`PAUSE_COLUMN_ID`),
+Fichiers : `adapters/csv-import/load-position.ts` (`PAUSE_COLUMN_ID` de `core/gesture.ts`),
 `to-cards.ts`, `import-changes.ts`, `core/import-changes.ts` (`paused`),
 `core/import-types.ts`, `middle/import.ts`, `sync/import-text.ts`,
 `front/importReport.ts`, `front/components/ImportLists.tsx`.

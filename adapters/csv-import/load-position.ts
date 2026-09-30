@@ -24,6 +24,9 @@
 import type { BoardConfig, Card, CardState } from "../../core/types.ts";
 import type { CardEventInput } from "../../core/events.ts";
 import { movedEvent } from "../../core/events.ts";
+// The Pause column, one id for the importer, the gesture gate and the fold:
+// a card there was put by a human (D4), no jalon undoes it.
+import { PAUSE_COLUMN_ID } from "../../core/gesture.ts";
 import type { EnrichedCard } from "./enrich.ts";
 import { IMPORT_ACTOR } from "./domain-conflicts.ts";
 import type { BoardReading } from "./board-reading.ts";
@@ -35,12 +38,6 @@ export interface AdvancedCard {
   fromColumn: string;
   toColumn: string;
 }
-
-/**
- * The Pause column of the model (config/board.json, by id): a card there
- * was put by a human — an arbitration decision (D4) no jalon undoes.
- */
-export const PAUSE_COLUMN_ID = "pause";
 
 /** What the position step records on the plan. */
 export interface PositionLedger {

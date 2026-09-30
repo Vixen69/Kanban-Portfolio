@@ -120,3 +120,21 @@ test("an « Importée » line is dated when the import ran, not at the project s
   assert.equal(older[0]?.ts, "2026-09-16T09:00:00.000Z");
   assert.equal(journalAll(board(), [imported(22, {})])[0]?.ts, "2025-01-15T00:00:00.000Z"); // nothing better known
 });
+
+test("the load's reason reads on imported, unlisted and relisted rows, as on the fiche (ADR 055)", () => {
+  const log = [
+    ev(1, "S4", "imported", { actor: "import-csv", toColumn: "demandes", payload: { laneId: "laneA", reason: "nouveau dans le périmètre" } }),
+    ev(2, "S4", "unlisted", { actor: "import-csv", payload: { reason: "état « Reporté »" } }),
+    ev(3, "S4", "relisted", { actor: "import-csv", payload: { reason: "de nouveau dans le périmètre" } }),
+    ev(4, "S5", "unlisted", { actor: "import-csv" }),
+    ev(5, "S5", "relisted", { actor: "import-csv", payload: { reason: "  " } }),
+  ];
+  const rows = journalRows(board(), log, { kinds: ALL });
+  assert.deepEqual(rows.map((row) => [row.id, row.label, row.detail]), [
+    ["evt-5", "De retour dans l'import", null],
+    ["evt-4", "Absente du dernier import", null],
+    ["evt-3", "De retour dans l'import", "de nouveau dans le périmètre"],
+    ["evt-2", "Absente de l'import", "état « Reporté »"],
+    ["evt-1", "Importée", "nouveau dans le périmètre"],
+  ]);
+});

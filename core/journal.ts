@@ -10,7 +10,7 @@ import { isReorder } from "./events.ts";
 import { eventSequence } from "./event-sequence.ts";
 import { unifiedColumnIds } from "./layout.ts";
 import { gestureTrail, IMPORT_ACTOR, PAUSE_COLUMN_ID, PAUSE_DECISION_ID, type Gesture } from "./gesture.ts";
-import { gestureWords } from "./history.ts";
+import { gestureWords, importReason } from "./history.ts";
 import { readDecision } from "./decision-record.ts";
 import { RESTORE_CARD_ID } from "./restore.ts";
 
@@ -146,8 +146,10 @@ function toRow(config: BoardConfig, event: CardEvent, trail: ReadonlyMap<string,
   if (event.type === "decided") return { ...base, ...decisionRow(config, event, renewal) };
   const known = LABELS[event.type];
   if (known === undefined) return null;
-  const reason = event.type === "blocked" ? event.payload["reason"] : null;
-  return { ...base, kind: known[0], label: known[1], detail: typeof reason === "string" && reason !== "" ? reason : null };
+  const reason = event.type === "blocked" ? event.payload["reason"] : importReason(event);
+  // With the load's reason, the fiche's words: « Absente de l'import — … ».
+  const label = event.type === "unlisted" && reason !== null ? "Absente de l'import" : known[1];
+  return { ...base, kind: known[0], label, detail: typeof reason === "string" && reason !== "" ? reason : null };
 }
 
 function kept(row: JournalRow, filter: JournalFilter): boolean {
