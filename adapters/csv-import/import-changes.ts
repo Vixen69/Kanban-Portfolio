@@ -7,12 +7,14 @@
 // core/snapshot-diff.ts), the projects that enter, leave or come back with
 // the rule behind each, and the facts kept from the board (ADR 054) —
 // since ADR 058/059 also the hand-made cards adopted, the cards deleted on
-// the board that the files still carry (skipped) and the identity doubts.
+// the board that the files still carry (skipped) and the identity doubts;
+// since ADR 060 the hand corrections a NEW export value took back and the
+// hand placements a new jalon went past.
 // Nothing is written. Pure: the caller passes the stored cards and log.
 
 import type { BoardConfig, Card, CardEvent, CardState } from "../../core/types.ts";
 import type {
-  ImportAdopted, ImportCardRef, ImportChangeCounts, ImportChanges, ImportEntered, ImportExcluded, ImportKeptFact, ImportLeft,
+  ImportAdopted, ImportAdvanced, ImportCardRef, ImportChangeCounts, ImportChanges, ImportEntered, ImportExcluded, ImportKeptFact, ImportLeft,
 } from "../../core/import-types.ts";
 import type { CardChange } from "../../core/snapshot-diff.ts";
 import { diffBoards } from "../../core/snapshot-diff.ts";
@@ -134,14 +136,23 @@ function backOf(plan: LoadPlan, perimeter: Perimeter, after: ReadonlyMap<string,
   }));
 }
 
-function keptOf(plan: LoadPlan, after: ReadonlyMap<string, CardState>): ImportKeptFact[] {
+// The facts kept (ADR 054) or replaced (ADR 060), with the cards named.
+function factCards(plan: LoadPlan, facts: LoadPlan["factsKeptCards"], after: ReadonlyMap<string, CardState>): ImportKeptFact[] {
   const planned = new Map(plan.cards.map((card) => [card.id, card]));
-  return plan.factsKeptCards.map(({ label, cardIds }) => ({
+  return facts.map(({ label, cardIds }) => ({
     label,
     cards: cardIds.flatMap((id) => {
       const card = after.get(id) ?? planned.get(id);
       return card === undefined ? [] : [ref(card)];
     }),
+  }));
+}
+
+// ADR 060: the hand placements a new jalon went past.
+function advancedOf(plan: LoadPlan, after: ReadonlyMap<string, CardState>): ImportAdvanced[] {
+  return byTitle(plan.advanced.map((a) => {
+    const card = after.get(a.cardId);
+    return { cardId: a.cardId, code: card?.codename ?? null, title: card?.title ?? a.title, fromColumn: a.fromColumn, toColumn: a.toColumn };
   }));
 }
 
@@ -163,13 +174,17 @@ function deletedOf(input: ChangesInput, plan: LoadPlan): ImportCardRef[] {
 function countsOf(plan: LoadPlan, cardChanges: CardChange[]): ImportChangeCounts {
   const changed = new Set(cardChanges.filter((c) => VALUE_KINDS.has(c.kind)).map((c) => c.cardId));
   const kept = new Set(plan.factsKeptCards.flatMap((fact) => fact.cardIds));
+  const replaced = new Set(plan.replaced.flatMap((fact) => fact.cardIds));
   return {
     updated: plan.updated, created: plan.created, absent: plan.unlisted, back: plan.relisted, moved: plan.moved,
     divergences: plan.divergences.length, valuesChanged: changed.size, valuesKept: kept.size,
+    replaced: replaced.size, advanced: plan.advanced.length,
   };
 }
 
-const NO_COUNTS: ImportChangeCounts = { updated: 0, created: 0, absent: 0, back: 0, moved: 0, divergences: 0, valuesChanged: 0, valuesKept: 0 };
+const NO_COUNTS: ImportChangeCounts = {
+  updated: 0, created: 0, absent: 0, back: 0, moved: 0, divergences: 0, valuesChanged: 0, valuesKept: 0, replaced: 0, advanced: 0,
+};
 
 /**
  * The readable report of an audit or a load (ADR 055).
@@ -189,7 +204,7 @@ export function importChanges(input: ChangesInput): ImportChanges {
     perimeter: { source: perimeter.source, file: perimeter.file, retained: perimeter.verdicts.length - excluded.length, excluded },
   };
   if (plan === null) {
-    return { ...head, counts: NO_COUNTS, entered: [], left: [], back: [], cardChanges: [], kept: [], adopted: [], deletedSkipped: [], identityDoubts: [] };
+    return { ...head, counts: NO_COUNTS, entered: [], left: [], back: [], cardChanges: [], kept: [], replaced: [], advanced: [], adopted: [], deletedSkipped: [], identityDoubts: [] };
   }
   const exercise = (cards: CardState[]): CardState[] => cardsOfExercise(cards, year, config.exercise.year);
   const before = exercise(foldEvents(input.baseCards, input.events));
@@ -200,7 +215,8 @@ export function importChanges(input: ChangesInput): ImportChanges {
   return {
     ...head, counts: countsOf(plan, cardChanges),
     entered: enteredOf(input, plan, perimeter), left: leftOf(plan, perimeter, beforeById),
-    back: backOf(plan, perimeter, afterById), cardChanges, kept: keptOf(plan, afterById),
+    back: backOf(plan, perimeter, afterById), cardChanges, kept: factCards(plan, plan.factsKeptCards, afterById),
+    replaced: factCards(plan, plan.replaced, afterById), advanced: advancedOf(plan, afterById),
     adopted: adoptedOf(plan), deletedSkipped: deletedOf(input, plan), identityDoubts: plan.identityDoubts,
   };
 }

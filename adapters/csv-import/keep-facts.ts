@@ -11,9 +11,11 @@
 
 import type { Card } from "../../core/types.ts";
 
-// The facts an import writes, in the order the report lists them, with
-// the words the report uses.
-const FACTS = [
+/**
+ * The facts an import writes, in the order the report lists them, with
+ * the words the report uses (shared with newer-facts.ts, ADR 060).
+ */
+export const FACTS = [
   ["title", "titre"],
   ["owner", "chef de projet"],
   ["typeId", "type"],

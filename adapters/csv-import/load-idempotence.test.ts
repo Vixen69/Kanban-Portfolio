@@ -83,11 +83,11 @@ test("a canal-only move never pins a card, is no divergence, and the export keep
   assert.equal(foldEvents(board.cards, board.events)[0]?.laneId, "projets_complexes");
 });
 
-test("a real hand move to another column still keeps it: divergence reported", () => {
+test("a real hand move to another column still keeps it while the jalon repeats: divergence reported", () => {
   const board = new Board();
   board.load([card()]);
   board.append(hand("etudes", "prets"));
-  const plan = board.load([card({ columnId: "actifs" })]);
+  const plan = board.load([card()]);
   assert.deepEqual([plan.moved, plan.divergences.length, board.column(ID)], [0, 1, "prets"]);
 });
 

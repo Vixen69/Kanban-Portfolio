@@ -172,6 +172,7 @@ function loadFigures(plan: LoadPlan, audit: AuditResult): ImportLoadResult["load
     divergences: plan.divergences.length, kept: plan.kept, chargesWithoutProfile: plan.chargesWithoutProfile,
     domainReplaced: plan.domainReplaced, domainKept: plan.domainKept, domainKeptByPrior: plan.domainKeptByPrior,
     deletedSkipped: plan.deletedSkipped.length, adopted: plan.adopted.length,
+    replaced: new Set(plan.replaced.flatMap((fact) => fact.cardIds)).size, advanced: plan.advanced.length,
     capacity: audit.capacity === null ? null
       : { persons: audit.capacity.snapshot.persons.length, assignments: audit.capacity.snapshot.assignments.length },
   };
@@ -226,7 +227,9 @@ async function loadNow(
     `${now.toISOString()} import (outil, exercice ${year}) : ${plan.created} créée(s), ${plan.updated} mise(s) à jour, ` +
       `${plan.moved} déplacée(s), ${plan.unlisted} absente(s), ${plan.relisted} de retour, ` +
       `domaines ${plan.domainReplaced} remplacé(s) / ${plan.domainKept} gardé(s), ` +
-      `${plan.deletedSkipped.length} supprimée(s) du tableau ignorée(s), ${plan.adopted.length} adoptée(s)` +
+      `${plan.deletedSkipped.length} supprimée(s) du tableau ignorée(s), ${plan.adopted.length} adoptée(s), ` +
+      `${new Set(plan.replaced.flatMap((fact) => fact.cardIds)).size} correction(s) manuelle(s) remplacée(s), ` +
+      `${plan.advanced.length} placement(s) à la main dépassé(s) par un nouveau jalon` +
       plan.factsKept.map((f) => ` · ${f.label} gardé (absent des fichiers) : ${f.cards}`).join(""),
   );
   return {

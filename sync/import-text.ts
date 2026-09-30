@@ -5,7 +5,7 @@
 // same ImportChanges object the tool shows; only the wording lives here.
 
 import type { BoardConfig } from "../core/types.ts";
-import type { ImportChanges, ImportLeft } from "../core/import-types.ts";
+import type { ImportChanges, ImportKeptFact, ImportLeft } from "../core/import-types.ts";
 import type { CardChange } from "../core/snapshot-diff.ts";
 import { FIGURE_FACTS } from "../core/snapshot-diff.ts";
 
@@ -82,6 +82,16 @@ function section(title: string, lines: string[]): string[] {
   return lines.length === 0 ? [] : [title, ...capped(lines)];
 }
 
+// One line per fact: its label, how many cards, the cards by code.
+function factLines(facts: ImportKeptFact[]): string[] {
+  return facts.map((k) => `  ${k.label} (${k.cards.length}) : ${k.cards.slice(0, CAP).map((card) => card.code ?? card.title).join(", ")}` +
+    (k.cards.length > CAP ? ` … (+${k.cards.length - CAP})` : ""));
+}
+
+function columnName(config: BoardConfig, columnId: string): string {
+  return config.columns.find((c) => c.id === columnId)?.name ?? columnId;
+}
+
 function reasonLines(mark: string, list: ImportLeft[]): string[] {
   return list.map((entry) => `  ${mark} ${named(entry)} — ${entry.reason}`);
 }
@@ -111,10 +121,13 @@ export function boardText(changes: ImportChanges, config: BoardConfig): string[]
   const c = changes.counts;
   const head = `Bilan : ${c.created} créée(s) · ${c.updated} relue(s) · ${c.absent} absente(s) · ${c.back} de retour` +
     ` · ${c.moved} déplacée(s) · ${c.divergences} divergence(s) · ${c.valuesChanged} carte(s) aux valeurs changées` +
-    ` · ${c.valuesKept} aux valeurs gardées du tableau`;
+    ` · ${c.valuesKept} aux valeurs gardées du tableau` +
+    ` · ${c.replaced ?? 0} aux corrections manuelles remplacées par l’export`;
   const entered = changes.entered.map((e) => `  + ${named(e)} — ${e.reason}${e.domainWarning === null ? "" : ` ⚠ ${e.domainWarning}`}`);
-  const kept = changes.kept.map((k) => `  ${k.label} (${k.cards.length}) : ${k.cards.slice(0, CAP).map((card) => card.code ?? card.title).join(", ")}` +
-    (k.cards.length > CAP ? ` … (+${k.cards.length - CAP})` : ""));
+  const kept = factLines(changes.kept);
+  const replaced = factLines(changes.replaced);
+  const advanced = changes.advanced.map((a) =>
+    `  ${named(a)} : ${columnName(config, a.fromColumn)} → ${columnName(config, a.toColumn)}`);
   return [
     head,
     ...section("Entrent :", entered),
@@ -122,5 +135,7 @@ export function boardText(changes: ImportChanges, config: BoardConfig): string[]
     ...section("De retour :", reasonLines("↺", changes.back)),
     ...(changes.cardChanges.some((x) => !LISTED.has(x.kind)) ? ["Changements, fait par fait :", ...byFact(config, changes.cardChanges)] : []),
     ...(kept.length === 0 ? [] : ["Absents des fichiers, gardés du tableau (ADR 054) :", ...kept]),
+    ...(replaced.length === 0 ? [] : ["Correction manuelle remplacée par la nouvelle valeur de l’export (ADR 060) :", ...replaced]),
+    ...section("Placement à la main dépassé par un nouveau jalon (ADR 060) :", advanced),
   ];
 }

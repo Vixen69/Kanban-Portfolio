@@ -21,12 +21,16 @@
 // and the export never places the canal of an existing card; a card
 // deleted on the board is skipped, never re-created; an « imported » event
 // is never dated after the load. ADR 059: a hand-made card carrying the
-// export's code is adopted, not duplicated (load-identity.ts).
+// export's code is adopted, not duplicated (load-identity.ts). ADR 060
+// (author, 2026-09-30): the export's NEW information wins — a new value
+// takes back a hand correction (newer-facts.ts), a new jalon further along
+// the flow goes past a hand placement (load-position.ts); a repeat of the
+// previous import's value leaves the hand's work alone.
 // Pure: no storage, no clock of its own — the caller passes both.
 
 import type { BoardConfig, Card, CardEvent, CardState } from "../../core/types.ts";
 import type { CardEventInput } from "../../core/events.ts";
-import { lifecycleEvent, movedEvent } from "../../core/events.ts";
+import { lifecycleEvent } from "../../core/events.ts";
 import type { DomainConflict, DomainDecision, DomainRef } from "../../core/import-types.ts";
 import type { EnrichedCard } from "./enrich.ts";
 import { IMPORT_ACTOR, domainConflict, domainDecisionEvent } from "./domain-conflicts.ts";
@@ -39,9 +43,13 @@ import type { AdoptedCard } from "./load-identity.ts";
 import { keepStoredFacts, keptFactCards, keptFactCounts } from "./keep-facts.ts";
 import type { KeptFactCards, KeptFactCount, KeptTally } from "./keep-facts.ts";
 import { toCard } from "./card-row.ts";
+import { placedLikeStored, refreshPosition } from "./load-position.ts";
+import type { AdvancedCard, PositionInput } from "./load-position.ts";
+import { newerFactEvents } from "./newer-facts.ts";
+import type { RefreshedCard } from "./newer-facts.ts";
 
 export { IMPORT_ACTOR, baseCardId, cardId, withLegacyIds };
-export type { AdoptedCard };
+export type { AdoptedCard, AdvancedCard };
 
 /** What a load would write, and what it deliberately would not. */
 export interface LoadPlan {
@@ -61,6 +69,10 @@ export interface LoadPlan {
   kept: number;
   /** Cards the export would move but a human already placed by hand. */
   divergences: Array<{ title: string; fromColumn: string; toColumn: string }>;
+  /** Hand-placed cards a jalon new since the previous import moved further along the flow (ADR 060; counted in moved). */
+  advanced: AdvancedCard[];
+  /** Hand corrections the export's NEW value took back, fact by fact, with the cards (ADR 060). */
+  replaced: KeptFactCards[];
   /** Charges dropped because their métier stayed unresolved. */
   chargesWithoutProfile: number;
   /** Facts the files left blank on existing cards: the stored value stood (ADR 054). */
@@ -122,6 +134,7 @@ export function planLoad(
   const stored = new Map(existingCards.map((c) => [c.id, c]));
   const tally: KeptTally = new Map();
   const deckIds = new Map<string, string>();
+  const refreshed: Array<RefreshedCard | null> = [];
   for (const card of deck) {
     const identity = resolveIdentity(card, year, reading, plan);
     const first = deckIds.get(identity.id);
@@ -139,15 +152,38 @@ export function planLoad(
       createCard(plan, identity.id, card, config, now);
       continue;
     }
-    plan.updated++;
     const domain = settleDomain(plan, existing, card, config, reading.priors.get(identity.id), decisions.get(identity.id), now);
-    plan.cards.push(keepStoredFacts(toCard(identity.id, card, config, plan, year, existing.createdAt, domain), stored.get(identity.id), tally));
-    refreshPosition(plan, identity.id, existing, card, reading, now);
+    const base = stored.get(identity.id);
+    const fresh = keepStoredFacts(toCard(identity.id, card, config, plan, year, existing.createdAt, domain), base, tally);
+    refreshed.push(refreshExisting(plan, { id: identity.id, existing, stored: base, card, adopted: false }, fresh, reading, config, now));
   }
+  takeBackHandCorrections(plan, refreshed, existingEvents, now);
   markAbsences(plan, reading.current, new Set(deckIds.keys()), now);
   plan.factsKept = keptFactCounts(tally);
   plan.factsKeptCards = keptFactCards(tally);
   return plan;
+}
+
+// ADR 060: the export's new values take back the hand corrections.
+function takeBackHandCorrections(plan: LoadPlan, refreshed: Array<RefreshedCard | null>, log: CardEvent[], now: Date): void {
+  const newer = newerFactEvents(refreshed.flatMap((r) => (r === null ? [] : [r])), log, now.toISOString());
+  plan.events.push(...newer.events);
+  plan.replaced = newer.replaced;
+}
+
+// An existing card: its refreshed base, placed like the stored one when
+// the files carry no position (ADR 060), then the position rule. Returns
+// the new base beside the stored one for the newer-facts rule (null when
+// nothing was stored under that id).
+function refreshExisting(
+  plan: LoadPlan, input: PositionInput, fresh: Card, reading: BoardReading, config: BoardConfig, now: Date,
+): RefreshedCard | null {
+  plan.updated++;
+  const placed = placedLikeStored(fresh, input.stored, input.card.positioned);
+  plan.cards.push(placed);
+  const adopted = plan.adopted.some((a) => a.id === input.id);
+  refreshPosition(plan, { ...input, adopted }, reading, config, now);
+  return input.stored === undefined ? null : { fresh: placed, stored: input.stored };
 }
 
 // A new card: its snapshot plus the « imported » event.
@@ -187,35 +223,6 @@ function settleDomain(
   return check.conflict.proposed;
 }
 
-// The position rule (ADR 026): no position in the export = the board's own
-// stands; the export places the COLUMN only — never the canal of an
-// existing card (ADR 058); a card a human moved to another column keeps it
-// (divergence reported); a column the log's last word already gives (an
-// import move the fold reads out of order, ADR 058) is not written again;
-// else the export moves the card.
-function refreshPosition(
-  plan: LoadPlan, id: string, existing: CardState, card: EnrichedCard, reading: BoardReading, now: Date,
-): void {
-  if (!card.positioned) {
-    plan.kept++;
-    return;
-  }
-  if (existing.columnId === card.columnId) return;
-  if (reading.movedByHand.has(id)) {
-    plan.divergences.push({ title: card.title, fromColumn: existing.columnId, toColumn: card.columnId });
-    return;
-  }
-  const last = reading.lastPosition.get(id);
-  if (last !== undefined && last.actor === IMPORT_ACTOR && last.toColumn === card.columnId) return;
-  plan.moved++;
-  plan.events.push(movedEvent(
-    id,
-    { laneId: existing.laneId, columnId: existing.columnId },
-    { laneId: existing.laneId, columnId: card.columnId },
-    IMPORT_ACTOR, now.toISOString(),
-  ));
-}
-
 // « Rien n'est écrasé » (ADR 026): a stored csv card the export no longer
 // lists is marked absent (unlisted), never deleted; one that comes back is
 // relisted. Manual cards and archived cards are left alone.
@@ -238,7 +245,7 @@ function markAbsences(plan: LoadPlan, current: Map<string, CardState>, deckIds: 
 function emptyPlan(year: number): LoadPlan {
   return {
     cards: [], events: [], created: 0, updated: 0, moved: 0, unlisted: 0, relisted: 0, kept: 0,
-    divergences: [], chargesWithoutProfile: 0, factsKept: [], factsKeptCards: [], domainFallback: [],
+    divergences: [], advanced: [], replaced: [], chargesWithoutProfile: 0, factsKept: [], factsKeptCards: [], domainFallback: [],
     exercise: year, aliases: new Map(), deletedSkipped: [], adopted: [], identityDoubts: [],
     domainConflicts: [], domainReplaced: 0, domainKept: 0, domainUndecided: 0, domainKeptByPrior: 0,
   };

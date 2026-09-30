@@ -199,7 +199,8 @@ function loadSummary(plan: LoadPlan): string {
       plan.divergences.slice(0, 5)
         .map((d) => `\n  · « ${d.title} » : tableau ${d.fromColumn} / export ${d.toColumn}`).join("");
   return `chargement : ${plan.created} carte(s) créée(s) · ${plan.updated} mise(s) à jour` +
-    ` · ${plan.moved} déplacée(s) par l'export` +
+    ` · ${plan.moved} déplacée(s) par l'export (dont ${plan.advanced.length} placée(s) à la main, dépassée(s) par un nouveau jalon)` +
+    ` · ${new Set(plan.replaced.flatMap((f) => f.cardIds)).size} correction(s) manuelle(s) remplacée(s) par la nouvelle valeur de l'export` +
     ` · ${plan.unlisted} absente(s) de l'export (marquées, jamais supprimées) · ${plan.relisted} de retour` +
     ` · ${plan.kept} position(s) conservée(s) (export sans jalon)` +
     ` · domaines : ${plan.domainReplaced} remplacé(s), ${plan.domainKept} gardé(s)${divergences}` +

@@ -92,6 +92,16 @@ export interface ImportKeptFact {
   cards: ImportCardRef[];
 }
 
+/**
+ * A hand-placed card a jalon NEW since the previous import moved further
+ * along the flow (ADR 060): « placement à la main dépassé par un nouveau
+ * jalon ». Columns by config id.
+ */
+export interface ImportAdvanced extends ImportCardRef {
+  fromColumn: string;
+  toColumn: string;
+}
+
 /** The headline counts. */
 export interface ImportChangeCounts {
   /** Cards on the board the files list again (re-read — not necessarily changed). */
@@ -109,6 +119,10 @@ export interface ImportChangeCounts {
   valuesChanged: number;
   /** Cards on which at least one fact left blank by the files kept its stored value (ADR 054). */
   valuesKept: number;
+  /** Cards on which the export's NEW value replaced a hand correction (ADR 060); absent in reports made before. */
+  replaced?: number;
+  /** Hand-placed cards a new jalon moved further along the flow (ADR 060; counted in moved too); absent before. */
+  advanced?: number;
 }
 
 /** The readable report of one audit or load (ADR 055). */
@@ -136,6 +150,14 @@ export interface ImportChanges {
   cardChanges: CardChange[];
   /** The facts kept from the board, fact by fact, with the cards (ADR 054). */
   kept: ImportKeptFact[];
+  /**
+   * « Correction manuelle remplacée par la nouvelle valeur de l'export »
+   * (ADR 060), fact by fact, with the cards: the export brought a value
+   * the previous import did not, and it took back the hand's correction.
+   */
+  replaced: ImportKeptFact[];
+  /** « Placement à la main dépassé par un nouveau jalon » (ADR 060). */
+  advanced: ImportAdvanced[];
   /** Hand-made cards the load adopts instead of creating a duplicate (ADR 059). */
   adopted: ImportAdopted[];
   /** Cards deleted on the board that the files still carry: « supprimées du tableau, ignorées » — never re-created (ADR 058). */

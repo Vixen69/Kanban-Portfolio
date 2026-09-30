@@ -54,9 +54,11 @@ le champ vide dans les fichiers : l'ancienne valeur reste.
 - Les valeurs déjà effacées par le chargement du 30/09 ne reviennent pas
   seules : restaurer l'instantané « avant chargement 2026 » puis recharger,
   ou recharger en ajoutant l'ancien fichier ProjetsCdP.
-- Question ouverte (auteur) : un projet absent d'un plan de charge PRÉSENT
-  garde son ancien plan ; la vue Capacité, elle, ne le voit plus (ses
-  affectations suivent le fichier). Vider le plan dans ce cas-là, ou garder ?
+- Décidé (auteur, 2026-09-30 : « on garde ») : un projet absent d'un plan
+  de charge PRÉSENT garde son ancien plan sur la carte ; la vue Capacité,
+  elle, ne le voit plus (ses affectations suivent le fichier).
+- L'ADR 060 précise la règle quand une valeur présente est **nouvelle** et
+  qu'une correction à la main la masquait : la nouvelle valeur l'emporte.
 - `keep-facts.ts`, `keep-capacity.ts` (+ tests), `to-cards.ts`,
   `core/import-types.ts` (`factsKept`), `middle/import.ts` (+ tests),
   `sync/import.ts`, `front/components/ImportView.tsx`.

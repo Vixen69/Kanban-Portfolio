@@ -100,17 +100,17 @@ test("re-import moves a card the export advanced, keeping its creation date", ()
   assert.equal(plan.cards[0]?.createdAt, before.cards[0]?.createdAt);
 });
 
-test("a hand-moved card keeps its column: the divergence is reported", () => {
+test("a hand-moved card keeps its column while the export repeats its jalon: the divergence is reported (ADR 026/060)", () => {
   const before = stored("etudes");
   const byHand: CardEvent = {
     id: "evt-9", ts: "2026-07-20T10:00:00.000Z", actor: "pmo", cardId: "PE10001@2026",
     type: "moved", fromColumn: "etudes", toColumn: "prets", payload: { laneId: "projets" },
   };
-  const plan = planLoad([card({ columnId: "actifs" })], CONFIG, before.cards, [...before.events, byHand], NOW);
+  const plan = planLoad([card({ columnId: "etudes" })], CONFIG, before.cards, [...before.events, byHand], NOW);
   assert.equal(plan.moved, 0);
   assert.deepEqual(plan.events, []);
   assert.deepEqual(plan.divergences, [
-    { title: "Modernisation atelier", fromColumn: "prets", toColumn: "actifs" },
+    { title: "Modernisation atelier", fromColumn: "prets", toColumn: "etudes" },
   ]);
 });
 
@@ -136,7 +136,7 @@ test("an export without position (no jalons) never moves an existing card: the b
   const before = stored("actifs");
   const plan = planLoad([card({ columnId: "demandes", positioned: false })], CONFIG, before.cards, before.events, NOW);
   assert.deepEqual([plan.updated, plan.moved, plan.kept, plan.events.length], [1, 0, 1, 0]);
-  assert.equal(plan.cards[0]?.columnId, "demandes", "the snapshot still says what the export said");
+  assert.equal(plan.cards[0]?.columnId, "actifs", "the snapshot keeps the previous import's column (ADR 060)");
 });
 
 // A board stored before ADR 035: bare ids, no exercise on the cards.

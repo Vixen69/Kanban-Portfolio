@@ -112,7 +112,7 @@ test("ADR 055: a modified export set — the audit names exactly what the load w
     const plan = values.find((c) => c.kind === "plan");
     assert.ok(plan?.kind === "plan");
     assert.deepEqual(plan.plan.profiles, [{ profileId: "pmo", before: { planned: 55, done: 25, raf: 30 }, after: { planned: 70, done: 25, raf: 45 } }]);
-    assert.deepEqual(changes.counts, { updated: 3, created: 2, absent: 2, back: 0, moved: 0, divergences: 0, valuesChanged: 1, valuesKept: 0 });
+    assert.deepEqual(changes.counts, { updated: 3, created: 2, absent: 2, back: 0, moved: 0, divergences: 0, valuesChanged: 1, valuesKept: 0, replaced: 0, advanced: 0 });
     const load = await loadImport(storage, CONFIG, modified(), NOW);
     assert.deepEqual(load.changes, changes, "the load did exactly what the audit announced");
     const again = await auditImport(storage, CONFIG, modified(), NOW);

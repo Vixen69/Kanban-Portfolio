@@ -6,7 +6,7 @@
 import type { ImportChanges } from "./import-changes.ts";
 
 export type {
-  ImportAdopted, ImportCardRef, ImportChangeCounts, ImportChanges, ImportEntered, ImportExcluded, ImportFileEntry, ImportFileStatus,
+  ImportAdopted, ImportAdvanced, ImportCardRef, ImportChangeCounts, ImportChanges, ImportEntered, ImportExcluded, ImportFileEntry, ImportFileStatus,
   ImportKeptFact, ImportLeft, ImportSource, ImportUnrecognized,
 } from "./import-changes.ts";
 
@@ -102,6 +102,10 @@ export interface ImportLoadResult extends ImportAuditResult {
     deletedSkipped: number;
     /** Hand-made cards adopted instead of duplicated (ADR 059). */
     adopted: number;
+    /** Cards on which the export's NEW value replaced a hand correction (ADR 060). */
+    replaced: number;
+    /** Hand-placed cards a new jalon moved further along the flow (ADR 060; counted in moved too). */
+    advanced: number;
     /** The capacity snapshot stored with the load, when the files carried one. */
     capacity: { persons: number; assignments: number } | null;
   };
