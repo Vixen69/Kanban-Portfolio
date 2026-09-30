@@ -22,7 +22,7 @@ import { logError, logRequest } from "./log.ts";
 import { auditImport, loadImport, parseDecisions, parseExercise, parseFiles } from "./import.ts";
 import { postExerciseSwitch } from "./exercise.ts";
 import { getSnapshotDiff, getSnapshots, postRestore, postSnapshot, takeSnapshot } from "./snapshots.ts";
-import { IMPORT_ACTOR } from "../adapters/csv-import/index.ts";
+import { IMPORT_ACTOR, importConfig } from "../adapters/csv-import/index.ts";
 import { exerciseOrCurrent } from "./validation.ts";
 
 const SECURITY_HEADERS: Record<string, string> = {
@@ -85,16 +85,19 @@ function errorHandler(err: unknown, req: Request, res: Response, _next: NextFunc
 
 // The import routes (ADR 027): the same audit and load as the CLI, no
 // authentication until RP3 like the rest of the write API. Their own JSON
-// parser carries the larger cap.
+// parser carries the larger cap. The importer matches export labels with
+// the versioned model's vocabulary, never the names ⚙ › Catégories renamed
+// (ADR 056, adapters/csv-import/vocabulary.ts).
 function mountImportRoutes(app: Express, deps: MiddleDeps): void {
   const body = express.json({ limit: IMPORT_MAX_BODY });
+  const configFor = (): ReturnType<typeof importConfig> => importConfig(deps.configStore.getRuntime(), deps.configStore.getDefaults());
   app.post("/api/import/audit", body, async (req: Request, res: Response) => {
-    const config = deps.configStore.getRuntime();
+    const config = configFor();
     const result = await auditImport(deps.storage, config, parseFiles(req.body), new Date(), parseExercise(req.body, config));
     res.status(200).json(result);
   });
   app.post("/api/import/load", body, async (req: Request, res: Response) => {
-    const config = deps.configStore.getRuntime();
+    const config = configFor();
     const year = parseExercise(req.body, config);
     const now = new Date();
     // The automatic snapshot (ADR 042): once the load is accepted, before it writes.

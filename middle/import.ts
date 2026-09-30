@@ -9,8 +9,10 @@
 // (ADR 036): the load carries the PMO's decisions, one per conflict, and
 // is refused while one is missing. Both return the readable report of
 // ADR 055 (`changes`): the audit says what the load WOULD change on the
-// board and why, the load what it DID — one import mode. Logs carry
-// counts only.
+// board and why, the load what it DID — one import mode. Loads run one
+// at a time, queued with every other board write (ADR 058: two concurrent
+// loads would both read the board before either wrote, and both create
+// every card). Logs carry counts only.
 
 import { win32 } from "node:path";
 import type { BoardStorage } from "../core/ports.ts";
@@ -20,6 +22,7 @@ import { importChanges, keepStoredCapacity, planLoad, renderReport, runImportAud
 import type { AuditResult, EnrichedCard, InputFile, LoadPlan } from "../adapters/csv-import/index.ts";
 import { BadRequest } from "./errors.ts";
 import { exerciseOrCurrent } from "./validation.ts";
+import { serializedWrite } from "./api.ts";
 
 /** What a load lets the caller do around its write. */
 export interface LoadHooks {
@@ -97,6 +100,8 @@ export function parseDecisions(body: unknown): Map<string, DomainDecision> {
 // be marked absent: no perimeter at all, or a file set with no project on
 // the requested year — the files of another exercise (ADR 035).
 function loadableDeck(audit: AuditResult, year: number): EnrichedCard[] {
+  // ADR 056: two files of one kind, one name twice, a Coût-like file not recognized.
+  if (audit.blockers.length > 0) throw new BadRequest(`Chargement refusé : ${audit.blockers.map((b) => b.message).join(" ")}`);
   if (audit.cards === null) {
     throw new BadRequest("Chargement refusé : aucune carte assemblée (le fichier « projets » manque ?).");
   }
@@ -128,7 +133,7 @@ async function dryRun(
   storage: BoardStorage, config: BoardConfig, audit: AuditResult, now: Date, year: number,
 ): Promise<Pick<ImportAuditResult, "conflicts" | "factsKept" | "changes">> {
   const [events, baseCards] = await Promise.all([storage.listEvents(), storage.listBaseCards()]);
-  if (audit.cards === null || audit.cards.cards.length === 0) {
+  if (audit.cards === null || audit.cards.cards.length === 0 || audit.blockers.length > 0) {
     return { conflicts: [], factsKept: [], changes: importChanges({ audit, config, year, plan: null, baseCards, events }) };
   }
   const plan = planLoad(audit.cards.cards, config, baseCards, events, now, year);
@@ -155,7 +160,7 @@ export async function auditImport(
   const dry = await dryRun(storage, config, audit, now, year);
   return {
     exercise: year, report: renderReport(audit.report, now), summary: summarize(audit),
-    loadable: audit.cards !== null, ...dry,
+    loadable: audit.cards !== null && audit.blockers.length === 0, ...dry,
   };
 }
 
@@ -166,6 +171,7 @@ function loadFigures(plan: LoadPlan, audit: AuditResult): ImportLoadResult["load
     unlisted: plan.unlisted, relisted: plan.relisted,
     divergences: plan.divergences.length, kept: plan.kept, chargesWithoutProfile: plan.chargesWithoutProfile,
     domainReplaced: plan.domainReplaced, domainKept: plan.domainKept, domainKeptByPrior: plan.domainKeptByPrior,
+    deletedSkipped: plan.deletedSkipped.length, adopted: plan.adopted.length,
     capacity: audit.capacity === null ? null
       : { persons: audit.capacity.snapshot.persons.length, assignments: audit.capacity.snapshot.assignments.length },
   };
@@ -181,15 +187,25 @@ function loadFigures(plan: LoadPlan, audit: AuditResult): ImportLoadResult["load
  * year (default: the current one), the decisions by card id.
  * Output: the audit result plus what the load wrote; `changes` says what
  * it changed on the board, card by card (ADR 055).
+ * The whole read-plan-write runs serialized with the other board writes
+ * (serializedWrite, ADR 058): a second load reads what the first wrote.
  * Failure: BadRequest on a closed year (below the current one), when no
  * card assembled (no `projets` file), when no project is retained on that
  * year (the files of another exercise) or when a conflict is undecided;
  * storage errors propagate (→ 500), nothing partially written for cards.
  */
-export async function loadImport(
+export function loadImport(
   storage: BoardStorage, config: BoardConfig, files: InputFile[], now: Date,
   year: number = config.exercise.year, decisions: ReadonlyMap<string, DomainDecision> = new Map(),
   hooks: LoadHooks = {},
+): Promise<ImportLoadResult> {
+  return serializedWrite(() => loadNow(storage, config, files, now, year, decisions, hooks));
+}
+
+// One load, alone on the board (the queue above).
+async function loadNow(
+  storage: BoardStorage, config: BoardConfig, files: InputFile[], now: Date,
+  year: number, decisions: ReadonlyMap<string, DomainDecision>, hooks: LoadHooks,
 ): Promise<ImportLoadResult> {
   if (year < config.exercise.year) throw new BadRequest(`Exercice ${year} clos : chargement refusé.`);
   const audit = runImportAudit(files, config, now, year);
@@ -209,7 +225,8 @@ export async function loadImport(
   console.log(
     `${now.toISOString()} import (outil, exercice ${year}) : ${plan.created} créée(s), ${plan.updated} mise(s) à jour, ` +
       `${plan.moved} déplacée(s), ${plan.unlisted} absente(s), ${plan.relisted} de retour, ` +
-      `domaines ${plan.domainReplaced} remplacé(s) / ${plan.domainKept} gardé(s)` +
+      `domaines ${plan.domainReplaced} remplacé(s) / ${plan.domainKept} gardé(s), ` +
+      `${plan.deletedSkipped.length} supprimée(s) du tableau ignorée(s), ${plan.adopted.length} adoptée(s)` +
       plan.factsKept.map((f) => ` · ${f.label} gardé (absent des fichiers) : ${f.cards}`).join(""),
   );
   return {

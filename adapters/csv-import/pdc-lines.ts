@@ -11,6 +11,7 @@
 
 import { normalizeLabel } from "./normalize.ts";
 import { stripCode } from "./code-prefix.ts";
+import { addDays, round2, roundBucket } from "./day-sums.ts";
 
 /** One nominative resource of the plan de charge. */
 export interface PdcPerson {
@@ -181,10 +182,6 @@ export function setPersonLine(person: PdcPerson, line: LineKind, jh: number, don
   }
 }
 
-function round2(value: number): number {
-  return Math.round(value * 100) / 100;
-}
-
 /**
  * Records a non-nominative project row: the project keeps the load, the
  * kind is counted, and the row joins the generic demand of its (project,
@@ -197,18 +194,51 @@ export function recordExcluded(
   excluded: PdcExcluded, generic: Map<string, PdcGeneric>, project: { key: string; genericJh: number; genericDone: number },
   kind: ResourceKind, facts: ResourceFacts, jh: number, done: number,
 ): void {
-  project.genericJh = round2(project.genericJh + jh);
-  project.genericDone = round2(project.genericDone + done);
-  excluded.jh = round2(excluded.jh + jh);
-  excluded.done = round2(excluded.done + done);
+  project.genericJh = addDays(project.genericJh, jh);
+  project.genericDone = addDays(project.genericDone, done);
+  excluded.jh = addDays(excluded.jh, jh);
+  excluded.done = addDays(excluded.done, done);
   if (kind === "zz") excluded.zz++;
   else if (kind === "role") excluded.roles++;
   else excluded.generic++;
   const key = `${project.key}|${normalizeLabel(facts.metier)}|${normalizeLabel(facts.organisation)}`;
   const row = generic.get(key) ?? { projectKey: project.key, metier: facts.metier, organisation: facts.organisation, jh: 0, done: 0 };
-  row.jh = round2(row.jh + jh);
-  row.done = round2(row.done + done);
+  row.jh = addDays(row.jh, jh);
+  row.done = addDays(row.done, done);
   generic.set(key, row);
+}
+
+/** The sums of one plan de charge read, as roundPdcSums rounds them. */
+export interface PdcSums {
+  totals: { jh: number; done: number };
+  excluded: PdcExcluded;
+  projects: ReadonlyMap<string, {
+    charges: Map<string, { jh: number; done: number }>;
+    persons: Map<string, { jh: number; done: number }>;
+    genericJh: number;
+    genericDone: number;
+  }>;
+  persons: ReadonlyMap<string, PdcPerson>;
+  generic: ReadonlyMap<string, PdcGeneric>;
+}
+
+/**
+ * Rounds every day-count sum of a plan de charge read to two decimals,
+ * once, when all the rows are read (ADR 058: summed raw, rounded once —
+ * the same whatever the rows' order).
+ * Input: the sums (mutated). Output: none. Failure modes: none.
+ */
+export function roundPdcSums(sums: PdcSums): void {
+  roundBucket(sums.totals);
+  roundBucket(sums.excluded);
+  for (const project of sums.projects.values()) {
+    for (const bucket of project.charges.values()) roundBucket(bucket);
+    for (const load of project.persons.values()) roundBucket(load);
+    project.genericJh = round2(project.genericJh);
+    project.genericDone = round2(project.genericDone);
+  }
+  for (const person of sums.persons.values()) roundBucket(person);
+  for (const row of sums.generic.values()) roundBucket(row);
 }
 
 /**

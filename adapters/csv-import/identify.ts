@@ -10,7 +10,7 @@ import { parseCsv } from "./csv.ts";
 import type { CsvRow } from "./csv.ts";
 import { CONTRACTS, identifyHeader } from "./contract.ts";
 import type { FileContract, HeaderDeviation, HeaderIdentification, HeaderMatch, HeaderNearMiss } from "./contract.ts";
-import { warn } from "./report.ts";
+import { doubt, warn } from "./report.ts";
 import type { FileInventoryEntry, ImportReport } from "./report.ts";
 
 /** One received file: name (no path) and raw bytes. */
@@ -27,6 +27,16 @@ export interface ParsedCsvFile {
   dataRows: CsvRow[];
 }
 
+/** A file whose header resembles a contract without matching it (ADR 056: a Coût near miss refuses the load). */
+export interface NearMiss {
+  file: string;
+  contractId: string;
+  /** Required columns found, out of `required`. */
+  found: number;
+  required: number;
+  missing: string[];
+}
+
 /** How many leading non-empty rows are tried as header candidates. */
 const HEADER_SEARCH_ROWS = 60;
 
@@ -37,11 +47,12 @@ const HEADER_SEARCH_ROWS = 60;
  * Non-.csv files are inventoried and
  * skipped; .csv files are decoded (encoding signaled), parsed, and their
  * header searched among the first rows.
- * Outputs: the header match and data rows for recognized files, else null.
+ * Outputs: the header match and data rows for recognized files, else null;
+ * a near miss is also pushed to `nearMisses` when the caller passes it.
  * Failure modes: none — every rejection lands in the inventory.
  */
 export function processFile(
-  file: InputFile, report: ImportReport, contracts: readonly FileContract[] = CONTRACTS,
+  file: InputFile, report: ImportReport, contracts: readonly FileContract[] = CONTRACTS, nearMisses?: NearMiss[],
 ): ParsedCsvFile | null {
   if (!file.name.toLowerCase().endsWith(".csv")) {
     addInventory(report, file, "not-csv", {});
@@ -49,6 +60,7 @@ export function processFile(
   }
   const decoded = decodeCsvBytes(file.bytes);
   for (const message of decoded.warnings) warn(report, message, file.name);
+  for (const question of decoded.doubts) doubt(report, file.name, question);
   if (decoded.unsupported !== undefined) {
     addInventory(report, file, "unsupported", { detail: decoded.unsupported });
     return null;
@@ -65,6 +77,14 @@ export function processFile(
     warn(report,
       `recherche d'en-têtes limitée aux ${HEADER_SEARCH_ROWS} premières lignes non vides — aucun contrat reconnu avant cette borne`,
       file.name);
+  }
+  const identification = pick.identification;
+  if (nearMisses !== undefined && identification.status === "near-miss") {
+    const required = identification.contract.columns.length;
+    nearMisses.push({
+      file: file.name, contractId: identification.contract.id,
+      found: required - identification.missing.length, required, missing: identification.missing,
+    });
   }
   return classify(file, report, encoding, parsed.rows, pick);
 }

@@ -11,6 +11,7 @@
 import type { Assignment, BoardConfig, CapacitySnapshot, CoutsDemand, GenericDemand, Person } from "../../core/types.ts";
 import type { CoutsTable } from "./couts.ts";
 import { normalizeLabel } from "./normalize.ts";
+import { addDays, round2 } from "./day-sums.ts";
 import { createDomainLookup } from "./domains.ts";
 import type { Lookup } from "./domains.ts";
 import type { EnrichedCard } from "./enrich.ts";
@@ -199,16 +200,16 @@ function statsOf(
   snapshot: CapacitySnapshot, cards: readonly EnrichedCard[], pdc: PdcTable,
   via: { path: number; profils: number; none: number },
 ): CapacityStats {
-  const round2 = (v: number): number => Math.round(v * 100) / 100;
   const covered = new Set(snapshot.assignments.map((a) => a.cardId));
   const sums = { capacityJh: 0, demandJh: 0, plannedJh: 0, doneAllJh: 0, coutsJh: 0 };
-  for (const assignment of snapshot.assignments) sums.demandJh = round2(sums.demandJh + assignment.jh);
-  for (const demand of snapshot.coutsDemand ?? []) sums.coutsJh = round2(sums.coutsJh + demand.jh);
+  for (const assignment of snapshot.assignments) sums.demandJh = addDays(sums.demandJh, assignment.jh);
+  for (const demand of snapshot.coutsDemand ?? []) sums.coutsJh = addDays(sums.coutsJh, demand.jh);
   for (const person of snapshot.persons) {
-    sums.capacityJh = round2(sums.capacityJh + (person.capacityJh ?? 0));
-    sums.plannedJh = round2(sums.plannedJh + (person.plannedJh ?? 0));
-    sums.doneAllJh = round2(sums.doneAllJh + (person.doneJh ?? 0));
+    sums.capacityJh = addDays(sums.capacityJh, person.capacityJh ?? 0);
+    sums.plannedJh = addDays(sums.plannedJh, person.plannedJh ?? 0);
+    sums.doneAllJh = addDays(sums.doneAllJh, person.doneJh ?? 0);
   }
+  for (const key of Object.keys(sums) as Array<keyof typeof sums>) sums[key] = round2(sums[key]);
   return {
     persons: snapshot.persons.length,
     external: snapshot.persons.filter((p) => p.external).length,

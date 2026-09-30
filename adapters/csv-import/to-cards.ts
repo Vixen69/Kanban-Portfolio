@@ -16,23 +16,32 @@
 // load targets one exercise and reads or touches only that year's cards;
 // cards stored before ADR 035 (bare ids) are that year's when it is the
 // current one, and keep their id (the capacity snapshot is remapped).
+// ADR 058 (idempotence, 2026-09-30): the plan reads the restore-filtered
+// log (board-reading.ts); a reorder or a canal-only move never pins a card
+// and the export never places the canal of an existing card; a card
+// deleted on the board is skipped, never re-created; an « imported » event
+// is never dated after the load. ADR 059: a hand-made card carrying the
+// export's code is adopted, not duplicated (load-identity.ts).
 // Pure: no storage, no clock of its own — the caller passes both.
 
 import type { BoardConfig, Card, CardEvent, CardState } from "../../core/types.ts";
 import type { CardEventInput } from "../../core/events.ts";
 import { lifecycleEvent, movedEvent } from "../../core/events.ts";
-import { foldEvents } from "../../core/state.ts";
-import { cardsOfExercise, hasExerciseSuffix } from "../../core/exercise.ts";
 import type { DomainConflict, DomainDecision, DomainRef } from "../../core/import-types.ts";
 import type { EnrichedCard } from "./enrich.ts";
-import { IMPORT_ACTOR, domainConflict, domainDecisionEvent, priorDomainDecisions } from "./domain-conflicts.ts";
+import { IMPORT_ACTOR, domainConflict, domainDecisionEvent } from "./domain-conflicts.ts";
 import type { PriorDecision } from "./domain-conflicts.ts";
 import { baseCardId, cardId, withLegacyIds } from "./card-identity.ts";
+import { readBoard } from "./board-reading.ts";
+import type { BoardReading } from "./board-reading.ts";
+import { resolveIdentity } from "./load-identity.ts";
+import type { AdoptedCard } from "./load-identity.ts";
 import { keepStoredFacts, keptFactCards, keptFactCounts } from "./keep-facts.ts";
 import type { KeptFactCards, KeptFactCount, KeptTally } from "./keep-facts.ts";
 import { toCard } from "./card-row.ts";
 
 export { IMPORT_ACTOR, baseCardId, cardId, withLegacyIds };
+export type { AdoptedCard };
 
 /** What a load would write, and what it deliberately would not. */
 export interface LoadPlan {
@@ -74,17 +83,25 @@ export interface LoadPlan {
   /** Conflicts silenced by an earlier « garder » against the same proposal. */
   domainKeptByPrior: number;
   /**
-   * Instance ids (cardId) the load mapped onto cards stored before ADR 035
-   * (bare ids): instance id → stored id. The capacity snapshot, built with
+   * Instance ids (cardId) the load mapped onto another board card: one
+   * stored before ADR 035 (bare id) or a hand-made card it adopted (ADR
+   * 059) — instance id → board id. The capacity snapshot, built with
    * instance ids, is remapped with it (withLegacyIds).
    */
   aliases: Map<string, string>;
+  /** Deck cards whose board card was deleted there (ADR 058): skipped, never re-created — by board id. */
+  deletedSkipped: string[];
+  /** Hand-made cards the load adopted instead of creating a duplicate (ADR 059). */
+  adopted: AdoptedCard[];
+  /** Identity questions the load could not settle alone, plain French (ADR 058/059). */
+  identityDoubts: string[];
 }
 
 /**
  * Builds the load plan from the audited deck and the current board state
  * of ONE exercise (ADR 035): only that year's cards are read, refreshed,
- * moved or marked absent — the other years' boards stand.
+ * moved or marked absent — the other years' boards stand. The log is read
+ * through the restores (ADR 042/058): what a restore undid is not read.
  * Inputs: the enriched cards, the board config, the cards and events
  * already stored (empty arrays on a first load), `now` (injected), the
  * exercise year loaded (default: the config's current one), and the PMO's
@@ -92,41 +109,56 @@ export interface LoadPlan {
  * Outputs: the LoadPlan — nothing is written here.
  * Failure modes: none; cards whose identity cannot be derived keep a
  * name-based id, so a renamed project creates a new card (the code
- * cross-check of the audit flags that case beforehand).
+ * cross-check of the audit flags that case beforehand); a second deck
+ * card on an id already planned is left out and said (identityDoubts).
  */
 export function planLoad(
   deck: EnrichedCard[], config: BoardConfig,
   existingCards: Card[], existingEvents: CardEvent[], now: Date, year: number = config.exercise.year,
   decisions: ReadonlyMap<string, DomainDecision> = new Map(),
 ): LoadPlan {
-  const folded = cardsOfExercise(foldEvents(existingCards, existingEvents), year, config.exercise.year);
-  const current = new Map(folded.map((c) => [c.id, c]));
-  const legacy = new Map(folded.filter((c) => !hasExerciseSuffix(c.id)).map((c) => [c.id, c]));
-  const movedByHand = handMovedIds(existingEvents);
-  const priors = priorDomainDecisions(existingEvents);
+  const reading = readBoard(existingCards, existingEvents, year, config.exercise.year);
   const plan = emptyPlan(year);
   const stored = new Map(existingCards.map((c) => [c.id, c]));
   const tally: KeptTally = new Map();
-  const deckIds = new Set<string>();
+  const deckIds = new Map<string, string>();
   for (const card of deck) {
-    const id = resolveId(card, year, legacy, plan);
-    deckIds.add(id);
-    const existing = current.get(id);
+    const identity = resolveIdentity(card, year, reading, plan);
+    const first = deckIds.get(identity.id);
+    if (first !== undefined) {
+      plan.identityDoubts.push(`identité « ${identity.id} » portée par deux projets de l’export (« ${first} », « ${card.title} ») — seul le premier est chargé`);
+      continue;
+    }
+    deckIds.set(identity.id, card.title);
+    if (identity.kind === "deleted") {
+      plan.deletedSkipped.push(identity.id);
+      continue;
+    }
+    const existing = reading.current.get(identity.id);
     if (existing === undefined) {
-      plan.cards.push(toCard(id, card, config, plan, year));
-      if (card.domainId === null) plan.domainFallback.push(id);
-      pushCreated(plan, id, card, now);
+      createCard(plan, identity.id, card, config, now);
       continue;
     }
     plan.updated++;
-    const domain = settleDomain(plan, existing, card, config, priors.get(id), decisions.get(id), now);
-    plan.cards.push(keepStoredFacts(toCard(id, card, config, plan, year, existing.createdAt, domain), stored.get(id), tally));
-    refreshPosition(plan, id, existing, card, movedByHand, now);
+    const domain = settleDomain(plan, existing, card, config, reading.priors.get(identity.id), decisions.get(identity.id), now);
+    plan.cards.push(keepStoredFacts(toCard(identity.id, card, config, plan, year, existing.createdAt, domain), stored.get(identity.id), tally));
+    refreshPosition(plan, identity.id, existing, card, reading, now);
   }
-  markAbsences(plan, current, deckIds, now);
+  markAbsences(plan, reading.current, new Set(deckIds.keys()), now);
   plan.factsKept = keptFactCounts(tally);
   plan.factsKeptCards = keptFactCards(tally);
   return plan;
+}
+
+// A new card: its snapshot plus the « imported » event.
+function createCard(plan: LoadPlan, id: string, card: EnrichedCard, config: BoardConfig, now: Date): void {
+  plan.cards.push(toCard(id, card, config, plan, plan.exercise));
+  if (card.domainId === null) plan.domainFallback.push(id);
+  plan.created++;
+  plan.events.push({
+    ...lifecycleEvent("imported", id, IMPORT_ACTOR, entryTs(card, now), { laneId: card.laneId }),
+    toColumn: card.columnId,
+  });
 }
 
 // The domain the refreshed snapshot carries (ADR 036): the board's own,
@@ -156,40 +188,30 @@ function settleDomain(
 }
 
 // The position rule (ADR 026): no position in the export = the board's own
-// stands; a hand-moved card keeps its column (divergence reported); else
-// the export moves the card.
+// stands; the export places the COLUMN only — never the canal of an
+// existing card (ADR 058); a card a human moved to another column keeps it
+// (divergence reported); a column the log's last word already gives (an
+// import move the fold reads out of order, ADR 058) is not written again;
+// else the export moves the card.
 function refreshPosition(
-  plan: LoadPlan, id: string, existing: CardState, card: EnrichedCard, movedByHand: ReadonlySet<string>, now: Date,
+  plan: LoadPlan, id: string, existing: CardState, card: EnrichedCard, reading: BoardReading, now: Date,
 ): void {
   if (!card.positioned) {
     plan.kept++;
     return;
   }
-  if (existing.columnId === card.columnId && existing.laneId === card.laneId) return;
-  if (movedByHand.has(id)) {
+  if (existing.columnId === card.columnId) return;
+  if (reading.movedByHand.has(id)) {
     plan.divergences.push({ title: card.title, fromColumn: existing.columnId, toColumn: card.columnId });
     return;
   }
-  pushMoved(plan, id, existing, card, now);
-}
-
-// The board id of a deck card in this exercise — or the id of the card
-// stored before ADR 035 (bare, no year) that it refreshes; that alias is
-// kept so the capacity snapshot can follow (withLegacyIds).
-function resolveId(card: EnrichedCard, year: number, legacy: Map<string, CardState>, plan: LoadPlan): string {
-  const stored = legacy.get(baseCardId(card));
-  if (stored === undefined) return cardId(card, year);
-  plan.aliases.set(cardId(card, year), stored.id);
-  return stored.id;
-}
-
-// The export advanced a card nobody placed by hand: the import moves it.
-function pushMoved(plan: LoadPlan, id: string, existing: CardState, card: EnrichedCard, now: Date): void {
+  const last = reading.lastPosition.get(id);
+  if (last !== undefined && last.actor === IMPORT_ACTOR && last.toColumn === card.columnId) return;
   plan.moved++;
   plan.events.push(movedEvent(
     id,
     { laneId: existing.laneId, columnId: existing.columnId },
-    { laneId: card.laneId, columnId: card.columnId },
+    { laneId: existing.laneId, columnId: card.columnId },
     IMPORT_ACTOR, now.toISOString(),
   ));
 }
@@ -213,35 +235,22 @@ function markAbsences(plan: LoadPlan, current: Map<string, CardState>, deckIds: 
   }
 }
 
-// A new card: its snapshot plus the "imported" event dated at its entry.
-function pushCreated(plan: LoadPlan, id: string, card: EnrichedCard, now: Date): void {
-  plan.created++;
-  plan.events.push({
-    ...lifecycleEvent("imported", id, IMPORT_ACTOR, entryTs(card, now), { laneId: card.laneId }),
-    toColumn: card.columnId,
-  });
-}
-
 function emptyPlan(year: number): LoadPlan {
   return {
     cards: [], events: [], created: 0, updated: 0, moved: 0, unlisted: 0, relisted: 0, kept: 0,
     divergences: [], chargesWithoutProfile: 0, factsKept: [], factsKeptCards: [], domainFallback: [],
-    exercise: year, aliases: new Map(),
+    exercise: year, aliases: new Map(), deletedSkipped: [], adopted: [], identityDoubts: [],
     domainConflicts: [], domainReplaced: 0, domainKept: 0, domainUndecided: 0, domainKeptByPrior: 0,
   };
 }
 
-/** Ids of cards a human (not this loader) positioned by hand. */
-function handMovedIds(events: CardEvent[]): Set<string> {
-  const ids = new Set<string>();
-  for (const event of events) {
-    if (event.type === "moved" && event.actor !== IMPORT_ACTOR) ids.add(event.cardId);
-  }
-  return ids;
-}
-
-// The aging clock starts at the project start date (author, 2026-08-01);
-// no start date falls back to the run instant.
+// The aging clock starts at the project start date (author, 2026-08-01) —
+// never after the load (ADR 058): a « Début » still to come would date
+// the event in the future, and the ts-ordered fold would replay it after
+// every later move. No start date falls back to the run instant.
 function entryTs(card: EnrichedCard, now: Date): string {
-  return card.createdAt === null ? now.toISOString() : `${card.createdAt}T00:00:00.000Z`;
+  const at = now.toISOString();
+  if (card.createdAt === null) return at;
+  const start = `${card.createdAt}T00:00:00.000Z`;
+  return start < at ? start : at;
 }

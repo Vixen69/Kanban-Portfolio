@@ -241,6 +241,10 @@ test("[pg] capacity snapshot: null until imported, replaced whole", { skip: SKIP
     await s.importCapacity({ exerciseYear: 2027, persons: [], assignments: [] });
     assert.deepEqual(await s.getCapacity(2027), { exerciseYear: 2027, persons: [], assignments: [] });
     assert.equal((await s.getCapacity(2026))?.assignments.length, 1, "one row per exercise year (ADR 035)");
+    await s.clearCapacity(2027);
+    await s.clearCapacity(2027);
+    assert.equal(await s.getCapacity(2027), null, "ADR 058: a cleared year reads null, clearing twice is a no-op");
+    assert.equal((await s.getCapacity(2026))?.assignments.length, 1, "the other years stand");
   }));
 
 test("[pg] listEvents honours the filter: after a sequence, of some cards, both (ADR 040)", { skip: SKIP }, () =>

@@ -51,6 +51,7 @@ function stubStorage(cards: Card[] = [testCard({ id: "S001" })]): BoardStorage {
     },
     async importCapacity(snapshot: CapacitySnapshot) { capacity = structuredClone(snapshot); },
     async getCapacity(year: number) { return capacity === null || capacity.exerciseYear !== year ? null : structuredClone(capacity); },
+    async clearCapacity(year: number) { if (capacity?.exerciseYear === year) capacity = null; },
     ...stubSnapshots(baseCards, () => seq),
     async close() {},
   };

@@ -58,4 +58,31 @@ for (const driver of DRIVERS) {
       }
     });
   });
+
+  // ADR 058: the restore of a snapshot taken while a year had no capacity removes it.
+  test(`[${driver.name}] clearCapacity: the year reads null, the others stand, it survives a reopen, twice is a no-op`, async () => {
+    await withTempDir(async (dir) => {
+      const first = driver.open(dir);
+      try {
+        await first.importCapacity({ exerciseYear: 2026, persons: [], assignments: [] });
+        await first.importCapacity({ exerciseYear: 2027, persons: [], assignments: [] });
+        await first.clearCapacity(2027);
+        await first.clearCapacity(2027);
+        await first.clearCapacity(2030);
+        assert.equal(await first.getCapacity(2027), null);
+        assert.deepEqual(await first.getCapacity(2026), { exerciseYear: 2026, persons: [], assignments: [] });
+      } finally {
+        await first.close();
+      }
+      const again = driver.open(dir);
+      try {
+        assert.equal(await again.getCapacity(2027), null, "the clearing is replayed on open");
+        assert.notEqual(await again.getCapacity(2026), null);
+        await again.importCapacity({ exerciseYear: 2027, persons: [], assignments: [] });
+        assert.notEqual(await again.getCapacity(2027), null, "a later import of the year stands again");
+      } finally {
+        await again.close();
+      }
+    });
+  });
 }

@@ -18,7 +18,7 @@ import type { CardEventInput } from "../../core/events.ts";
 import type { CapacitySnapshot, Card, CardEvent } from "../../core/types.ts";
 import { summarizeSnapshot, type BoardSnapshot } from "../../core/snapshot.ts";
 import { appendLines, buildCard, buildEvent, headerLine, loadState } from "./jsonl-format.ts";
-import type { CapacityRecord, CardsRecord, SnapshotRecord, State } from "./jsonl-format.ts";
+import type { CapacityClearedRecord, CapacityRecord, CardsRecord, SnapshotRecord, State } from "./jsonl-format.ts";
 
 function doImport(fd: number, state: State, cards: Card[], events: CardEventInput[]): void {
   const built = cards.map(buildCard);
@@ -64,6 +64,14 @@ function doImportCapacity(fd: number, state: State, snapshot: CapacitySnapshot):
   appendLines(fd, [line]);
   const stored = (JSON.parse(line) as CapacityRecord).snapshot;
   state.capacity.set(stored.exerciseYear, stored);
+}
+
+// Removes one year's capacity (ADR 058): one record, replayed on open.
+function doClearCapacity(fd: number, state: State, year: number): void {
+  if (!state.capacity.has(year)) return;
+  const record: CapacityClearedRecord = { kind: "capacity-cleared", year };
+  appendLines(fd, [JSON.stringify(record)]);
+  state.capacity.delete(year);
 }
 
 // A board snapshot (ADR 042): one record, kept for good.
@@ -136,11 +144,17 @@ function snapshotReaders(state: State, assertOpen: () => void): Pick<BoardStorag
 
 // The fact-table writes: the capacity of one year, a snapshot, the base
 // cards replaced (ADR 024/042).
-function writers(fd: number, state: State, assertOpen: () => void): Pick<BoardStorage, "importCapacity" | "saveSnapshot" | "restoreCards"> {
+function writers(
+  fd: number, state: State, assertOpen: () => void,
+): Pick<BoardStorage, "importCapacity" | "clearCapacity" | "saveSnapshot" | "restoreCards"> {
   return {
     async importCapacity(snapshot) {
       assertOpen();
       doImportCapacity(fd, state, snapshot);
+    },
+    async clearCapacity(year) {
+      assertOpen();
+      doClearCapacity(fd, state, year);
     },
     async saveSnapshot(snapshot) {
       assertOpen();

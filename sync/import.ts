@@ -19,7 +19,7 @@ import { validateBoardConfig } from "../core/config.ts";
 import { loadServerConfig } from "../middle/config.ts";
 import { createConfigStore } from "../middle/config-store.ts";
 import {
-  importChanges, keepStoredCapacity, planLoad, renderReport, runImportAudit, withLegacyIds,
+  importChanges, importConfig, keepStoredCapacity, planLoad, renderReport, runImportAudit, withLegacyIds,
 } from "../adapters/csv-import/index.ts";
 import type { AuditResult, CardAssembly } from "../adapters/csv-import/index.ts";
 import type { DomainDecision, ImportChanges } from "../core/import-types.ts";
@@ -80,11 +80,13 @@ function parseArgs(argv: string[]): Args | null {
   return folder === null || (charger && comparer) ? null : { folder, out, charger, comparer, exercice, domaines };
 }
 
-// The config the board actually serves: defaults + admin runtime override.
+// The config the board actually serves (defaults + admin runtime
+// override), matching export labels with the versioned model's vocabulary
+// — the same as the tool's import routes (ADR 056).
 function loadRuntimeBoardConfig(): BoardConfig {
   const cfg = loadServerConfig(process.env);
   const defaults = validateBoardConfig(JSON.parse(readFileSync(cfg.boardConfigPath, "utf8")));
-  return createConfigStore(cfg.dataDir, defaults).getRuntime();
+  return importConfig(createConfigStore(cfg.dataDir, defaults).getRuntime(), defaults);
 }
 
 // Every regular file of the folder, bytes untouched; recognition is the
@@ -232,7 +234,11 @@ try {
   );
   const noBoard = importChanges({ audit, config: boardConfig, year, plan: null, baseCards: [], events: [] });
   console.log(filesText(noBoard).join("\n"));
+  // ADR 056: two files of one kind, one name twice, a Coût-like file not recognized.
+  const blocked = audit.blockers.length === 0 ? null : `chargement refusé : ${audit.blockers.map((b) => b.message).join(" ")}`;
+  if (blocked !== null) console.error(blocked);
   if (args.charger) {
+    if (blocked !== null) process.exit(1);
     if (cards === null || cards.cards.length === 0 || year < boardConfig.exercise.year) {
       console.error(refusal(cards, year, boardConfig.exercise.year));
       process.exit(1);
@@ -244,7 +250,7 @@ try {
       const { persons, assignments } = capacity.snapshot;
       console.log(`capacité ${capacity.snapshot.exerciseYear} : ${persons.length} personne(s), ${assignments.length} affectation(s) enregistrées.`);
     }
-  } else if (args.comparer && cards !== null && cards.cards.length > 0) {
+  } else if (args.comparer && blocked === null && cards !== null && cards.cards.length > 0) {
     console.log(boardText(await compare(audit, cards.cards, boardConfig, year), boardConfig).join("\n"));
   } else if (args.comparer) {
     console.log("comparaison : aucune carte assemblée pour cet exercice — rien à comparer.");

@@ -8,9 +8,10 @@
 import { Pool, type PoolClient } from "pg";
 import type { BoardStorage, EventFilter } from "../../core/ports.ts";
 import type { CardEventInput } from "../../core/events.ts";
-import type { CapacitySnapshot, Card, CardEvent } from "../../core/types.ts";
+import type { Card, CardEvent } from "../../core/types.ts";
 import { summarizeSnapshot, type BoardSnapshot, type SnapshotSummary } from "../../core/snapshot.ts";
 import { logError } from "../log.ts";
+import { pgCapacity } from "./postgres-capacity.ts";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS cards (
@@ -56,7 +57,7 @@ const UPSERT_CARD =
   "INSERT INTO cards (id, data) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data";
 
 /** Runs `work` inside a transaction, committing on success, rolling back on throw. */
-type Tx = <T>(work: (client: PoolClient) => Promise<T>) => Promise<T>;
+export type Tx = <T>(work: (client: PoolClient) => Promise<T>) => Promise<T>;
 
 // JSON round-trip, exactly as jsonb storage would (drops undefined keys,
 // coerces NaN/Infinity to null), so the returned event mirrors the stored row.
@@ -111,28 +112,6 @@ async function pgListEvents(pool: Pool, filter: EventFilter = {}): Promise<CardE
   const clause = where.length === 0 ? "" : ` WHERE ${where.join(" AND ")}`;
   const res = await pool.query<{ data: CardEvent }>(`SELECT data FROM card_events${clause} ORDER BY seq ASC`, params);
   return res.rows.map((row) => (row as { data: CardEvent }).data);
-}
-
-// The capacity snapshot (ADR 024) lives in one row, replaced whole.
-// One row per exercise year (id = the year, ADR 035). Rows written before
-// ADR 035 sit under id 'current': read as a fallback for their own year.
-const UPSERT_CAPACITY =
-  "INSERT INTO capacity (id, data) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data";
-const LEGACY_CAPACITY_ID = "current";
-
-async function pgImportCapacity(runTx: Tx, snapshot: CapacitySnapshot): Promise<void> {
-  await runTx(async (client) => {
-    await client.query(UPSERT_CAPACITY, [String(snapshot.exerciseYear), snapshot]);
-  });
-}
-
-async function pgGetCapacity(pool: Pool, year: number): Promise<CapacitySnapshot | null> {
-  const res = await pool.query<{ data: CapacitySnapshot }>("SELECT data FROM capacity WHERE id = $1", [String(year)]);
-  const row = res.rows[0];
-  if (row !== undefined) return row.data;
-  const legacy = await pool.query<{ data: CapacitySnapshot }>("SELECT data FROM capacity WHERE id = $1", [LEGACY_CAPACITY_ID]);
-  const old = legacy.rows[0];
-  return old !== undefined && old.data.exerciseYear === year ? old.data : null;
 }
 
 // Board snapshots (ADR 042): one row each, the summary stored beside the
@@ -195,7 +174,7 @@ function makeTx(pool: Pool): Tx {
 }
 
 // The read side of the port: plain queries on the pool, no transaction.
-function pgReaders(pool: Pool, assertOpen: () => void): Pick<BoardStorage, "listEvents" | "listBaseCards" | "getCapacity"> {
+function pgReaders(pool: Pool, assertOpen: () => void): Pick<BoardStorage, "listEvents" | "listBaseCards"> {
   return {
     async listEvents(filter = {}) {
       assertOpen();
@@ -204,10 +183,6 @@ function pgReaders(pool: Pool, assertOpen: () => void): Pick<BoardStorage, "list
     async listBaseCards() {
       assertOpen();
       return pgListBaseCards(pool);
-    },
-    async getCapacity(year) {
-      assertOpen();
-      return pgGetCapacity(pool, year);
     },
   };
 }
@@ -261,11 +236,7 @@ function buildStorage(pool: Pool, runTx: Tx): BoardStorage {
     },
     ...pgReaders(pool, assertOpen),
     ...pgSnapshots(pool, runTx, assertOpen),
-    async importCapacity(snapshot) {
-
-      assertOpen();
-      await pgImportCapacity(runTx, snapshot);
-    },
+    ...pgCapacity(pool, runTx, assertOpen),
     async close() {
       if (!open) return;
       open = false;

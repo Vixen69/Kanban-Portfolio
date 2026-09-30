@@ -3,7 +3,10 @@
 // normalized name) suffixed with the year, so a re-import of the same year
 // lands on the same card and next year's instance is another card. Cards
 // stored before ADR 035 keep their bare id; the capacity snapshot, built
-// with instance ids, is remapped onto them (withLegacyIds). Pure.
+// with instance ids, is remapped onto them (withLegacyIds). ADR 058: a
+// name-derived id is cut at 48 characters, so two long names may share one
+// — those, and only those, take a short hash of their full name
+// (disambiguateIds): the ids that do not collide never change. Pure.
 
 import type { CapacitySnapshot } from "../../core/types.ts";
 import { instanceId } from "../../core/exercise.ts";
@@ -26,9 +29,51 @@ export function cardId(card: EnrichedCard, year: number): string {
  * Inputs: the enriched card. Outputs: the base id. Failure modes: none.
  */
 export function baseCardId(card: EnrichedCard): string {
+  if (card.baseId !== undefined) return card.baseId;
   if (card.codename !== null) return card.codename;
-  const slug = card.normalizedName.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48);
+  return nameId(card.normalizedName);
+}
+
+function nameId(normalizedName: string): string {
+  const slug = normalizedName.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48);
   return `IMP-${slug === "" ? "sans-nom" : slug}`;
+}
+
+// FNV-1a, 32 bits, as 8 hex digits: a short, stable fingerprint of a name.
+function fingerprint(text: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, "0");
+}
+
+/**
+ * Gives the deck cards whose name-derived ids collide (different full
+ * names cut to the same 48 characters, ADR 058) a distinct id each: the
+ * cut name followed by a short hash of the full name — the same whatever
+ * the row order. Cards with a code, and name ids that do not collide, are
+ * untouched. Two rows with the SAME name stay on one id (the load keeps
+ * the first and says so).
+ * Input: the deck (mutated: `baseId` set on the colliding cards).
+ * Output: the collisions settled, each with its cards' titles.
+ * Failure modes: none.
+ */
+export function disambiguateIds(deck: EnrichedCard[]): Array<{ id: string; titles: string[] }> {
+  const byId = new Map<string, EnrichedCard[]>();
+  for (const card of deck) {
+    if (card.codename !== null) continue;
+    const id = nameId(card.normalizedName);
+    byId.set(id, [...(byId.get(id) ?? []), card]);
+  }
+  const settled: Array<{ id: string; titles: string[] }> = [];
+  for (const [id, cards] of byId) {
+    if (new Set(cards.map((card) => card.normalizedName)).size < 2) continue;
+    for (const card of cards) card.baseId = `${id}-${fingerprint(card.normalizedName)}`;
+    settled.push({ id, titles: cards.map((card) => card.title).sort((a, b) => a.localeCompare(b, "fr")) });
+  }
+  return settled;
 }
 
 /**

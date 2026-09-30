@@ -47,6 +47,7 @@ export function stubStorage(cards: Card[] = [testCard({ id: "S001" })]): BoardSt
     async getCapacity() {
       return capacity === null ? null : structuredClone(capacity);
     },
+    async clearCapacity(year: number) { if (capacity?.exerciseYear === year) capacity = null; },
     async listBaseCards() {
       return baseCards.map((card) => ({ ...card }));
     },
@@ -111,6 +112,10 @@ export function stubConfigStore(
       override = config;
       runtime = { ...base, exercise: { ...base.exercise, year: runtime.exercise.year } };
       return runtime;
+    },
+    getDefaultsHash: () => "stub-model",
+    setAsideOverride(_config: BoardConfig, actor: string): BoardConfig {
+      return this.restoreOverride(null, actor);
     },
     getExerciseYear: () => runtime.exercise.year,
     setExerciseYear(year: number): BoardConfig {

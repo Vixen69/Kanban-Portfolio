@@ -1,11 +1,15 @@
-// Which file serves each contract when several match — recognition is by
-// header, never by name, so two exports can compete for one contract. The
-// generic rule is the cleanest header. The perimeter has its own rule since
-// the September audit elected a 1 357-row full export over the PMO's
-// 138-row Projets onglet: the PMO's Projets never carries the Responsable
-// columns, and the export that does is the ProjetsCdP source (author,
-// 2026-09-09). Pure functions over the classified candidates.
+// Which file serves each contract — recognition is by header, never by
+// name, so two exports can match one contract. Since ADR 056 (author,
+// 2026-09-30: « un seul mode d'import ») there is no election any more:
+// ONE file per kind, and two of a kind refuse the load, both named, so the
+// PMO removes one (the file name used to decide — « Cout (1).csv » beat
+// « Cout.csv », a dated name elected the OLDEST export). The Projets
+// contract keeps its structural pair (author, 2026-09-09): the PMO's
+// onglet never carries the Responsable columns — it is the perimeter —
+// and a full export that does lends the chefs de projet. Two of either
+// shape still refuse. Pure functions over the classified candidates.
 
+import type { ImportSource } from "../../core/import-types.ts";
 import type { HeaderMatch } from "./contract.ts";
 import type { CsvRow } from "./csv.ts";
 import type { InputFile } from "./identify.ts";
@@ -21,98 +25,136 @@ export interface Candidate {
   dataRows: CsvRow[];
 }
 
+/** Why the files received cannot be loaded (ADR 056), in plain French. */
+export interface ImportBlocker {
+  /** The expected source it concerns; null for the drop as a whole (same name twice). */
+  source: ImportSource | null;
+  /** The sentence the PMO reads (« Deux fichiers Coût : « A » et « B » — n'en déposer qu'un. »). */
+  message: string;
+  /** The received files named. */
+  files: string[];
+}
+
 /** The column that tells a ProjetsCdP export from the PMO's Projets onglet. */
 const RESPONSABLE = "Responsable 1";
-/** The column the consolidated onglet carries and a raw export does not. */
-const ORGA = "Domaine (Orga)";
+
+/** Each contract's source and its short name in a refusal. */
+const KINDS: Readonly<Record<string, { source: ImportSource; label: string }>> = {
+  couts: { source: "couts", label: "Coût" },
+  param: { source: "param", label: "PARAM" },
+  sp: { source: "sp", label: "SP" },
+  projets_jalons: { source: "jalons", label: "ProjetsJalons" },
+  projets: { source: "projets", label: "Projets" },
+  projets_cdp: { source: "cdp", label: "ProjetsCdP" },
+  ress_profils: { source: "profils", label: "Ress.Profils" },
+  ressources_pdc: { source: "pdc", label: "Ressources_PdC" },
+};
+
+const COUNT_WORDS = ["", "Un", "Deux", "Trois", "Quatre", "Cinq"];
 
 /**
- * Elects one file for a contract: the cleanest header wins (fewest
- * deviations, then first name — the candidates arrive in name order); the
- * others are flagged douteux, never silently parsed.
- * Inputs: the candidates of one contract, the report.
- * Output: the elected candidate, null when there is none.
+ * The names of several files in the PMO's words (« « A » et « B » »,
+ * « « A », « B » et « C » »), in code-unit order so the sentence never
+ * depends on the drop order.
+ * Input: the names. Output: the text. Failure: none.
+ */
+export function namesLabel(names: readonly string[]): string {
+  const quoted = [...names].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)).map((n) => `« ${n} »`);
+  const last = quoted.pop();
+  return quoted.length === 0 ? (last ?? "") : `${quoted.join(", ")} et ${last ?? ""}`;
+}
+
+/**
+ * The refusal for several files of one kind.
+ * Inputs: the kind's short name, the files' names. Output: the blocker
+ * sentence (« Deux fichiers Coût : « A » et « B » — n'en déposer qu'un. »).
  * Failure modes: none.
  */
-export function elect(candidates: Candidate[], report: ImportReport): Candidate | null {
-  const best = candidates.reduce<Candidate | null>(
-    (acc, c) => (acc === null || c.match.deviations.length < acc.match.deviations.length ? c : acc),
-    null,
-  );
-  if (best === null) return null;
-  for (const c of candidates) {
-    if (c === best) continue;
-    doubt(
-      report, c.file.name,
-      `correspond aussi au contrat ${best.match.contract.displayName} ` +
-        `(${c.match.deviations.length} écart(s) d'en-têtes, contre ` +
-        `${best.match.deviations.length} pour « ${best.file.name} ») — non retenu`,
-    );
-  }
-  return best;
+export function competingMessage(label: string, names: readonly string[]): string {
+  const count = COUNT_WORDS[names.length] ?? String(names.length);
+  return `${count} fichiers ${label} : ${namesLabel(names)} — n'en déposer qu'un.`;
 }
 
-interface PerimeterRank {
-  responsable: number;
-  orga: number;
-  deviations: number;
-  name: string;
-}
-
-// Lowest wins: no Responsable columns first (the PMO's Projets onglet never
-// carries them), then the consolidated Orga columns, then the fewest header
-// deviations, then the name.
-function perimeterRank(c: Candidate): PerimeterRank {
-  return {
-    responsable: c.match.columnIndex.has(RESPONSABLE) ? 1 : 0,
-    orga: c.match.columnIndex.has(ORGA) ? 0 : 1,
-    deviations: c.match.deviations.length,
-    name: c.file.name,
-  };
-}
-
-function compareRanks(a: PerimeterRank, b: PerimeterRank): number {
-  return (a.responsable - b.responsable) || (a.orga - b.orga) || (a.deviations - b.deviations) ||
-    (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+function refuse(blockers: ImportBlocker[], source: ImportSource | null, label: string, candidates: readonly Candidate[]): void {
+  const files = candidates.map((c) => c.file.name);
+  blockers.push({ source, message: competingMessage(label, files), files });
 }
 
 /**
- * Elects the perimeter among the Projets-shaped files (author, 2026-09-09):
- * the one WITHOUT « Responsable 1 » — the PMO's Projets onglet never
- * carries the Responsable columns; a full export that does is the
- * ProjetsCdP source, not the perimeter (September: 1 357 rows against
- * 138). Ties: the consolidated Orga columns, then the cleanest header,
- * then the first name. Every other candidate is flagged douteux with the
- * reason and the elected file's name.
- * Inputs: the Projets candidates, the report.
- * Output: the perimeter candidate, null when there is none.
+ * The one file of a contract: none -> null; one -> it; several -> null and
+ * a blocker naming them all (ADR 056: never an election by name).
+ * Inputs: the candidates of one contract, the blockers to feed.
+ * Output: the candidate to read, null when there is none or several.
  * Failure modes: none.
  */
-export function electPerimeter(candidates: Candidate[], report: ImportReport): Candidate | null {
-  const ranked = [...candidates].sort((a, b) => compareRanks(perimeterRank(a), perimeterRank(b)));
-  const best = ranked[0];
-  if (best === undefined) return null;
-  for (const c of ranked.slice(1)) {
-    const why = c.match.columnIndex.has(RESPONSABLE) && !best.match.columnIndex.has(RESPONSABLE)
-      ? `il porte « ${RESPONSABLE} » (export ProjetsCdP, chefs de projet)`
-      : `${c.match.deviations.length} écart(s) d'en-têtes, contre ${best.match.deviations.length}`;
-    doubt(report, c.file.name,
-      `correspond aussi au contrat Projets — non retenu comme périmètre : ${why} ; périmètre = « ${best.file.name} »`);
-  }
-  return best;
+export function elect(candidates: readonly Candidate[], blockers: ImportBlocker[]): Candidate | null {
+  const first = candidates[0];
+  if (first === undefined) return null;
+  if (candidates.length === 1) return first;
+  const kind = KINDS[first.match.contract.id];
+  refuse(blockers, kind?.source ?? null, kind?.label ?? first.match.contract.displayName, candidates);
+  return null;
+}
+
+/** The Projets-shaped files, by role (author, 2026-09-09). */
+export interface ProjetsElection {
+  /** The perimeter candidate: the onglet without Responsable columns, else a lone full export. */
+  perimeter: Candidate | null;
+  /** The full export carrying « Responsable 1 » when the onglet is the perimeter: it lends the chefs de projet. */
+  lender: Candidate | null;
 }
 
 /**
- * A second Projets-shaped file carrying the Responsable columns feeds the
- * chefs de projet when no dedicated ProjetsCdP file came: the elected
- * perimeter stays, the other one only lends its owners (signaled).
- * Inputs: the Projets candidates, the elected perimeter, the report.
+ * Splits the Projets-shaped files by role: the one WITHOUT « Responsable
+ * 1 » is the perimeter (the PMO's onglet never carries the Responsable
+ * columns — September: a 1 357-row full export against 138 rows); a full
+ * export that does lends the chefs de projet, and is the perimeter only
+ * when it came alone. Two files of one shape refuse the load (ADR 056).
+ * Inputs: the Projets candidates, the blockers, the report.
+ * Output: the perimeter candidate and the lender. Failure modes: none.
+ */
+export function electProjets(candidates: readonly Candidate[], blockers: ImportBlocker[], report: ImportReport): ProjetsElection {
+  const onglets = candidates.filter((c) => !c.match.columnIndex.has(RESPONSABLE));
+  const exports = candidates.filter((c) => c.match.columnIndex.has(RESPONSABLE));
+  if (onglets.length > 1) refuse(blockers, "projets", "Projets (onglet sans « Responsable 1 »)", onglets);
+  if (exports.length > 1) refuse(blockers, "cdp", "Projets avec « Responsable 1 »", exports);
+  const onglet = onglets.length === 1 ? (onglets[0] ?? null) : null;
+  const full = exports.length === 1 ? (exports[0] ?? null) : null;
+  if (onglets.length > 1) return { perimeter: null, lender: full };
+  if (onglet === null) return { perimeter: full, lender: null };
+  if (full !== null) {
+    doubt(report, full.file.name,
+      `correspond aussi au contrat Projets — non retenu comme périmètre : il porte « ${RESPONSABLE} » ` +
+        `(export ProjetsCdP, chefs de projet) ; périmètre = « ${onglet.file.name} »`);
+  }
+  return { perimeter: onglet, lender: full };
+}
+
+/**
+ * The full export lends its chefs de projet when no dedicated ProjetsCdP
+ * file came: the perimeter stays the onglet (signaled).
+ * Inputs: the lender (electProjets), the report.
  * Output: the candidate to read as ProjetsCdP, null when there is none.
  * Failure modes: none.
  */
-export function secondProjets(candidates: Candidate[], elected: Candidate | null, report: ImportReport): Candidate | null {
-  const other = candidates.find((c) => c !== elected && c.match.columnIndex.has(RESPONSABLE));
-  if (other === undefined) return null;
-  warn(report, "second fichier Projets — lu comme ProjetsCdP (chefs de projet), non retenu comme périmètre", other.file.name);
-  return other;
+export function secondProjets(lender: Candidate | null, report: ImportReport): Candidate | null {
+  if (lender === null) return null;
+  warn(report, "second fichier Projets — lu comme ProjetsCdP (chefs de projet), non retenu comme périmètre", lender.file.name);
+  return lender;
+}
+
+/**
+ * The same file name received twice (from two folders — the path is
+ * stripped): which one is fresher cannot be told, so the load is refused.
+ * Input: the received files. Output: one blocker per repeated name, in
+ * name order. Failure modes: none.
+ */
+export function sameNameBlockers(files: readonly InputFile[]): ImportBlocker[] {
+  const counts = new Map<string, number>();
+  for (const file of files) counts.set(file.name, (counts.get(file.name) ?? 0) + 1);
+  return [...counts].filter(([, n]) => n > 1).map(([name]) => name).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+    .map((name) => ({
+      source: null, files: [name],
+      message: `${COUNT_WORDS[counts.get(name) ?? 0] ?? counts.get(name)} fichiers portent le même nom « ${name} » — n'en déposer qu'un.`,
+    }));
 }

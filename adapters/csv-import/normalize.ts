@@ -78,6 +78,8 @@ export function damageTolerantPattern(label: string): RegExp {
 export interface TolerantHit {
   id: string;
   repaired: boolean;
+  /** Set when only a name renamed in ⚙ › Catégories matched (vocabulary.ts, ADR 056). */
+  renamed?: true;
 }
 
 /**

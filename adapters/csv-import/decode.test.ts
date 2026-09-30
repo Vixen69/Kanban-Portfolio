@@ -70,3 +70,24 @@ test("Windows-1252 is mapped by hand: the euro byte and the typographic quotes s
   assert.equal(decodeWindows1252(Uint8Array.from([0x41, 0xa0, 0xe9, 0xff])), "A\u00a0\u00e9\u00ff", "ISO-8859-1 range untouched");
   assert.equal(decodeWindows1252(new Uint8Array(20000)).length, 20000, "chunking keeps every byte");
 });
+
+test("ADR 056: a UTF-8 file with a stray byte stays UTF-8 — the byte replaced and named as douteux", () => {
+  const utf8 = Buffer.from("Année;Nom\n".concat("2026;Été\n".repeat(30)), "utf8");
+  const out = decodeCsvBytes(Buffer.concat([utf8, Buffer.from([0x92]), Buffer.from("\n", "utf8")]));
+  assert.equal(out.encoding, "utf-8");
+  assert.ok(out.text.startsWith("Année;Nom\n2026;Été"));
+  assert.ok(out.text.includes(String.fromCharCode(0xfffd)));
+  assert.deepEqual(out.warnings, []);
+  assert.equal(out.doubts.length, 1);
+  assert.match(out.doubts[0] ?? "", /^1 octet\(s\) invalide\(s\) dans un fichier UTF-8 \(61 caractère\(s\) accentué\(s\) valides\) — .* ligne\(s\) 32 :/);
+});
+
+test("ADR 056: the threshold — past one stray byte per 20 accented characters, the file is Windows-1252", () => {
+  const accents = (n: number): Buffer => Buffer.from("é".repeat(n), "utf8");
+  const stray = (n: number): Buffer => Buffer.from(Array.from({ length: n }, () => 0xe9));
+  assert.equal(decodeCsvBytes(Buffer.concat([accents(40), stray(2)])).encoding, "utf-8", "2 for 40: within 5 %");
+  assert.equal(decodeCsvBytes(Buffer.concat([accents(40), stray(3)])).encoding, "windows-1252", "3 for 40: beyond");
+  assert.equal(decodeCsvBytes(Buffer.from("Déjà été ; Réalisé ; Prévu", "latin1")).encoding, "windows-1252", "a real 1252 file");
+  const accidental = Buffer.concat([Buffer.from([0xc3, 0xa9]), Buffer.from("Déjà été ; Réalisé", "latin1")]);
+  assert.equal(decodeCsvBytes(accidental).encoding, "windows-1252", "one accidental « Ã© » does not make it UTF-8");
+});

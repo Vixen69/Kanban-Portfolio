@@ -13,6 +13,7 @@
 import type { BoardConfig } from "../../core/types.ts";
 import { normalizeLabel } from "./normalize.ts";
 import { keywordPattern } from "./domains.ts";
+import { matchLabels } from "./vocabulary.ts";
 
 /** A resolved portfolio: the domain, its sub-domain when named, how. */
 export interface PortfolioHit {
@@ -23,6 +24,8 @@ export interface PortfolioHit {
   scope: "last" | "path" | "name";
   /** The config label that matched (domain name / short / alias, or a sub-domain name). */
   label: string;
+  /** Set when only a domain name renamed in ⚙ › Catégories matched (ADR 056). */
+  renamed?: true;
 }
 
 interface Rule {
@@ -47,26 +50,46 @@ function matchIn(rules: readonly Rule[], key: string, scope: "last" | "path"): P
   return { domainId: first.domainId, subDomainId, via: first.via, scope, label: first.label };
 }
 
-/**
- * Compiles the config's domain vocabulary (name, short, aliases) and
- * sub-domain names into whole-word rules, then resolves portfolios.
- * Inputs: the board config. Output: a resolver — portfolio path -> hit or
- * null (unknown or ambiguous). Failure modes: none.
- */
-export function createPortfolioResolver(config: BoardConfig): (portfolio: string) => PortfolioHit | null {
+// The domain rules: the versioned vocabulary (name, short, aliases,
+// sub-domain names), and apart the names renamed in ⚙ (ADR 056).
+function compileRules(config: BoardConfig): { rules: Rule[]; renamed: Rule[] } {
   const rules: Rule[] = [];
+  const renamed: Rule[] = [];
   for (const domain of config.domains) {
-    for (const label of [domain.name, domain.short, ...(domain.aliases ?? [])]) {
+    const labels = matchLabels(domain);
+    for (const label of [...labels.versioned, ...(domain.aliases ?? [])]) {
       rules.push({ re: keywordPattern(label), domainId: domain.id, subDomainId: null, via: "domain", label });
     }
     for (const sub of domain.subDomains ?? []) {
       rules.push({ re: keywordPattern(sub.name), domainId: domain.id, subDomainId: sub.id, via: "subdomain", label: sub.name });
     }
+    for (const label of labels.renamed) renamed.push({ re: keywordPattern(label), domainId: domain.id, subDomainId: null, via: "domain", label });
   }
+  return { rules, renamed };
+}
+
+// The last segment first, then the whole path (fallback).
+function resolveWith(rules: readonly Rule[], portfolio: string): PortfolioHit | null {
+  const segments = portfolio.split(".").map((s) => normalizeLabel(s)).filter((s) => s !== "");
+  const last = segments[segments.length - 1] ?? "";
+  return matchIn(rules, last, "last") ?? matchIn(rules, normalizeLabel(portfolio), "path");
+}
+
+/**
+ * Compiles the config's domain vocabulary (name, short, aliases — the
+ * versioned model's under an import config) and sub-domain names into
+ * whole-word rules, then resolves portfolios; a name renamed in ⚙ is
+ * tried last, its hit marked `renamed` (ADR 056).
+ * Inputs: the board config. Output: a resolver — portfolio path -> hit or
+ * null (unknown or ambiguous). Failure modes: none.
+ */
+export function createPortfolioResolver(config: BoardConfig): (portfolio: string) => PortfolioHit | null {
+  const { rules, renamed } = compileRules(config);
   return (portfolio) => {
-    const segments = portfolio.split(".").map((s) => normalizeLabel(s)).filter((s) => s !== "");
-    const last = segments[segments.length - 1] ?? "";
-    return matchIn(rules, last, "last") ?? matchIn(rules, normalizeLabel(portfolio), "path");
+    const hit = resolveWith(rules, portfolio);
+    if (hit !== null || renamed.length === 0) return hit;
+    const late = resolveWith(renamed, portfolio);
+    return late === null ? null : { ...late, renamed: true };
   };
 }
 
@@ -100,7 +123,8 @@ export function createNameMarkerResolver(config: BoardConfig): (name: string) =>
  */
 export function ruleLabel(hit: PortfolioHit): string {
   if (hit.scope === "name") return `marqueur « [${hit.label.toLowerCase()}] » dans le nom`;
-  return `${hit.scope === "last" ? "dernier segment" : "chemin entier (repli)"} · « ${hit.label} »`;
+  const renamed = hit.renamed === true ? " (nom renommé dans ⚙, absent du modèle versionné)" : "";
+  return `${hit.scope === "last" ? "dernier segment" : "chemin entier (repli)"} · « ${hit.label} »${renamed}`;
 }
 
 /**

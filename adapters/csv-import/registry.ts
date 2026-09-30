@@ -13,7 +13,8 @@ import type { FileContract } from "./contract.ts";
 /** The COUT PREV export (« Coût », ADR 030): the raw Sciforma cost
  * forecast, one row per project × cost centre × year — THE perimeter when
  * present. Only the identity, year, type, state, portfolio and active flag
- * are read; the four ME cells are tested for a non-zero figure (a project
+ * are read (and « Date d'export », the tie-break of rows that disagree,
+ * ADR 056); the four ME cells are tested for a non-zero figure (a project
  * with none is cancelled in fact) but never read into a card; every other
  * amount and « Projet.Responsable 1 » is declared ignored (author,
  * 2026-09-11: not to be read). Registered first: its dotted labels match
@@ -27,11 +28,13 @@ export const COUTS_CONTRACT: FileContract = {
     "Charge finale ME (Res) (J)", "Charge réelle ME (Res) (J)", "Coût final ME (Res ouTrans)", "Coût réel ME (Res ouTrans)",
     // ADR 034: the « Charge » rows' days by cost centre — the macro's appel de charges, cross-checked with the PdC.
     "Type de centre de coût", "Centre de coût",
+    // ADR 056: breaks a tie between rows of one Id that disagree (the most recent export wins).
+    "Date d'export",
   ],
   ignored: [
     "Fichier", "Projet. Entité payeur", "Projet.Entité payeur mutualisée",
     "Projet.Nature du projet", "Projet.Etat du budget", "Projet.Criticité", "Projet.Priorité", "Projet.Score criblage",
-    "Projet.Responsable 1", "Portefeuille.Responsable 1", "Date d'export",
+    "Projet.Responsable 1", "Portefeuille.Responsable 1",
   ],
 };
 

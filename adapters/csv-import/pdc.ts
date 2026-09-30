@@ -9,6 +9,8 @@
 // assignments). Only NOMINATIVE resources feed the persons; generic
 // assignments, « zz… » codes and « PE22… » roles are counted and kept on
 // the project as demand without a person (pdc-lines.ts). IMPORT-MAPPING.md.
+// ADR 058: the day counts are summed raw and rounded once, at the end of
+// the read (day-sums.ts) — the same whatever the rows' order.
 
 import type { BoardConfig } from "../../core/types.ts";
 import { createTolerantLookup, normalizeLabel } from "./normalize.ts";
@@ -21,7 +23,10 @@ import type { CsvRow } from "./csv.ts";
 import type { HeaderMatch } from "./contract.ts";
 import { discard, doubt, warn } from "./report.ts";
 import type { ImportReport, RowRef } from "./report.ts";
-import { countReading, excludedLabel, lineKind, matriculeOf, personFor, recordExcluded, resourceKind, setPersonLine } from "./pdc-lines.ts";
+import { addDays } from "./day-sums.ts";
+import {
+  countReading, excludedLabel, lineKind, matriculeOf, personFor, recordExcluded, resourceKind, roundPdcSums, setPersonLine,
+} from "./pdc-lines.ts";
 import type { PdcExcluded, PdcGeneric, PdcPerson, PdcReading, ResourceFacts } from "./pdc-lines.ts";
 
 export type { PdcExcluded, PdcGeneric, PdcPerson, PdcReading } from "./pdc-lines.ts";
@@ -175,8 +180,8 @@ function readPdcRow(ctx: PdcContext, row: CsvRow): void {
   if (done > jh) tallyInto(ctx.tallies, `réel ${ctx.year} > prévisionnel ${ctx.year} (cas réel, conservé)`, row.line);
   const project = projectFor(ctx, ref, idCell, nameCell || idCell);
   addCharge(project, facts.profileId, jh, done);
-  ctx.totals.jh = round2(ctx.totals.jh + jh);
-  ctx.totals.done = round2(ctx.totals.done + done);
+  ctx.totals.jh = addDays(ctx.totals.jh, jh);
+  ctx.totals.done = addDays(ctx.totals.done, done);
   if (kind === "nominative") addNominative(ctx, project, matricule, resource, facts, jh, done);
   else {
     recordExcluded(ctx.excluded, ctx.generic, project, kind, facts, jh, done);
@@ -207,12 +212,6 @@ function resolveMetier(ctx: PdcContext, row: CsvRow): string | null {
   return null;
 }
 
-// Day counts, two decimals: repeated float additions otherwise produce
-// « 36.099999999994 » — noise that would reach the board and its editors.
-function round2(value: number): number {
-  return Math.round(value * 100) / 100;
-}
-
 // The project of a row, keyed by its code — names repeat across projects
 // (author, 2026-09-10); a row without code falls back on the name.
 function projectFor(ctx: PdcContext, ref: RowRef, idCell: string, nameCell: string): PdcProject {
@@ -233,8 +232,8 @@ function projectFor(ctx: PdcContext, ref: RowRef, idCell: string, nameCell: stri
 function addCharge(project: PdcProject, profileId: string | null, jh: number, done: number): void {
   const key = profileId ?? "";
   const bucket = project.charges.get(key) ?? { jh: 0, done: 0 };
-  bucket.jh = round2(bucket.jh + jh);
-  bucket.done = round2(bucket.done + done);
+  bucket.jh = addDays(bucket.jh, jh);
+  bucket.done = addDays(bucket.done, done);
   project.charges.set(key, bucket);
 }
 
@@ -244,16 +243,17 @@ function addNominative(
 ): void {
   const person = personFor(ctx.persons, matricule, resource, facts);
   const load = project.persons.get(matricule) ?? { name: person.name, jh: 0, done: 0 };
-  load.jh = round2(load.jh + jh);
-  load.done = round2(load.done + done);
+  load.jh = addDays(load.jh, jh);
+  load.done = addDays(load.done, done);
   project.persons.set(matricule, load);
-  person.jh = round2(person.jh + jh);
-  person.done = round2(person.done + done);
+  person.jh = addDays(person.jh, jh);
+  person.done = addDays(person.done, done);
 }
 
 // Aggregated signalements, unknown-métier questions, prefix survey, the
 // zero-charge projects, and the cross-checks of the persons' own lines.
 function finalize(ctx: PdcContext): void {
+  roundPdcSums(ctx); // every sum at two decimals, once (ADR 058)
   for (const [message, t] of ctx.tallies) warn(ctx.report, `${message} : ${tallyLabel(t)}`, ctx.fileName);
   for (const [label, t] of ctx.unknownMetiers) {
     doubt(ctx.report, ctx.fileName,

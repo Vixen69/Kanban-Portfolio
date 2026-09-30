@@ -5,7 +5,10 @@
 // milestones (ADR 043) — SP the 2026 costs. Join
 // keys, in order of trust: Id, then full name, then the PE code embedded
 // in the name (SP only). Every miss is counted, never silent. The report's
-// « pris » lines ARE the cards.
+// « pris » lines ARE the cards. ADR 058: the name / code fallback is taken
+// only when the card found no row by its Id, the key is carried by one
+// row only, and that row carries no OTHER Id — a card never borrows
+// another project's milestones or k€.
 
 import type { BoardConfig } from "../../core/types.ts";
 import { resolveFlowAnchors } from "../../core/flow.ts";
@@ -16,7 +19,8 @@ import type { ProjetEntry, ProjetsTable } from "./projets.ts";
 import type { JalonEntry, JalonsTable, Stage } from "./jalons.ts";
 import type { SpEntry, SpTable } from "./sp.ts";
 import type { CardCharge } from "./charges.ts";
-import { take, warn } from "./report.ts";
+import { doubt, take, warn } from "./report.ts";
+import { disambiguateIds } from "./card-identity.ts";
 import type { ImportReport, RowRef } from "./report.ts";
 import { createNameMarkerResolver, ruleLabel } from "./portfolio.ts";
 import type { PortfolioHit } from "./portfolio.ts";
@@ -54,6 +58,8 @@ export interface EnrichedCard {
    * assignments (ADR 024); null until then or when uncovered. */
   pdcKey: string | null;
   ref: RowRef;
+  /** The year-less board id when two name-derived ids collided (card-identity.ts, ADR 058); absent otherwise. */
+  baseId?: string;
 }
 
 /** Join and coverage counters for the assembly read-out. */
@@ -122,6 +128,10 @@ export function assembleCards(
   ctx.stats.jalonsOutside = (jalons?.entries.length ?? 0) - ctx.consumedJalons.size;
   ctx.stats.spOutside = (sp?.entries.length ?? 0) - ctx.consumedSp.size;
   for (const [message, t] of ctx.tallies) warn(report, `${message} : ${tallyLabel(t)}`, "assemblage");
+  for (const clash of disambiguateIds(cards)) {
+    doubt(report, "assemblage",
+      `identité dérivée du nom « ${clash.id} » partagée par ${clash.titles.map((t) => `« ${t} »`).join(", ")} — un suffixe tiré du nom complet les distingue (ADR 058)`);
+  }
   return { cards, stats: ctx.stats };
 }
 
@@ -219,11 +229,19 @@ function buildCard(ctx: JoinContext, entry: ProjetEntry): EnrichedCard {
   return card;
 }
 
+// A fallback hit (by name, by code) that carries another Id than the
+// card's is another project (ADR 058): refused, and said.
+function sameProject<T extends { id: string | null }>(ctx: JoinContext, entry: ProjetEntry, hit: T | undefined, what: string): T | undefined {
+  if (hit === undefined || entry.id === "" || hit.id === null || hit.id === "" || hit.id === entry.id) return hit;
+  tallyInto(ctx.tallies, `${what} : le nom désigne un autre Id (${hit.id}) — pas de jointure, rien d'emprunté`, entry.ref.line);
+  return undefined;
+}
+
 // ProjetsJalons by Id, then by name; a hit counts the stage it implies.
 function joinJalons(ctx: JoinContext, entry: ProjetEntry): JalonEntry | null {
   if (ctx.jalons === null) return null;
   const hit = (entry.id === "" ? undefined : ctx.jalons.byId.get(entry.id))
-    ?? ctx.jalons.byName.get(entry.normalizedName);
+    ?? sameProject(ctx, entry, ctx.jalons.byName.get(entry.normalizedName), "ProjetsJalons");
   if (hit === undefined) {
     ctx.stats.withoutJalons++;
     const where = isFinished(ctx, entry) ? "placée par l'état du projet" : "colonne d'entrée";
@@ -241,18 +259,23 @@ function joinJalons(ctx: JoinContext, entry: ProjetEntry): JalonEntry | null {
 function joinSp(ctx: JoinContext, entry: ProjetEntry): SpEntry | null {
   if (ctx.sp === null) return null;
   const byId = entry.id === "" ? undefined : ctx.sp.byId.get(entry.id);
-  const byName = ctx.sp.byName.get(entry.normalizedName);
-  const byCode = entry.codename === null ? undefined : ctx.sp.byCode.get(entry.codename);
+  const byName = byId === undefined ? sameProject(ctx, entry, ctx.sp.byName.get(entry.normalizedName), "SP") : undefined;
+  const byCode = byId === undefined && byName === undefined && entry.codename !== null
+    ? sameProject(ctx, entry, ctx.sp.byCode.get(entry.codename), "SP") : undefined;
   const hit = byId ?? byName ?? byCode;
   if (hit === undefined) {
     ctx.stats.withoutSp++;
-    tallyInto(ctx.tallies, "carte sans correspondance SP — coûts de l'exercice inconnus", entry.ref.line);
+    const ambiguous = ctx.sp.ambiguous.has(entry.normalizedName) || (entry.codename !== null && ctx.sp.ambiguous.has(entry.codename));
+    tallyInto(ctx.tallies, ambiguous
+      ? "carte sans ligne SP à son Id, et son nom (ou code) est porté par plusieurs Id — aucun coût emprunté"
+      : "carte sans correspondance SP — coûts de l'exercice inconnus", entry.ref.line);
     return null;
   }
   if (byId !== undefined) ctx.stats.spById++;
   else if (byName !== undefined) ctx.stats.spByName++;
   else ctx.stats.spByCode++;
-  if (byId !== undefined && byName !== undefined && byId !== byName) {
+  const namesake = ctx.sp.byName.get(entry.normalizedName);
+  if (byId !== undefined && namesake !== undefined && byId !== namesake) {
     tallyInto(ctx.tallies, "SP : l'Id et le nom désignent deux sujets différents — Id retenu", entry.ref.line);
   }
   ctx.consumedSp.add(hit);

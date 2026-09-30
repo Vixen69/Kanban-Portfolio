@@ -6,26 +6,25 @@
 // by default, or a year in preparation; it never touches another year's
 // cards. The audit's domain conflicts are decided one by one before the
 // load (ADR 036, ./ImportConflicts.tsx). No authentication until RP3.
+// The report reads as the PMO reads an import (ADR 055,
+// ./ImportOutcome.tsx): what the load changes, which files it took, who
+// enters or leaves and why; « Voir ce qui a changé depuis le dernier
+// import » compares the board with the instantané of the last load.
 
 import { useState } from "react";
 import type { BoardConfig } from "../../core/types.ts";
-import type { ImportAuditResult, ImportFilePayload, ImportLoadResult } from "../../core/import-types.ts";
+import type { ImportFilePayload } from "../../core/import-types.ts";
 
 import { ApiError, postImportAudit, postImportLoad } from "../api.ts";
-import { ImportConflicts } from "./ImportConflicts.tsx";
 import type { Decisions } from "./ImportConflicts.tsx";
+import { ImportOutcome, type ImportPhase as Phase } from "./ImportOutcome.tsx";
+import { ImportSince } from "./ImportSince.tsx";
 
 interface Picked {
   name: string;
   size: number;
   base64: string;
 }
-
-type Phase =
-  | { kind: "idle" }
-  | { kind: "busy"; what: "audit" | "load"; previous: ImportAuditResult | null }
-  | { kind: "audited"; result: ImportAuditResult }
-  | { kind: "loaded"; result: ImportLoadResult };
 
 const CHUNK = 0x8000;
 /** Years offered by the selector: the current exercise and the next two. */
@@ -124,94 +123,6 @@ function ImportForm({ files, onPick, busy, onAudit, exercise, currentYear, onYea
   );
 }
 
-function Summary({ result }: { result: ImportAuditResult }) {
-  const s = result.summary;
-  return (
-    <div className="import-summary">
-      Exercice <b>{result.exercise}</b> · <b>{s.received}</b> fichier(s) reçu(s), <b>{s.recognized}</b> reconnu(s) · pris {s.taken} ·
-      écartés {s.discarded} · douteux {s.doubtful} · signalements {s.warnings}
-      {s.missing.length > 0 && <> · manquants : {s.missing.join(", ")}</>}
-      {" · "}{result.loadable ? "périmètre assemblé — chargement possible" : "périmètre non assemblé — chargement impossible"}
-    </div>
-  );
-}
-
-// ADR 054: the facts the files leave blank on cards already on the board —
-// the stored value stands. Said before the load (audit) and after it.
-function KeptFacts({ result }: { result: ImportAuditResult }) {
-  if (result.factsKept.length === 0) return null;
-  const verb = "load" in result ? "ont été gardées" : "seront gardées";
-  return (
-    <div className="import-summary">
-      Absentes des fichiers, les valeurs déjà sur le tableau {verb} (jamais effacées) :{" "}
-      {result.factsKept.map((f) => `${f.label} (${f.cards} carte${f.cards > 1 ? "s" : ""})`).join(" · ")}
-    </div>
-  );
-}
-
-function LoadSummary({ result }: { result: ImportLoadResult }) {
-  const l = result.load;
-  return (
-    <div className="import-summary ok">
-      Chargé dans l’exercice {result.exercise} : {l.created} créée(s) · {l.updated} mise(s) à jour · {l.moved} déplacée(s) ·
-      {" "}{l.unlisted} absente(s) marquée(s) · {l.relisted} de retour · {l.divergences} divergence(s) conservée(s) ·
-      {" "}{l.kept} position(s) conservée(s) (sans jalon) · domaines : {l.domainReplaced} remplacé(s), {l.domainKept} gardé(s)
-      {l.domainKeptByPrior > 0 && <>, {l.domainKeptByPrior} déjà tranché(s)</>}
-      {l.capacity !== null && <> · capacité : {l.capacity.persons} personne(s), {l.capacity.assignments} affectation(s)</>}
-    </div>
-  );
-}
-
-function LoadControls({ result, pending, acknowledged, setAcknowledged, busy, onLoad }: {
-  result: ImportAuditResult; pending: number; acknowledged: boolean; setAcknowledged: (v: boolean) => void;
-  busy: boolean; onLoad: () => void;
-}) {
-  if (!result.loadable) return null;
-  return (
-    <div className="import-actions">
-      <label className="dec-opt">
-        <input type="checkbox" checked={acknowledged} onChange={(e) => setAcknowledged(e.target.checked)} />
-        J’ai lu le rapport
-      </label>
-      <button className="btn" disabled={busy || !acknowledged || pending > 0} onClick={onLoad}>Charger dans le tableau {result.exercise}</button>
-      <span className="m2-note">
-        {pending > 0 ? `${pending} conflit(s) de domaine à trancher avant de charger.` : "Cartes et évènements en un lot ; rien n’est supprimé ; les autres exercices ne sont pas touchés."}
-      </span>
-    </div>
-  );
-}
-
-// Everything under the form: the error, the busy note, the load and audit
-// summaries, the conflicts to decide, the load controls and the report.
-function Outcome({ phase, error, shown, config, decisions, setDecisions, acknowledged, setAcknowledged, onLoad }: {
-  phase: Phase; error: string | null; shown: ImportAuditResult | null; config: BoardConfig;
-  decisions: Decisions; setDecisions: (d: Decisions) => void;
-  acknowledged: boolean; setAcknowledged: (v: boolean) => void; onLoad: () => void;
-}) {
-  const busy = phase.kind === "busy";
-  const conflicts = phase.kind === "audited" ? phase.result.conflicts : [];
-  const pending = conflicts.filter((c) => decisions[c.cardId] === undefined).length;
-  return (
-    <>
-      {error !== null && <div className="import-error">{error}</div>}
-      {busy && <div className="m2-note">{phase.what === "audit" ? "Audit en cours…" : "Chargement en cours…"}</div>}
-      {phase.kind === "loaded" && <LoadSummary result={phase.result} />}
-      {shown !== null && <Summary result={shown} />}
-      {shown !== null && <KeptFacts result={shown} />}
-      {phase.kind === "audited" && (
-        <ImportConflicts conflicts={conflicts} decisions={decisions} config={config}
-          onDecide={(cardId, decision) => setDecisions({ ...decisions, [cardId]: decision })}
-          onDecideAll={(decision) => setDecisions(Object.fromEntries(conflicts.map((c) => [c.cardId, decision])))} />
-      )}
-      {phase.kind === "audited" && (
-        <LoadControls result={phase.result} pending={pending} acknowledged={acknowledged} setAcknowledged={setAcknowledged}
-          busy={busy} onLoad={onLoad} />
-      )}
-      {shown !== null && <pre className="import-report">{shown.report}</pre>}
-    </>
-  );
-}
-
 /**
  * The import pane — ⚙ › Importer un export PPM (ADR 046/049; the admin
  * shell shows it alone, without the configuration's tabs).
@@ -241,11 +152,12 @@ export function ImportPanel({ onLoaded, config, defaultYear }: {
         ne lit ni n’écrit une carte 2026 ; un même code PE y est une autre carte, avec son budget. Le domaine d’une
         carte déjà là n’est jamais remplacé sans votre décision, conflit par conflit.
       </div>
+      <ImportSince key={`${exercise}:${phase.kind === "loaded" ? "chargé" : ""}`} config={config} exercise={exercise} />
       <ImportForm files={files} busy={phase.kind === "busy"} exercise={exercise} currentYear={currentYear}
         onYear={(year) => { setExercise(year); reset(); }}
         onPick={(list) => { void readFiles(list).then((picked) => { setFiles(picked); reset(); }); }}
         onAudit={() => { setAcknowledged(false); void run("audit"); }} />
-      <Outcome phase={phase} error={error} shown={shown} config={config} decisions={decisions} setDecisions={setDecisions}
+      <ImportOutcome phase={phase} error={error} shown={shown} config={config} decisions={decisions} setDecisions={setDecisions}
         acknowledged={acknowledged} setAcknowledged={setAcknowledged} onLoad={() => void run("load")} />
     </div>
   );

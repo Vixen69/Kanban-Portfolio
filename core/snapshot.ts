@@ -27,6 +27,12 @@ export interface BoardSnapshot {
   capacity: CapacitySnapshot[];
   /** The applied config override, null when the versioned model ran. */
   configOverride: BoardConfig | null;
+  /**
+   * The hash of the versioned model (config/board.json) the override was
+   * applied on (ADR 038/058); absent on snapshots taken before ADR 058.
+   * A restore puts the override back only onto that same model.
+   */
+  configDefaultsHash?: string;
 }
 
 /** What a list shows of a snapshot — never its cards. */

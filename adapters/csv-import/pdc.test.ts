@@ -82,6 +82,28 @@ test("summed day counts stay clean (no floating-point noise)", () => {
   assert.deepEqual(table.totals, { jh: 36.1, done: 0.3 });
 });
 
+test("ADR 058: sums are raw, rounded once — 8 × 0,125 j.h is 1, 40 × 0,125 is 5, whatever the rows' order", () => {
+  const hours = (n: number) => Array.from({ length: n }, (_, i) => row("", `Expert ${i}`, "Expert", "PE20016", "Portail", "0,125", "0,125"));
+  assert.deepEqual(run(hours(8)).table.projects.get("code:pe20016")?.charges.get("expert"), { jh: 1, done: 1 });
+  assert.deepEqual(run(hours(40)).table.totals, { jh: 5, done: 5 });
+  const rows = [
+    row("M1", "Jean", "PMO", "PE20006", "Portail", "1,115", "0"),
+    row("M2", "Aya", "PMO", "PE20006", "Portail", "0,115", "0"),
+    row("M3", "Luc", "PMO", "PE20006", "Portail", "0,005", "0"),
+  ];
+  const sums = [[0, 1, 2], [2, 1, 0], [1, 2, 0], [0, 2, 1]].map((order) =>
+    run(order.map((i) => rows[i]!)).table.projects.get("code:pe20006")?.charges.get("pmo")?.jh);
+  assert.equal(new Set(sums).size, 1, `one sum in every order: ${sums.join(" / ")}`);
+});
+
+test("ADR 058: 120 hour-rows against a « Planifiée » line of 15 raise no « diffère » warning", () => {
+  const planned = "M1;Jean;DSI;PMO;Planifiée projet (en jour);;T;P;;;;;;;15;0;;;;;;;;;;;;;;";
+  const lines = Array.from({ length: 120 }, (_, i) => row("M1", "Jean", "PMO", `PE${30000 + i}`, `P${i}`, "0,125", "0"));
+  const { table, report } = run([planned, ...lines]);
+  assert.deepEqual([table.persons[0]?.jh, table.persons[0]?.plannedJh], [15, 15]);
+  assert.equal(report.warnings.some((w) => /diffère de la ligne « Planifiée projet »/.test(w.message)), false);
+});
+
 test("réel > prévisionnel is kept and signaled; persons are consolidated", () => {
   const { table, report } = run([
     row("M1", "Jean ROCA", "PMO", "", "Alpha", "15", "18"),

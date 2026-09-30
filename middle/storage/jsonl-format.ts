@@ -20,6 +20,9 @@ type EventRecord = { kind: "event"; seq: number; event: CardEvent };
 // The capacity snapshot (ADR 024): appended whole at each import; the last
 // record of each exercise year wins (ADR 035).
 export type CapacityRecord = { kind: "capacity"; snapshot: CapacitySnapshot };
+// A year's capacity removed (a restore, ADR 058): the year reads null
+// until a later "capacity" record of that year.
+export type CapacityClearedRecord = { kind: "capacity-cleared"; year: number };
 // A board snapshot (ADR 042): appended whole, kept for good.
 export type SnapshotRecord = { kind: "snapshot"; snapshot: BoardSnapshot };
 // The base cards replaced as a whole (a restore, ADR 042): the record
@@ -131,6 +134,8 @@ function applyRecord(state: State, rec: unknown, lineNo: number): void {
   } else if (rec["kind"] === "capacity") {
     const snapshot = rec["snapshot"] as CapacitySnapshot;
     state.capacity.set(snapshot.exerciseYear, snapshot);
+  } else if (rec["kind"] === "capacity-cleared") {
+    state.capacity.delete(rec["year"] as number);
   } else if (rec["kind"] === "snapshot") {
     const snapshot = rec["snapshot"] as BoardSnapshot;
     state.snapshots.set(snapshot.id, snapshot);

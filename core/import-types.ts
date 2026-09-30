@@ -6,7 +6,7 @@
 import type { ImportChanges } from "./import-changes.ts";
 
 export type {
-  ImportCardRef, ImportChangeCounts, ImportChanges, ImportEntered, ImportExcluded, ImportFileEntry, ImportFileStatus,
+  ImportAdopted, ImportCardRef, ImportChangeCounts, ImportChanges, ImportEntered, ImportExcluded, ImportFileEntry, ImportFileStatus,
   ImportKeptFact, ImportLeft, ImportSource, ImportUnrecognized,
 } from "./import-changes.ts";
 
@@ -98,6 +98,10 @@ export interface ImportLoadResult extends ImportAuditResult {
     domainReplaced: number;
     domainKept: number;
     domainKeptByPrior: number;
+    /** Deck cards deleted on the board: skipped, never re-created (ADR 058). */
+    deletedSkipped: number;
+    /** Hand-made cards adopted instead of duplicated (ADR 059). */
+    adopted: number;
     /** The capacity snapshot stored with the load, when the files carried one. */
     capacity: { persons: number; assignments: number } | null;
   };

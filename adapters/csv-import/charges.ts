@@ -4,6 +4,7 @@
 // 200 j.h/an) lands in the report — names stay on this machine.
 
 import { normalizeLabel } from "./normalize.ts";
+import { addDays, round2 } from "./day-sums.ts";
 import { tallyInto, tallyLabel } from "./tallies.ts";
 import type { Tally } from "./tallies.ts";
 import type { EnrichedCard } from "./enrich.ts";
@@ -58,10 +59,6 @@ function indexProjects(pdc: PdcTable): ProjectIndex {
 const ETP_BASE = 200;
 const TOP_PERSONS = 15;
 
-// Day counts, two decimals: float additions otherwise leak « 36.09999… ».
-function round2(value: number): number {
-  return Math.round(value * 100) / 100;
-}
 
 /**
  * Formats a j.h total for the report: one decimal at most, French comma.
@@ -108,6 +105,8 @@ export function attachCharges(
     stats.covered++;
   }
   stats.pdcOutside = pdc.projects.size - consumed.size;
+  stats.cardsJh = round2(stats.cardsJh);
+  stats.cardsDone = round2(stats.cardsDone);
   for (const [message, t] of tallies) {
     warn(report, `${message} : ${tallyLabel(t)}`, "assemblage");
   }
@@ -120,8 +119,8 @@ function attach(project: PdcProject, stats: ChargeStats): CardCharge[] {
   const charges = [...project.charges.entries()]
     .map(([profileId, c]): CardCharge => ({ profileId: profileId === "" ? null : profileId, ...c }));
   for (const charge of charges) {
-    stats.cardsJh = round2(stats.cardsJh + charge.jh);
-    stats.cardsDone = round2(stats.cardsDone + charge.done);
+    stats.cardsJh = addDays(stats.cardsJh, charge.jh);
+    stats.cardsDone = addDays(stats.cardsDone, charge.done);
   }
   return charges;
 }

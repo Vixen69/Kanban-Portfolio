@@ -43,6 +43,17 @@ export interface ConfigStore {
    * acting user. Output: the runtime config. Failure: throws on I/O errors.
    */
   restoreOverride(config: BoardConfig | null, actor: string): BoardConfig;
+  /** The hash of the versioned model running — what an applied config is stamped with (ADR 038). */
+  getDefaultsHash(): string;
+  /**
+   * Sets an applied config aside instead of running it — the restore of a
+   * snapshot whose config was applied on another versioned model (ADR
+   * 038/058): one history line keeps it with the note, the override file
+   * goes, the versioned model runs.
+   * Inputs: the config set aside, the acting user, the note (French).
+   * Output: the runtime config. Failure: throws on I/O errors.
+   */
+  setAsideOverride(config: BoardConfig, actor: string, note: string): BoardConfig;
   /** The current exercise year: exercise.json when present, else the defaults'. */
   getExerciseYear(): number;
   /**
@@ -143,10 +154,15 @@ export function createConfigStore(dataDir: string, defaults: BoardConfig): Confi
       override = config;
       return runtime();
     },
-    getOverride: () => override,
+    getOverride: () => override, getDefaultsHash: () => defaultsHash,
     restoreOverride: (config, actor) => {
       persistOverride(dataDir, paths, defaultsHash, config, actor, RESTORE_NOTE);
       override = config;
+      return runtime();
+    },
+    setAsideOverride: (config, actor, note) => {
+      setAside(dataDir, paths, config, actor, note);
+      override = null;
       return runtime();
     },
     getExerciseYear: () => year,
@@ -182,6 +198,13 @@ function persistOverride(
   } else {
     writeFileSync(paths.override, `${JSON.stringify({ defaultsHash, config }, null, 2)}\n`, "utf8");
   }
+}
+
+// A config set aside (ADR 038/058): its history line first, then the file goes.
+function setAside(dataDir: string, paths: Paths, config: BoardConfig, actor: string, note: string): void {
+  mkdirSync(dataDir, { recursive: true });
+  appendFileSync(paths.history, `${JSON.stringify({ ts: new Date().toISOString(), actor, note, config })}\n`, "utf8");
+  if (existsSync(paths.override)) rmSync(paths.override);
 }
 
 // Records the switch: one history line, then exercise.json.

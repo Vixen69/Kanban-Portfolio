@@ -5,12 +5,14 @@
 // files taken, the perimeter's verdicts, the board now against the board
 // after the load (a fold dry run read by the change engine of
 // core/snapshot-diff.ts), the projects that enter, leave or come back with
-// the rule behind each, and the facts kept from the board (ADR 054).
+// the rule behind each, and the facts kept from the board (ADR 054) —
+// since ADR 058/059 also the hand-made cards adopted, the cards deleted on
+// the board that the files still carry (skipped) and the identity doubts.
 // Nothing is written. Pure: the caller passes the stored cards and log.
 
 import type { BoardConfig, Card, CardEvent, CardState } from "../../core/types.ts";
 import type {
-  ImportCardRef, ImportChangeCounts, ImportChanges, ImportEntered, ImportExcluded, ImportKeptFact, ImportLeft,
+  ImportAdopted, ImportCardRef, ImportChangeCounts, ImportChanges, ImportEntered, ImportExcluded, ImportKeptFact, ImportLeft,
 } from "../../core/import-types.ts";
 import type { CardChange } from "../../core/snapshot-diff.ts";
 import { diffBoards } from "../../core/snapshot-diff.ts";
@@ -89,9 +91,7 @@ function idsOf(plan: LoadPlan, type: CardEvent["type"]): string[] {
   return plan.events.filter((event) => event.type === type).map((event) => event.cardId);
 }
 
-function enteredOf(
-  input: ChangesInput, plan: LoadPlan, perimeter: Perimeter, after: ReadonlyMap<string, CardState>,
-): ImportEntered[] {
+function enteredOf(input: ChangesInput, plan: LoadPlan, perimeter: Perimeter): ImportEntered[] {
   const planned = new Map(plan.cards.map((card) => [card.id, card]));
   const fallback = new Set(plan.domainFallback);
   const defaultName = input.config.domains[0]?.name ?? "aucun domaine";
@@ -100,9 +100,8 @@ function enteredOf(
     if (card === undefined) return [];
     const verdict = verdictOf(perimeter, card);
     const why = verdict?.motive === "retained" ? ` — ${verdict.reason}` : "";
-    const gone = after.has(id) ? "" : " — supprimée du tableau auparavant : elle n’y revient pas";
     return [{
-      ...ref(card), reason: `nouveau dans le périmètre ${perimeter.source ?? ""}${why}${gone}`,
+      ...ref(card), reason: `nouveau dans le périmètre ${perimeter.source ?? ""}${why}`,
       domainWarning: fallback.has(id) ? `domaine non résolu → ${defaultName} par défaut, à corriger` : null,
     }];
   }));
@@ -146,6 +145,21 @@ function keptOf(plan: LoadPlan, after: ReadonlyMap<string, CardState>): ImportKe
   }));
 }
 
+// ADR 059: the hand-made cards adopted, under the export's title.
+function adoptedOf(plan: LoadPlan): ImportAdopted[] {
+  return byTitle(plan.adopted.map((a) => ({ cardId: a.id, code: a.code, title: a.title, manualTitle: a.manualTitle })));
+}
+
+// ADR 058: the deck cards whose board card was deleted — named from the
+// stored base card (the fold no longer shows it).
+function deletedOf(input: ChangesInput, plan: LoadPlan): ImportCardRef[] {
+  const stored = new Map(input.baseCards.map((card) => [card.id, card]));
+  return byTitle(plan.deletedSkipped.map((id) => {
+    const card = stored.get(id);
+    return card === undefined ? { cardId: id, code: null, title: id } : ref(card);
+  }));
+}
+
 function countsOf(plan: LoadPlan, cardChanges: CardChange[]): ImportChangeCounts {
   const changed = new Set(cardChanges.filter((c) => VALUE_KINDS.has(c.kind)).map((c) => c.cardId));
   const kept = new Set(plan.factsKeptCards.flatMap((fact) => fact.cardIds));
@@ -174,7 +188,9 @@ export function importChanges(input: ChangesInput): ImportChanges {
     ...importFiles(audit),
     perimeter: { source: perimeter.source, file: perimeter.file, retained: perimeter.verdicts.length - excluded.length, excluded },
   };
-  if (plan === null) return { ...head, counts: NO_COUNTS, entered: [], left: [], back: [], cardChanges: [], kept: [] };
+  if (plan === null) {
+    return { ...head, counts: NO_COUNTS, entered: [], left: [], back: [], cardChanges: [], kept: [], adopted: [], deletedSkipped: [], identityDoubts: [] };
+  }
   const exercise = (cards: CardState[]): CardState[] => cardsOfExercise(cards, year, config.exercise.year);
   const before = exercise(foldEvents(input.baseCards, input.events));
   const after = exercise(boardAfter(input, plan));
@@ -183,7 +199,8 @@ export function importChanges(input: ChangesInput): ImportChanges {
   const cardChanges = diffBoards(config, before, after);
   return {
     ...head, counts: countsOf(plan, cardChanges),
-    entered: enteredOf(input, plan, perimeter, afterById), left: leftOf(plan, perimeter, beforeById),
+    entered: enteredOf(input, plan, perimeter), left: leftOf(plan, perimeter, beforeById),
     back: backOf(plan, perimeter, afterById), cardChanges, kept: keptOf(plan, afterById),
+    adopted: adoptedOf(plan), deletedSkipped: deletedOf(input, plan), identityDoubts: plan.identityDoubts,
   };
 }

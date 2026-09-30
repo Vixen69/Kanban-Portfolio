@@ -97,6 +97,13 @@ export interface BoardStorage {
    */
   getCapacity(year: number): Promise<CapacitySnapshot | null>;
   /**
+   * Removes the capacity snapshot of one exercise year: getCapacity(year)
+   * then returns null — the restore of a board snapshot taken while that
+   * year had none (ADR 058). Idempotent: clearing an absent year is a no-op.
+   * Failure: rejects on storage errors.
+   */
+  clearCapacity(year: number): Promise<void>;
+  /**
    * Stores one board snapshot (ADR 042) — kept for good, never replaced.
    * Failure: rejects on storage errors or a duplicate id.
    */

@@ -57,12 +57,23 @@ test("SP_total shape: no Id, the PE code embedded in the name is a key", () => {
   assert.equal(table.byName.get("sujet sans code")?.codename, null);
 });
 
-test("duplicates by id or name keep the first and are questioned", () => {
+test("a duplicated Id keeps the first and is questioned; the same name under another Id is another project (ADR 058)", () => {
   const { table, report } = run(HEADER_2026, [
     ";A;Un;;;;10;;;;",
     ";A;Un bis;;;;20;;;;",
     ";B;Un;;;;30;;;;",
   ]);
-  assert.equal(table.entries.length, 1);
+  assert.deepEqual(table.entries.map((e) => [e.id, e.budgetEstimated]), [["A", 10], ["B", 30]]);
+  assert.equal(table.byName.has("un"), false, "a name two Ids carry joins nothing");
+  assert.equal(table.ambiguous.has("un"), true);
   assert.equal(report.doubtful.length, 2);
+  assert.ok(report.doubtful[1]?.question.startsWith("nom « Un » porté par plusieurs Id (A, B)"));
+});
+
+test("without Ids, the same name twice is one project: the first row is kept", () => {
+  const { table, report } = run(HEADER_TOTAL, [
+    ";;Sujet;Étude;;;;;;;;;;;;;;;20;;;;",
+    ";;Sujet;Étude;;;;;;;;;;;;;;;30;;;;",
+  ]);
+  assert.deepEqual([table.entries.length, table.byName.get("sujet")?.budgetEstimated, report.doubtful.length], [1, 20, 1]);
 });

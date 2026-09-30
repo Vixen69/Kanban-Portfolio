@@ -146,12 +146,22 @@ test("a raw Sciforma export is translated through PARAM", () => {
   assert.equal(cards?.cards[0]?.owner, "Alice MERLE");
 });
 
-test("two files matching one contract: the cleanest header wins, the other is questioned", () => {
+test("ADR 056: two files matching one contract are both named and neither is read — the load is refused", () => {
   const clean = "Id;Nom;Type;État du processus\nPE1;Un;Etude;Nouveau\n";
   const dirty = "Id;Nom;Type;État du processus;Extra\nPE2;Deux;Etude;Nouveau;x\n";
-  const { report, projets } = audit([file("b.csv", dirty), file("a.csv", clean)]);
-  assert.equal(projets?.entries[0]?.name, "Un");
-  assert.ok(report.doubtful.some((d) => d.file === "b.csv" && /non retenu/.test(d.question)));
+  const { projets, blockers } = audit([file("b.csv", dirty), file("a.csv", clean)]);
+  assert.equal(projets, null);
+  assert.deepEqual(blockers.map((b) => b.files.slice().sort()), [["a.csv", "b.csv"]]);
+  const sp = audit([...ALL.map(fixture), { ...fixture("SP_2026.csv"), name: "SP_2026 (1).csv" }]);
+  assert.equal(sp.sp, null, "no SP file elected by its name");
+  assert.deepEqual(sp.blockers.map((b) => [b.source, b.message]),
+    [["sp", "Deux fichiers SP : « SP_2026 (1).csv » et « SP_2026.csv » — n'en déposer qu'un."]]);
+  assert.notEqual(sp.cards, null, "the audit still reads the rest");
+});
+
+test("ADR 056: one file name received twice (two folders) refuses the load", () => {
+  const { blockers } = audit([fixture("PARAM.csv"), fixture("Projets.csv"), fixture("Projets.csv")]);
+  assert.ok(blockers.some((b) => b.source === null && b.message === "Deux fichiers portent le même nom « Projets.csv » — n'en déposer qu'un."));
 });
 
 test("without the perimeter, the other tables wait", () => {
@@ -218,15 +228,12 @@ test("with COUT PREV as perimeter, a Projets onglet carrying Responsable lends i
   assert.equal(new Map(cards?.cards.map((c) => [c.codename, c])).get("PE10001")?.owner, "Alice MERLE");
 });
 
-test("a second full Projets export lends its chefs de projet when no ProjetsCdP file came", () => {
+test("ADR 056: a second copy of the full Projets export is not « the other one » — two of a shape refuse the load", () => {
   const files = ALL.filter((name) => name !== "ProjetsCdP.csv").map(fixture);
-  const { report, cdp, projets } = audit([...files, { ...fixture("Projets.csv"), name: "ProjetsExport.csv" }]);
-  assert.ok(cdp);
-  assert.equal(projets?.entries.length, 6, "the perimeter is still the first Projets file");
-  assert.ok(report.warnings.some((w) => w.file === "ProjetsExport.csv" && /lu comme ProjetsCdP/.test(w.message)));
-  const byLabel = new Map(report.assembly.map((a) => [a.subject, a.status]));
-  assert.equal(byLabel.get("chef de projet"),
-    "5/6 (dont 0 via ProjetsCdP · 0 ligne(s) ProjetsCdP hors périmètre) · responsables de domaine exclus : 4");
+  const { blockers, projets } = audit([...files, { ...fixture("Projets.csv"), name: "ProjetsExport.csv" }]);
+  assert.equal(projets, null, "no perimeter elected by name");
+  assert.deepEqual(blockers.map((b) => b.source), ["cdp"]);
+  assert.match(blockers[0]?.message ?? "", /« Projets\.csv » et « ProjetsExport\.csv »/);
 });
 
 test("ADR 035: the audit reads the exercise it is given — the 2026 COUT PREV carries no project on 2027", () => {

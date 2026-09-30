@@ -2,7 +2,8 @@
 // composes these; everything else in this directory is internal.
 
 export { runImportAudit } from "./orchestrate.ts";
-export type { AuditResult, InputFile } from "./orchestrate.ts";
+export type { AuditResult, ImportBlocker, InputFile } from "./orchestrate.ts";
+export { importConfig } from "./vocabulary.ts";
 export { renderReport } from "./render-report.ts";
 export type { ImportReport } from "./report.ts";
 export type { ParamTable } from "./param.ts";

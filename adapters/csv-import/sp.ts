@@ -4,7 +4,10 @@
 // in k€ (euros are converted and said). Accepts the SP_2026 onglet (with
 // an « Id », the join key) and the raw SP_total export (no Id: join by
 // name, then by the PE code embedded in the name). Its rows never become
-// cards — they only enrich the `projets` perimeter.
+// cards — they only enrich the `projets` perimeter. ADR 058: two rows with
+// different Ids are two projects even under one name — the name (or the
+// embedded code) they share then joins nothing, so no card borrows the
+// other's k€, whatever the rows' order.
 
 import { normalizeLabel } from "./normalize.ts";
 import { splitSubjectName } from "./subject-name.ts";
@@ -37,8 +40,11 @@ export interface SpEntry {
 export interface SpTable {
   entries: SpEntry[];
   byId: ReadonlyMap<string, SpEntry>;
+  /** Names and codes carried by one entry only: a key two Ids share joins nothing (ADR 058). */
   byName: ReadonlyMap<string, SpEntry>;
   byCode: ReadonlyMap<string, SpEntry>;
+  /** The names (normalized) and codes two Ids share — refused as join keys. */
+  ambiguous: ReadonlySet<string>;
   /** True when the file carries an « Id » column (SP_2026 shape). */
   hasIds: boolean;
 }
@@ -51,6 +57,9 @@ interface SpContext {
   byId: Map<string, SpEntry>;
   byName: Map<string, SpEntry>;
   byCode: Map<string, SpEntry>;
+  /** Every entry by normalized name — the duplicate gate (byName keeps the unique ones). */
+  names: Map<string, SpEntry>;
+  ambiguous: Set<string>;
   tallies: Map<string, Tally>;
 }
 
@@ -66,12 +75,12 @@ interface SpContext {
 export function parseSp(rows: CsvRow[], match: HeaderMatch, report: ImportReport, fileName: string): SpTable {
   const ctx: SpContext = {
     match, report, fileName,
-    entries: [], byId: new Map(), byName: new Map(), byCode: new Map(), tallies: new Map(),
+    entries: [], byId: new Map(), byName: new Map(), byCode: new Map(), names: new Map(), ambiguous: new Set(), tallies: new Map(),
   };
   for (const row of rows) readRow(ctx, row);
   for (const [message, t] of ctx.tallies) warn(report, `${message} : ${tallyLabel(t)}`, fileName);
   return {
-    entries: ctx.entries, byId: ctx.byId, byName: ctx.byName, byCode: ctx.byCode,
+    entries: ctx.entries, byId: ctx.byId, byName: ctx.byName, byCode: ctx.byCode, ambiguous: ctx.ambiguous,
     hasIds: match.columnIndex.has("Id"),
   };
 }
@@ -81,8 +90,9 @@ function cell(ctx: SpContext, row: CsvRow, column: string): string {
   return index === undefined ? "" : (row.cells[index] ?? "").trim();
 }
 
-// Structural gates (empty, nameless, total rows), duplicates, then the
-// entry build under its keys.
+// Structural gates (empty, nameless, total rows), duplicates — the same
+// Id, or the same name when one of the two rows has no Id — then the entry
+// build under its keys.
 function readRow(ctx: SpContext, row: CsvRow): void {
   const ref: RowRef = { file: ctx.fileName, line: row.line };
   if (row.cells.every((c) => c.trim() === "")) {
@@ -101,19 +111,36 @@ function readRow(ctx: SpContext, row: CsvRow): void {
   }
   const rawId = cell(ctx, row, "Id");
   const id = rawId === "" ? null : rawId;
-  const sameId = id === null ? undefined : ctx.byId.get(id);
-  const sameName = ctx.byName.get(normalizedName);
-  if (sameId !== undefined || sameName !== undefined) {
-    const first = sameId ?? sameName;
+  const sameName = ctx.names.get(normalizedName);
+  const first = (id === null ? undefined : ctx.byId.get(id))
+    ?? (sameName !== undefined && (id === null || sameName.id === null) ? sameName : undefined);
+  if (first !== undefined) {
     doubt(ctx.report, ctx.fileName,
-      `« ${nom} » (ligne ${row.line}) en double avec « ${first?.name ?? ""} » (ligne ${first?.ref.line ?? 0}) — première conservée`, { ref });
+      `« ${nom} » (ligne ${row.line}) en double avec « ${first.name} » (ligne ${first.ref.line}) — première conservée`, { ref });
     return;
   }
   const entry = buildEntry(ctx, row, ref, id, nom, normalizedName);
   ctx.entries.push(entry);
   if (id !== null) ctx.byId.set(id, entry);
-  ctx.byName.set(normalizedName, entry);
-  if (entry.codename !== null && !ctx.byCode.has(entry.codename)) ctx.byCode.set(entry.codename, entry);
+  if (sameName === undefined) ctx.names.set(normalizedName, entry);
+  indexUnique(ctx, ctx.byName, normalizedName, entry, `nom « ${nom} »`);
+  if (entry.codename !== null) indexUnique(ctx, ctx.byCode, entry.codename, entry, `code « ${entry.codename} »`);
+}
+
+// A join key (name, embedded code) stays usable while ONE Id carries it;
+// a second Id makes it ambiguous: removed, said once (ADR 058).
+function indexUnique(ctx: SpContext, index: Map<string, SpEntry>, key: string, entry: SpEntry, label: string): void {
+  if (ctx.ambiguous.has(key)) return;
+  const first = index.get(key);
+  if (first === undefined) {
+    index.set(key, entry);
+    return;
+  }
+  index.delete(key);
+  ctx.ambiguous.add(key);
+  doubt(ctx.report, ctx.fileName,
+    `${label} porté par plusieurs Id (${first.id ?? "sans Id"}, ${entry.id ?? "sans Id"}) — pas de jointure par ce nom ni ce code, aucun coût emprunté`,
+    { ref: entry.ref });
 }
 
 function buildEntry(

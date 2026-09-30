@@ -58,13 +58,24 @@ test("alone, a full export carrying the Responsable columns is still the perimet
   assert.equal(cards?.cards[0]?.owner, "Alice MERLE");
 });
 
-test("two files without Responsable columns: the consolidated Orga columns win, then the cleanest header", () => {
+test("ADR 056: two Projets onglets without Responsable columns refuse the load — no election by Orga columns, header or name", () => {
   const raw = "Id;Nom;Type;État du processus;Domaine\nPE1;Un;Etude (Projet);Nouveau;DSI NEXTER.DOMAINE INFRASTRUCTURE\n";
-  const { projets, report } = runImportAudit([param(), file("A.csv", raw), file("B.csv", PERIMETER)], CONFIG, NOW);
-  assert.equal(projets?.fileName, "B.csv", "Orga columns beat a cleaner header and an earlier name");
-  assert.match(report.doubtful.find((d) => d.file === "A.csv")?.question ?? "", /périmètre = « B\.csv »/);
-  const clean = "Id;Nom;Type;État du processus\nPE1;Un;Etude (Projet);Nouveau\n";
-  const dirty = "Id;Nom;Type;État du processus;Extra\nPE2;Deux;Etude (Projet);Nouveau;x\n";
-  const second = runImportAudit([file("b.csv", dirty), file("a.csv", clean)], CONFIG, NOW);
-  assert.equal(second.projets?.fileName, "a.csv", "no Responsable, no Orga: the cleanest header wins");
+  const { projets, cards, blockers, report } = runImportAudit([param(), file("B.csv", PERIMETER), file("A.csv", raw)], CONFIG, NOW);
+  assert.equal(projets, null, "neither file is read as the perimeter");
+  assert.equal(cards, null);
+  assert.deepEqual(blockers.map((b) => [b.source, b.message]), [
+    ["projets", "Deux fichiers Projets (onglet sans « Responsable 1 ») : « A.csv » et « B.csv » — n'en déposer qu'un."],
+  ]);
+  assert.ok(report.doubtful.some((d) => d.file === "B.csv, A.csv" || d.file === "A.csv, B.csv"));
+  assert.match(report.assembly[0]?.status ?? "", /^refusé — Deux fichiers Projets/);
+});
+
+test("ADR 056: two full exports carrying « Responsable 1 » beside the onglet refuse the load too", () => {
+  const other = FULL_EXPORT.replace("PE10003;Hors périmètre", "PE10004;Autre");
+  const { blockers, projets } = runImportAudit(
+    [param(), file("Projets.csv", PERIMETER), file("Export1.csv", FULL_EXPORT), file("Export2.csv", other)], CONFIG, NOW,
+  );
+  assert.equal(projets?.fileName, "Projets.csv", "the onglet is still read (the load is refused all the same)");
+  assert.deepEqual(blockers.map((b) => b.message),
+    ["Deux fichiers Projets avec « Responsable 1 » : « Export1.csv » et « Export2.csv » — n'en déposer qu'un."]);
 });

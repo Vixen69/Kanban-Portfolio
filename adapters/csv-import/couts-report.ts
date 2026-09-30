@@ -5,7 +5,8 @@
 // could not tell why), then the questions — portfolios without domain,
 // non-PE codes retained, and the projects excluded for having no ME
 // figure, named so the domain owners can check them (a « 0 / 0 / 0 » can
-// be a missing entry, not a cancellation).
+// be a missing entry, not a cancellation), and those kept on an unreadable
+// ME cell (ADR 056).
 
 import type { BoardConfig } from "../../core/types.ts";
 import { ruleLabel } from "./portfolio.ts";
@@ -35,10 +36,14 @@ export interface CoutsReading {
   /** False when the config carries no `exercise.states` (every state kept). */
   statesListed: boolean;
   tallies: Map<string, Tally>;
+  /** « Année » values read, by year or « illisible » (ADR 056). */
+  years: Map<string, Tally>;
   unknownPortfolios: Map<string, Tally>;
   portfolios: Map<string, PortfolioTally>;
   nonPe: string[];
   noMe: string[];
+  /** Projects kept on an unreadable ME cell alone (ADR 056). */
+  meUnknown: string[];
 }
 
 const CODES_SHOWN = 20;
@@ -84,6 +89,7 @@ export function emitCoutsReport(r: CoutsReading): void {
       (s.inactive > 0 ? ` · ${s.inactive} retenu(s) avec « Projet.Actif » faux (gardés, information)` : ""),
     r.fileName);
   for (const [message, t] of r.tallies) warn(r.report, `${message} : ${tallyLabel(t)}`, r.fileName);
+  emitYears(r);
   emitPortfolios(r);
   for (const [label, t] of r.unknownPortfolios) {
     doubt(r.report, r.fileName,
@@ -97,5 +103,22 @@ export function emitCoutsReport(r: CoutsReading): void {
     doubt(r.report, r.fileName,
       `projets écartés sans aucun chiffre ME (quatre cellules vides ou à zéro) : ${r.noMe.length} — codes : ${codes(r.noMe)}` +
         " — annulés de fait, ou saisie manquante ? à vérifier avec les responsables de domaine");
+  }
+  if (r.meUnknown.length > 0) {
+    doubt(r.report, r.fileName,
+      `projets gardés sur une cellule ME illisible (ni vide ni zéro) : ${r.meUnknown.length} — codes : ${codes(r.meUnknown)}` +
+        " — la valeur n'a pas pu être lue ; à vérifier dans l'export (ADR 056)");
+  }
+}
+
+// Every « Année » value read, most frequent first (ADR 056: a reformatted
+// column — « 2 026 », a date — stands out); unreadable cells are a
+// douteux: their rows count outside the exercise.
+function emitYears(r: CoutsReading): void {
+  const seen = [...r.years].filter(([year]) => year !== "illisible").sort((a, b) => b[1].count - a[1].count || a[0].localeCompare(b[0]));
+  warn(r.report, `valeurs d'« Année » lues : ${seen.map(([year, t]) => `${year} (${t.count})`).join(" · ") || "aucune"}`, r.fileName);
+  const unreadable = r.years.get("illisible");
+  if (unreadable !== undefined) {
+    doubt(r.report, r.fileName, `« Année » illisible : ${tallyLabel(unreadable)} — ces lignes comptent hors ${r.year}`);
   }
 }

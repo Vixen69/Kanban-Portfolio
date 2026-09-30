@@ -65,6 +65,12 @@ export interface ImportEntered extends ImportCardRef {
   domainWarning: string | null;
 }
 
+/** A hand-made card the load adopts (ADR 059): the board's card becomes the export's project, its id kept. */
+export interface ImportAdopted extends ImportCardRef {
+  /** The title the card carried on the board before the load (title: the export's). */
+  manualTitle: string;
+}
+
 /** A card the load marks absent (∅, never deleted), or lists again. */
 export interface ImportLeft extends ImportCardRef {
   /** Plain French: the perimeter's exclusion motive, else « plus présent dans le fichier … ». */
@@ -130,4 +136,10 @@ export interface ImportChanges {
   cardChanges: CardChange[];
   /** The facts kept from the board, fact by fact, with the cards (ADR 054). */
   kept: ImportKeptFact[];
+  /** Hand-made cards the load adopts instead of creating a duplicate (ADR 059). */
+  adopted: ImportAdopted[];
+  /** Cards deleted on the board that the files still carry: « supprimées du tableau, ignorées » — never re-created (ADR 058). */
+  deletedSkipped: ImportCardRef[];
+  /** Identity questions the load could not settle alone (ADR 058/059), plain French, one per case. */
+  identityDoubts: string[];
 }

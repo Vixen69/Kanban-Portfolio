@@ -4,12 +4,16 @@
 // « (Opportunité) », « (Run) » — ignored by decision), and the
 // whole-word person matching used to exclude domain leads from the chef
 // de projet. Domains and types may carry `aliases` — export labels
-// searched INSIDE a label as whole words (ADR 029/030). Pure and
-// dependency-free.
+// searched INSIDE a label as whole words (ADR 029/030). Names and shorts
+// are the versioned model's when the config comes from importConfig; a
+// name renamed in ⚙ only answers when nothing else did (vocabulary.ts, ADR
+// 056). Pure and dependency-free.
 
 import type { BoardConfig } from "../../core/types.ts";
 import { createTolerantLookup, normalizeLabel } from "./normalize.ts";
 import type { TolerantHit } from "./normalize.ts";
+import { matchLabels } from "./vocabulary.ts";
+import type { Labelled } from "./vocabulary.ts";
 
 /** A tolerant label -> id lookup (null = unknown or ambiguous). */
 export type Lookup = (cell: string) => TolerantHit | null;
@@ -47,20 +51,41 @@ function withKeywords(lookup: Lookup, keywords: readonly Keyword[], prepare: (ce
   };
 }
 
+/** What a lookup is built from: a type or a domain. */
+type Entry = { id: string; name: string; short: string; aliases?: string[] } & Labelled;
+
+// The last resort: the names renamed in ⚙ (exact, then accent-damage
+// tolerant), consulted only when the versioned vocabulary found nothing;
+// the hit is marked `renamed`.
+function withRenamed(lookup: Lookup, entries: readonly Entry[], prepare: (cell: string) => string): Lookup {
+  const pairs = entries.flatMap((e) => matchLabels(e).renamed.map((label): [string, string] => [label, e.id]));
+  if (pairs.length === 0) return lookup;
+  const renamed = createTolerantLookup(pairs);
+  return (cell) => {
+    const hit = lookup(cell);
+    if (hit !== null) return hit;
+    const late = renamed(prepare(cell));
+    return late === null ? null : { ...late, renamed: true };
+  };
+}
+
+// id, versioned name and short, then the aliases: the exact labels of an entry.
+function exactPairs(e: Entry): Array<[string, string]> {
+  return [[e.id, e.id], ...matchLabels(e).versioned.map((label): [string, string] => [label, e.id]),
+    ...(e.aliases ?? []).map((alias): [string, string] => [alias, e.id])];
+}
+
 /**
  * Builds a tolerant domain lookup accepting id, name, short code or alias
- * (exact, then the aliases as whole words inside the label — ADR 030).
+ * (exact, then the aliases as whole words inside the label — ADR 030);
+ * names and shorts are the versioned model's under an import config, a
+ * name renamed in ⚙ answering last (ADR 056).
  * Inputs: the board config. Outputs: cell -> hit or null. Failure: none.
  */
 export function createDomainLookup(config: BoardConfig): Lookup {
-  const lookup = createTolerantLookup(
-    config.domains.flatMap((d): Array<[string, string]> => [
-      [d.id, d.id], [d.name, d.id], [d.short, d.id],
-      ...(d.aliases ?? []).map((alias): [string, string] => [alias, d.id]),
-    ]),
-  );
+  const lookup = createTolerantLookup(config.domains.flatMap(exactPairs));
   const keywords = config.domains.flatMap((d) => (d.aliases ?? []).map((alias): Keyword => ({ re: keywordPattern(alias), id: d.id })));
-  return withKeywords(lookup, keywords, (cell) => cell);
+  return withRenamed(withKeywords(lookup, keywords, (cell) => cell), config.domains, (cell) => cell);
 }
 
 /**
@@ -94,18 +119,15 @@ export function typeBaseLabel(raw: string): string {
  * alias (exact, then accent-damage tolerant), then — for the aliases only —
  * the alias searched INSIDE the label as a whole word (author, 2026-09-10:
  * the September « obsolescence » labels matched none of the spellings
- * dictated so far; a keyword survives every variant).
+ * dictated so far; a keyword survives every variant). Names and shorts
+ * are the versioned model's under an import config, a name renamed in ⚙
+ * answering last, exactly (ADR 056: a rename never changes the perimeter).
  * Inputs: the board config. Outputs: cell -> hit or null. Failure: none.
  */
 export function createTypeLookup(config: BoardConfig): Lookup {
-  const lookup = createTolerantLookup(
-    config.types.flatMap((t): Array<[string, string]> => [
-      [t.id, t.id], [t.name, t.id], [t.short, t.id],
-      ...(t.aliases ?? []).map((alias): [string, string] => [alias, t.id]),
-    ]),
-  );
+  const lookup = createTolerantLookup(config.types.flatMap(exactPairs));
   const keywords = config.types.flatMap((t) => (t.aliases ?? []).map((alias): Keyword => ({ re: keywordPattern(alias), id: t.id })));
-  return withKeywords(lookup, keywords, typeBaseLabel);
+  return withRenamed(withKeywords(lookup, keywords, typeBaseLabel), config.types, typeBaseLabel);
 }
 
 /**

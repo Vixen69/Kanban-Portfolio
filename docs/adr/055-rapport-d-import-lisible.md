@@ -68,6 +68,45 @@ bougé sur le tableau, pas les chiffres ni le pourquoi.
 Le rapport Markdown existant ne change pas : il devient le « rapport
 technique », replié sous le rapport lisible.
 
+## Vue
+
+L'écran d'import (⚙ › Importer) lit cet objet de haut en bas, dans une
+maquette validée par l'auteur :
+
+1. **Les chiffres clés** : projets mis à jour · nouveaux · absents de
+   l'import (∅) · valeurs changées · gardées (absentes des fichiers), sous
+   le titre « Ce que le chargement va changer » à l'audit, « Ce que le
+   chargement a changé » après. Un audit dont le périmètre ne s'assemble
+   pas ne montre pas de chiffres : il dit que rien ne serait écrit.
+2. **Les fichiers** en pastilles : « ✓ Coût », « ✓ Projets »… pour les
+   fichiers pris ; un fichier manquant en ton d'alerte avec ce que le
+   chargement fait sans lui (« ProjetsCdP absent → chefs de projet
+   gardés ») ; un fichier facultatif manquant en gris. Replié dessous : le
+   périmètre et ses projets écartés avec leur motif, le détail des fichiers.
+3. **Valeurs actualisées** : une section repliable par fait avec son
+   nombre (plan de charge, estimé, réalisé, engagé, enveloppe RDLI k€,
+   meilleur estimé, consommé j.h, chef de projet, date RDR, type, titre,
+   domaine, déplacés). Chaque ligne : code · titre · ancien → nouveau,
+   hausse ↑ en ton d'alerte, baisse ↓ en ton vert, sans décor. La ligne du
+   plan de charge dit « prévu a → b j.h · RAF a → b j.h » et se déplie sur
+   les métiers qui ont bougé. Seule la première section s'ouvre, et
+   seulement sous 30 lignes.
+4. **Nouveaux projets** (raison, et l'avertissement « domaine par défaut »),
+   **Absents de cet import** (raison), **De retour** ; puis **Gardées,
+   absentes des fichiers**, fait par fait avec les projets. Une liste de 10
+   lignes au plus s'ouvre seule.
+5. Les conflits de domaine et les commandes de chargement restent tels
+   quels ; le **rapport technique complet** (le Markdown) est replié en bas.
+
+Le bouton « Voir ce qui a changé depuis le dernier import » retrouve
+l'instantané « avant chargement <année> » le plus récent de l'exercice
+choisi et le compare au tableau maintenant. « Comparer avec maintenant »
+(Instantanés) montre les mêmes sections, avec en plus les arrivées,
+absences, disparitions, retours et archivages : **un seul composant** pour
+les changements groupés (`front/components/ChangeSections.tsx`), les mots
+et les regroupements dans des fonctions pures testées
+(`front/changeGroups.ts`, `front/importReport.ts`). Rien ne bouge (ADR 051).
+
 ## Conséquences
 
 - Le PMO voit, avant de charger, quel projet entre ou sort et pourquoi, et
@@ -84,4 +123,12 @@ technique », replié sous le rapport lisible.
   `projets-types.ts`, `orchestrate.ts`, `import-files.ts`,
   `import-changes.ts`, `keep-facts.ts`, `card-row.ts`, `to-cards.ts`),
   `middle/import.ts`, `middle/snapshots.ts`, `sync/import.ts`,
-  `sync/import-text.ts`, et leurs tests.
+  `sync/import-text.ts`, et leurs tests ; pour la vue, `front/changeGroups.ts`,
+  `front/importReport.ts`, `front/components/` (`ChangeSections.tsx`,
+  `ChangeRows.tsx`, `FilesStrip.tsx`, `ImportChanges.tsx`,
+  `ImportLists.tsx`, `ImportOutcome.tsx`, `ImportSince.tsx`,
+  `ImportView.tsx`, `SnapshotDiffView.tsx`), `front/styles/admin.css`, et
+  leurs tests.
+- Dans « Comparer avec maintenant », seule la première section s'ouvre
+  désormais (avant : toutes celles de 30 lignes au plus) : une seule règle
+  pour les deux écrans.

@@ -1,8 +1,10 @@
 // The files part of the readable import report (ADR 055): for each
 // expected source, the received file read for it — or what the load does
 // without it, in the PMO's words (ADR 054: a missing source keeps the
-// board's values, it never erases them). Built from the audit's inventory
-// and the files it elected. Pure.
+// board's values, it never erases them) — or why the load is refused
+// (ADR 056: two files of one kind, a Coût-like file not recognized).
+// Built from the audit's inventory, the files it read and its blockers.
+// Pure.
 
 import type { ImportFileEntry, ImportFileStatus, ImportSource, ImportUnrecognized } from "../../core/import-types.ts";
 import {
@@ -48,9 +50,10 @@ const SPECS: readonly SourceSpec[] = [
 
 // The role of a taken file when it is not the obvious one, and its
 // tolerated header drift.
-function takenNote(spec: SourceSpec, taken: FileInventoryEntry | undefined, sources: AuditResult["sources"]): string | null {
+function takenNote(spec: SourceSpec, taken: FileInventoryEntry | undefined, sources: AuditResult["sources"], refused: boolean): string | null {
   const notes: string[] = [];
   if (spec.source === "projets" && sources.couts !== null) notes.push("recoupement seulement — le périmètre est COUT PREV");
+  if (spec.source === "projets" && refused) notes.push("non utilisé comme périmètre : l’export Coût est refusé");
   if (spec.source === "cdp" && taken?.contractId === PROJETS_CONTRACT.id) notes.push("chefs de projet lus dans un export Projets");
   if (taken?.status === "recognized-with-deviations" && taken.detail !== undefined) notes.push(`en-têtes à écarts : ${folded(taken.detail)}`);
   return notes.length === 0 ? null : notes.join(" ; ");
@@ -84,13 +87,21 @@ function untaken(spec: SourceSpec, mine: FileInventoryEntry[], sources: AuditRes
 export function importFiles(audit: AuditResult): { files: ImportFileEntry[]; unrecognized: ImportUnrecognized[] } {
   const { inventory } = audit.report;
   const takenNames = new Set(Object.values(audit.sources).filter((name): name is string => name !== null));
+  const coutsRefused = audit.blockers.some((b) => b.source === "couts");
   const files = SPECS.map((spec): ImportFileEntry => {
     const file = audit.sources[spec.source];
     const mine = inventory.filter((entry) => entry.contractId !== undefined && spec.contracts.includes(entry.contractId));
     const others = mine.filter((entry) => !takenNames.has(entry.name)).map((entry) => entry.name);
+    const refusal = audit.blockers.filter((b) => b.source === spec.source);
+    if (refusal.length > 0) {
+      const named = [...new Set([...others, ...refusal.flatMap((b) => b.files)])];
+      const consequence = `chargement refusé — ${refusal.map((b) => b.message).join(" ")}`;
+      return { source: spec.source, label: spec.label, file: null, status: "douteux", consequence, others: named };
+    }
     if (file === null) return { source: spec.source, label: spec.label, file, others, ...untaken(spec, mine, audit.sources) };
     const taken = inventory.find((entry) => entry.name === file);
-    return { source: spec.source, label: spec.label, file, status: "pris", consequence: takenNote(spec, taken, audit.sources), others };
+    const consequence = takenNote(spec, taken, audit.sources, coutsRefused);
+    return { source: spec.source, label: spec.label, file, status: "pris", consequence, others };
   });
   const served = new Set(SPECS.flatMap((spec) => spec.contracts));
   const unrecognized = inventory

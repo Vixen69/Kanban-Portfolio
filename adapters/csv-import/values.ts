@@ -6,24 +6,53 @@
 // case the caller reports.
 
 import { normalizeLabel } from "./normalize.ts";
+import { readNumber } from "./numbers.ts";
 
 /** Outcome of parsing an amount cell. */
 export type ParsedAmount =
-  | { kind: "value"; value: number; unit?: string }
+  | { kind: "value"; value: number; unit?: string; ambiguous?: { alternative: number } }
   | { kind: "empty" }
   | { kind: "invalid"; raw: string };
 
 const FORMULA_ERRORS = ["#ref!", "#n/a", "#div/0!", "#valeur!", "#nom?", "#value!", "#name?"];
+// Every blank goes, visible or not: spaces, tabs, NBSP, narrow NBSP, the
+// Unicode spaces, zero-width space, BOM (September SP cells still failed
+// after « k » was accepted — something invisible sat in « 501 k »).
+const BLANKS = /[\s ­  -​  　﻿]/g;
+// Units seen after the figure: € / k€, « eur », « ke » (the August SP
+// export's k€) and a bare « k » (the September SP export: « 501 k »); a
+// currency before it is the en-US rendering (« €1,234.50 », ADR 056).
+const SUFFIX_UNIT = /(k?€|k?eur(?:os?)?|ke|k)$/i;
+const PREFIX_UNIT = /^(k?€|eur)/i;
+
+// Sign, currency prefix, unit suffix and accounting parentheses around the
+// figure: the compact number left, whether it is negated, the unit written.
+function stripDecorations(compact: string): { core: string; negated: boolean; unit: string | null } {
+  const paren = compact.match(/^\((.*)\)$/);
+  let body = paren === null ? compact : (paren[1] ?? "");
+  const sign = body.startsWith("-") || body.startsWith("+") ? body.slice(0, 1) : "";
+  body = body.slice(sign.length);
+  const prefix = body.match(PREFIX_UNIT);
+  if (prefix !== null) body = body.slice(prefix[0].length);
+  const suffix = prefix === null ? body.match(SUFFIX_UNIT) : null;
+  if (suffix !== null) body = body.slice(0, -suffix[0].length);
+  const unit = prefix?.[0] ?? suffix?.[0] ?? null;
+  return { core: (sign === "-" ? "-" : "") + body, negated: paren !== null, unit };
+}
 
 /**
- * Parses a French-formatted amount cell.
+ * Parses an amount cell, French first, whatever the converter's locale.
  * Inputs: the raw cell text.
  * Outputs: value (comma or dot decimals, space/NBSP thousand separators;
- * a stray unit suffix like « € »/« k€ »/« ke »/« k » is stripped, kept in `unit` so the
- * caller can signal it — the column's unit is the contract's, never the
- * cell's), empty (blank cell), or invalid (dashes, N/A, question marks,
- * formula errors, anything unreadable). Negative values are returned as
- * values; flagging them is the caller's decision.
+ * en-US « 1,234.50 », « 1.234,50 », scientific « 1,2345E+03 » and
+ * accounting negatives « (1 234,50 €) » since ADR 056; a stray unit like
+ * « € »/« k€ »/« ke »/« k » after the figure, or a currency before it, is
+ * stripped and kept in `unit` so the caller can signal it — the column's
+ * unit is the contract's, never the cell's; `ambiguous` carries the
+ * thousands reading of a lone comma + three digits, « 1,035 », whose
+ * French reading 1.035 is the value), empty (blank cell), or invalid
+ * (dashes, N/A, question marks, formula errors, anything unreadable).
+ * Negative values are returned as values; flagging them is the caller's.
  * Failure modes: none.
  */
 export function parseFrenchAmount(raw: string): ParsedAmount {
@@ -33,19 +62,36 @@ export function parseFrenchAmount(raw: string): ParsedAmount {
   if (["-", "—", "n/a", "na", "?"].includes(lowered) || FORMULA_ERRORS.includes(lowered)) {
     return { kind: "invalid", raw: cell };
   }
-  // Every blank goes, visible or not: spaces, tabs, NBSP, narrow NBSP, the
-  // Unicode spaces, zero-width space, BOM (September SP cells still failed
-  // after « k » was accepted — something invisible sat in « 501 k »).
-  const compact = cell.replace(/[\s\u00A0\u00AD\u1680\u2000-\u200B\u202F\u205F\u3000\uFEFF]/g, "");
-  // Units seen: € / k€, « eur », « ke » (the August SP export's k€) and a
-  // bare « k » (the September SP export: « 501 k », « 1 736 k »).
-  const unitMatch = compact.match(/(k?€|k?eur(?:os?)?|ke|k)$/i);
-  const cleaned = (unitMatch === null ? compact : compact.slice(0, -unitMatch[0].length))
-    .replace(",", ".");
-  if (!/^-?\d+(\.\d+)?$/.test(cleaned)) return { kind: "invalid", raw: cell };
-  const result: ParsedAmount = { kind: "value", value: Number(cleaned) };
-  if (unitMatch !== null) result.unit = unitMatch[0];
+  const { core, negated, unit } = stripDecorations(cell.replace(BLANKS, ""));
+  const reading = readNumber(core);
+  if (reading === null || (negated && core.startsWith("-"))) return { kind: "invalid", raw: cell };
+  const flip = (n: number): number => (negated && n !== 0 ? -n : n);
+  const result: ParsedAmount = { kind: "value", value: flip(reading.value) };
+  if (unit !== null) result.unit = unit;
+  if (reading.ambiguous !== undefined) result.ambiguous = { alternative: flip(reading.ambiguous.alternative) };
   return result;
+}
+
+/**
+ * Reads the year of an « Année » cell whatever its rendering (ADR 056):
+ * « 2026 », « 2 026 », « 2026,00 », « 2,026 » / « 2.026 » (a thousands
+ * separator — no year reads 2.026), a date « 01/01/2026 » or its Excel
+ * serial number.
+ * Input: the raw cell. Output: the year (1990–2100), null when the cell
+ * is empty or holds no plausible year. Failure modes: none.
+ */
+export function parseYearCell(raw: string): number | null {
+  const plausible = (n: number | undefined): n is number => n !== undefined && Number.isInteger(n) && n >= 1990 && n <= 2100;
+  const compact = raw.replace(BLANKS, "");
+  if (/^\d[.,]\d{3}$/.test(compact)) {
+    const year = Number(compact.replace(/[.,]/, ""));
+    return plausible(year) ? year : null;
+  }
+  const amount = parseFrenchAmount(raw);
+  if (amount.kind === "value" && amount.unit === undefined && plausible(amount.value)) return amount.value;
+  const date = parseFrenchDate(raw);
+  const year = date.kind === "date" ? Number(date.iso.slice(0, 4)) : undefined;
+  return plausible(year) ? year : null;
 }
 
 /** Outcome of parsing a date or milestone cell. */

@@ -50,6 +50,7 @@ function stubStorage(cards: Card[] = [testCard({ id: "S001" })]): BoardStorage {
     async getCapacity() {
       return null;
     },
+    async clearCapacity() {},
     ...stubSnapshots(baseCards, () => seq),
     async close() {},
 
