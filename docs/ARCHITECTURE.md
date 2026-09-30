@@ -637,6 +637,11 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-30 (nuit) — Le chef de projet : le responsable de domaine quand il est le seul nom
+
+- **Règle de l'auteur** : le chef de projet est Responsable 1, ou Responsable 2 quand le 1 est un responsable de domaine ; « des fois c'est le responsable de domaine, s'il a son nom et qu'il n'y a pas d'autre nom ».
+- **Fait** : quand tous les noms donnés sont des responsables de domaine, le premier devient chef de projet (avant : case vide). Même règle pour l'onglet Projets et ProjetsCdP (`owner-rule.ts`).
+
 ### 2026-09-30 (soir) — Un import n'efface jamais une information absente (ADR 054)
 
 - **Incident** : un rechargement partiel (Coût, Projets, SP 2026, PdC

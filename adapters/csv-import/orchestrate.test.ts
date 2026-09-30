@@ -64,7 +64,7 @@ test("the five fixture files assemble the full deck", () => {
     " · cellules décidées par : statut 10 · date 0 · « franchi » 8");
   assert.equal(byLabel.get("domaine"), "6/6 (direct 6 · via PARAM 0 · manquant 0) · sous-domaine : 3 détaillé(s), 2 replié(s) dans leur domaine");
   assert.equal(byLabel.get("chef de projet"),
-    "6/6 (dont 1 via ProjetsCdP · 1 ligne(s) ProjetsCdP hors périmètre) · responsables de domaine exclus : 4");
+    "6/6 (dont 1 via ProjetsCdP · 1 ligne(s) ProjetsCdP hors périmètre) · responsables de domaine écartés pour un autre nom : 4");
   const carto = cards?.cards.find((c) => c.codename === "PE10008");
   assert.equal(carto?.owner, "Farid KOVAC", "BARBIER Anne is a PARAM domain lead, excluded");
   assert.match(byLabel.get("coûts 2026 (SP)") ?? "", /^4\/6 jointes \(Id 3 · nom 1 · code 0\) · sans correspondance : 2 · sujets SP hors périmètre : 1 · RDLI/);
@@ -226,7 +226,7 @@ test("a second full Projets export lends its chefs de projet when no ProjetsCdP 
   assert.ok(report.warnings.some((w) => w.file === "ProjetsExport.csv" && /lu comme ProjetsCdP/.test(w.message)));
   const byLabel = new Map(report.assembly.map((a) => [a.subject, a.status]));
   assert.equal(byLabel.get("chef de projet"),
-    "5/6 (dont 0 via ProjetsCdP · 0 ligne(s) ProjetsCdP hors périmètre) · responsables de domaine exclus : 4");
+    "5/6 (dont 0 via ProjetsCdP · 0 ligne(s) ProjetsCdP hors périmètre) · responsables de domaine écartés pour un autre nom : 4");
 });
 
 test("ADR 035: the audit reads the exercise it is given — the 2026 COUT PREV carries no project on 2027", () => {

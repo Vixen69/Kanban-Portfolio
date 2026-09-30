@@ -119,7 +119,10 @@ la machine d'exécution, **jamais stockées** (même règle que `RDOM`).
 consolidé `Projets` porte lui-même Responsable 1/2/3 ; `owner` = le premier
 qui n'est **pas** un responsable de domaine (colonne Responsable de la
 table DOMAINES de `PARAM`), exclusions comptées. L'export brut `projet`
-n'est plus nécessaire (Q20 sans objet).
+n'est plus nécessaire (Q20 sans objet). **Précision auteur 2026-09-30** :
+quand le seul nom donné est un responsable de domaine, c'est lui le chef de
+projet (« des fois c'est le responsable de domaine, s'il a son nom et qu'il
+n'y a pas d'autre nom ») — `owner-rule.ts`, même règle pour ProjetsCdP.
 
 **R7 — Position initiale : `ProjetsJalons`.** Jointure par Id (nom en
 contrôle). **Le statut du jalon décide** (auteur, 2026-09-11, ADR 032) :
@@ -419,7 +422,8 @@ reste le fichier **sans** colonnes Responsable (R2, 2026-09-09 — signalé
 dans les douteux). Contrat `projets_cdp` : requis Id,
 Responsable 1 ; optionnels Nom, Responsable 2, Responsable 3. Même règle
 que Projets (R6) : le chef de projet est le premier Responsable qui n'est
-pas un responsable de domaine de PARAM. Jointure par Id (le code de la
+pas un responsable de domaine de PARAM — à défaut, le responsable de
+domaine quand il est le seul nom. Jointure par Id (le code de la
 carte), puis par nom ; seules les cartes **sans** chef de projet en
 prennent un ; les lignes hors périmètre sont comptées. La ligne « chef de
 projet » de l'état d'assemblage dit « dont N via ProjetsCdP ».

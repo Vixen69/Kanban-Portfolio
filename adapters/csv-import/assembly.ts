@@ -49,7 +49,7 @@ export function emitMissing(report: ImportReport, present: Presence, year: numbe
     ["sp", "SP (exercice ou total)", `coûts ${year} : meilleur estimé, réel, engagé`],
     ["pdc", "Ressources_PdC", "plan de charge de l'exercice par profil et par personne (+ consolidation nominative)"],
     ["profils", "Ress.Profils", "facultatif depuis l'ADR 029 — les personnes, capacités et métiers viennent du plan de charge ; sert de repli pour le domaine"],
-    ["cdp", "ProjetsCdP", "chefs de projet (Responsable 1→3, responsables de domaine exclus) quand `projets` ne les porte pas — facultatif"],
+    ["cdp", "ProjetsCdP", "chefs de projet (Responsable 1→3 ; un responsable de domaine seulement s'il est le seul nom) quand `projets` ne les porte pas — facultatif"],
   ];
   for (const [key, name, note] of expected) {
     if (key === "projets" && present.couts) continue;
@@ -203,12 +203,12 @@ function emitDeck(
 }
 
 // Chefs de projet: from Projets, completed by ProjetsCdP when present; the
-// domain leads excluded by both readers are summed.
+// domain leads passed over for another name by both readers are summed.
 function ownerStatus(deck: CardAssembly, projets: ProjetsTable, data: AssemblyData): string {
   const via = data.ownerStats === null ? ""
     : ` (dont ${data.ownerStats.filled} via ProjetsCdP · ${data.ownerStats.cdpOutside} ligne(s) ProjetsCdP hors périmètre)`;
   const excluded = projets.counts.leadsExcluded + (data.cdp?.counts.leadsExcluded ?? 0);
-  return `${deck.stats.withOwner}/${deck.stats.total}${via} · responsables de domaine exclus : ${excluded}`;
+  return `${deck.stats.withOwner}/${deck.stats.total}${via} · responsables de domaine écartés pour un autre nom : ${excluded}`;
 }
 
 function positionStatus(data: AssemblyData, deck: CardAssembly): string {

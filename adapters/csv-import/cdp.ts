@@ -1,12 +1,14 @@
 // Reader for the ProjetsCdP sheet (2026-09-08): the perimeter's rows with
 // their Responsable 1→3, exported separately because the August Projets
-// onglet carries none. Same rule as Projets (R6): the chef de projet is the
-// first Responsable that is not a PARAM domain lead. Rows are keyed by Id
+// onglet carries none. Same rule as Projets (R6, owner-rule.ts): the chef
+// de projet is the first Responsable that is not a PARAM domain lead, else
+// the domain lead when he is the only name. Rows are keyed by Id
 // (the card's codename) with the name as fallback; owners.ts attaches them
 // to the assembled cards that still lack an owner.
 
 import { normalizeLabel } from "./normalize.ts";
 import { isDomainLead } from "./domains.ts";
+import { pickOwner } from "./owner-rule.ts";
 import { tallyInto, tallyLabel } from "./tallies.ts";
 import type { Tally } from "./tallies.ts";
 import type { CsvRow } from "./csv.ts";
@@ -40,18 +42,17 @@ function cell(ctx: CdpContext, row: CsvRow, column: string): string {
   return index === undefined ? "" : (row.cells[index] ?? "").trim();
 }
 
-// First of Responsables 1→3 that is not a PARAM domain lead (R6).
+// The chef de projet among Responsables 1→3 (R6, owner-rule.ts): the first
+// that is not a PARAM domain lead, else the lead when he is the only name.
 function deriveOwner(ctx: CdpContext, row: CsvRow): string | null {
-  for (const column of RESPONSABLE_COLUMNS) {
-    const value = cell(ctx, row, column);
-    if (value === "") continue;
-    if (ctx.param !== null && isDomainLead(ctx.param.leadWords, value)) {
-      ctx.table.counts.leadsExcluded++;
-      continue;
-    }
-    return value;
-  }
-  return null;
+  const leads = ctx.param?.leadWords;
+  const pick = pickOwner(
+    RESPONSABLE_COLUMNS.map((column) => cell(ctx, row, column)),
+    leads === undefined ? null : (value) => isDomainLead(leads, value),
+  );
+  ctx.table.counts.leadsExcluded += pick.leadsSkipped;
+  if (pick.leadTaken) tallyInto(ctx.tallies, "seul nom : un responsable de domaine, pris comme chef de projet", row.line);
+  return pick.owner;
 }
 
 function readRow(ctx: CdpContext, row: CsvRow): void {
@@ -68,7 +69,7 @@ function readRow(ctx: CdpContext, row: CsvRow): void {
   }
   const owner = deriveOwner(ctx, row);
   ctx.table.counts.rows++;
-  if (owner === null) tallyInto(ctx.tallies, "ligne sans chef de projet (responsables vides ou tous responsables de domaine)", row.line);
+  if (owner === null) tallyInto(ctx.tallies, "ligne sans chef de projet (responsables vides)", row.line);
   else ctx.table.counts.withOwner++;
   if (id !== "") {
     if (ctx.table.byId.has(id)) tallyInto(ctx.tallies, "Id en double — première ligne conservée", row.line, id);
