@@ -64,10 +64,13 @@ export function toCard(
 
 /**
  * The « domaine à vérifier » flag of a refreshed stored card (ADR 061):
- * set when the export resolves no domain for it, the card wears one, and
- * no human ever set that domain (no domain decision in the log — by hand
- * or ADR 036 — and no creation by hand): the domain may be the old
- * first-domain fallback. Recomputed at each load — cleared otherwise. A
+ * set when the export resolves no domain for it, the card wears the FIRST
+ * configured domain — the only one the old fallback ever gave (author,
+ * 2026-09-30: « des projets à A&D qui ne sont pas à A&D ») — and no human
+ * ever set that domain (no domain decision in the log — by hand or ADR
+ * 036 — and no creation by hand): that domain may be the old default. A
+ * card in any other domain got it from an export and is left alone.
+ * Recomputed at each load — cleared otherwise. A
  * domain the config does not declare is never flagged: the board reads it
  * « Sans domaine » (to assign), not as a domain to check.
  * Inputs: the rebuilt card, whether the export resolved a domain, whether
@@ -76,7 +79,8 @@ export function toCard(
  */
 export function withDomainFlag(card: Card, exportResolved: boolean, setByHand: boolean, config: BoardConfig): Card {
   const { domainUnresolved: _previous, ...rest } = card;
-  return !exportResolved && !setByHand && isDeclaredDomain(config, card.domain) ? { ...rest, domainUnresolved: true } : rest;
+  const oldDefault = card.domain === config.domains[0]?.id;
+  return !exportResolved && !setByHand && oldDefault && isDeclaredDomain(config, card.domain) ? { ...rest, domainUnresolved: true } : rest;
 }
 
 // The plan de charge lines a card keeps: those whose métier resolved to a

@@ -57,6 +57,36 @@ information is listed under "Open decisions", ask rather than assume.
 > the cumulated limit is `lanes × column.wip` (per CELL since ADR 046), and
 > terminal stages are always derived from the config, never hardcoded.
 
+> **2026-09-30 — Readable, safe imports** (ADR 054–061, author's decisions).
+> ONE import mode: a partial file set updates what it carries and never
+> erases a stored fact (ADR 054). The audit and the load return ONE
+> structured report (`changes`, core/import-changes.ts, ADR 055): files
+> taken and what a missing one keeps, the perimeter with a reason per
+> excluded project, entered / left / back with reasons, value changes old →
+> new (owner, k€, j.h, date RDR, plan de charge planned / RAF per métier —
+> one engine, core/snapshot-diff.ts, also behind « Comparer avec
+> maintenant »), kept facts; the Markdown report stays, folded. Determinism
+> (ADR 056): one file per kind (competing files refuse the load), matching
+> on the VERSIONED model's vocabulary (a ⚙ › Catégories rename is display
+> only), a Coût look-alike not recognised refuses the load, COUT PREV facts
+> independent of row order, locale-safe figures, every ambiguity a douteux.
+> Idempotence (ADR 058): jalons dated from the export's own date
+> (Europe/Paris), Id-first joins, the importer reads the restore-filtered
+> log, only a hand move to ANOTHER column pins a card, deleted cards are
+> never re-created, restores clear later capacity and set aside a config
+> applied on another board.json, loads are serialized, the fold always
+> applies a card's creation first (core/fold-order.ts). Hand entry parity
+> (ADR 057): creation takes any patchable fact, unknown keys are refused,
+> no invented « PX » code. Adoption (ADR 059): a hand card whose code an
+> export project carries becomes that project. New export information wins
+> (ADR 060): a value changed since the previous import beats a hand
+> correction; a newer, further jalon moves a hand-placed card (never out of
+> Pause); a repeat leaves hand work alone. No default domain, ever (ADR
+> 061): a project without domain enters with none (domain ""), wears a
+> static « ? » and is assigned by hand; old A&D defaults are flagged
+> « domaine à vérifier ». Details in each ADR; the sections below predate
+> this block where they disagree.
+
 ## 1. What this project is
 
 An opinionated portfolio kanban instrument: a single-page board that makes a
@@ -150,7 +180,7 @@ BoardStorage                  (persistence — Postgres adapter behind it)
   importCards / insertCard / appendEvent / listEvents(filter?) / listBaseCards / close
   (filter = afterSeq | cardIds, ADR 040: the incremental refresh and the
    per-action validation fold never read the whole log)
-  importCapacity / getCapacity(year)                      (ADR 024/035)
+  importCapacity / getCapacity(year) / clearCapacity(year) (ADR 024/035/058)
   saveSnapshot / listSnapshots / loadSnapshot / restoreCards / lastSeq
   (ADR 042: the snapshots and the restore of the base cards)
 ```
@@ -247,8 +277,8 @@ read from the log.
   `toSeq`): the fold reads the log through `core/restore.ts` — the
   events between `toSeq` and the restore are UNDONE (kept, no longer
   read), the later ones apply; restores nest. Nothing is ever deleted.
-  One snapshot is taken automatically before each import load and each
-  year switch.
+  One snapshot is taken automatically before each import load (tool and
+  CLI) and each year switch.
  The event-sourced model (append-only log + fold-on-read) is retained —
 it is the product's core (§1) and maps to a plain Postgres append-only table;
 to the platform the middle is a standard Express+Postgres service doing
@@ -431,7 +461,9 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
 - QuickAdd (« + Sujet », touche N): always enters the first column; the
   canal confers the nature. When the intake column has no canal (ADR 039)
   the form asks for none — the server defaults to the « complicated »
-  canal, hidden until the qualification drag picks the real one.
+  canal, hidden until the qualification drag picks the real one. A folded
+  « Plus d'informations » block takes the other facts (ADR 057); no domain
+  is preselected (ADR 061); after « Créer » the card's « Modifier » opens.
 - Admin panel (⚙, ADR 046 — locked to what the importer does not depend
   on, author 2026-09-24): **Limites WIP** (one limit per cell, canal by
   column; a column without canal has one cell; empty = none; replaces the

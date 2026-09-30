@@ -25,7 +25,9 @@ sa couleur, ses chiffres et dans l'arbitrage des responsables de domaine.
    (« [Business] »), la sécurité « PROJETS VENDUS » et les conflits de
    l'ADR 036 ne changent pas.
 2. **Les anciennes cartes rangées par défaut deviennent visibles.** Quand
-   l'export ne donne pas de domaine pour une carte déjà au tableau et
+   l'export ne donne pas de domaine pour une carte déjà au tableau, rangée
+   dans le premier domaine du modèle (A&D, le seul que l'ancienne règle
+   donnait — une carte d'un autre domaine le tient d'un export), et
    qu'aucun humain n'a jamais fixé son domaine (ni modification dans la
    fiche, ni décision « garder » / « remplacer » de l'ADR 036, ni création à
    la main), le chargement la marque **« domaine à vérifier »** : son

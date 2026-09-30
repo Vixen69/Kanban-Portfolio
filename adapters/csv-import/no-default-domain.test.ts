@@ -75,6 +75,13 @@ test("a stored card whose export gives no domain and no human set it is flagged 
   assert.deepEqual([resolved.cards[0]?.domainUnresolved, "domainUnresolved" in (resolved.cards[0] ?? {})], [undefined, false], "the export gives it again: cleared");
 });
 
+test("only the old default (the first configured domain) can be flagged: a card an export put in another domain is left alone", () => {
+  const board = legacyBoard();
+  board.cards = board.cards.map((card) => ({ ...card, domain: "infra" }));
+  const plan = planLoad([deckCard(BLANK)], CONFIG, board.cards, board.events, NOW);
+  assert.deepEqual([plan.cards[0]?.domain, plan.cards[0]?.domainUnresolved, plan.domainToCheck], ["infra", undefined, []]);
+});
+
 test("a human domain — fiche edit, ADR 036 decision or hand creation — is never flagged; the edit clears the flag in the fold", () => {
   const cases: Array<[string, (board: Board) => CardEvent]> = [
     ["edit in the fiche", (board) => editedDomain(board, "anonymous", "ad")],
