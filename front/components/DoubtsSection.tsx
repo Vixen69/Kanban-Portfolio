@@ -71,7 +71,8 @@ export function DoubtsSection({ doubts, state, onChange, onPreview, busy, ignore
       <div className="m2-note">
         Jamais bloquant : sans rien toucher, le chargement applique les choix de l’outil. Un choix vaut pour ce chargement,
         et la question reviendra au prochain import ; « Ne plus me demander pour ce projet » garde le choix de cette
-        question tant que le doute reste le même. Chaque réponse est tracée dans le journal au chargement.
+        question tant que le doute reste le même. Chaque réponse est enregistrée au chargement dans le journal
+        d’événements (Analytics › Journal ne la montre pas) ; les choix mémorisés reviennent sous « Déjà tranchés ».
       </div>
       <Groups open={open} state={state} onChange={onChange} />
       <RememberedDoubts doubts={remembered} onAskAgain={(doubt) => onChange(withForgotten(state, doubt))} />

@@ -106,7 +106,8 @@ remet la question parmi les doutes, sur le choix de l’outil.
 - Le rapport lisible nomme les « Doutes tranchés autrement que par
   l’outil » (mémorisé ou choisi à ce chargement), le périmètre dit le
   projet écarté par un choix, le résumé du chargement compte les choix
-  tracés dans le journal. `remembered` porte l’auteur du choix (`actor`
+  enregistrés dans le journal d’événements (la vue Analytics › Journal,
+  ADR 052, ne les montre pas — § 3). `remembered` porte l’auteur du choix (`actor`
   de l’événement `settled`).
 - Fichiers : `front/importDoubts.ts` (état, envoi, textes — testé),
   `front/useImport.ts`, `front/apiImport.ts` (les deux appels d’import,

@@ -104,7 +104,7 @@ test("loadOutcomes: what the load did beyond the summary, the non-zero ones only
     "6 sortie(s) de Pause : état Sciforma terminé",
     "3 carte(s) saisie(s) à la main adoptée(s)",
     "4 supprimée(s) du tableau, ignorée(s)",
-    "2 choix de doute tracé(s) dans le journal",
+    "2 choix de doute enregistré(s) dans le journal d’événements",
   ]);
   assert.deepEqual(loadOutcomes({ ...load, settled: 0 }), [], "no choice sent, nothing traced (ADR 062)");
 });

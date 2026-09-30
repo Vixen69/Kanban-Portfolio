@@ -637,6 +637,13 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-30 (branche import-doutes) — Doutes à trancher à l'import (ADR 062)
+
+- **Demande de l'auteur** : « me dire pourquoi c'est douteux, est-ce qu'on le prend, est-ce qu'on le prend pas » ; « tant que tu n'as pas cliqué, on te redemandera ». Construit sur la branche `import-doutes`, au-dessus de `import-lisible`.
+- **Fait** : l'audit transforme les doutes décidables en questions (core/import-doubts.ts) : le projet, la question, pourquoi, les choix et leur conséquence, le choix de l'outil présélectionné. Jamais bloquant : charger sans rien toucher applique les choix de l'outil. L'écran ⚙ › Importer gagne la section « Doutes à trancher » ; les choix mémorisés sont repliés sous « Déjà tranchés », avec « Redemander ».
+- **Nouveau type d'événement `settled`** : chaque réponse envoyée au chargement est écrite dans le même lot que le chargement (qui, quand, le doute, l'option, ses mots — jamais un nom de personne —, mémorisée ou non). Seule la mémoire de l'importeur le lit : le pli du tableau, l'Historique, la vue Analytics › Journal et les indicateurs de flux l'ignorent. Son identifiant de carte peut nommer un projet qui n'est pas au tableau (« code@année »), à savoir pour l'outillage de la base (table toujours en ajout seul). « Ne plus me demander » garde le choix tant que le doute reste le même (empreinte) ; une restauration oublie les choix écrits après la position restaurée.
+- **Compatibilité** : aucune migration ; les cartes et journaux existants se relisent tels quels (un journal sans `settled` n'a simplement aucun choix mémorisé). Le résumé du chargement dit « N choix de doute enregistré(s) dans le journal d'événements » — pas « dans le journal », pour ne pas renvoyer vers la vue Journal qui ne les montre pas.
+
 ### 2026-09-30 (branche import-lisible) — Des imports lisibles et sûrs (ADR 055 à 061)
 
 - **Demande de l'auteur** : « les valeurs actualisées, je dois pouvoir les voir rapidement à un endroit et savoir vraiment ce qu'il a pris » ; un seul mode d'import ; tout doit pouvoir se saisir à la main ; jamais de domaine par défaut. Construit sur la branche `import-lisible`, fusionnée par l'auteur après la RSP.

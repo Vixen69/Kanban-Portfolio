@@ -57,7 +57,7 @@ information is listed under "Open decisions", ask rather than assume.
 > the cumulated limit is `lanes × column.wip` (per CELL since ADR 046), and
 > terminal stages are always derived from the config, never hardcoded.
 
-> **2026-09-30 — Readable, safe imports** (ADR 054–061, author's decisions).
+> **2026-09-30 — Readable, safe imports** (ADR 054–062, author's decisions).
 > ONE import mode: a partial file set updates what it carries and never
 > erases a stored fact (ADR 054). The audit and the load return ONE
 > structured report (`changes`, core/import-changes.ts, ADR 055): files
@@ -84,7 +84,10 @@ information is listed under "Open decisions", ask rather than assume.
 > Pause); a repeat leaves hand work alone. No default domain, ever (ADR
 > 061): a project without domain enters with none (domain ""), wears a
 > static « ? » and is assigned by hand; old A&D defaults are flagged
-> « domaine à vérifier ». Details in each ADR; the sections below predate
+> « domaine à vérifier ». Doubts to settle (ADR 062): the audit turns the
+> decidable doubts into questions with the tool's choice preselected (never
+> blocking); each answer sent at load is a `settled` event, remembered per
+> project and question while the doubt stays the same. Details in each ADR; the sections below predate
 > this block where they disagree.
 
 ## 1. What this project is
@@ -244,7 +247,7 @@ fields, append-only enforced by table grants/triggers):
 - `card_events` : append-only. seq (bigint sequence, ordering), id
   (evt-<seq>), ts, actor, card_id, type (created/moved/blocked/unblocked/
   edited/commented/archived/unarchived/deleted/imported/decided/unlisted/
-  relisted/activated/restored), from_column,
+  relisted/activated/restored/settled), from_column,
   to_column, payload (jsonb). Never updated, never deleted. Comments are a
   projection of `commented` events; deletion is a `deleted` event (the fold
   excludes the card, the log keeps everything — ADR 012); archiving is a
@@ -263,7 +266,12 @@ fields, append-only enforced by table grants/triggers):
   « Décision et Raison » V0.1 (instance, reason, options, frees, pause kind
   tactique/parking + lift condition + review date — none for a parking —,
   what changed + canal from → to + architect validation, decidedOn), read
-  back by `core/decision-record.ts`.
+  back by `core/decision-record.ts`. `settled` (ADR 062) is an import
+  doubt's answer (the option, its words — never a person's name —,
+  remembered or not, or a « Redemander »), appended in the same batch as
+  the load and read ONLY by the importer's memory: the fold, the
+  Historique, the Analytics › Journal and the flow metrics ignore it, and
+  its card_id may name a project that is not on the board (« code@année »).
 - `users`: id, login, scrypt_hash, role (viewer/editor/admin), created_at,
   disabled.
 - `capacity` (ADR 024/028/035): one row PER EXERCISE YEAR (id = the
