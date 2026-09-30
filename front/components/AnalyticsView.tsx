@@ -31,6 +31,8 @@ export interface AnalyticsViewProps {
   allCards: CardState[];
   /** Opens a card's fiche from the journal. */
   onOpenCard: (cardId: string) => void;
+  /** Hidden while a fiche opened from it is shown: tab, period and filters survive. */
+  hidden: boolean;
   onClose: () => void;
 }
 
@@ -55,7 +57,7 @@ function TabBar({ tab, onTab }: { tab: Tab; onTab: (tab: Tab) => void }) {
 export function AnalyticsView(props: AnalyticsViewProps) {
   const [tab, setTab] = useState<Tab>("capacite");
   return (
-    <div className="metrics-view m2">
+    <div className="metrics-view m2" style={{ display: props.hidden ? "none" : undefined }}>
       <div className="metrics-head">
         <div>
           <h2 className="metrics-title">Analytics</h2>

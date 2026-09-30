@@ -16,6 +16,7 @@ import { patchValidators } from "./validation.ts";
 import { BadRequest } from "./errors.ts";
 import { buildDecided } from "./decisions.ts";
 import { buildMoves } from "./moves.ts";
+import { PAUSE_COLUMN_ID, PAUSE_DECISION_ID } from "../core/gesture.ts";
 
 export { isCriticality } from "./validation.ts";
 
@@ -190,6 +191,11 @@ function buildByType(
     case "deleted":
       return lifecycleEvent("deleted", state.id, SERVER_ACTOR, ts);
     case "decided":
+      // Decisions are taken by the gesture (ADR 052): alone, only the pause
+      // of a card in Pause is traced (decided on paper) or renewed.
+      if (body["decisionId"] !== PAUSE_DECISION_ID || state.columnId !== PAUSE_COLUMN_ID) {
+        throw new BadRequest("Les décisions se prennent au geste : seule la pause d’une carte en Pause se trace depuis la fiche.");
+      }
       return buildDecided(config, state, body, ts, SERVER_ACTOR);
     default:
       throw new BadRequest("Type d’évènement non autorisé.");

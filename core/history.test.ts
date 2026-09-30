@@ -126,3 +126,22 @@ test("a decision line reads the fiche's blocks (ADR 052)", () => {
   assert.equal(history[0]?.detail, "D4 Mettre en pause · pause tactique · N’avance pas · réexamen le 02/11/2026 · décidée le 01/10/2026");
   assert.equal(history[0]?.reason, "Plus de sponsor. — Pour la lever : Un sponsor nommé");
 });
+
+test("« Mise en pause », « Reprise », and a card sent straight from Demandes into Pause (ADR 052)", () => {
+  const config = {
+    ...CONFIG,
+    columns: [
+      { id: "demandes", name: "Demandes", gate: null, review: null, gateStart: null, note: "" },
+      { id: "qualification", name: "Qualification", gate: null, review: null, gateStart: null, note: "" },
+      { id: "actifs", name: "Actifs", gate: null, review: null, gateStart: null, note: "" },
+      { id: "pause", name: "Pause", gate: null, review: null, gateStart: null, note: "" },
+    ],
+  };
+  const move = (id: number, from: string, to: string) => event({
+    id: `evt-${id}`, ts: `2026-0${id}-01T00:00:00.000Z`, type: "moved", actor: "anonymous",
+    fromColumn: from, toColumn: to, payload: { fromLaneId: "laneA", laneId: "laneA" },
+  });
+  const history = cardHistory([move(1, "actifs", "pause"), move(2, "pause", "actifs"), move(3, "demandes", "pause")], "S001", config);
+  // Pause has canals: leaving the intake straight into it is also the qualification.
+  assert.deepEqual(history.map((entry) => entry.gesture), ["Mise en pause · Qualifiée : Lane A", "Reprise", "Mise en pause"]);
+});

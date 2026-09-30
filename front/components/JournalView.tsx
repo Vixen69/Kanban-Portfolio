@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { BoardConfig, CardEvent, CardState } from "../../core/types.ts";
 import type { SnapshotSummary } from "../../core/snapshot.ts";
-import { journalCounts, journalRows, type JournalKind, type JournalRow } from "../../core/journal.ts";
+import { filterJournal, journalAll, journalCounts, type JournalKind, type JournalRow } from "../../core/journal.ts";
 import { cardMatchesQuery } from "../../core/text-search.ts";
 import { fetchSnapshots } from "../apiSnapshots.ts";
 import { displayActor } from "../lookup.ts";
@@ -84,7 +84,7 @@ function Rows({ rows, byId, onOpen }: { rows: JournalRow[]; byId: Map<string, Ca
   const out: React.ReactNode[] = [];
   let day = "";
   for (const row of rows) {
-    const today = row.ts.slice(0, 10);
+    const today = new Date(row.ts).toLocaleDateString("fr-FR"); // the local day, as titled and timed
     if (today !== day) {
       day = today;
       out.push(<tr key={"d" + row.id} className="jr-day"><td colSpan={6}>{frDayTitle(row.ts)}</td></tr>);
@@ -92,6 +92,23 @@ function Rows({ rows, byId, onOpen }: { rows: JournalRow[]; byId: Map<string, Ca
     out.push(<Row key={row.id} row={row} card={byId.get(row.cardId)} onOpen={onOpen} />);
   }
   return <>{out}</>;
+}
+
+// The rows the filters keep: built once per log (not per keystroke), then
+// filtered — the exercise's cards matching the search, plus the deleted
+// ones (gone from the fold, not from the log).
+function useJournalRows(src: Pick<JournalTabProps, "cards" | "events" | "config" | "now">, period: Period, kinds: ReadonlySet<JournalKind>, search: string): JournalRow[] {
+  const { cards, events, config, now } = src;
+  const all = useMemo(() => journalAll(config, events), [config, events]);
+  const deleted = useMemo(() => new Set(events.filter((e) => e.type === "deleted").map((e) => e.cardId)), [events]);
+  return useMemo(() => {
+    const matching = cards.filter((card) => cardMatchesQuery(card, search)).map((card) => card.id);
+    const needle = search.trim().toLowerCase();
+    const gone = [...deleted].filter((id) => needle === "" || id.toLowerCase().includes(needle));
+    const since = period.kind === "days" ? { sinceTs: new Date(now - period.days * DAY_MS).toISOString() } : {};
+    const after = period.kind === "snapshot" ? { afterSeq: period.seq } : {};
+    return filterJournal(all, { kinds, cardIds: new Set([...matching, ...gone]), ...since, ...after });
+  }, [all, cards, deleted, kinds, now, period, search]);
 }
 
 /**
@@ -107,12 +124,8 @@ export function JournalTab({ cards, events, config, now, onOpen }: JournalTabPro
   const [search, setSearch] = useState("");
   const [limit, setLimit] = useState(PAGE);
   const byId = useMemo(() => new Map(cards.map((card) => [card.id, card])), [cards]);
-  const rows = useMemo(() => {
-    const cardIds = new Set(cards.filter((card) => cardMatchesQuery(card, search)).map((card) => card.id));
-    const since = period.kind === "days" ? { sinceTs: new Date(now - period.days * DAY_MS).toISOString() } : {};
-    const after = period.kind === "snapshot" ? { afterSeq: period.seq } : {};
-    return journalRows(config, events, { kinds, cardIds, ...since, ...after });
-  }, [cards, config, events, kinds, now, period, search]);
+  const rows = useJournalRows({ cards, events, config, now }, period, kinds, search);
+  const since = period.kind === "snapshot" ? snapshots.find((s) => s.logSeq === period.seq) : undefined;
   const counts = journalCounts(rows);
   const toggle = (kind: JournalKind) => setKinds((current) => {
     const next = new Set(current);
@@ -129,7 +142,8 @@ export function JournalTab({ cards, events, config, now, onOpen }: JournalTabPro
         <input className="inp jr-search" placeholder="Rechercher un sujet…" value={search} onChange={(event) => setSearch(event.target.value)} />
       </div>
       <div className="jr-head">
-        {counts.move} mouvement(s) · {counts.decision} décision(s) · {counts.block} blocage(s) · {counts.archive} archivage(s){kinds.has("import") ? ` · ${counts.import} ligne(s) d’import` : ""}
+        {since !== undefined ? `Depuis l’instantané « ${since.label} » : ` : ""}
+        {counts.move} mouvement(s) · {counts.decision} décision(s) · {counts.block} blocage(s) · {counts.archive} archivage(s) ou suppression(s){kinds.has("import") ? ` · ${counts.import} ligne(s) d’import` : ""}
       </div>
       {rows.length === 0
         ? <div className="cm-empty">Rien sur cette période avec ces filtres.</div>

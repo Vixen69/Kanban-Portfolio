@@ -100,9 +100,12 @@ export function buildMoves(
   const sent = sentDecisions(body["decisions"]);
   checkDecisions(config, requiredDecisions(config, gesture), sent);
   const moved = movedEvent(state.id, from, to, context.actor, context.ts, beforeId);
+  // The canal from → to is the server's own reading of the move, on the
+  // requalification only; whatever the client sent there is dropped.
   const decided = sent.map((entry) => {
-    const lanes = entry["decisionId"] === REQUALIFY_DECISION_ID ? { fromLaneId: from.laneId, toLaneId: to.laneId } : {};
-    return buildDecided(config, state, { ...entry, ...lanes }, context.ts, context.actor, { acceptLanes: true });
+    const requalify = entry["decisionId"] === REQUALIFY_DECISION_ID;
+    const body = { ...entry, fromLaneId: requalify ? from.laneId : undefined, toLaneId: requalify ? to.laneId : undefined };
+    return buildDecided(config, state, body, context.ts, context.actor, { acceptLanes: requalify });
   });
   return [moved, ...decided];
 }

@@ -24,6 +24,8 @@ export interface PendingDecision {
 /** The gate: request a move, trace a pause, confirm or cancel the fiche. */
 export interface MoveGate {
   pending: PendingDecision | null;
+  /** Whether this move is a decision (its fiche will open) — read before writing anything. */
+  requires: (card: CardState, to: MoveTarget) => boolean;
   /** Moves the card, or holds the move for its fiche; resolves true once written. */
   request: (card: CardState, to: MoveTarget) => Promise<boolean>;
   /** Opens the fiche to trace (or renew) the pause of a card in Pause. */
@@ -40,6 +42,27 @@ function useLatest<T>(value: T) {
   return ref;
 }
 
+// The open fiche: its state (rendered), a ref (read after an await) and
+// the promise of the move it holds.
+function useFiche() {
+  const [pending, setPending] = useState<PendingDecision | null>(null);
+  const resolver = useRef<((ok: boolean) => void) | null>(null);
+  const held = useRef<PendingDecision | null>(null);
+  const open = useCallback((next: PendingDecision, resolve: ((ok: boolean) => void) | null) => {
+    resolver.current?.(false); // a fiche left open is abandoned, never written
+    resolver.current = resolve;
+    held.current = next;
+    setPending(next);
+  }, []);
+  const settle = useCallback((ok: boolean) => {
+    resolver.current?.(ok);
+    resolver.current = null;
+    held.current = null;
+    setPending(null);
+  }, []);
+  return { pending, held, open, settle };
+}
+
 /**
  * The move gate of the board.
  * Inputs: the board store (cards, events, moveCard, decideCard, lastError),
@@ -49,41 +72,35 @@ function useLatest<T>(value: T) {
  * nothing half-written (the move and its decisions travel together).
  */
 export function useMoveGate(store: BoardStore, config: BoardConfig): MoveGate {
-  const [pending, setPending] = useState<PendingDecision | null>(null);
-  const resolver = useRef<((ok: boolean) => void) | null>(null);
-  const latest = useLatest({ store, config, pending });
-  const settle = useCallback((ok: boolean) => {
-    resolver.current?.(ok);
-    resolver.current = null;
-    setPending(null);
-  }, []);
-  const request = useCallback((card: CardState, to: MoveTarget): Promise<boolean> => {
+  const { pending, held, open, settle } = useFiche();
+  const latest = useLatest({ store, config });
+  const readMove = useCallback((card: CardState, to: MoveTarget) => {
     const { store: current, config: cfg } = latest.current;
-    const from = { laneId: card.laneId, columnId: card.columnId };
-    const gesture = readGesture(cfg, from, to, laneChosen(cfg, card.id, current.events));
-    const required = requiredDecisions(cfg, gesture);
-    if (required.length === 0) return current.moveCard(card.id, to);
-    resolver.current?.(false); // a fiche left open is abandoned, never written
-    return new Promise<boolean>((resolve) => {
-      resolver.current = resolve;
-      current.dismissError();
-      setPending({ card, to, gesture, required });
-    });
+    const gesture = readGesture(cfg, { laneId: card.laneId, columnId: card.columnId }, to, laneChosen(cfg, card.id, current.events));
+    return { gesture, required: requiredDecisions(cfg, gesture) };
   }, [latest]);
-  const tracePause = useCallback((card: CardState) => {
-    resolver.current?.(false);
-    resolver.current = null;
+  const requires = useCallback((card: CardState, to: MoveTarget) => readMove(card, to).required.length > 0, [readMove]);
+  const request = useCallback((card: CardState, to: MoveTarget): Promise<boolean> => {
+    const { gesture, required } = readMove(card, to);
+    if (required.length === 0) return latest.current.store.moveCard(card.id, to);
     latest.current.store.dismissError();
-    setPending({ card, to: null, gesture: null, required: [PAUSE_DECISION_ID] });
-  }, [latest]);
+    return new Promise<boolean>((resolve) => open({ card, to, gesture, required }, resolve));
+  }, [latest, readMove, open]);
+  const tracePause = useCallback((card: CardState) => {
+    latest.current.store.dismissError();
+    open({ card, to: null, gesture: null, required: [PAUSE_DECISION_ID] }, null);
+  }, [latest, open]);
   const confirm = useCallback(async (decisions: DecisionInput[]) => {
-    const { store: current, pending: held } = latest.current;
-    if (held === null) return;
-    const ok = held.to === null
-      ? await current.decideCard(held.card.id, decisions[0]!)
-      : await current.moveCard(held.card.id, held.to, decisions);
-    if (ok) settle(true); // refused: the fiche stays open over the store's lastError
-  }, [latest, settle]);
-  const cancel = useCallback(() => settle(false), [settle]);
-  return useMemo(() => ({ pending, request, tracePause, confirm, cancel }), [pending, request, tracePause, confirm, cancel]);
+    const fiche = held.current;
+    if (fiche === null) return;
+    const current = latest.current.store;
+    const ok = fiche.to === null
+      ? await current.decideCard(fiche.card.id, decisions[0]!)
+      : await current.moveCard(fiche.card.id, fiche.to, decisions);
+    // Refused: the fiche stays open over the store's lastError. Written:
+    // only THIS fiche closes — never one opened meanwhile.
+    if (ok && held.current === fiche) settle(true);
+  }, [held, latest, settle]);
+  const cancel = useCallback(() => { latest.current.store.dismissError(); settle(false); }, [latest, settle]);
+  return useMemo(() => ({ pending, requires, request, tracePause, confirm, cancel }), [pending, requires, request, tracePause, confirm, cancel]);
 }

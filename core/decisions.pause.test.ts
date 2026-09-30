@@ -65,3 +65,15 @@ test("out of Pause: no pause status, nothing overdue", () => {
   assert.equal(pauseStatus(card, NOW), null);
   assert.equal(reviewOverdue(card, NOW), false);
 });
+
+test("the year switch, a canal change inside Pause, or a pause decided just before the drag keep the pause in force", () => {
+  const activated = fold([toPause(1, "2026-10-01T09:00:00.000Z"), pause(2, "2026-10-01T09:00:00.000Z", "2026-12-02"),
+    ev(3, "2027-01-01T00:00:00.000Z", "activated")]);
+  assert.equal(pauseStatus(activated, NOW)?.entry?.reviewDate, "2026-12-02");
+  const requalified = fold([toPause(1, "2026-10-01T09:00:00.000Z"), pause(2, "2026-10-01T09:00:00.000Z", "2026-12-02"),
+    ev(3, "2026-10-05T09:00:00.000Z", "moved", { fromColumn: "pause", toColumn: "pause", payload: { fromLaneId: "laneA", laneId: "laneB" } })]);
+  assert.equal(pauseStatus(requalified, NOW)?.entry?.reviewDate, "2026-12-02");
+  // Before ADR 052 the D4 was traced from the fiche, then the card dragged into Pause.
+  const legacy = fold([pause(1, "2026-09-20T09:00:00.000Z", "2026-12-02"), toPause(2, "2026-09-20T09:05:00.000Z")]);
+  assert.equal(pauseStatus(legacy, NOW)?.entry?.reviewDate, "2026-12-02");
+});

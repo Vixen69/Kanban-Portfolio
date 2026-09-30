@@ -28,11 +28,12 @@ export function DecisionMark({ card, config, now }: { card: CardState; config: B
   }
   const decision = config.decisions.find((d) => d.id === PAUSE_DECISION_ID);
   const code = entry.pauseKind === "tactique" ? "T" : entry.pauseKind === "parking" ? "P" : (decision?.short ?? entry.decisionId);
-  const kind = entry.pauseKind === null ? "" : entry.pauseKind === "tactique" ? " tactique" : " parking";
-  const review = entry.reviewDate === null ? "" : ` · réexamen ${frDay(entry.reviewDate)}${overdue ? " (dépassé)" : ""}`;
+  const review = entry.reviewDate === null ? "" : ` · réexamen le ${frDay(entry.reviewDate)}${overdue ? " (dépassé)" : ""}`;
+  const title = entry.pauseKind === "tactique" ? `Pause tactique${review}`
+    : entry.pauseKind === "parking" ? `Pause parking depuis le ${frDay(entry.ts.slice(0, 10))}`
+    : `${decision?.name ?? "Mettre en pause"}${review}`;
   return (
-    <span className={"dec-pill" + (overdue ? " overdue" : "")} style={{ background: decision?.color ?? "#7c3aed" }}
-      title={`${decision?.name ?? "Mettre en pause"}${kind}${review}`}>
+    <span className={"dec-pill" + (overdue ? " overdue" : "")} style={{ background: decision?.color ?? "#7c3aed" }} title={title}>
       {code}
     </span>
   );

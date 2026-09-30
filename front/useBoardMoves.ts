@@ -38,10 +38,18 @@ export function useBoardMoves(store: BoardStore, config: BoardConfig, ui: UiStat
   );
   const drag = useDragHandlers(store, ui, reorder, move);
   // The field patch first, then the move: the sequence stops at the first
-  // refused intent so a failed patch never lets the move half-apply.
+  // refused intent so a failed patch never lets the move half-apply. A move
+  // that is a decision goes FIRST (its fiche opens): « Annuler » there then
+  // leaves the whole edit unwritten, « Valider » writes the patch after.
+  const { requires } = gate;
   const saveEdit = useCallback(async (card: CardState, patch: CardPatch, to: MoveTarget | null) => {
-    if (Object.keys(patch).length > 0 && !(await store.editCard(card.id, patch))) return;
+    const hasPatch = Object.keys(patch).length > 0;
+    if (to !== null && requires(card, to)) {
+      if ((await move(card, to)) && hasPatch) await store.editCard(card.id, patch);
+      return;
+    }
+    if (hasPatch && !(await store.editCard(card.id, patch))) return;
     if (to) await move(card, to);
-  }, [store, move]);
+  }, [store, move, requires]);
   return { drag, gate, move, flash: moveFlash.current, saveEdit };
 }

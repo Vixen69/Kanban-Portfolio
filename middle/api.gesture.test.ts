@@ -22,7 +22,7 @@ function board(): BoardConfig {
 
 const config = board();
 const TS = "2026-09-01T10:00:00.000Z";
-const PAUSE = { decisionId: "D4", grounds: ["n_avance_pas"], reason: "Plus de sponsor.", reviewDate: "2026-11-02" };
+const PAUSE = { decisionId: "D4", grounds: ["n_avance_pas"], reason: "Plus de sponsor.", reviewDate: "2099-11-02" };
 
 // A card in Actifs · laneA whose canal a person chose (qualification drag).
 async function qualifiedCard() {
@@ -126,4 +126,28 @@ test("malformed decision lists are refused", async () => {
   await assert.rejects(() => postEvent(storage, config, { ...move, decisions: "D4" }), /Décisions du déplacement invalides/);
   await assert.rejects(() => postEvent(storage, config, { ...move, decisions: [PAUSE, PAUSE] }), /deux fois/);
   await assert.rejects(() => postEvent(storage, config, { ...move, decisions: [{ ...PAUSE, decidedOn: "2999-01-01" }] }), /dans le futur/);
+});
+
+test("no laundering through Qualification: a chosen canal changed on the way there, or while there, needs « Requalifier » (ADR 052)", async () => {
+  const storage = await qualifiedCard(); // chosen canal laneA, in actifs
+  await assert.rejects(
+    () => postEvent(storage, config, { type: "moved", cardId: "S001", toLaneId: "laneB", toColumnId: "qualification" }),
+    /« Requalifier »/,
+  );
+  await postEvent(storage, config, { type: "moved", cardId: "S001", toLaneId: "laneA", toColumnId: "qualification" });
+  await assert.rejects(
+    () => postEvent(storage, config, { type: "moved", cardId: "S001", toLaneId: "laneB", toColumnId: "qualification" }),
+    /« Requalifier »/,
+  );
+});
+
+test("a pause carried by a move never keeps canal lanes the client sent", async () => {
+  const storage = await qualifiedCard();
+  await postEvent(storage, config, {
+    type: "moved", cardId: "S001", toLaneId: "laneA", toColumnId: "pause",
+    decisions: [{ ...PAUSE, fromLaneId: "X".repeat(5000), toLaneId: "laneB" }],
+  });
+  const decided = (await logOf(storage)).at(-1);
+  assert.equal(decided?.payload["fromLaneId"], undefined);
+  assert.equal(decided?.payload["toLaneId"], undefined);
 });

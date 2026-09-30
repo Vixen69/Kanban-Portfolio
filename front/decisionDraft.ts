@@ -5,7 +5,7 @@
 // no date for a parking; a requalification says what changed in the
 // subject's nature. No React here: node:test covers it.
 
-import type { DecisionFrees, DecisionInstance, PauseKind } from "../core/types.ts";
+import type { CardDecision, DecisionFrees, DecisionInstance, PauseKind } from "../core/types.ts";
 import { PAUSE_DECISION_ID, REQUALIFY_DECISION_ID } from "../core/gesture.ts";
 import type { DecisionInput } from "./api.ts";
 
@@ -103,4 +103,18 @@ export function draftDecisions(draft: FicheDraft, required: readonly string[], t
       natureChange: draft.natureChange.trim(), architectValidated: draft.architectValidated,
     };
   });
+}
+
+/**
+ * The fiche of a renewal: the pause in force carried over — its terms,
+ * reason, kind, instance and what lifts it — with a new review date and
+ * today's decision day (« prolonger est une décision : nouvelle fiche »).
+ * Inputs: the pause in force, now. Output: the FicheDraft. Failure: none.
+ */
+export function renewalDraft(previous: CardDecision, now: Date): FicheDraft {
+  return {
+    ...emptyDraft(now), instance: previous.instance, grounds: [...previous.grounds], reason: previous.reason,
+    liftCondition: previous.liftCondition, pauseKind: previous.pauseKind,
+    reviewDate: previous.pauseKind === "parking" ? "" : nextReview(now),
+  };
 }

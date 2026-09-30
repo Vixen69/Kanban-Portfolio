@@ -71,5 +71,20 @@ moment… laisse-la quand même ». Et un journal global des déplacements.
   `cardMarks.tsx`, `CollapsedCells.tsx`. L'acteur de l'import vit dans
   core. Le garde-fou d'architecture lit les imports en début
   d'instruction (« l'import » d'un libellé n'est pas un import).
+- Relecture adversariale (5 angles, chaque constat contre-vérifié) : corrigés
+  — le contournement par Qualification (un canal choisi changé en y entrant
+  est une requalification), les canaux envoyés par le client, la décision
+  seule limitée à la pause d'une carte en Pause, la pause en cours ancrée sur
+  la dernière SORTIE de Pause (le changement d'année et une pause décidée
+  juste avant le dépôt ne la perdent plus), le rafraîchissement après un
+  refus, Annuler/Échap inactifs pendant l'envoi, l'édition dont le
+  déplacement est une décision écrite après « Valider », la marque de pause
+  dans la liste de la bande repliée, le journal (cartes supprimées, jours
+  locaux, reconduction, « décidée le », Analytics gardé sous la fiche).
+- Limites connues, acceptées : un arrêt brutal du serveur pendant l'unique
+  écriture JSONL d'une paire peut n'en garder que la première ligne ; les
+  restaurations d'instantané n'apparaissent pas au journal (les gestes
+  défaits en disparaissent) ; les lignes « Importée » portent la date de
+  début du projet, pas celle de l'import.
 - Écarts du référentiel à corriger côté document : voir la proposition
   (§ « Écarts avec le référentiel V3.1 »).

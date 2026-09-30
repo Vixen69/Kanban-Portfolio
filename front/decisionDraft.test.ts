@@ -3,7 +3,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { draftDecisions, draftProblems, emptyDraft, nextReview } from "./decisionDraft.ts";
+import { draftDecisions, draftProblems, emptyDraft, nextReview, renewalDraft } from "./decisionDraft.ts";
 
 const NOW = new Date("2026-10-01T09:00:00.000Z");
 
@@ -58,4 +58,18 @@ test("draftDecisions: a parking sends no date; a traced paper decision sends its
   assert.equal(parking?.decidedOn, undefined);
   const [traced] = draftDecisions({ ...emptyDraft(NOW), reason: "RDOM", decidedOn: "2026-09-14" }, ["D4"], true);
   assert.equal(traced?.decidedOn, "2026-09-14");
+});
+
+test("renewalDraft: the pause in force carried over, a new review date, decided today", () => {
+  const previous = {
+    actor: "vous", ts: "2026-09-01T09:00:00.000Z", decisionId: "D4", grounds: ["n_avance_pas"], reason: "Plus de sponsor.",
+    reviewDate: "2026-10-01", instance: "synchro" as const, options: "", frees: { people: "", budget: "", capacity: "" },
+    liftCondition: "Un sponsor", pauseKind: "tactique" as const, natureChange: "", fromLaneId: null, toLaneId: null,
+    architectValidated: false, decidedOn: null,
+  };
+  const draft = renewalDraft(previous, NOW);
+  assert.deepEqual([draft.grounds, draft.reason, draft.pauseKind, draft.instance, draft.liftCondition], [["n_avance_pas"], "Plus de sponsor.", "tactique", "synchro", "Un sponsor"]);
+  assert.equal(draft.reviewDate, "2026-11-01");
+  assert.equal(draft.decidedOn, "2026-10-01");
+  assert.equal(renewalDraft({ ...previous, pauseKind: "parking" }, NOW).reviewDate, "");
 });

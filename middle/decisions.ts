@@ -83,9 +83,21 @@ function parseBlocks(body: Record<string, unknown>, acceptLanes: boolean): Recor
 // What each decision must say: the requalification says what changed; the
 // pause, why and when it is reviewed (none for a parking); any other traced
 // decision, a grid term or a reason.
-function checkTrace(decision: DecisionType, grounds: string[], reason: string, reviewDate: string | null, blocks: Record<string, unknown>, today: string): void {
+// The day after the server's UTC day: a user east of UTC may already be
+// on the next day (a fiche filled in Paris at 00:30).
+function tomorrowOf(ts: string): string {
+  return new Date(Date.parse(ts) + 86_400_000).toISOString().slice(0, 10);
+}
+
+function checkDates(reviewDate: string | null, blocks: Record<string, unknown>, ts: string): void {
+  const decidedOn = typeof blocks["decidedOn"] === "string" ? blocks["decidedOn"] : null;
+  if (decidedOn !== null && decidedOn > tomorrowOf(ts)) throw new BadRequest("Date de décision dans le futur.");
+  const day = decidedOn ?? ts.slice(0, 10);
+  if (reviewDate !== null && reviewDate < day) throw new BadRequest("L’échéance du réexamen précède la décision.");
+}
+
+function checkTrace(decision: DecisionType, grounds: string[], reason: string, reviewDate: string | null, blocks: Record<string, unknown>): void {
   if (blocks["pauseKind"] !== undefined && decision.id !== PAUSE_DECISION_ID) throw new BadRequest("Type de pause : seulement pour une mise en pause.");
-  if (typeof blocks["decidedOn"] === "string" && blocks["decidedOn"] > today) throw new BadRequest("Date de décision dans le futur.");
   if (decision.id === REQUALIFY_DECISION_ID) {
     if (blocks["natureChange"] === undefined) throw new BadRequest("Requalifier : dire ce qui a changé dans la nature du sujet.");
     return;
@@ -122,6 +134,7 @@ export function buildDecided(
   const reason = parseText(body["reason"], "Raison");
   const reviewDate = parseDay(body["reviewDate"], "Date de réexamen");
   const blocks = parseBlocks(body, options.acceptLanes === true);
-  checkTrace(decision, grounds, reason, reviewDate, blocks, ts.slice(0, 10));
+  checkDates(reviewDate, blocks, ts);
+  checkTrace(decision, grounds, reason, reviewDate, blocks);
   return lifecycleEvent("decided", state.id, actor, ts, { decisionId: decision.id, grounds, reason, reviewDate, ...blocks });
 }

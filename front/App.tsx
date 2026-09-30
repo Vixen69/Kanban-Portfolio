@@ -121,7 +121,7 @@ function ShellModals({ ctx }: { ctx: Ctx }) {
       )}
       {ui.metrics && (
         <AnalyticsView cards={ctx.cards} events={store.events} config={config} now={ctx.nowMs} year={ctx.viewYear} capacity={ctx.capacity}
-          allCards={[...ctx.cards, ...ctx.archivedCards]} onOpenCard={(id) => { ui.setMetrics(false); ui.setDetailId(id); }}
+          allCards={[...ctx.cards, ...ctx.archivedCards]} onOpenCard={(id) => ui.setDetailId(id)} hidden={ctx.detailCard !== null}
           onClose={() => ui.setMetrics(false)} />
       )}
       {ctx.moves.gate.pending !== null && (
@@ -198,7 +198,7 @@ function Screen({ ctx }: { ctx: Ctx }) {
       <BoardArea ctx={ctx} />
       <CardModals ctx={ctx} />
       <ShellModals ctx={ctx} />
-      {ctx.store.lastError !== null && (
+      {ctx.store.lastError !== null && ctx.moves.gate.pending === null && ( /* the fiche shows its own refusal */
         <div className="err-banner" role="alert">
           <span>{ctx.store.lastError}</span>
           <button onClick={ctx.store.dismissError} title="Fermer">✕</button>

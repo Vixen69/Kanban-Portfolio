@@ -166,7 +166,9 @@ function useRefresh(
 
 // The card actions: await the API call, then refresh the log. A
 // failed write simply did not happen (logged, ids only — no titles) — the
-// French message lands in lastError so the shell can show it.
+// French message lands in lastError so the shell can show it — and the log
+// is refreshed too: a refusal often means the board shown was stale (another
+// hand moved or decided), and the next gesture must read the truth (ADR 052).
 function useCardActions(reload: () => Promise<void>, setLastError: (m: string | null) => void) {
   const perform = useCallback(
     async (call: () => Promise<unknown>): Promise<boolean> => {
@@ -176,6 +178,7 @@ function useCardActions(reload: () => Promise<void>, setLastError: (m: string | 
         const message = messageOf(cause);
         console.error("action refusée :", message);
         setLastError(message);
+        await reload().catch(() => undefined);
         return false;
       }
       setLastError(null);

@@ -172,7 +172,7 @@ function LaneRow({ lane, columns, props, totals, totalsOpen, read }: {
           return <CollapsedCell key={col.id} cards={inCell} config={props.config} now={props.now} onOpen={props.onOpen} />;
         }
         if (props.collapsedCols.has(col.id)) {
-          return <CollapsedColCell key={col.id} cards={inCell} config={props.config} onOpen={props.onOpen}
+          return <CollapsedColCell key={col.id} cards={inCell} config={props.config} now={props.now} onOpen={props.onOpen}
             onDragOver={(event) => props.onDragOverCell(event, lane.id, col.id)} onDrop={(event) => props.onDrop(event, lane.id, col.id)} />;
         }
         return <BoardCell key={col.id} lane={lane} col={col} cards={inCell} props={props} read={read} />;

@@ -41,6 +41,9 @@ test("readGesture: the stage and canal sides of every kind of move", () => {
     ["into Pause of another canal", [A, "actifs"], [B, "pause"], true, "pause", "requalification"],
     ["out of Pause", [A, "pause"], [A, "actifs"], true, "resume", "none"],
     ["back to the intake", [A, "etudes"], [A, "demandes"], true, "move", "none"],
+    ["chosen canal changed on the way back to Qualification", [A, "etudes"], [B, "qualification"], true, "move", "requalification"],
+    ["canal changed while in Qualification", [A, "qualification"], [B, "qualification"], true, "move", "requalification"],
+    ["import default changed in Qualification", [A, "qualification"], [B, "qualification"], false, "move", "none"],
   ];
   for (const [label, [fromLane, fromColumn], [toLane, toColumn], chosen, stage, canal] of rows) {
     const gesture = readGesture(config, { laneId: fromLane, columnId: fromColumn }, { laneId: toLane, columnId: toColumn }, chosen);

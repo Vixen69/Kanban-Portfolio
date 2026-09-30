@@ -9,7 +9,7 @@ import type { BoardConfig, CardEvent } from "./types.ts";
 import { isReorder } from "./events.ts";
 import { eventSequence } from "./event-sequence.ts";
 import { unifiedColumnIds } from "./layout.ts";
-import { gestureTrail, IMPORT_ACTOR, type Gesture } from "./gesture.ts";
+import { gestureTrail, IMPORT_ACTOR, PAUSE_COLUMN_ID, PAUSE_DECISION_ID, type Gesture } from "./gesture.ts";
 import { gestureWords } from "./history.ts";
 import { readDecision } from "./decision-record.ts";
 
@@ -47,8 +47,8 @@ export interface JournalFilter {
 const LABELS: Partial<Record<CardEvent["type"], [JournalKind, string]>> = {
   created: ["move", "Créée"],
   imported: ["import", "Importée"],
-  blocked: ["block", "Bloquée"],
-  unblocked: ["block", "Débloquée"],
+  blocked: ["block", "Bloqué"],
+  unblocked: ["block", "Blocage levé"],
   archived: ["archive", "Archivée"],
   unarchived: ["archive", "Désarchivée"],
   deleted: ["archive", "Supprimée"],
@@ -78,24 +78,50 @@ function moveRow(config: BoardConfig, event: CardEvent, gesture: Gesture | undef
   return { kind: "move", label: words ?? "Déplacée", from, to };
 }
 
-function decisionRow(config: BoardConfig, event: CardEvent): Pick<JournalRow, "kind" | "label" | "detail"> {
+const frDay = (isoDate: string) => isoDate.split("-").reverse().join("/");
+
+// A decision's words: its name — « Pause reconduite » when a pause in force
+// is renewed — with the pause kind, then the fiche's terms, dates and texts.
+function decisionRow(config: BoardConfig, event: CardEvent, renewal: boolean): Pick<JournalRow, "kind" | "label" | "detail"> {
   const decision = readDecision(event);
   if (decision === null) return { kind: "decision", label: "Décision", detail: null };
   const type = config.decisions.find((d) => d.id === decision.decisionId);
   const kind = decision.pauseKind === null ? "" : decision.pauseKind === "tactique" ? " (tactique)" : " (parking)";
+  const name = renewal ? "Pause reconduite" : (type?.name ?? decision.decisionId);
   const terms = config.decisionGrounds.filter((g) => decision.grounds.includes(g.id)).map((g) => g.name);
-  const review = decision.reviewDate === null ? [] : [`réexamen ${decision.reviewDate.split("-").reverse().join("/")}`];
+  const dates = [
+    ...(decision.reviewDate === null ? [] : [`réexamen le ${frDay(decision.reviewDate)}`]),
+    ...(decision.decidedOn === null ? [] : [`décidée le ${frDay(decision.decidedOn)}`]),
+    ...(decision.instance === null ? [] : [decision.instance === "revue" ? "Revue Stratégique" : "Synchro"]),
+  ];
   const texts = [decision.natureChange, decision.reason].filter((t) => t !== "");
-  const detail = [...terms, ...review, ...texts].join(" · ");
-  return { kind: "decision", label: `${type?.name ?? decision.decisionId}${kind}`, detail: detail === "" ? null : detail };
+  const detail = [...terms, ...dates, ...texts].join(" · ");
+  return { kind: "decision", label: `${name}${kind}`, detail: detail === "" ? null : detail };
+}
+
+// Per card, while reading the log: in Pause, and already under a pause
+// decision there — the next « Mettre en pause » is then a renewal.
+interface PauseTrack { inPause: boolean; decided: boolean }
+
+function trackPause(tracks: Map<string, PauseTrack>, event: CardEvent): boolean {
+  const track = tracks.get(event.cardId) ?? { inPause: false, decided: false };
+  tracks.set(event.cardId, track);
+  if (event.type === "moved" && event.toColumn !== event.fromColumn) {
+    track.inPause = event.toColumn === PAUSE_COLUMN_ID;
+    if (event.fromColumn === PAUSE_COLUMN_ID) track.decided = false;
+  }
+  if (event.type !== "decided" || event.payload["decisionId"] !== PAUSE_DECISION_ID) return false;
+  const renewal = track.inPause && track.decided;
+  track.decided = track.decided || track.inPause;
+  return renewal;
 }
 
 // One event as a journal row, or null when the journal does not narrate it
 // (reorders, edits, comments, the year switch, restores).
-function toRow(config: BoardConfig, event: CardEvent, trail: ReadonlyMap<string, Gesture>): JournalRow | null {
+function toRow(config: BoardConfig, event: CardEvent, trail: ReadonlyMap<string, Gesture>, renewal: boolean): JournalRow | null {
   const base = { id: event.id, seq: eventSequence(event.id), ts: event.ts, cardId: event.cardId, actor: event.actor, from: null, to: null, detail: null };
   if (event.type === "moved") return isReorder(event) ? null : { ...base, ...moveRow(config, event, trail.get(event.id)) };
-  if (event.type === "decided") return { ...base, ...decisionRow(config, event) };
+  if (event.type === "decided") return { ...base, ...decisionRow(config, event, renewal) };
   const known = LABELS[event.type];
   if (known === undefined) return null;
   const reason = event.type === "blocked" ? event.payload["reason"] : null;
@@ -110,19 +136,38 @@ function kept(row: JournalRow, filter: JournalFilter): boolean {
 }
 
 /**
- * The journal: the narrated events a filter keeps, newest first.
+ * Every row the journal can narrate, newest first — built once per log,
+ * then filtered (filterJournal) at each keystroke or period change.
  * Inputs: the config, the effective events in log order (ADR 042 — undone
- * ones already set aside), the filter.
+ * ones already set aside). Output: JournalRow[]. Failure: none.
+ */
+export function journalAll(config: BoardConfig, events: readonly CardEvent[]): JournalRow[] {
+  const trail = gestureTrail(config, events);
+  const tracks = new Map<string, PauseTrack>();
+  const rows: JournalRow[] = [];
+  for (const event of events) {
+    const row = toRow(config, event, trail, trackPause(tracks, event));
+    if (row !== null) rows.push(row);
+  }
+  return rows.sort((a, b) => (a.ts !== b.ts ? (a.ts < b.ts ? 1 : -1) : b.seq - a.seq));
+}
+
+/**
+ * The rows a filter keeps, in their order.
+ * Inputs: the rows (journalAll), the filter. Output: JournalRow[].
+ * Failure: none.
+ */
+export function filterJournal(rows: readonly JournalRow[], filter: JournalFilter): JournalRow[] {
+  return rows.filter((row) => kept(row, filter));
+}
+
+/**
+ * The journal: the narrated events a filter keeps, newest first.
+ * Inputs: the config, the effective events in log order, the filter.
  * Output: JournalRow[]. Failure: none.
  */
 export function journalRows(config: BoardConfig, events: readonly CardEvent[], filter: JournalFilter): JournalRow[] {
-  const trail = gestureTrail(config, events);
-  const rows: JournalRow[] = [];
-  for (const event of events) {
-    const row = toRow(config, event, trail);
-    if (row !== null && kept(row, filter)) rows.push(row);
-  }
-  return rows.sort((a, b) => (a.ts !== b.ts ? (a.ts < b.ts ? 1 : -1) : b.seq - a.seq));
+  return filterJournal(journalAll(config, events), filter);
 }
 
 /**

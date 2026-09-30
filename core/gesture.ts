@@ -50,7 +50,10 @@ function stageOf(config: BoardConfig, from: Position, to: Position): StageGestur
 }
 
 function canalOf(unified: ReadonlySet<string>, from: Position, to: Position, laneChosen: boolean): CanalGesture {
-  if (unified.has(to.columnId)) return "none"; // before the RDO a card has no canal (ADR 039)
+  // Before the RDO a card shows no canal (ADR 039) — but a chosen canal
+  // changed on the way there is still a requalification (no laundering
+  // through Qualification).
+  if (unified.has(to.columnId)) return laneChosen && from.laneId !== to.laneId ? "requalification" : "none";
   if (unified.has(from.columnId)) {
     // Leaving the intake columns into a canal: the qualification — unless a
     // canal was chosen before (sent back to Qualification) and now changes.
@@ -102,7 +105,8 @@ function recordedPositions(event: CardEvent): { from: Position; to: Position } {
  * The gesture of every recorded "moved" event, reading the log in order
  * card by card: a canal counts as chosen once a hand move (not the
  * import's) qualified or requalified it.
- * Inputs: the config, the events in fold order (effective ones — ADR 042).
+ * Inputs: the config, the events in log (sequence) order — the effective
+ * ones (ADR 042).
  * Output: a Map event id → Gesture (moved events only). Failure: none.
  */
 export function gestureTrail(config: BoardConfig, events: readonly CardEvent[]): Map<string, Gesture> {
@@ -122,7 +126,8 @@ export function gestureTrail(config: BoardConfig, events: readonly CardEvent[]):
  * Whether a person already chose the card's canal (a hand move qualified
  * or requalified it) — the line between a qualification and a
  * requalification.
- * Inputs: the config, the card's events in fold order (others ignored).
+ * Inputs: the config, the card id, the events in log (sequence) order
+ * (other cards' ignored).
  * Output: boolean. Failure: none.
  */
 export function laneChosen(config: BoardConfig, cardId: string, events: readonly CardEvent[]): boolean {

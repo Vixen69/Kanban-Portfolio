@@ -49,7 +49,7 @@ test("journalRows: newest first, gestures in words, reorders / comments left out
     ["evt-9", "import", "Déplacée par l'import"],
     ["evt-6", "decision", "Mettre en pause (tactique)"],
     ["evt-5", "move", "Mise en pause"],
-    ["evt-4", "block", "Bloquée"],
+    ["evt-4", "block", "Bloqué"],
     ["evt-3", "move", "Qualifiée : Lane B"],
     ["evt-2", "move", "Faire entrer"],
     ["evt-1", "import", "Importée"],
@@ -58,7 +58,7 @@ test("journalRows: newest first, gestures in words, reorders / comments left out
   assert.equal(pause?.from, "Études · Lane B");
   assert.equal(pause?.to, "Pause · Lane B");
   assert.equal(rows.find((row) => row.id === "evt-2")?.to, "Qualification"); // no canal before the RDO
-  assert.equal(rows.find((row) => row.id === "evt-6")?.detail, "N’avance pas · réexamen 02/11/2026 · Plus de sponsor.");
+  assert.equal(rows.find((row) => row.id === "evt-6")?.detail, "N’avance pas · réexamen le 02/11/2026 · Plus de sponsor.");
   assert.equal(rows.find((row) => row.id === "evt-4")?.detail, "Attente du sponsor");
 });
 
@@ -81,4 +81,22 @@ test("journalCounts and placeName", () => {
   assert.equal(placeName(config, "laneA", "actifs"), "Actifs · Lane A");
   assert.equal(placeName(config, "laneA", "demandes"), "Demandes");
   assert.equal(placeName(config, null, "ghost"), "ghost");
+});
+
+test("a pause renewed in Pause reads « Pause reconduite »; a paper decision says its day and instance", () => {
+  const log = [
+    move(1, "S3", ["laneA", "etudes"], ["laneA", "pause"]),
+    ev(2, "S3", "decided", { payload: { decisionId: "D4", grounds: [], reason: "x", reviewDate: "2026-10-01" } }),
+    ev(3, "S3", "decided", { payload: { decisionId: "D4", grounds: [], reason: "encore", reviewDate: "2026-11-01", decidedOn: "2026-09-02", instance: "synchro" } }),
+    move(4, "S3", ["laneA", "pause"], ["laneA", "actifs"]),
+    move(5, "S3", ["laneA", "actifs"], ["laneA", "pause"]),
+    ev(6, "S3", "decided", { payload: { decisionId: "D4", grounds: [], reason: "de nouveau", reviewDate: "2026-12-01" } }),
+  ];
+  const decisions = journalRows(board(), log, { kinds: new Set(["decision"]) });
+  assert.deepEqual(decisions.map((row) => [row.id, row.label]), [
+    ["evt-6", "Mettre en pause"],
+    ["evt-3", "Pause reconduite"],
+    ["evt-2", "Mettre en pause"],
+  ]);
+  assert.equal(decisions[1]?.detail, "réexamen le 01/11/2026 · décidée le 02/09/2026 · Synchro · encore");
 });

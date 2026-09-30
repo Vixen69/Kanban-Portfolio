@@ -229,6 +229,8 @@ export interface CardState extends Card {
   archived: boolean;
   /** Decisions in chronological order, from "decided" events (ADR 026). */
   decisions: CardDecision[];
+  /** ISO ts the card last LEFT Pause (ADR 052); absent = never left it. The pause in force is the last one decided after it. */
+  pauseLeftAt?: string;
   /** ISO ts of the import that did not list the card (ADR 026); null when listed. */
   absentFromLastImport: string | null;
 }
