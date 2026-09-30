@@ -5,12 +5,13 @@
 // one (ADR 036, ./ImportConflicts.tsx) and the load controls — the load
 // waits for a new audit when a doubt's choice changed since the report —
 // then the technical report (the Markdown of the audit), folded at the
-// bottom.
+// bottom. While « Revoir le rapport avec ces choix » runs, the doubts,
+// conflicts and controls of the previous audit stay mounted (disabled).
 
 import type { BoardConfig } from "../../core/types.ts";
 import type { ImportAuditResult, ImportLoadResult } from "../../core/import-types.ts";
 import type { DoubtState } from "../importDoubts.ts";
-import { staleCount } from "../importDoubts.ts";
+import { auditedOnScreen, staleCount } from "../importDoubts.ts";
 import { loadOutcomes } from "../importReport.ts";
 import { DoubtsSection } from "./DoubtsSection.tsx";
 import { ImportChanges } from "./ImportChanges.tsx";
@@ -109,25 +110,27 @@ export interface ImportOutcomeProps {
 export function ImportOutcome(props: ImportOutcomeProps) {
   const { phase, error, shown, config, decisions, setDecisions } = props;
   const busy = phase.kind === "busy";
-  const conflicts = phase.kind === "audited" ? phase.result.conflicts : [];
+  const current = auditedOnScreen(phase);
+  const conflicts = current?.conflicts ?? [];
   const pending = conflicts.filter((c) => decisions[c.cardId] === undefined).length;
-  const doubts = phase.kind === "audited" ? phase.result.doubts ?? [] : [];
+  const doubts = current?.doubts ?? [];
   return (
     <>
       {error !== null && <div className="import-error">{error}</div>}
       {busy && <div className="m2-note">{BUSY[phase.what]}</div>}
       {phase.kind === "loaded" && <LoadSummary result={phase.result} />}
       {shown !== null && <ImportChanges result={shown} loaded={phase.kind === "loaded"} config={config} />}
-      {phase.kind === "audited" && (
-        <DoubtsSection doubts={doubts} state={props.doubts} onChange={props.setDoubts} onPreview={props.onPreview} busy={busy} />
+      {current !== null && (
+        <DoubtsSection doubts={doubts} state={props.doubts} onChange={props.setDoubts} onPreview={props.onPreview} busy={busy}
+          ignored={current.ignoredChoices?.length ?? 0} />
       )}
-      {phase.kind === "audited" && (
+      {current !== null && (
         <ImportConflicts conflicts={conflicts} decisions={decisions} config={config}
           onDecide={(cardId, decision) => setDecisions({ ...decisions, [cardId]: decision })}
           onDecideAll={(decision) => setDecisions(Object.fromEntries(conflicts.map((c) => [c.cardId, decision])))} />
       )}
-      {phase.kind === "audited" && (
-        <LoadControls result={phase.result} pending={pending} stale={staleCount(doubts, props.doubts)} acknowledged={props.acknowledged}
+      {current !== null && (
+        <LoadControls result={current} pending={pending} stale={staleCount(doubts, props.doubts)} acknowledged={props.acknowledged}
           setAcknowledged={props.setAcknowledged} busy={busy} onLoad={props.onLoad} />
       )}
       {shown !== null && <TechnicalReport report={shown.report} />}

@@ -3,10 +3,11 @@
 // → `{ option, sticky }` (apply this option; sticky = « ne plus me
 // demander pour ce projet ») or `{ forget: true }` (« Redemander »: the
 // remembered choice is forgotten, the tool's proposal applies). The shape
-// is checked here; whether each doubt and option exists is checked
-// against the audit the request re-runs (choiceProblem) — both refusals
-// are French 400s. Both routes take them: the audit to preview them, the
-// load to apply and trace them.
+// is checked here (a French 400); each option is checked against the
+// audit the request re-runs (checkChoices: an option its doubt does not
+// offer is a 400, a choice whose doubt vanished is ignored and said).
+// Both routes take them: the audit to preview them, the load to apply
+// and trace them.
 
 import type { ImportChoice } from "../core/import-types.ts";
 import { BadRequest } from "./errors.ts";

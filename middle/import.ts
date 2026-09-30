@@ -24,7 +24,7 @@ import type { BoardStorage } from "../core/ports.ts";
 import type { BoardConfig, Card, CardEvent } from "../core/types.ts";
 import type { DomainDecision, ImportAuditResult, ImportChoice, ImportDoubt, ImportLoadResult, ImportSummary } from "../core/import-types.ts";
 import {
-  bookInput, choiceProblem, createDoubtBook, importChanges, keepStoredCapacity, loadRefusal, planLoad, renderReport, runImportAudit,
+  bookInput, checkChoices, createDoubtBook, importChanges, keepStoredCapacity, loadRefusal, planLoad, renderReport, runImportAudit,
   settledEvents, withEventReasons, withLegacyIds,
 } from "../adapters/csv-import/index.ts";
 import type { AuditResult, DoubtBook, EnrichedCard, InputFile, LoadPlan } from "../adapters/csv-import/index.ts";
@@ -144,14 +144,15 @@ function auditWith(
   return runImportAudit(files, config, now, year, createDoubtBook(bookInput(year, choices, board.events)));
 }
 
-// The doubts once the plan chose the board ids (aliases, adoptions); the
-// request's choices must name them — else a French 400 (ADR 062).
-function settledDoubts(book: DoubtBook, plan: LoadPlan | null, choices: ReadonlyMap<string, ImportChoice>): ImportDoubt[] {
+// The doubts once the plan chose the board ids (aliases, adoptions); an
+// option a doubt does not offer is a French 400, a choice whose doubt
+// vanished (another answer took it away) is ignored and said (ADR 062).
+function settledDoubts(book: DoubtBook, plan: LoadPlan | null, choices: ReadonlyMap<string, ImportChoice>): { doubts: ImportDoubt[]; ignored: string[] } {
   if (plan !== null) book.remapCards(plan.aliases);
   const doubts = book.list();
-  const problem = choiceProblem(doubts, choices);
+  const { problem, ignored } = checkChoices(doubts, choices);
   if (problem !== null) throw new BadRequest(problem);
-  return doubts;
+  return { doubts, ignored };
 }
 
 // The conflicts a load would raise, the facts it would keep, what it
@@ -162,13 +163,13 @@ function settledDoubts(book: DoubtBook, plan: LoadPlan | null, choices: Readonly
 function dryRun(
   config: BoardConfig, audit: AuditResult, now: Date, year: number, refused: boolean, board: BoardRead,
   choices: ReadonlyMap<string, ImportChoice>,
-): Pick<ImportAuditResult, "conflicts" | "factsKept" | "changes" | "doubts"> {
+): Pick<ImportAuditResult, "conflicts" | "factsKept" | "changes" | "doubts" | "ignoredChoices"> {
   const { events, baseCards } = board;
   const plan = refused || audit.cards === null ? null : planLoad(audit.cards.cards, config, baseCards, events, now, year, new Map(), audit.book);
-  const doubts = settledDoubts(audit.book, plan, choices);
+  const { doubts, ignored } = settledDoubts(audit.book, plan, choices);
   const changes = importChanges({ audit, config, year, plan, baseCards, events, doubts });
-  if (plan === null) return { conflicts: [], factsKept: [], changes, doubts };
-  return { conflicts: plan.domainConflicts.map(({ decision: _decision, ...conflict }) => conflict), factsKept: plan.factsKept, changes, doubts };
+  const conflicts = plan === null ? [] : plan.domainConflicts.map(({ decision: _decision, ...conflict }) => conflict);
+  return { conflicts, factsKept: plan?.factsKept ?? [], changes, doubts, ignoredChoices: ignored };
 }
 
 /**
@@ -182,9 +183,10 @@ function dryRun(
  * proposals). Output: the rendered report (Markdown, French), its counts,
  * whether a load would be accepted and else why (loadRefusal — the load's
  * own rule), the conflicts, the facts kept, the changes, the doubts.
- * Failure: BadRequest (French) when a choice names a doubt or an option
- * these files do not raise; every other anomaly lands in the report;
- * storage errors propagate (→ 500).
+ * Failure: BadRequest (French) when a choice names an option its doubt
+ * does not offer (a choice whose doubt vanished is ignored, listed in
+ * `ignoredChoices`); every other anomaly lands in the report; storage
+ * errors propagate (→ 500).
  */
 export async function auditImport(
   storage: BoardStorage, config: BoardConfig, files: InputFile[], now: Date, year: number = config.exercise.year,
@@ -241,7 +243,7 @@ export interface LoadAnswers {
  * Failure: BadRequest on a closed year (below the current one), when no
  * card assembled (no `projets` file), when no project is retained on that
  * year (the files of another exercise), when a conflict is undecided or
- * a choice names an unknown doubt or option; storage errors propagate
+ * a choice names an option its doubt does not offer; storage errors propagate
  * (→ 500), nothing partially written for cards.
  */
 export function loadImport(
@@ -262,7 +264,7 @@ async function loadNow(
   const deck = loadableDeck(audit, year, config);
   const { events, baseCards } = board;
   const plan = planLoad(deck, config, baseCards, events, now, year, answers.decisions ?? new Map(), audit.book);
-  const doubts = settledDoubts(audit.book, plan, choices);
+  const { doubts, ignored } = settledDoubts(audit.book, plan, choices);
   const changes = importChanges({ audit, config, year, plan, baseCards, events, doubts });
   if (plan.domainUndecided > 0) {
     throw new BadRequest(`Chargement refusé : ${plan.domainUndecided} conflit(s) de domaine sans décision (garder ou remplacer).`);
@@ -278,7 +280,7 @@ async function loadNow(
   logLoad(now, year, plan, doubts.length, settled.length);
   return {
     exercise: year, report: renderReport(audit.report, now), summary: summarize(audit), loadable: true, refusal: null,
-    conflicts: plan.domainConflicts, factsKept: plan.factsKept, changes, doubts, load: loadFigures(plan, audit, settled.length),
+    conflicts: plan.domainConflicts, factsKept: plan.factsKept, changes, doubts, ignoredChoices: ignored, load: loadFigures(plan, audit, settled.length),
   };
 }
 

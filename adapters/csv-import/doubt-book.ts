@@ -13,6 +13,7 @@ import type { ImportDoubt, ImportDoubtHow, ImportDoubtKind, ImportDoubtOption } 
 import { fnv1a } from "./hash.ts";
 import { projectInstanceId } from "./card-identity.ts";
 import { normalizeLabel } from "./normalize.ts";
+import { doubtSubject } from "./doubt-subject.ts";
 
 /** One option as a reader proposes it. */
 export interface DoubtOptionSpec {
@@ -161,7 +162,7 @@ function record(input: BookInput, spec: DoubtSpec): Entry | null {
   const fingerprint = doubtFingerprint(id, spec);
   const doubt: ImportDoubt = {
     id, kind: spec.kind, cardId: spec.cardId ?? projectInstanceId(spec.code, spec.name, input.year),
-    code: spec.code, title: spec.title, why: spec.why, options, proposed: spec.proposed,
+    code: spec.code, title: spec.title, subject: doubtSubject(spec.kind, spec.detail), why: spec.why, options, proposed: spec.proposed,
     ...settle(input, id, fingerprint, ids, spec.proposed), fingerprint,
   };
   const traces = new Map(spec.options.map((o) => [o.id, o.trace ?? o.label]));

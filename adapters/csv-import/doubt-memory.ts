@@ -60,22 +60,41 @@ export function bookInput(year: number, request: ReadonlyMap<string, ImportChoic
   return { year, choices, forgotten, memory: rememberedChoices(events) };
 }
 
+/** What checkChoices finds in a request's choices. */
+export interface ChoiceCheck {
+  /** Why the request is refused, plain French — an option its doubt does not offer; null when none. */
+  problem: string | null;
+  /**
+   * The choices whose doubt this run does not raise, in request order:
+   * another answer of the same request made it vanish (a project taken
+   * out, another row read), or the files changed. Nothing is written for
+   * them; the audit and the load return them (`ignoredChoices`).
+   */
+  ignored: string[];
+}
+
 /**
- * Why a request's choices cannot be applied, in plain French, or null:
- * a doubt these files do not raise, or an option the doubt does not
- * offer (the files or the board changed since the audit).
+ * Checks a request's choices against the doubts this run raised (ADR
+ * 062). Doubts depend on each other — « Budget présenté » takes a project
+ * out and its ProjetsJalons doubt vanishes; the other SP row is read and
+ * the « 1,035 » of the first one is no longer a doubt — so a choice whose
+ * doubt is absent is ignored, never refused; only an option that a
+ * present doubt does not offer is refused (the files or the board
+ * changed since the audit).
  * Inputs: the doubts of the audit / load, the request's choices.
- * Output: the message or null. Failure modes: none.
+ * Output: the ChoiceCheck. Failure modes: none.
  */
-export function choiceProblem(doubts: readonly ImportDoubt[], request: ReadonlyMap<string, ImportChoice>): string | null {
+export function checkChoices(doubts: readonly ImportDoubt[], request: ReadonlyMap<string, ImportChoice>): ChoiceCheck {
   const byId = new Map(doubts.map((d) => [d.id, d]));
+  const ignored: string[] = [];
   for (const [id, choice] of request) {
     const doubt = byId.get(id);
-    if (doubt === undefined) return `Doute inconnu « ${id} » : les fichiers ou le tableau ont changé depuis l'analyse — relancer l'analyse.`;
-    if ("forget" in choice || doubt.options.some((o) => o.id === choice.option)) continue;
-    return `Choix « ${choice.option} » inconnu pour « ${doubt.title} » (${doubt.why}) — relancer l'analyse.`;
+    if (doubt === undefined) ignored.push(id);
+    else if (!("forget" in choice) && !doubt.options.some((o) => o.id === choice.option)) {
+      return { problem: `Choix « ${choice.option} » inconnu pour « ${doubt.title} » (${doubt.why}) — relancer l'analyse.`, ignored };
+    }
   }
-  return null;
+  return { problem: null, ignored };
 }
 
 /**
@@ -87,7 +106,7 @@ export function choiceProblem(doubts: readonly ImportDoubt[], request: ReadonlyM
  * Inputs: the doubts (after the plan, card ids remapped), the request,
  * the book (trace words), the actor, the instant.
  * Output: the events, in doubt order. Failure modes: none — a choice on
- * an unknown doubt is skipped (choiceProblem refused it before).
+ * a doubt this run does not raise writes nothing (checkChoices: ignored).
  */
 export function settledEvents(
   doubts: readonly ImportDoubt[], request: ReadonlyMap<string, ImportChoice>, book: DoubtBook, actor: string, ts: string,
@@ -106,13 +125,16 @@ export function settledEvents(
 }
 
 /**
- * The doubts settled otherwise than by the proposal, for the change
- * report (ADR 055/062). Input: the doubts. Output: ImportSettled[], in
- * doubt order. Failure modes: none.
+ * The doubts whose applied option differs from the tool's proposal
+ * (remembered or chosen), for the change report (ADR 055/062). A choice
+ * that keeps the tool's option — « ne plus me demander » ticked alone —
+ * is not « tranché autrement que par l'outil »: it is still traced in the
+ * log and listed under « Déjà tranchés ». Input: the doubts. Output:
+ * ImportSettled[], in doubt order. Failure modes: none.
  */
 export function settledOf(doubts: readonly ImportDoubt[]): ImportSettled[] {
   return doubts.flatMap((d): ImportSettled[] => {
-    if (d.how === "proposé") return [];
+    if (d.how === "proposé" || d.applied === d.proposed) return [];
     const option = d.options.find((o) => o.id === d.applied)?.label ?? d.applied;
     return [{ cardId: d.cardId, code: d.code, title: d.title, kind: d.kind, why: d.why, option, how: d.how }];
   });

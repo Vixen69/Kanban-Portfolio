@@ -2,8 +2,9 @@
 // trancher », a load applies the choices sent and traces each in the log
 // (a `settled` event, same batch); « ne plus me demander » is reapplied
 // silently while the doubt is the same, a changed doubt, a choice for
-// this load only, a « Redemander » and a restore all ask again; an unknown
-// doubt or option is a French 400; the CLI applies the memory.
+// this load only, a « Redemander » and a restore all ask again; an option
+// the doubt lacks is a French 400, a choice whose doubt vanished (another
+// answer took it away) is ignored and said; the CLI applies the memory.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -121,11 +122,11 @@ test("a changed doubt, a choice for this load only, « Redemander » and a resto
   });
 });
 
-test("an unknown doubt or option refuses the load in French, before anything is written", async () => {
+test("an option the doubt lacks refuses the load in French, before anything is written; an unknown doubt is ignored", async () => {
   await withBoard(async (storage) => {
-    await assert.rejects(() => loadImport(storage, CONFIG, files(), NOW, 2026, choices([["inconnu", { forget: true }]])), /^Error: Doute inconnu « inconnu »/);
-    await assert.rejects(() => loadImport(storage, CONFIG, files(), NOW, 2026, choices([[ID, { option: "v:zz", sticky: true }]])), /Choix « v:zz » inconnu pour « Socle réseau »/);
-    await assert.rejects(() => auditImport(storage, CONFIG, files(), NOW, 2026, new Map([["inconnu", { forget: true }]])), /Doute inconnu/);
+    await assert.rejects(() => loadImport(storage, CONFIG, files(), NOW, 2026, choices([[ID, { option: "v:zz", sticky: true }]])), /^Error: Choix « v:zz » inconnu pour « Socle réseau »/);
+    const audit = await auditImport(storage, CONFIG, files(), NOW, 2026, new Map([["inconnu", { forget: true }]]));
+    assert.deepEqual(audit.ignoredChoices, ["inconnu"], "a doubt these files do not raise: ignored and said");
     assert.equal((await storage.listEvents()).length, 0);
   });
 });
@@ -151,7 +152,7 @@ test("the CLI applies the remembered choice and says it", async () => {
   });
 });
 
-test("the routes take the choices: the audit previews, the load traces, an unknown doubt is a 400", async () => {
+test("the routes take the choices: the audit previews, the load traces, an unknown option is a 400", async () => {
   const dir = mkdtempSync(join(tmpdir(), "kanban-doubts-http-"));
   const storage = createJsonlStorage(join(dir, "board.jsonl"));
   const server: Server = await new Promise((resolve) => {
@@ -164,9 +165,9 @@ test("the routes take the choices: the audit previews, the load traces, an unkno
   try {
     const audit = (await (await post("/api/import/audit", body({}))).json()) as { doubts: ImportDoubt[] };
     const option = optionFor(doubtOf(audit.doubts), /présenté/);
-    const bad = await post("/api/import/load", body({ choices: { inconnu: { forget: true } } }));
+    const bad = await post("/api/import/load", body({ choices: { [ID]: { option: "v:zz", sticky: true } } }));
     assert.equal(bad.status, 400);
-    assert.match(((await bad.json()) as { error: string }).error, /Doute inconnu/);
+    assert.match(((await bad.json()) as { error: string }).error, /Choix « v:zz » inconnu/);
     const load = await post("/api/import/load", body({ choices: { [ID]: { option, sticky: true } } }));
     assert.equal(load.status, 200);
     assert.equal(((await load.json()) as { load: { settled: number } }).load.settled, 1);
@@ -175,4 +176,51 @@ test("the routes take the choices: the audit previews, the load traces, an unkno
     await storage.close();
     rmSync(dir, { recursive: true, force: true, maxRetries: 5 });
   }
+});
+
+// Doubts depend on each other (review of ADR 062): an answer can take away
+// another doubt of the same request — the project leaves the perimeter, or
+// another row is read. That answer is ignored and said, never a 400.
+const jalon = (rdli: string) => ({ "Id": "PE20001", "Nom du projet": "Socle réseau", "RDO (Statut)": "Approuvé", "RDLI (Statut)": rdli, "RDR (Statut)": "Planifié" });
+const spRow = (estimate: string) => ({ "Id": "PE20001", "Nom": "Socle réseau", "Coût prév (ME)": estimate });
+const DEPENDENT: Array<{ name: string; files: InputFile[]; keep: [string, RegExp]; vanish: [string, RegExp] }> = [
+  {
+    name: "« Budget présenté » takes the project out: its ProjetsJalons duplicate choice is ignored",
+    files: sampleFiles({ couts: [SOCLE, SOCLE, PRESENTE, coutsRow("PE20003", "Réseau campus")], jalons: [jalon("Planifié"), jalon("Approuvé")] }),
+    keep: [ID, /présenté/], vanish: ["duplicate-row|2026|PE20001|jalons", /ligne \d+ seule/],
+  },
+  {
+    name: "the other SP row is read: the « 1,035 » of the first one is no longer a doubt",
+    files: sampleFiles({ couts: [SOCLE], sp: [spRow("1,035"), spRow("1,035"), spRow("20")] }),
+    keep: ["duplicate-row|2026|PE20001|sp", /« 20 »/], vanish: ["figure|2026|PE20001|Coût prév (ME)", /anglaise/],
+  },
+];
+
+for (const c of DEPENDENT) {
+  test(`dependent answers: ${c.name}`, async () => {
+    await withBoard(async (storage) => {
+      const audit = await auditImport(storage, CONFIG, c.files, NOW);
+      const pick = ([id, label]: [string, RegExp]): [string, ImportChoice] =>
+        [id, { option: audit.doubts?.find((d) => d.id === id)?.options.find((o) => label.test(o.label))?.id ?? "?", sticky: false }];
+      const answers = new Map([pick(c.keep), pick(c.vanish)]);
+      assert.ok([...answers.values()].every((a) => "option" in a && a.option !== "?"), "both doubts raised by the first audit");
+      const preview = await auditImport(storage, CONFIG, c.files, NOW, 2026, answers);
+      assert.deepEqual([preview.ignoredChoices, preview.doubts?.map((d) => d.id)], [[c.vanish[0]], [c.keep[0]]]);
+      const load = await loadImport(storage, CONFIG, c.files, NOW, 2026, { choices: answers });
+      assert.deepEqual([load.ignoredChoices, load.load.settled], [[c.vanish[0]], 1]);
+      const settled = (await storage.listEvents()).filter((e) => e.type === "settled");
+      assert.deepEqual(settled.map((e) => e.payload["doubtId"]), [c.keep[0]], "only the surviving doubt is traced");
+    });
+  });
+}
+
+test("« ne plus me demander » on the tool's own choice is traced and remembered, never « tranché autrement que par l'outil »", async () => {
+  await withBoard(async (storage) => {
+    const audit = await auditImport(storage, CONFIG, files(), NOW);
+    const proposed = doubtOf(audit.doubts)?.proposed ?? "?";
+    const load = await loadImport(storage, CONFIG, files(), NOW, 2026, choices([[ID, { option: proposed, sticky: true }]]));
+    assert.deepEqual([load.load.settled, doubtOf(load.doubts)?.how, load.changes.settled], [1, "choisi", []]);
+    const next = await auditImport(storage, CONFIG, files(), NOW);
+    assert.deepEqual([doubtOf(next.doubts)?.how, doubtOf(next.doubts)?.remembered?.option, next.changes.settled], ["mémorisé", proposed, []]);
+  });
 });

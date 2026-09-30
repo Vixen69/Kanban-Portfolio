@@ -132,7 +132,7 @@ export function HandLists({ changes, config }: { changes: ImportChanges; config:
 /**
  * The doubts settled otherwise than by the tool's choice (ADR 062): the
  * project, the option applied and how — remembered (« ne plus me
- * demander ») or chosen at this load; why it was doubtful in the tooltip.
+ * demander ») or chosen at this load; why it was doubtful, under it.
  * Inputs: the settled doubts (absent in reports made before), whether the
  * load ran. Output: the list, nothing when none. Failure modes: none.
  */
@@ -145,10 +145,11 @@ export function SettledLists({ settled, loaded }: { settled: readonly ImportSett
         <summary><b>{loaded ? "Choix appliqués" : "Choix qui seront appliqués"}</b> · {settled.length}</summary>
         <ul>
           {settled.map((entry, i) => (
-            <li key={i} className="sd-item" title={entry.why}>
+            <li key={i} className="sd-item">
               {entry.code !== null && <span className="sd-code">{entry.code}</span>}
               <span className="sd-title">{entry.title}</span>
               <span className="sd-move">{settledReason(entry)}</span>
+              <span className="doubt-why">{entry.why}</span>
             </li>
           ))}
         </ul>

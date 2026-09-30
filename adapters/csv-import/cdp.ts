@@ -131,18 +131,27 @@ function chosenOwner(ctx: CdpContext, id: string, rows: readonly OwnerRow[], kep
   return byOption.get(applied)?.owner ?? kept.owner;
 }
 
-// Every row read: one owner per Id and per name, from the row kept.
+// Every row read: one owner per Id and per name, from the row kept. A
+// name whose rows carry one single Id, when the PMO chose another chef de
+// projet on that Id's doubt, takes that choice: a card joined by the name
+// (a code-less card, or the namesake taken, owners.ts) gets the owner
+// chosen, never the kept row's (ADR 062). The proposal changes nothing.
 function settleOwners(ctx: CdpContext): void {
+  const chosen = new Set<string>();
   for (const [id, rows] of ctx.rowsById) {
     const kept = keptRow(rows);
-    ctx.table.byId.set(id, chosenOwner(ctx, id, rows, kept));
+    const owner = chosenOwner(ctx, id, rows, kept);
+    if (owner !== kept.owner) chosen.add(id);
+    ctx.table.byId.set(id, owner);
     for (const row of [...rows].sort((a, b) => a.line - b.line)) {
       if (row !== kept) tallyInto(ctx.tallies, `Id en double — ligne gardée : ${KEPT_ROW_RULE}`, row.line, id);
     }
   }
   for (const [name, rows] of ctx.rowsByName) {
-    ctx.table.byName.set(name, keptRow(rows).owner);
-    ctx.table.idsByName.set(name, [...new Set(rows.map((row) => row.id).filter((id) => id !== ""))].sort());
+    const ids = [...new Set(rows.map((row) => row.id).filter((id) => id !== ""))].sort();
+    const settled = ids.length === 1 && chosen.has(ids[0] ?? "");
+    ctx.table.byName.set(name, settled ? ctx.table.byId.get(ids[0] ?? "") ?? null : keptRow(rows).owner);
+    ctx.table.idsByName.set(name, ids);
   }
 }
 

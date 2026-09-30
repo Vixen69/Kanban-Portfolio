@@ -141,11 +141,14 @@ function bump(map: Map<string, number>, label: string): void {
 // The perimeter rule (author, 2026-09-11, tightened the same afternoon):
 // on the exercise year, state in the retained list, type in the config,
 // not an arbitrage line, some ME figure — an unreadable ME cell keeps the
-// project (ADR 056) unless the PMO sets it aside (ADR 062). The first
-// failing rule is counted and returned; null = the project passes them all.
-function exclusion(ctx: CoutsContext, seen: Seen, facts: ProjectFacts, typeId: string | null): CoutsMotive | null {
+// project (ADR 056) unless the PMO sets it aside (ADR 062: `meSetAside` —
+// counted without ME, but not listed among the projects whose four cells
+// are empty or zero: its cell is unreadable). The first failing rule is
+// counted and returned; null = the project passes them all.
+function exclusion(ctx: CoutsContext, seen: Seen, facts: ProjectFacts, typeId: string | null): { motive: CoutsMotive | null; meSetAside: boolean } {
   let motive = ruleMotive(ctx, seen, facts, typeId);
-  if (motive === null && !seen.hasMe && !keepOnUnreadableMe(ctx, seen, facts)) motive = "noMe";
+  const meSetAside = motive === null && !seen.hasMe && !keepOnUnreadableMe(ctx, seen, facts);
+  if (meSetAside) motive = "noMe";
   const x = ctx.stats.excluded;
   if (motive === "noYear") x.noYear++;
   else if (motive === "state") bump(x.etat, facts.etat || "(vide)");
@@ -153,9 +156,20 @@ function exclusion(ctx: CoutsContext, seen: Seen, facts: ProjectFacts, typeId: s
   else if (motive === "arbitrage") x.arbitrage++;
   else if (motive === "noMe") {
     x.noMe++;
-    ctx.noMe.push(seen.id);
+    if (!meSetAside) ctx.noMe.push(seen.id);
   } else if (!seen.hasMe) ctx.meUnknown.push(seen.id);
-  return motive;
+  return { motive, meSetAside };
+}
+
+// The verdict of one project, with the words of the choices that decided
+// it (ADR 062): the disputed facts settled, and an unreadable ME cell set
+// aside — its reason names the cell, never « vide ou annulé de fait ».
+function settledVerdict(ctx: CoutsContext, seen: Seen, facts: ProjectFacts, motive: CoutsMotive | null, settled: { facts: string | null; me: boolean }): PerimeterVerdict {
+  const verdict = coutsVerdict({ id: seen.id, name: facts.name, etat: facts.etat, type: facts.type }, motive ?? "retained", ctx.year);
+  const samples = [...seen.meSamples].sort().map((s) => `« ${s} »`).join(", ");
+  const reason = settled.me ? `aucune cellule ME lisible sur ${ctx.year} (${samples}) — écarté par un choix à l'import` : verdict.reason;
+  const words = [settled.facts, settled.me ? "ME illisible : écarté (tranché à l'import)" : null].filter((w) => w !== null);
+  return words.length === 0 ? verdict : { ...verdict, reason, settledBy: words.join(", ") };
 }
 
 // One project through the rule: its facts resolved from all its rows (a
@@ -178,9 +192,8 @@ function decide(ctx: CoutsContext, seen: Seen): ProjetEntry | null {
   if (typeHit?.renamed === true) {
     tallyInto(ctx.tallies, `type « ${typeBaseLabel(facts.type)} » reconnu par un nom renommé dans ⚙ Catégories, absent du modèle versionné — à ajouter aux alias de board.json`, seen.ref.line);
   }
-  const motive = exclusion(ctx, seen, facts, typeId);
-  const verdict = coutsVerdict({ id: seen.id, name: facts.name, etat: facts.etat, type: facts.type }, motive ?? "retained", ctx.year);
-  ctx.verdicts.push(settledBy === null ? verdict : { ...verdict, settledBy });
+  const { motive, meSetAside } = exclusion(ctx, seen, facts, typeId);
+  ctx.verdicts.push(settledVerdict(ctx, seen, facts, motive, { facts: settledBy, me: meSetAside }));
   if (motive !== null || typeId === null) return null;
   ctx.stats.retained++;
   if (["faux", "false", "0", "non", "n"].includes(normalizeLabel(facts.actif))) ctx.stats.inactive++;

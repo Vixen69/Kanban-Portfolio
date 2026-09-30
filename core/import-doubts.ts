@@ -59,6 +59,12 @@ export interface ImportDoubt {
   /** The project code, null when the project has none. */
   code: string | null;
   title: string;
+  /**
+   * Plain French, a few words: what the question is on inside the project
+   * (« état », « ligne SP », « chef de projet (ProjetsCdP) ») — one project
+   * may raise several doubts, each answered and remembered on its own.
+   */
+  subject: string;
   /** Plain French: why it is doubtful. */
   why: string;
   /** At least two; the proposed one first. */

@@ -13,7 +13,7 @@ import { cardHistory } from "../../core/history.ts";
 import { testCard, testConfig } from "../../core/test-helpers.ts";
 import { createDoubtBook, doubtFingerprint, doubtId } from "./doubt-book.ts";
 import type { BookInput, DoubtSpec } from "./doubt-book.ts";
-import { bookInput, choiceProblem, rememberedChoices, settledEvents, settledOf } from "./doubt-memory.ts";
+import { bookInput, checkChoices, rememberedChoices, settledEvents, settledOf } from "./doubt-memory.ts";
 
 const SPEC: DoubtSpec = {
   kind: "couts-fact", detail: "etat", code: "PE1", name: "socle", title: "Socle", why: "lignes en désaccord",
@@ -101,13 +101,23 @@ test("the memory is the log's last word per doubt (by sequence), read through th
   assert.deepEqual([[...(input.forgotten ?? [])], [...(input.choices ?? [])]], [[ID], [["x", "o"]]]);
 });
 
-test("choiceProblem refuses an unknown doubt or option, in French", () => {
+test("checkChoices refuses an option the doubt lacks, in French; a choice whose doubt vanished is ignored, not refused", () => {
   const { doubt } = ask({});
   const doubts = doubt === undefined ? [] : [doubt];
-  assert.equal(choiceProblem(doubts, new Map([[ID, { option: "v:b", sticky: true }]])), null);
-  assert.equal(choiceProblem(doubts, new Map([[ID, { forget: true }]])), null);
-  assert.match(choiceProblem(doubts, new Map([["inconnu", { forget: true }]])) ?? "", /^Doute inconnu « inconnu »/);
-  assert.match(choiceProblem(doubts, new Map([[ID, { option: "v:z", sticky: false }]])) ?? "", /^Choix « v:z » inconnu pour « Socle »/);
+  assert.deepEqual(checkChoices(doubts, new Map([[ID, { option: "v:b", sticky: true }]])), { problem: null, ignored: [] });
+  assert.deepEqual(checkChoices(doubts, new Map([[ID, { forget: true }]])), { problem: null, ignored: [] });
+  assert.deepEqual(checkChoices(doubts, new Map<string, ImportChoice>([["disparu", { forget: true }], [ID, { option: "v:b", sticky: false }], ["autre", { option: "x", sticky: true }]])),
+    { problem: null, ignored: ["disparu", "autre"] });
+  assert.match(checkChoices(doubts, new Map([[ID, { option: "v:z", sticky: false }]])).problem ?? "", /^Choix « v:z » inconnu pour « Socle »/);
+});
+
+test("settledOf: a choice that keeps the tool's option (« ne plus me demander » alone) is not « tranché autrement », chosen or remembered", () => {
+  const chosen = ask({ choices: new Map([[ID, "v:a"]]) });
+  const remembered = ask({ memory: memory("v:a", true) });
+  assert.deepEqual([chosen.doubt?.how, remembered.doubt?.how], ["choisi", "mémorisé"]);
+  assert.deepEqual(settledOf([chosen.doubt, remembered.doubt].filter((d) => d !== undefined)), []);
+  const request = new Map<string, ImportChoice>([[ID, { option: "v:a", sticky: true }]]);
+  assert.equal(settledEvents(chosen.doubt === undefined ? [] : [chosen.doubt], request, chosen.book, "a", "t").length, 1, "still traced in the log");
 });
 
 test("settledEvents: one event per answer sent, the trace words, sticky, forget; untouched doubts write nothing", () => {

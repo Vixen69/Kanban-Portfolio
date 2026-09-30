@@ -25,4 +25,5 @@ export { loadRefusal } from "./load-refusal.ts";
 export type { ChangesInput } from "./import-changes.ts";
 export { createDoubtBook } from "./doubt-book.ts";
 export type { DoubtBook } from "./doubt-book.ts";
-export { bookInput, choiceProblem, rememberedChoices, settledEvents, settledOf } from "./doubt-memory.ts";
+export { bookInput, checkChoices, rememberedChoices, settledEvents, settledOf } from "./doubt-memory.ts";
+export type { ChoiceCheck } from "./doubt-memory.ts";

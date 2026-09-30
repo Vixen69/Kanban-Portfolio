@@ -19,7 +19,9 @@ Jusqu'ici l'importeur tranchait seul (ADR 056/058) et le disait en
 
 1. **Les doutes décidables deviennent des questions.** L'audit rend
    `doubts` (`core/import-doubts.ts`) : pour chaque doute, le projet (code,
-   titre, carte — « code@année » s'il n'est pas au tableau), **pourquoi**
+   titre, carte — « code@année » s'il n'est pas au tableau), la
+   **question** (`subject` : « état », « ligne SP »… — un projet peut en
+   poser plusieurs), **pourquoi**
    en clair, les **choix** avec leur conséquence (« le projet sort du
    périmètre : état « Budget présenté » hors des états retenus ») et le
    **choix de l'outil**, présélectionné — le comportement d'avant. Six
@@ -45,7 +47,9 @@ Jusqu'ici l'importeur tranchait seul (ADR 056/058) et le disait en
    corrections à la main), pas `decided` (les décisions D1–D6 de la fiche).
    Le pli du tableau, l'Historique et les indicateurs l'ignorent ; il ne
    masque jamais la naissance d'une carte (`core/fold-order.ts`).
-4. **« Ne plus me demander pour ce projet ».** Sans la case, le choix vaut
+4. **« Ne plus me demander pour ce projet (question) ».** La case vaut
+   pour la question où elle est cochée : un projet aux deux questions
+   (état et type) se coche deux fois. Sans la case, le choix vaut
    pour ce chargement : la question revient. Avec, il est réappliqué sans
    rien demander tant que le doute est **le même** (même projet, même
    sorte, mêmes valeurs en concurrence — une empreinte) ; un doute changé
@@ -54,12 +58,21 @@ Jusqu'ici l'importeur tranchait seul (ADR 056/058) et le disait en
    restauration (ADR 042) oublie les choix écrits après la position
    restaurée, comme tout événement.
 5. **API.** `POST /api/import/audit` et `/load` acceptent `choices`
-   (id du doute → `{ option, sticky }` ou `{ forget: true }`) ; un doute
-   ou une option inconnus : refus en français (relancer l'analyse).
+   (id du doute → `{ option, sticky }` ou `{ forget: true }`) ; une
+   option qu'un doute n'offre pas : refus en français (relancer
+   l'analyse). Les doutes dépendent les uns des autres (« Budget
+   présenté » sort le projet et sa question ProjetsJalons disparaît ; lire
+   une autre ligne SP fait disparaître son « 1,035 ») : un choix dont le
+   doute a disparu est **ignoré, jamais refusé** — rien d'écrit, rendu
+   dans `ignoredChoices` et dit à l'écran (« N choix sans objet : le
+   doute a disparu avec vos autres choix »).
    L'audit prévisualise, le chargement applique les choix aux mêmes
    fichiers (même lecture du journal, avant l'audit) et le rapport lisible
-   nomme les doutes tranchés autrement que par l'outil (`changes.settled`,
-   `settledBy` sur un projet écarté par un choix). La commande applique
+   nomme les doutes tranchés autrement que par l'outil (`changes.settled` :
+   l'option appliquée diffère de celle de l'outil — la case cochée seule
+   sur le choix de l'outil est tracée et mémorisée, pas listée là ;
+   `settledBy` sur un projet écarté par un choix, y compris une cellule
+   ME illisible écartée, dont la raison nomme la cellule). La commande applique
    les choix mémorisés (avec `--charger` / `--comparer`), sinon ceux de
    l'outil, imprime chaque doute et comment il a été tranché, et n'écrit
    aucun choix.
@@ -70,10 +83,11 @@ Jusqu'ici l'importeur tranchait seul (ADR 056/058) et le disait en
 « Charger » : la section **« Doutes à trancher »**. En tête : « N doute(s) —
 l’outil a pré-choisi ; changez ce qui ne va pas ». Les doutes sont groupés
 par sorte (repliés au-delà de dix) ; chaque doute est un cadre : code ·
-titre, pourquoi, les choix en boutons radio avec leur conséquence, le choix
-de l’outil coché et marqué « choix de l’outil », la case « Ne plus me
-demander pour ce projet ». Les choix mémorisés sont repliés sous « Déjà
-tranchés (M) » — le choix, le jour, l’auteur — avec « Redemander », qui
+titre — question, pourquoi, les choix en boutons radio avec leur
+conséquence, le choix de l’outil coché et marqué « choix de l’outil », la
+case « Ne plus me demander pour ce projet (question) ». Les choix mémorisés sont repliés sous « Déjà
+tranchés (M) » — le choix, le jour, l’auteur (« vous » jusqu’à RP3), le
+pourquoi en clair — avec « Redemander », qui
 remet la question parmi les doutes, sur le choix de l’outil.
 
 - **Ce qui part au chargement** : seulement les doutes touchés — un autre
@@ -85,7 +99,9 @@ remet la question parmi les doutes, sur le choix de l’outil.
   rapport affiché a appliqué (le cocher seul ne change rien) met
   « Charger » en attente d’un nouvel audit, « Revoir le rapport avec ces
   choix » ; celui-ci garde les réponses et les décisions de domaine, et
-  redemande « J’ai lu le rapport ». Un nouvel « Auditer » repart des choix
+  redemande « J’ai lu le rapport ». Pendant cette demande, les doutes,
+  les conflits et « Charger » restent affichés (inactifs) : les groupes
+  dépliés le restent, la page ne saute pas. Un nouvel « Auditer » repart des choix
   de l’outil.
 - Le rapport lisible nomme les « Doutes tranchés autrement que par
   l’outil » (mémorisé ou choisi à ce chargement), le périmètre dit le
@@ -110,6 +126,9 @@ remet la question parmi les doutes, sur le choix de l’outil.
 - Un choix mémorisé survit aux imports tant que les fichiers disent la
   même chose ; dès qu'ils changent, la question revient d'elle-même.
 - Jusqu'à RP3, l'auteur des choix est « anonymous », comme toute écriture.
+- Un chef de projet choisi sur un Id en double de ProjetsCdP vaut aussi
+  pour la carte qui joint cette ligne par son nom (carte sans code, ou
+  ligne homonyme prise).
 - Hors périmètre : `amountCell` (j.h) ne signale pas « 1,035 » ; les
   projets écartés sans ME et les codes hors PE restent des signalements
   (à confirmer avec l'auteur avant d'en faire des questions).

@@ -85,6 +85,8 @@
 .doubt-csq { font-size: 10.5px; font-weight: 400; color: var(--tx-3); }
 .doubt-sticky { font-size: 10.5px; color: var(--tx-2); display: flex; align-items: center; gap: 5px; margin-top: 5px; cursor: pointer; }
 .doubt-kept li button { margin-left: auto; }
+.doubt-subject { color: var(--tx-2); }
+.sd-item .doubt-why { flex-basis: 100%; margin: 0; }
 
 /* ---------- Panneau Exercice : la bascule d'année (ADR 035/038/049) ---------- */
 .a-exercise { display: flex; flex-direction: column; gap: 8px; }

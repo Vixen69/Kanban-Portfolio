@@ -98,6 +98,13 @@ export interface ImportAuditResult {
    * server that predates ADR 062.
    */
   doubts?: ImportDoubt[];
+  /**
+   * The doubt ids the request answered that this run does not raise
+   * (ADR 062): another answer of the same request made the doubt vanish
+   * (a project taken out, another row read) — ignored, nothing written.
+   * Absent or empty when none.
+   */
+  ignoredChoices?: string[];
 }
 
 /** What a load wrote, on top of the audit it re-ran. */

@@ -6,7 +6,9 @@
 // already settled), the choices a request sends, and whether the report on
 // screen already follows the answers. Pure; no React.
 
-import type { ImportChoice, ImportDoubt, ImportDoubtKind, ImportSettled } from "../core/import-types.ts";
+import type { ImportAuditResult, ImportChoice, ImportDoubt, ImportDoubtKind, ImportSettled } from "../core/import-types.ts";
+import { displayActor } from "./lookup.ts";
+import type { ImportPhase } from "./components/ImportOutcome.tsx";
 
 /** The PMO's answer to one doubt: the option, and « ne plus me demander pour ce projet ». */
 export interface DoubtAnswer {
@@ -164,20 +166,61 @@ export function groupDoubts(doubts: readonly ImportDoubt[]): DoubtGroup[] {
   return groups;
 }
 
+// The local day, as the fiche's Historique writes it (DetailSections).
 function frenchDay(ts: string): string {
-  return ts.slice(0, 10).split("-").reverse().join("/");
+  return new Date(ts).toLocaleDateString("fr-FR");
 }
 
 /**
  * The line of a remembered doubt (« Déjà tranchés »): the option kept,
- * when and by whom. Input: the doubt. Output: the French line; the bare
- * option id when the doubt no longer lists it. Failure: none.
+ * when (the local day) and by whom (« vous » until RP3, like the fiche).
+ * Input: the doubt. Output: the French line; the bare option id when the
+ * doubt no longer lists it. Failure: none.
  */
 export function rememberedLine(doubt: ImportDoubt): string {
   const memo = doubt.remembered;
   if (memo === null) return "";
   const label = doubt.options.find((o) => o.id === memo.option)?.label ?? memo.option;
-  return `Tranché : ${label} — le ${frenchDay(memo.ts)} par ${memo.actor}`;
+  return `Tranché : ${label} — le ${frenchDay(memo.ts)} par ${displayActor(memo.actor)}`;
+}
+
+/**
+ * The label of « ne plus me demander », naming the question it keeps (a
+ * project may raise several; each is remembered on its own). Input: the
+ * doubt. Output: the French label. Failure: none.
+ */
+export function stickyLabel(doubt: ImportDoubt): string {
+  return `Ne plus me demander pour ce projet (${doubt.subject})`;
+}
+
+/**
+ * The accessible name of « Redemander »: the project and the question.
+ * Input: the doubt. Output: the French name. Failure: none.
+ */
+export function askAgainLabel(doubt: ImportDoubt): string {
+  return `Redemander : ${doubt.title} (${doubt.subject})`;
+}
+
+/**
+ * The line saying that answers were ignored because their doubt vanished
+ * with the other answers (ADR 062). Input: the ignored count. Output: the
+ * French line, "" when none. Failure: none.
+ */
+export function ignoredLine(count: number): string {
+  if (count === 0) return "";
+  return `${count} choix sans objet : le doute a disparu avec vos autres choix (ignoré${count > 1 ? "s" : ""}, rien n’est écrit).`;
+}
+
+/**
+ * The audit whose doubts, conflicts and load controls stay on screen: the
+ * audit's, and the previous one while « Revoir le rapport avec ces choix »
+ * runs — kept mounted, so the groups the PMO unfolded stay unfolded and
+ * the page does not jump (a fresh « Auditer » starts over: none).
+ * Input: the phase. Output: the audit result or null. Failure: none.
+ */
+export function auditedOnScreen(phase: ImportPhase): ImportAuditResult | null {
+  if (phase.kind === "audited") return phase.result;
+  return phase.kind === "busy" && phase.what === "preview" ? phase.previous : null;
 }
 
 /**

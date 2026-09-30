@@ -5,15 +5,15 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import type { ImportDoubt } from "../core/import-types.ts";
+import type { ImportAuditResult, ImportDoubt } from "../core/import-types.ts";
 import {
-  answerOf, choicesPayload, doubtsHeader, EMPTY_DOUBT_STATE, groupDoubts, initialDoubtState, isRemembered, rememberedLine,
-  settledReason, splitDoubts, staleCount, withAnswer, withForgotten,
+  answerOf, askAgainLabel, auditedOnScreen, choicesPayload, doubtsHeader, EMPTY_DOUBT_STATE, groupDoubts, ignoredLine, initialDoubtState,
+  isRemembered, rememberedLine, settledReason, splitDoubts, staleCount, stickyLabel, withAnswer, withForgotten,
 } from "./importDoubts.ts";
 
 function doubt(id: string, over: Partial<ImportDoubt> = {}): ImportDoubt {
   return {
-    id, kind: "couts-fact", cardId: `${id}@2026`, code: id, title: `Projet ${id}`, why: "lignes en désaccord",
+    id, kind: "couts-fact", cardId: `${id}@2026`, code: id, title: `Projet ${id}`, subject: "état", why: "lignes en désaccord",
     options: [
       { id: "a", label: "« Budget validé »", consequence: null },
       { id: "b", label: "« Budget présenté »", consequence: "le projet sort du périmètre" },
@@ -80,9 +80,39 @@ test("the words: header, kinds grouped in order, the remembered line, the report
   assert.deepEqual(groups.map((g) => [g.title, g.doubts.map((d) => d.id)]), [
     ["Coût (COUT PREV) : lignes du projet en désaccord", ["PE1", "PE2"]], ["Montant ambigu", ["PE3"]],
   ]);
-  assert.equal(rememberedLine(KEPT), "Tranché : « Budget présenté » — le 12/09/2026 par anonymous");
+  assert.equal(rememberedLine(KEPT), "Tranché : « Budget présenté » — le 12/09/2026 par vous", "« vous » until RP3, like the fiche");
   assert.equal(rememberedLine(OPEN), "");
   const settled = { cardId: "PE1@2026", code: "PE1", title: "P", kind: "couts-fact" as const, why: "w", option: "« Budget présenté »" };
   assert.equal(settledReason({ ...settled, how: "mémorisé" }), "« Budget présenté » (choix mémorisé)");
   assert.equal(settledReason({ ...settled, how: "choisi" }), "« Budget présenté » (choisi à ce chargement)");
+});
+
+test("the remembered line gives the LOCAL day, as the fiche's Historique does", () => {
+  const late = doubt("PE4", { remembered: { ...MEMO, ts: "2026-09-11T22:30:00.000Z", actor: "pmo" } });
+  const local = new Date("2026-09-11T22:30:00.000Z").toLocaleDateString("fr-FR");
+  assert.equal(rememberedLine(late), `Tranché : « Budget présenté » — le ${local} par pmo`);
+});
+
+test("each question of a project is named: « ne plus me demander » and « Redemander » say which", () => {
+  const type = doubt("PE1", { id: "PE1-type", subject: "type" });
+  assert.deepEqual([stickyLabel(OPEN), stickyLabel(type)], ["Ne plus me demander pour ce projet (état)", "Ne plus me demander pour ce projet (type)"]);
+  assert.deepEqual([askAgainLabel(OPEN), askAgainLabel(type)], ["Redemander : Projet PE1 (état)", "Redemander : Projet PE1 (type)"]);
+});
+
+test("the answers ignored because their doubt vanished with the others are said", () => {
+  assert.equal(ignoredLine(0), "");
+  assert.equal(ignoredLine(1), "1 choix sans objet : le doute a disparu avec vos autres choix (ignoré, rien n’est écrit).");
+  assert.equal(ignoredLine(2), "2 choix sans objet : le doute a disparu avec vos autres choix (ignorés, rien n’est écrit).");
+  const vanished = withAnswer(withAnswer(EMPTY_DOUBT_STATE, "PE1", { option: "b", sticky: false }), "GONE", { option: "a", sticky: false });
+  assert.equal(staleCount([doubt("PE1", { applied: "b", how: "choisi" })], initialDoubtState([doubt("PE1", { applied: "b", how: "choisi" })], vanished)), 0,
+    "the vanished answer is dropped after the new audit: « Charger » no longer waits");
+});
+
+test("the doubts stay on screen while « Revoir le rapport avec ces choix » runs, not during a fresh audit or a load", () => {
+  const result = { exercise: 2026, doubts: [OPEN] } as unknown as ImportAuditResult;
+  assert.equal(auditedOnScreen({ kind: "audited", result }), result);
+  assert.equal(auditedOnScreen({ kind: "busy", what: "preview", previous: result }), result);
+  assert.equal(auditedOnScreen({ kind: "busy", what: "audit", previous: result }), null);
+  assert.equal(auditedOnScreen({ kind: "busy", what: "load", previous: result }), null);
+  assert.equal(auditedOnScreen({ kind: "idle" }), null);
 });

@@ -52,8 +52,18 @@ const CASES: Case[] = [
     name: "an unreadable ME cell alone keeps the project; « écarter » sets it aside like a project without ME",
     files: sampleFiles({ couts: [coutsRow("PE20002", "Stockage", { "Coût final ME (Res ouTrans)": "???" })] }),
     id: "me-unreadable|2026|PE20002|me", choose: /écarter/i,
-    read: (a) => [card(a, "PE20002") !== undefined, a.couts?.verdicts.find((v) => v.code === "PE20002")?.motive],
-    proposal: [true, "retained"], chosen: [false, "noMe"],
+    read: (a) => {
+      const verdict = a.couts?.verdicts.find((v) => v.code === "PE20002");
+      return [card(a, "PE20002") !== undefined, verdict?.motive, verdict?.settledBy ?? null, verdict?.reason];
+    },
+    proposal: [true, "retained", null, "état « Budget validé », type « Etude »"],
+    chosen: [false, "noMe", "ME illisible : écarté (tranché à l'import)", "aucune cellule ME lisible sur 2026 (« ??? ») — écarté par un choix à l'import"],
+  },
+  {
+    name: "a code-less card joined to ProjetsCdP by its name takes the chef de projet chosen on the Id's duplicate doubt",
+    files: sampleFiles({ projets: [projetsRow("", "Socle réseau")], cdp: [cdpRow("PE66666", "Socle réseau", "MARTIN Eva"), cdpRow("PE66666", "Socle réseau", "DURAND Luc")] }),
+    id: "duplicate-row|2026|PE66666|cdp", choose: /MARTIN/,
+    read: (a) => a.cards?.cards.find((c) => c.title === "Socle réseau")?.owner, proposal: "DURAND Luc", chosen: "MARTIN Eva",
   },
   {
     name: "one Id twice in the Projets onglet (the perimeter): the tool's row, or the other one",
@@ -143,4 +153,23 @@ test("ADR 062 · an SP row without Id read BEFORE its Id's row no longer sets th
   const files = sampleFiles({ couts: [SOCLE], sp: [{ "Nom": "Socle réseau", "Coût prév (ME)": "5" }, spRow("PE20001", "Socle réseau", "7")] });
   const audit = runImportAudit(files, SAMPLE_CONFIG, NOW);
   assert.equal(card(audit, "PE20001")?.budgetEstimated, 7, "the row carrying the Id (more complete) is kept");
+});
+
+test("ADR 062 · a coded card taking the namesake ProjetsCdP row gets the chef de projet chosen on that row's duplicate doubt", () => {
+  const files = sampleFiles({ couts: [SOCLE], cdp: [cdpRow("PE66666", "Socle réseau", "MARTIN Eva"), cdpRow("PE66666", "Socle réseau", "DURAND Luc")] });
+  const proposed = runImportAudit(files, SAMPLE_CONFIG, NOW);
+  const dup = doubtOf(proposed, "duplicate-row|2026|PE66666|cdp");
+  const take = doubtOf(proposed, "join|2026|PE20001|cdp-nom").options.find((o) => o.id !== "non")?.id ?? "?";
+  const martin = dup.options.find((o) => /MARTIN/.test(o.label))?.id ?? "?";
+  const owner = (choices: Array<[string, string]>) =>
+    card(runImportAudit(files, SAMPLE_CONFIG, NOW, 2026, createDoubtBook({ year: 2026, choices: new Map(choices) })), "PE20001")?.owner ?? null;
+  assert.deepEqual([owner([]), owner([["join|2026|PE20001|cdp-nom", take]])], [null, "DURAND Luc"], "the proposals: no borrow, then the kept row");
+  assert.equal(owner([["join|2026|PE20001|cdp-nom", take], [dup.id, martin]]), "MARTIN Eva", "the duplicate choice reaches the name join");
+});
+
+test("ADR 062 · a project set aside on its unreadable ME cell is not listed among the projects whose ME cells are empty or zero", () => {
+  const files = sampleFiles({ couts: [coutsRow("PE20002", "Stockage", { "Coût final ME (Res ouTrans)": "???" })] });
+  const audit = runImportAudit(files, SAMPLE_CONFIG, NOW, 2026, createDoubtBook({ year: 2026, choices: new Map([["me-unreadable|2026|PE20002|me", "ecarter"]]) }));
+  assert.deepEqual(audit.report.doubtful.filter((d) => /sans aucun chiffre ME/.test(d.question)), []);
+  assert.equal(audit.couts?.stats.excluded.noMe, 1, "still counted among the projects without ME");
 });
