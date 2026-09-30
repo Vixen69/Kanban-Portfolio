@@ -25,9 +25,16 @@ export interface CreatedCard {
   event: CardEvent;
 }
 
+/** The optional facts « Plus d'informations » may carry at creation (ADR 057). */
+export type CreationFacts = Pick<
+  CardPatch,
+  | "codename" | "subDomain" | "effortEstimated" | "effortConsumed" | "budgetEstimated"
+  | "budgetConsumed" | "budgetRdli" | "budgetEngaged" | "dateRdr" | "loadPlan" | "resources"
+>;
+
 /** The QuickAdd creation intent — the server builds everything else,
  * including the nature (derived from the canal, ADR 018). */
-export interface NewCardInput {
+export interface NewCardInput extends CreationFacts {
   title: string;
   domain: string;
   /** The canal; omitted when the intake column has none (ADR 039) — the server picks the « complicated » one. */
@@ -189,8 +196,9 @@ export function fetchCapacity(exercise: number): Promise<CapacitySnapshot | null
 }
 
 /**
- * POST /api/cards — create a subject from the QuickAdd intent; the server
- * assigns id, codename, first column, timestamps and the "created" event.
+ * POST /api/cards — create a subject from the QuickAdd intent (with its
+ * optional typed facts, ADR 057); the server assigns id, first column,
+ * timestamps and the "created" event.
  * Input: the NewCardInput. Output: { card, event }. Failure: throws ApiError.
  */
 export function postCard(input: NewCardInput): Promise<CreatedCard> {

@@ -96,3 +96,15 @@ test("getSnapshotDiff: what the board did since the snapshot — here a move and
   assert.equal((await storage.listEvents()).length, 2); // a read: nothing written
   await assert.rejects(() => getSnapshotDiff({ storage, configStore }, "inconnu"), BadRequest);
 });
+
+test("getSnapshotDiff (ADR 055): the refreshed values travel as numbers — a budget edited since the snapshot", async () => {
+  const { storage, configStore } = deps();
+  const taken = await takeSnapshot({ storage, configStore }, "avant chargement", "pmo", NOW);
+  await storage.appendEvent(lifecycleEvent("edited", "S001", "pmo", NOW.toISOString(), { patch: { budgetEstimated: 42, owner: "Bruno DIAZ" } }));
+  const result = await getSnapshotDiff({ storage, configStore }, taken.id);
+  const body = result.body as { changes: Array<{ kind: string; from: string | null; to: string | null; figure?: unknown }> };
+  assert.deepEqual(body.changes.map((c) => [c.kind, c.from, c.to, c.figure ?? null]), [
+    ["owner", CARD.owner, "Bruno DIAZ", null],
+    ["figure", null, null, { fact: "budgetEstimated", unit: "k€", before: null, after: 42, delta: null }],
+  ]);
+});

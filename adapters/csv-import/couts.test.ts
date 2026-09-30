@@ -133,3 +133,27 @@ test("the report names the projects excluded for having no ME figure, and says w
     "portefeuille « DSI NEXTER.PROJETS VENDUS » : 1 projet(s) → PROJETS VENDUS — dernier segment · « PROJETS VENDUS »",
   ]);
 });
+
+test("ADR 055: every project read has a verdict — retained on its état and type, excluded on the first failing rule", () => {
+  const { table } = couts();
+  assert.deepEqual(table.verdicts.map((v) => [v.code, v.motive, v.reason]), [
+    ["PE10001", "retained", "état « Basculé en projet », type « Projet de mise en oeuvre »"],
+    ["PE10002", "retained", "état « Budget validé », type « Etude »"],
+    ["PE10003", "retained", "état « Basculé en projet », type « Projet ATLAS [Hors PDSI] »"],
+    ["MEWTBN7Q", "retained", "état « Terminé », type « Projet de gestion d'obsolescence »"],
+    ["PE10007", "state", "état « Annulé » hors des états retenus"],
+    ["PE10008", "noYear", "hors exercice 2026 (aucune ligne sur l’année)"],
+    ["PE10009", "state", "état « Budget présenté » hors des états retenus"],
+    ["PE10010", "type", "type « Achat » hors des types retenus"],
+    ["PE10011", "type", "type « Evolution - TMA » hors des types retenus"],
+    ["PE10012", "state", "état « Reporté » hors des états retenus"],
+    ["PE10013", "type", "type « RUN » hors des types retenus"],
+    ["PE10014", "arbitrage", "ligne d’arbitrage (« arbitrage » dans le nom)"],
+    ["PE10015", "noMe", "aucune cellule ME non nulle sur 2026 (vide ou annulé de fait)"],
+    ["PE10016", "state", "état « Fusionné » hors des états retenus"],
+    ["PE10017", "retained", "état « Budget validé », type « Etude »"],
+    ["PE10018", "state", "état « Nouveau » hors des états retenus"],
+  ]);
+  assert.equal(table.verdicts.filter((v) => v.motive === "retained").length, table.stats.retained, "verdicts and counters agree");
+  assert.equal(table.verdicts[0]?.name, "PE10001 - Modernisation atelier", "the name as written");
+});

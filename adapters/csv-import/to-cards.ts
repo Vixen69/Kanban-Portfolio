@@ -18,10 +18,9 @@
 // current one, and keep their id (the capacity snapshot is remapped).
 // Pure: no storage, no clock of its own — the caller passes both.
 
-import type { BoardConfig, Card, CardEvent, CardState, ChargeEntry } from "../../core/types.ts";
+import type { BoardConfig, Card, CardEvent, CardState } from "../../core/types.ts";
 import type { CardEventInput } from "../../core/events.ts";
 import { lifecycleEvent, movedEvent } from "../../core/events.ts";
-import { laneNature } from "../../core/config.ts";
 import { foldEvents } from "../../core/state.ts";
 import { cardsOfExercise, hasExerciseSuffix } from "../../core/exercise.ts";
 import type { DomainConflict, DomainDecision, DomainRef } from "../../core/import-types.ts";
@@ -29,8 +28,9 @@ import type { EnrichedCard } from "./enrich.ts";
 import { IMPORT_ACTOR, domainConflict, domainDecisionEvent, priorDomainDecisions } from "./domain-conflicts.ts";
 import type { PriorDecision } from "./domain-conflicts.ts";
 import { baseCardId, cardId, withLegacyIds } from "./card-identity.ts";
-import { keepStoredFacts, keptFactCounts } from "./keep-facts.ts";
-import type { KeptFact, KeptFactCount } from "./keep-facts.ts";
+import { keepStoredFacts, keptFactCards, keptFactCounts } from "./keep-facts.ts";
+import type { KeptFactCards, KeptFactCount, KeptTally } from "./keep-facts.ts";
+import { toCard } from "./card-row.ts";
 
 export { IMPORT_ACTOR, baseCardId, cardId, withLegacyIds };
 
@@ -56,6 +56,10 @@ export interface LoadPlan {
   chargesWithoutProfile: number;
   /** Facts the files left blank on existing cards: the stored value stood (ADR 054). */
   factsKept: KeptFactCount[];
+  /** The same facts with the cards that kept them named (ADR 055). */
+  factsKeptCards: KeptFactCards[];
+  /** New cards whose domain nothing resolved: they take the first configured domain (reported, ADR 055). */
+  domainFallback: string[];
   /** The exercise the load writes into (ADR 035). */
   exercise: number;
   /**
@@ -102,7 +106,7 @@ export function planLoad(
   const priors = priorDomainDecisions(existingEvents);
   const plan = emptyPlan(year);
   const stored = new Map(existingCards.map((c) => [c.id, c]));
-  const tally = new Map<KeptFact, number>();
+  const tally: KeptTally = new Map();
   const deckIds = new Set<string>();
   for (const card of deck) {
     const id = resolveId(card, year, legacy, plan);
@@ -110,6 +114,7 @@ export function planLoad(
     const existing = current.get(id);
     if (existing === undefined) {
       plan.cards.push(toCard(id, card, config, plan, year));
+      if (card.domainId === null) plan.domainFallback.push(id);
       pushCreated(plan, id, card, now);
       continue;
     }
@@ -120,6 +125,7 @@ export function planLoad(
   }
   markAbsences(plan, current, deckIds, now);
   plan.factsKept = keptFactCounts(tally);
+  plan.factsKeptCards = keptFactCards(tally);
   return plan;
 }
 
@@ -219,7 +225,8 @@ function pushCreated(plan: LoadPlan, id: string, card: EnrichedCard, now: Date):
 function emptyPlan(year: number): LoadPlan {
   return {
     cards: [], events: [], created: 0, updated: 0, moved: 0, unlisted: 0, relisted: 0, kept: 0,
-    divergences: [], chargesWithoutProfile: 0, factsKept: [], exercise: year, aliases: new Map(),
+    divergences: [], chargesWithoutProfile: 0, factsKept: [], factsKeptCards: [], domainFallback: [],
+    exercise: year, aliases: new Map(),
     domainConflicts: [], domainReplaced: 0, domainKept: 0, domainUndecided: 0, domainKeptByPrior: 0,
   };
 }
@@ -237,57 +244,4 @@ function handMovedIds(events: CardEvent[]): Set<string> {
 // no start date falls back to the run instant.
 function entryTs(card: EnrichedCard, now: Date): string {
   return card.createdAt === null ? now.toISOString() : `${card.createdAt}T00:00:00.000Z`;
-}
-
-// The import-time snapshot row. Fields the exports never carry (tags,
-// risks, blocage, notes...) stay empty: they are lived in the tool. An
-// existing card passes the domain it keeps (settleDomain, ADR 036); a new
-// one takes the export's, else the first configured domain.
-function toCard(
-  id: string, card: EnrichedCard, config: BoardConfig, plan: LoadPlan, year: number,
-  keepCreatedAt?: string, domain?: DomainRef,
-): Card {
-  return {
-    id,
-    title: card.title,
-    domain: domain?.domain ?? card.domainId ?? config.domains[0]?.id ?? "",
-    subDomain: domain === undefined ? card.subDomainId : domain.subDomain,
-
-    laneId: card.laneId, columnId: card.columnId,
-    owner: card.owner ?? "",
-    criticality: "normal",
-    typeId: card.typeId,
-    codename: card.codename,
-    nature: laneNature(config, card.laneId),
-    tags: [], dependencies: [],
-    blocked: false, blockedReason: null, blockedSince: null,
-    effortEstimated: card.effortEstimated,
-    effortConsumed: card.effortConsumed,
-    budgetEstimated: card.budgetEstimated,
-    budgetConsumed: card.budgetConsumed,
-    loadPlan: null, resources: [], notes: "",
-    budgetEngaged: card.budgetEngaged,
-    budgetRdli: card.budgetRdli,
-    chargeByProfile: chargesOf(card, plan),
-    contentionProfiles: [], contentionNote: "",
-    risks: [], projectConstraints: [], alerts: [],
-    dateRdr: card.dateRdr,
-    sciformaId: card.codename,
-    custom: {},
-    createdAt: keepCreatedAt ?? `${card.createdAt ?? new Date(0).toISOString().slice(0, 10)}T00:00:00.000Z`,
-    source: "csv",
-    exercise: year,
-  };
-}
-
-// The plan de charge lines a card keeps: those whose métier resolved to a
-// profile; the others are counted and dropped.
-function chargesOf(card: EnrichedCard, plan: LoadPlan): ChargeEntry[] {
-  return card.charges.flatMap((charge): ChargeEntry[] => {
-    if (charge.profileId === null) {
-      plan.chargesWithoutProfile++;
-      return [];
-    }
-    return [{ profileId: charge.profileId, jh: charge.jh, done: charge.done }];
-  });
 }

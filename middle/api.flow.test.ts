@@ -61,7 +61,6 @@ const CARD_BODY = {
   domain: "beta",
   laneId: "laneB",
   typeId: "t2",
-  nature: "complex",
   criticality: "top",
   owner: "Mme Chef",
 };

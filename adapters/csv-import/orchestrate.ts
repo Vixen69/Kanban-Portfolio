@@ -43,6 +43,7 @@ import type { ProfilsTable } from "./profils.ts";
 import { buildCapacity } from "./capacity.ts";
 import type { CapacityBuild } from "./capacity.ts";
 import { emitAssembly, emitMissing } from "./assembly.ts";
+import type { ImportSource } from "../../core/import-types.ts";
 
 export type { InputFile } from "./identify.ts";
 
@@ -67,6 +68,8 @@ export interface AuditResult {
   ownerStats: OwnerStats | null;
   chargeStats: ChargeStats | null;
   capacity: CapacityBuild | null;
+  /** The received file each expected source was read from, null when none (ADR 055). */
+  sources: Record<ImportSource, string | null>;
 }
 
 /**
@@ -98,17 +101,7 @@ export function runImportAudit(files: InputFile[], config: BoardConfig, now: Dat
     : parseParam(paramBest.dataRows, paramBest.match, paramBest.headerCells, cfg, report, paramBest.file.name);
   const perimeter = readPerimeter(byContract, cfg, param, report);
   const projets = perimeter.projets;
-  const jalonsBest = pick(JALONS_CONTRACT.id);
-  const jalons = jalonsBest === null ? null
-    : parseJalons(jalonsBest.dataRows, jalonsBest.match, cfg, report, jalonsBest.file.name, now);
-  const spBest = pick(SP_CONTRACT.id);
-  const sp = spBest === null ? null : parseSp(spBest.dataRows, spBest.match, report, spBest.file.name);
-  const pdcBest = pick(PDC_CONTRACT.id);
-  const pdc = pdcBest === null ? null
-    : parsePdc(pdcBest.dataRows, pdcBest.match, cfg, report, pdcBest.file.name);
-  const profilsBest = pick(PROFILS_CONTRACT.id);
-  const profils = profilsBest === null ? null
-    : parseProfils(profilsBest.dataRows, profilsBest.match, cfg, report, profilsBest.file.name);
+  const { jalons, sp, pdc, profils, names } = readSideTables(pick, cfg, report, now);
   const cdpBest = pick(CDP_CONTRACT.id)
     ?? secondProjets(byContract.get(PROJETS_CONTRACT.id) ?? [], perimeter.ongletBest, report) ?? lentOnglet(perimeter, report);
   const cdp = cdpBest === null ? null : parseCdp(cdpBest.dataRows, cdpBest.match, param, report, cdpBest.file.name);
@@ -123,9 +116,43 @@ export function runImportAudit(files: InputFile[], config: BoardConfig, now: Dat
   const result: AuditResult = {
     exercise: year, report, param, couts: perimeter.couts, projets, perimeterCheck: perimeter.check, jalons, sp, pdc, profils, cdp,
     cards, ownerStats, chargeStats, capacity,
+    sources: {
+      couts: perimeter.couts?.fileName ?? null, projets: perimeter.ongletBest?.file.name ?? null,
+      param: paramBest?.file.name ?? null, cdp: cdpBest?.file.name ?? null, ...names,
+    },
   };
   emitAssembly(report, result, cfg);
   return result;
+}
+
+interface SideTables {
+  jalons: JalonsTable | null;
+  sp: SpTable | null;
+  pdc: PdcTable | null;
+  profils: ProfilsTable | null;
+  names: Pick<AuditResult["sources"], "jalons" | "sp" | "pdc" | "profils">;
+}
+
+// The tables that enrich the perimeter's cards, each from its elected file
+// (elected then read one after the other: the report keeps its order).
+function readSideTables(pick: (id: string) => Candidate | null, cfg: BoardConfig, report: ImportReport, now: Date): SideTables {
+  const jalonsBest = pick(JALONS_CONTRACT.id);
+  const jalons = jalonsBest === null ? null
+    : parseJalons(jalonsBest.dataRows, jalonsBest.match, cfg, report, jalonsBest.file.name, now);
+  const spBest = pick(SP_CONTRACT.id);
+  const sp = spBest === null ? null : parseSp(spBest.dataRows, spBest.match, report, spBest.file.name);
+  const pdcBest = pick(PDC_CONTRACT.id);
+  const pdc = pdcBest === null ? null : parsePdc(pdcBest.dataRows, pdcBest.match, cfg, report, pdcBest.file.name);
+  const profilsBest = pick(PROFILS_CONTRACT.id);
+  const profils = profilsBest === null ? null
+    : parseProfils(profilsBest.dataRows, profilsBest.match, cfg, report, profilsBest.file.name);
+  return {
+    jalons, sp, pdc, profils,
+    names: {
+      jalons: jalonsBest?.file.name ?? null, sp: spBest?.file.name ?? null,
+      pdc: pdcBest?.file.name ?? null, profils: profilsBest?.file.name ?? null,
+    },
+  };
 }
 
 interface Perimeter {

@@ -3,6 +3,7 @@
 // the plan-de-charge profile rows. No React, no network.
 
 import type { BoardConfig, CardState } from "../core/types.ts";
+import { parseAmount } from "../core/card-input.ts";
 
 const DAY_MS = 86_400_000;
 
@@ -17,7 +18,10 @@ export interface BudgetRow {
   /** The Card field an inline edit of this bar patches. */
   field: "budgetRdli" | "budgetEstimated" | "budgetEngaged" | "budgetConsumed";
   label: string;
+  /** The bar length: the stored figure, or its display estimate when none is stored. */
   val: number;
+  /** The stored figure, null when none (ADR 057): what the inline edit shows (« — ») and starts from. */
+  raw: number | null;
   color: string;
   ref?: boolean;
 }
@@ -30,10 +34,10 @@ export function budgetModel(card: CardState): { rows: BudgetRow[]; bMax: number;
   const bEng = card.budgetEngaged ?? Math.round(bReal + (Math.max(bEst, bReal) - bReal) * 0.5);
   const bMax = Math.max(bRdli, bEst, bEng, bReal, 1) * 1.04;
   const rows: BudgetRow[] = [
-    { key: "rdli", field: "budgetRdli", label: "Enveloppe RDLI", val: bRdli, color: "#94a3b8", ref: true },
-    { key: "est", field: "budgetEstimated", label: "Meilleur estimé", val: bEst, color: "var(--accent)" },
-    { key: "eng", field: "budgetEngaged", label: "Budget engagé", val: bEng, color: "#b45309" },
-    { key: "real", field: "budgetConsumed", label: "Réalisé", val: bReal, color: bReal > bRdli ? "var(--danger)" : "var(--ok)" },
+    { key: "rdli", field: "budgetRdli", label: "Enveloppe RDLI", val: bRdli, raw: card.budgetRdli, color: "#94a3b8", ref: true },
+    { key: "est", field: "budgetEstimated", label: "Meilleur estimé", val: bEst, raw: card.budgetEstimated, color: "var(--accent)" },
+    { key: "eng", field: "budgetEngaged", label: "Budget engagé", val: bEng, raw: card.budgetEngaged, color: "#b45309" },
+    { key: "real", field: "budgetConsumed", label: "Réalisé", val: bReal, raw: card.budgetConsumed, color: bReal > bRdli ? "var(--danger)" : "var(--ok)" },
   ];
   return { rows, bMax, bRdli, bReal };
 }
@@ -74,6 +78,25 @@ export interface ProfileRow {
  */
 export function roundJh(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+/**
+ * A budget figure typed inline in the fiche (ADR 057): comma or dot, an
+ * emptied input is null — « non renseigné », never 0.
+ * Inputs: the typed text. Outputs: the k€ amount ≥ 0, or null.
+ * Failure modes: none — unreadable or negative text reads as null.
+ */
+export function budgetFromInput(raw: string): number | null {
+  return parseAmount(raw);
+}
+
+/**
+ * A per-métier consumed typed inline in the fiche: comma or dot, to the
+ * hundredth (roundJh) — 12,75 stays 12,75; emptied or unreadable is 0.
+ * Inputs: the typed text. Outputs: the j.h amount ≥ 0. Failure modes: none.
+ */
+export function doneFromInput(raw: string): number {
+  return roundJh(parseAmount(raw) ?? 0);
 }
 
 /**

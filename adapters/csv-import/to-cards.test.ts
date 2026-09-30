@@ -216,6 +216,7 @@ test("ADR 036: no conflict when the export resolved no domain — the board's va
   assert.deepEqual([plan.domainConflicts.length, plan.cards[0]?.domain], [0, "infra"]);
   const fresh = planLoad([blank], CONFIG, [], [], NOW);
   assert.equal(fresh.cards[0]?.domain, CONFIG.domains[0]?.id, "a new card without domain takes the first configured one");
+  assert.deepEqual([fresh.domainFallback, plan.domainFallback], [[fresh.cards[0]?.id], []], "ADR 055: that fallback is named, an existing card's is not one");
 });
 
 test("ADR 054: a partial re-import (no CdP, no SP, no plan de charge) never erases the stored facts", () => {

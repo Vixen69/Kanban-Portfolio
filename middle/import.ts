@@ -7,13 +7,16 @@
 // tool is the report the CLI writes. The import targets ONE exercise
 // (ADR 035) and the audit lists the domain conflicts a load would raise
 // (ADR 036): the load carries the PMO's decisions, one per conflict, and
-// is refused while one is missing. Logs carry counts only.
+// is refused while one is missing. Both return the readable report of
+// ADR 055 (`changes`): the audit says what the load WOULD change on the
+// board and why, the load what it DID — one import mode. Logs carry
+// counts only.
 
 import { win32 } from "node:path";
 import type { BoardStorage } from "../core/ports.ts";
 import type { BoardConfig } from "../core/types.ts";
 import type { DomainDecision, ImportAuditResult, ImportLoadResult, ImportSummary } from "../core/import-types.ts";
-import { keepStoredCapacity, planLoad, renderReport, runImportAudit, withLegacyIds } from "../adapters/csv-import/index.ts";
+import { importChanges, keepStoredCapacity, planLoad, renderReport, runImportAudit, withLegacyIds } from "../adapters/csv-import/index.ts";
 import type { AuditResult, EnrichedCard, InputFile, LoadPlan } from "../adapters/csv-import/index.ts";
 import { BadRequest } from "./errors.ts";
 import { exerciseOrCurrent } from "./validation.ts";
@@ -116,31 +119,40 @@ function summarize(audit: AuditResult): ImportSummary {
   };
 }
 
-// The conflicts a load would raise and the facts it would keep, read
-// without writing: the audit is a dry run of the plan against the
-// exercise's stored cards (ADR 036, ADR 054).
+// The conflicts a load would raise, the facts it would keep and what it
+// would change, read without writing: the audit is a dry run of the plan
+// against the exercise's stored cards (ADR 036, ADR 054, ADR 055). A deck
+// the load would refuse (none, or empty on that year) previews nothing:
+// no card would be written, none marked absent.
 async function dryRun(
-  storage: BoardStorage, config: BoardConfig, deck: EnrichedCard[], now: Date, year: number,
-): Promise<Pick<ImportAuditResult, "conflicts" | "factsKept">> {
+  storage: BoardStorage, config: BoardConfig, audit: AuditResult, now: Date, year: number,
+): Promise<Pick<ImportAuditResult, "conflicts" | "factsKept" | "changes">> {
   const [events, baseCards] = await Promise.all([storage.listEvents(), storage.listBaseCards()]);
-  const plan = planLoad(deck, config, baseCards, events, now, year);
-  return { conflicts: plan.domainConflicts.map(({ decision: _decision, ...conflict }) => conflict), factsKept: plan.factsKept };
+  if (audit.cards === null || audit.cards.cards.length === 0) {
+    return { conflicts: [], factsKept: [], changes: importChanges({ audit, config, year, plan: null, baseCards, events }) };
+  }
+  const plan = planLoad(audit.cards.cards, config, baseCards, events, now, year);
+  return {
+    conflicts: plan.domainConflicts.map(({ decision: _decision, ...conflict }) => conflict), factsKept: plan.factsKept,
+    changes: importChanges({ audit, config, year, plan, baseCards, events }),
+  };
 }
 
 /**
  * Runs the audit over the received files — nothing is written — and lists
- * the domain conflicts a load would raise against the board (ADR 036).
+ * the domain conflicts a load would raise against the board (ADR 036) and
+ * the readable report of what it would change (ADR 055).
  * Inputs: the storage (read only), the runtime config, the files, now, the
  * exercise year read (default: the current one, ADR 035). Output: the
  * rendered report (Markdown, French), its counts, whether a load would
- * write cards, the conflicts. Failure: none — every anomaly lands in the
- * report; storage errors propagate (→ 500).
+ * write cards, the conflicts, the facts kept, the changes. Failure: none —
+ * every anomaly lands in the report; storage errors propagate (→ 500).
  */
 export async function auditImport(
   storage: BoardStorage, config: BoardConfig, files: InputFile[], now: Date, year: number = config.exercise.year,
 ): Promise<ImportAuditResult> {
   const audit = runImportAudit(files, config, now, year);
-  const dry = audit.cards === null ? { conflicts: [], factsKept: [] } : await dryRun(storage, config, audit.cards.cards, now, year);
+  const dry = await dryRun(storage, config, audit, now, year);
   return {
     exercise: year, report: renderReport(audit.report, now), summary: summarize(audit),
     loadable: audit.cards !== null, ...dry,
@@ -167,7 +179,8 @@ function loadFigures(plan: LoadPlan, audit: AuditResult): ImportLoadResult["load
  * (ADR 036): the load is refused otherwise, before anything is written.
  * Inputs: the storage, the runtime config, the files, now, the exercise
  * year (default: the current one), the decisions by card id.
- * Output: the audit result plus what the load wrote.
+ * Output: the audit result plus what the load wrote; `changes` says what
+ * it changed on the board, card by card (ADR 055).
  * Failure: BadRequest on a closed year (below the current one), when no
  * card assembled (no `projets` file), when no project is retained on that
  * year (the files of another exercise) or when a conflict is undecided;
@@ -183,6 +196,7 @@ export async function loadImport(
   const deck = loadableDeck(audit, year);
   const [events, baseCards] = await Promise.all([storage.listEvents(), storage.listBaseCards()]);
   const plan = planLoad(deck, config, baseCards, events, now, year, decisions);
+  const changes = importChanges({ audit, config, year, plan, baseCards, events });
   if (plan.domainUndecided > 0) {
     throw new BadRequest(`Chargement refusé : ${plan.domainUndecided} conflit(s) de domaine sans décision (garder ou remplacer).`);
   }
@@ -200,6 +214,6 @@ export async function loadImport(
   );
   return {
     exercise: year, report: renderReport(audit.report, now), summary: summarize(audit), loadable: true,
-    conflicts: plan.domainConflicts, factsKept: plan.factsKept, load: loadFigures(plan, audit),
+    conflicts: plan.domainConflicts, factsKept: plan.factsKept, changes, load: loadFigures(plan, audit),
   };
 }

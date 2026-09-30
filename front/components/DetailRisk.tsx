@@ -1,10 +1,13 @@
 // Read-mode detail sections (design/modals.jsx): the budget cross-graph
 // (RDLI · estimé · engagé · réalisé, all inline-editable) and the Risques
 // section (retained risks, editable). Each saves through onPatch (editCard).
+// ADR 057: a figure not stored reads « — » and edits from empty; the bar
+// may still show its estimate, which is never written back as data.
 
 import { useState } from "react";
 import type { BoardConfig, CardPatch, CardState } from "../../core/types.ts";
-import { budgetModel } from "../detailModel.ts";
+import { budgetFromInput, budgetModel } from "../detailModel.ts";
+import { CARD_TEXT_LIMITS as CAP } from "../../core/card-input.ts";
 import { InlineEdit, RiskEditor } from "./modalEditors.tsx";
 import { fmtNum } from "../format.ts";
 
@@ -23,9 +26,9 @@ export function BudgetGraph({ card, onPatch }: { card: CardState; onPatch: (patc
               <span className="bg-ref" style={{ left: `${(bRdli / bMax) * 100}%` }} />
             </div>
             <span className="bg-val" style={{ color: r.key === "real" && bReal > bRdli ? "var(--danger-strong)" : "var(--tx-2)" }}>
-              <InlineEdit<number>
-                value={r.val} type="number" display={fmtNum(r.val)}
-                fromInput={(v) => (v === "" ? 0 : Math.max(0, Number(v)))}
+              <InlineEdit<number | null>
+                value={r.raw} type="number" display={r.raw === null ? "—" : fmtNum(r.raw)}
+                fromInput={budgetFromInput}
                 onCommit={(v) => onPatch({ [r.field]: v } as CardPatch)}
               />
             </span>
@@ -48,7 +51,7 @@ function RiskRows({ risks, config, onPatch }: { risks: CardState["risks"]; confi
             <span className="risk-sev" style={{ background: rt ? rt.color : "#64748b" }} />
             {rt && <span className="ctype-tag" style={{ color: rt.color, borderColor: `color-mix(in oklab, ${rt.color} 40%, transparent)`, background: `color-mix(in oklab, ${rt.color} 8%, #fff)` }}>{rt.short}</span>}
             <span className="risk-desc">
-              <InlineEdit value={r.desc} placeholder="décrire le risque…"
+              <InlineEdit value={r.desc} placeholder="décrire le risque…" maxLength={CAP.riskDesc}
                 onCommit={(v) => onPatch({ risks: risks.map((x) => (x.type === r.type ? { ...x, desc: v } : x)) })} />
             </span>
           </div>

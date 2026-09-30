@@ -35,10 +35,9 @@ import { CardDetail } from "./components/CardDetail.tsx";
 import { CardEdit } from "./components/CardEdit.tsx";
 import { Header } from "./components/Chrome.tsx";
 import { EmptyOverlay } from "./components/EmptyOverlay.tsx";
-
 import { AnalyticsView } from "./components/AnalyticsView.tsx";
 import type { YearPickerProps } from "./components/YearPicker.tsx";
-import { QuickAdd } from "./components/QuickAdd.tsx";
+import { QuickAdd, type QuickAddInput } from "./components/QuickAdd.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
 
 // Everything the screen pieces read, built once per render in Shell.
@@ -76,7 +75,6 @@ interface Ctx {
   /** The last move, outlined for 4 s and read to screen readers (ADR 050). */
   moveFlash: MoveFlashState | null;
 }
-
 
 // One edit-form save, decomposed into its API intents in order: field
 // patch, then move. The sequence stops at the first refused intent so a
@@ -128,14 +126,19 @@ function CardModals({ ctx }: { ctx: Ctx }) {
   );
 }
 
-
+// « + Sujet » (ADR 057): created in the exercise shown, then its « Modifier »
+// form opens at once; a refused creation opens nothing (lastError says why).
+async function createThenEdit(ctx: Ctx, input: QuickAddInput): Promise<void> {
+  const id = await ctx.store.createCard({ ...input, exercise: ctx.viewYear });
+  if (id !== null) { ctx.ui.setDetailId(id); ctx.ui.setEditing(true); }
+}
 function ShellModals({ ctx }: { ctx: Ctx }) {
   const { store, config, ui } = ctx;
   return (
     <>
       {ui.adding && (
         <QuickAdd config={config} onClose={() => ui.setAdding(false)}
-          onCreate={(input) => { void store.createCard({ ...input, exercise: ctx.viewYear }); ui.setAdding(false); }} />
+          onCreate={(input) => { void createThenEdit(ctx, input); ui.setAdding(false); }} />
       )}
       {ui.admin && (
         <AdminPanel config={config} cards={store.cards} {...adminWrites(store, ui, ctx.bumpCapacity)} onClose={() => ui.setAdmin(false)}

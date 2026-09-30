@@ -4,6 +4,7 @@
 
 import type { ReactNode } from "react";
 import type { Criticality, CustomValue, FieldDef } from "../../core/types.ts";
+import { CARD_TEXT_LIMITS as CAP } from "../../core/card-input.ts";
 
 /** Design order of the criticality keys in the edit/create selects. */
 export const CRITICALITY_KEYS: readonly Criticality[] = ["normal", "major", "top"];
@@ -94,8 +95,9 @@ export function CustomKV({ field, value }: { field: FieldDef; value: CustomValue
  * Inputs: the FieldDef, the current value (may be undefined) and the change
  * callback receiving the new CustomValue.
  * Output: a toggle row (checkbox), a select (select) or a typed input
- * (text/number/date/person as text). Failure modes: none — an empty number
- * input reports the empty string, matching the design behavior.
+ * (text/number/date/person as text, capped like the middle). Failure
+ * modes: none — an emptied input or « — » reports null, the value the
+ * middle accepts for every field type (ADR 057).
  */
 export function CustomInput({ field, value, onChange }: {
   field: FieldDef;
@@ -116,7 +118,7 @@ export function CustomInput({ field, value, onChange }: {
       ...(field.options ?? []).map((option) => ({ value: option.label, label: option.label })),
     ];
     return (
-      <SelectField label={field.name} value={typeof value === "string" ? value : ""} options={options} onChange={onChange} />
+      <SelectField label={field.name} value={typeof value === "string" ? value : ""} options={options} onChange={(v) => onChange(v === "" ? null : v)} />
     );
   }
   const inputType = field.type === "number" ? "number" : field.type === "date" ? "date" : "text";
@@ -125,10 +127,12 @@ export function CustomInput({ field, value, onChange }: {
       <input
         className="inp"
         type={inputType}
+        maxLength={CAP.customText}
         value={value == null ? "" : String(value)}
-        onChange={(event) =>
-          onChange(field.type === "number" && event.target.value !== "" ? Number(event.target.value) : event.target.value)
-        }
+        onChange={(event) => {
+          const raw = event.target.value;
+          onChange(raw === "" ? null : field.type === "number" ? Number(raw) : raw);
+        }}
       />
     </Field>
   );

@@ -38,6 +38,15 @@ export interface KeptFactCount {
   cards: number;
 }
 
+/** Which cards kept their stored value of one fact (ADR 055: named, not only counted). */
+export interface KeptFactCards {
+  label: string;
+  cardIds: string[];
+}
+
+/** The kept facts of a load: fact -> the ids of the cards that kept it, in load order. */
+export type KeptTally = Map<KeptFact, string[]>;
+
 // Blank = the files said nothing: null, an empty text, an empty list.
 function blank(value: unknown): boolean {
   if (value === null || value === undefined) return true;
@@ -48,17 +57,18 @@ function blank(value: unknown): boolean {
 /**
  * The refreshed card with its blank facts filled from the stored card.
  * Inputs: the card the files rebuilt, the stored base card (undefined for
- * a new card: nothing to keep), the tally counting kept facts (mutated).
+ * a new card: nothing to keep), the tally naming the cards per kept fact
+ * (mutated: the card's id is added under each fact it kept).
  * Output: the card to write — a copy, the inputs are left untouched.
  * Failure modes: none.
  */
-export function keepStoredFacts(fresh: Card, stored: Card | undefined, tally: Map<KeptFact, number>): Card {
+export function keepStoredFacts(fresh: Card, stored: Card | undefined, tally: KeptTally): Card {
   if (stored === undefined) return fresh;
   const card: Card = { ...fresh };
   for (const [fact] of FACTS) {
     if (!blank(fresh[fact]) || blank(stored[fact])) continue;
     Object.assign(card, { [fact]: stored[fact] });
-    tally.set(fact, (tally.get(fact) ?? 0) + 1);
+    tally.set(fact, [...(tally.get(fact) ?? []), fresh.id]);
   }
   return card;
 }
@@ -68,9 +78,18 @@ export function keepStoredFacts(fresh: Card, stored: Card | undefined, tally: Ma
  * Input: the tally keepStoredFacts filled. Output: KeptFactCount[] (empty
  * when the files carried every fact the board held). Failure modes: none.
  */
-export function keptFactCounts(tally: ReadonlyMap<KeptFact, number>): KeptFactCount[] {
+export function keptFactCounts(tally: ReadonlyMap<KeptFact, readonly string[]>): KeptFactCount[] {
+  return keptFactCards(tally).map(({ label, cardIds }) => ({ label, cards: cardIds.length }));
+}
+
+/**
+ * The tally in the report's order and words, with the cards named (ADR 055).
+ * Input: the tally keepStoredFacts filled. Output: KeptFactCards[] (empty
+ * when nothing was kept). Failure modes: none.
+ */
+export function keptFactCards(tally: ReadonlyMap<KeptFact, readonly string[]>): KeptFactCards[] {
   return FACTS.flatMap(([fact, label]) => {
-    const cards = tally.get(fact) ?? 0;
-    return cards === 0 ? [] : [{ label, cards }];
+    const cardIds = tally.get(fact) ?? [];
+    return cardIds.length === 0 ? [] : [{ label, cardIds: [...cardIds] }];
   });
 }

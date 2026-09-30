@@ -11,7 +11,8 @@ import type { HistoryEntry } from "../../core/history.ts";
 import type { FlowAnchors, FlowTimes } from "../../core/flow.ts";
 import { TypeTag } from "./cardParts.tsx";
 import { CustomKV, Tag } from "./modalParts.tsx";
-import { CommentList, DelaysSection, HistoryList } from "./DetailSections.tsx";
+import { CommentList, DelaysSection, HistoryList, NotesSection } from "./DetailSections.tsx";
+import { CARD_TEXT_LIMITS as CAP } from "../../core/card-input.ts";
 import { AbsentBanner, DecisionSection } from "./DetailDecision.tsx";
 import type { DecisionInput } from "../api.ts";
 import { ConstraintEditor, InlineEdit } from "./modalEditors.tsx";
@@ -67,8 +68,8 @@ function TopBar({ card, nav, onClose, onPatch }: { card: CardState; nav: CellNav
   return (
     <div className="modal-top">
       <div>
-        <h2 className="modal-name"><InlineEdit value={card.title} onCommit={(v) => { if (v.trim()) onPatch({ title: v.trim() }); }} /></h2>
-        <span className="modal-code"><InlineEdit value={card.codename} placeholder="code" onCommit={(v) => onPatch({ codename: v.trim() })} /></span>
+        <h2 className="modal-name"><InlineEdit value={card.title} maxLength={CAP.title} onCommit={(v) => { if (v.trim()) onPatch({ title: v.trim() }); }} /></h2>
+        <span className="modal-code"><InlineEdit value={card.codename} placeholder="code" maxLength={CAP.codename} onCommit={(v) => onPatch({ codename: v.trim() || null })} /></span>
       </div>
       <div className="modal-top-right">
         {nav !== null && nav.total > 1 && <CellNavControl nav={nav} />}
@@ -121,6 +122,7 @@ function BlockForm({ onCancel, onConfirm }: { onCancel: () => void; onConfirm: (
         className="inp"
         rows={2}
         autoFocus
+        maxLength={CAP.blockReason}
         placeholder="Ex. dépendance équipe Infra non livrée, attente arbitrage…"
         value={text}
         onChange={(event) => setText(event.target.value)}
@@ -190,14 +192,16 @@ function Actions({ archived, onArchive, onUnarchive, onClose, onEdit }: {
 }
 
 // The stacked detail sections in design-v11 order (budget before plan de
-// charge, BLOCAGE after Risques) plus any custom fields.
-function MidSections({ card, config, now, onPatch, onBlock, onUnblock }: {
+// charge, BLOCAGE after Risques) plus any custom fields, then the
+// ressources and notes typed in « Modifier » (ADR 057).
+function MidSections({ card, config, now, onPatch, onBlock, onUnblock, onEdit }: {
   card: CardState;
   config: BoardConfig;
   now: number;
   onPatch: (patch: CardPatch) => void;
   onBlock: (reason: string) => void;
   onUnblock: () => void;
+  onEdit: () => void;
 }) {
   const hasCustom = config.fields.some((field) => {
     const value = card.custom[field.id];
@@ -217,6 +221,7 @@ function MidSections({ card, config, now, onPatch, onBlock, onUnblock }: {
           {config.fields.map((field) => <CustomKV key={field.id} field={field} value={card.custom[field.id]} />)}
         </div>
       )}
+      <NotesSection notes={card.notes} resources={card.resources} onEdit={onEdit} />
     </>
   );
 }
@@ -259,7 +264,7 @@ export function CardDetail(props: CardDetailProps) {
           <AbsentBanner card={card} />
           {constraintEdit && <ConstraintPop card={card} config={config} onPatch={onPatch} onClose={() => setConstraintEdit(false)} />}
           <MidSections card={card} config={config} now={props.now} onPatch={onPatch}
-            onBlock={props.onBlock} onUnblock={props.onUnblock} />
+            onBlock={props.onBlock} onUnblock={props.onUnblock} onEdit={props.onEdit} />
           <DecisionSection key={"dc" + card.id} card={card} config={config} now={props.now} onDecide={props.onDecide} />
           <CommentList key={card.id} comments={card.comments} onAdd={props.onComment} />
           <DelaysSection key={"dl" + card.id} flow={props.flow} anchors={props.anchors} />

@@ -5,7 +5,8 @@
 import { useState } from "react";
 import type { BoardConfig, CardPatch, CardState, Profile } from "../../core/types.ts";
 import { daysInColumn } from "../../core/aging.ts";
-import { colLabel, profileRows, rdrModel } from "../detailModel.ts";
+import { CARD_TEXT_LIMITS as CAP } from "../../core/card-input.ts";
+import { colLabel, doneFromInput, profileRows, rdrModel } from "../detailModel.ts";
 import { ChargeEditor, ContentionEditor, InlineEdit } from "./modalEditors.tsx";
 import { fmtNum } from "../format.ts";
 
@@ -23,7 +24,7 @@ export function OwnerStrip({ card, config, now, onPatch }: {
     <div className="owner-strip">
       <span className="owner-mono" style={{ background: domain.color }}>{initial}</span>
       <div className="owner-meta">
-        <b><InlineEdit value={card.owner} placeholder="Chef de projet non assigné" onCommit={(v) => onPatch({ owner: v.trim() })} /></b>
+        <b><InlineEdit value={card.owner} placeholder="Chef de projet non assigné" maxLength={CAP.owner} onCommit={(v) => onPatch({ owner: v.trim() })} /></b>
         <span>{card.loadPlan || "plan de charge n.c."}</span>
       </div>
       <span className="owner-since">{days} j dans {colLabel(config, card.columnId)}</span>
@@ -43,7 +44,7 @@ export function RdrStrip({ card, now, onPatch }: { card: CardState; now: number;
           <InlineEdit<string | null>
             value={card.dateRdr} type="date" display={rdr.formatted}
             toInput={(v) => (v ? String(v).slice(0, 10) : "")}
-            fromInput={(v) => (v ? new Date(v).toISOString() : null)}
+            fromInput={(v) => (v ? v.slice(0, 10) : null)}
             onCommit={(v) => onPatch({ dateRdr: v })}
           />
         </b>
@@ -54,7 +55,8 @@ export function RdrStrip({ card, now, onPatch }: { card: CardState; now: number;
 }
 
 // One plan-de-charge row: profile bar + « consommé / estimé » where the
-// consumed is click-to-edit inline (design v11), clamped to [0, jh].
+// consumed is click-to-edit inline (design v11), clamped to [0, jh], read
+// to the hundredth like the plan itself (12,75 stays 12,75 — ADR 057).
 function ProfRow({ p, max, onCommitDone }: { p: ReturnType<typeof profileRows>["rows"][number]; max: number; onCommitDone: (v: number) => void }) {
   return (
     <div className="prof-row">
@@ -66,7 +68,7 @@ function ProfRow({ p, max, onCommitDone }: { p: ReturnType<typeof profileRows>["
       <span className="prof-jh" title="Consommé / estimé — cliquer le consommé pour modifier">
         <InlineEdit<number>
           value={p.done} type="number" className="prof-done-num" display={fmtNum(p.done)}
-          fromInput={(v) => { const n = v === "" ? 0 : Number(v); return Number.isFinite(n) ? Math.round(n) : 0; }}
+          fromInput={doneFromInput}
           onCommit={onCommitDone}
         />
         <span className="prof-slash">/</span><b>{fmtNum(p.jh)}</b> j.h
@@ -94,7 +96,7 @@ export function PlanDeCharge({ card, config, onPatch }: { card: CardState; confi
         {!edit && <button className="delay-toggle" onClick={() => setEdit(true)}>Modifier</button>}
       </div>
       {edit ? (
-        <ChargeEditor config={config} charge={card.chargeByProfile} est={est} cons={cons}
+        <ChargeEditor config={config} charge={card.chargeByProfile}
           onSave={(cb) => { onPatch({ chargeByProfile: cb }); setEdit(false); }} onCancel={() => setEdit(false)} />
       ) : rows.length === 0 ? (
         <div className="cm-empty" onClick={() => setEdit(true)}>Aucune charge répartie. Cliquer pour renseigner les profils.</div>

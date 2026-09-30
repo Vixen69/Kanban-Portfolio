@@ -20,9 +20,10 @@ import type { HeaderMatch } from "./contract.ts";
 import type { ParamTable } from "./param.ts";
 import { discard, doubt, warn } from "./report.ts";
 import type { ImportReport, RowRef } from "./report.ts";
-import type { DomainShape, ProjetEntry, ProjetsCounts, ProjetsTable } from "./projets-types.ts";
+import type { DomainShape, PerimeterVerdict, ProjetEntry, ProjetsCounts, ProjetsTable } from "./projets-types.ts";
+import { projetsVerdict } from "./couts-verdicts.ts";
 
-export type { DomainShape, ProjetEntry, ProjetsCounts, ProjetsTable } from "./projets-types.ts";
+export type { DomainShape, PerimeterVerdict, ProjetEntry, ProjetsCounts, ProjetsTable } from "./projets-types.ts";
 
 interface ProjetsContext {
   match: HeaderMatch;
@@ -34,6 +35,7 @@ interface ProjetsContext {
   subLookups: Map<string, Lookup>;
   typeLookup: Lookup;
   entries: ProjetEntry[];
+  verdicts: PerimeterVerdict[];
   byId: Map<string, ProjetEntry>;
   byName: Map<string, ProjetEntry>;
   typeCounts: Map<string, number>;
@@ -64,7 +66,7 @@ export function parseProjets(
     match, report, fileName, param, shape: detectShape(match, param, report, fileName),
     domainLookup: createDomainLookup(config), subLookups: createSubDomainLookups(config),
     typeLookup: createTypeLookup(config),
-    entries: [], byId: new Map(), byName: new Map(), typeCounts: new Map(),
+    entries: [], verdicts: [], byId: new Map(), byName: new Map(), typeCounts: new Map(),
     counts: { domainDirect: 0, domainViaParam: 0, domainMissing: 0, subDetailed: 0, subFolded: 0, withOwner: 0, leadsExcluded: 0 },
     unknownTypes: new Map(), unknownDomains: new Map(), unknownSubs: new Map(),
     unknownPaths: new Map(), states: new Map(), tallies: new Map(),
@@ -73,7 +75,7 @@ export function parseProjets(
   for (const row of rows) readRow(ctx, row);
   finalize(ctx);
   return {
-    fileName, entries: ctx.entries, byId: ctx.byId, byName: ctx.byName, shape: ctx.shape,
+    fileName, entries: ctx.entries, verdicts: ctx.verdicts, byId: ctx.byId, byName: ctx.byName, shape: ctx.shape,
     typeCounts: ctx.typeCounts, counts: ctx.counts,
   };
 }
@@ -115,12 +117,14 @@ function readRow(ctx: ProjetsContext, row: CsvRow): void {
   if (id === "") tallyInto(ctx.tallies, "« Id » vide — identité dérivée du nom", row.line);
   const sameId = id === "" ? undefined : ctx.byId.get(id);
   if (sameId !== undefined) {
+    ctx.verdicts.push(projetsVerdict(id, nom, cell(ctx, row, "Type"), cell(ctx, row, "État du processus"), sameId.ref.line));
     doubt(ctx.report, ctx.fileName,
       `Id « ${id}» porté par « ${sameId.name} » (ligne ${sameId.ref.line}) et « ${nom} » (ligne ${row.line}) — première conservée`, { ref });
     return;
   }
   const entry = buildEntry(ctx, row, ref, id, nom, normalizedName);
   ctx.entries.push(entry);
+  ctx.verdicts.push(projetsVerdict(entry.codename ?? "", nom, cell(ctx, row, "Type"), entry.state, null));
   if (id !== "") ctx.byId.set(id, entry);
   const sameName = ctx.byName.get(normalizedName);
   if (sameName === undefined) ctx.byName.set(normalizedName, entry);

@@ -29,7 +29,7 @@
 .kv span { font-size: 8px; color: var(--tx-4); text-transform: uppercase; letter-spacing: .07em; }
 .kv b { font-size: 13px; color: var(--tx-1); }
 .kv b.warm { color: var(--warn); } .kv b.hot { color: var(--danger-strong); }
-.notes-box { font-size: 11px; color: var(--tx-2); background: #f1f4f9; border: 1px solid var(--bd-sub); border-radius: 6px; padding: 9px 11px; margin-bottom: 13px; line-height: 1.5; }
+.notes-box { font-size: 11px; color: var(--tx-2); background: #f1f4f9; border: 1px solid var(--bd-sub); border-radius: 6px; padding: 9px 11px; margin-bottom: 13px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
 .scf { font-size: 9px; color: var(--tx-4); margin-bottom: 13px; }
 .modal-actions { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
 .btn { font-size: 11px; font-weight: 600; padding: 7px 14px; border-radius: 5px; cursor: pointer; border: 1px solid var(--bd); background: #f1f4f9; color: var(--tx-1); font-family: inherit; }
@@ -48,7 +48,12 @@
 .toggle-row { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--tx-2); margin-bottom: 11px; }
 .intake-note { font-size: 10px; color: var(--tx-3); background: #eef2f8; border: 1px solid var(--bd-sub); border-radius: 6px; padding: 7px 10px; margin-bottom: 13px; }
 .intake-note b { color: var(--tx-1); }
-
+/* « Plus d'informations » of « + Sujet » (ADR 057): folded by default, no motion. */
+.qa-more { border: 1px solid var(--bd-sub); border-radius: 7px; padding: 8px 11px; margin-bottom: 11px; background: #fafbfd; }
+.qa-more > summary { font-size: 11px; font-weight: 600; color: var(--tx-2); cursor: pointer; }
+.qa-more > summary:hover { color: var(--accent); }
+.qa-more[open] > summary { margin-bottom: 7px; }
+.qa-more-note { font-size: 9px; color: var(--tx-4); margin: 0 0 9px; }
 /* ---------- Card detail: charge, ressources, docs, comments, history ---------- */
 .charge-box { background: #f1f4f9; border: 1px solid var(--bd-sub); border-radius: 6px; padding: 9px 11px; margin-bottom: 11px; }
 .charge-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; }

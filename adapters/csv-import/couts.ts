@@ -29,6 +29,8 @@ import type { HeaderMatch } from "./contract.ts";
 import { doubt } from "./report.ts";
 import type { ImportReport, RowRef } from "./report.ts";
 import type { ProjetEntry, ProjetsTable } from "./projets.ts";
+import type { PerimeterVerdict } from "./projets-types.ts";
+import { coutsVerdict } from "./couts-verdicts.ts";
 import type { CoutsCharge, CoutsStats } from "./couts-stats.ts";
 import { emitCoutsReport } from "./couts-report.ts";
 import type { PortfolioTally } from "./couts-report.ts";
@@ -78,6 +80,8 @@ interface CoutsContext {
   nonPe: string[];
   /** Retained-shaped projects excluded for having no ME figure — named for the domain owners. */
   noMe: string[];
+  /** Every project read, retained or excluded, with the rule (ADR 055). */
+  verdicts: PerimeterVerdict[];
   unknownPortfolios: Map<string, Tally>;
   /** Every « Projet.Portefeuille » path of the retained projects, and where it landed. */
   portfolios: Map<string, PortfolioTally>;
@@ -114,7 +118,7 @@ export function parseCouts(
       excluded: { noYear: 0, etat: new Map(), type: new Map(), arbitrage: 0, noMe: 0 },
       inactive: 0, nonPe: 0, domainResolved: 0, domainUnknown: 0,
     },
-    charges: [], nonPe: [], noMe: [], unknownPortfolios: new Map(), portfolios: new Map(), tallies: new Map(),
+    charges: [], nonPe: [], noMe: [], verdicts: [], unknownPortfolios: new Map(), portfolios: new Map(), tallies: new Map(),
   };
   for (const row of rows) readRow(ctx, row);
   const entries: ProjetEntry[] = [];
@@ -127,7 +131,7 @@ export function parseCouts(
     tallies: ctx.tallies, unknownPortfolios: ctx.unknownPortfolios, portfolios: ctx.portfolios, nonPe: ctx.nonPe, noMe: ctx.noMe,
   });
   return {
-    fileName, entries,
+    fileName, entries, verdicts: ctx.verdicts,
     byId: new Map(entries.map((e) => [e.id, e])),
     byName: new Map(entries.map((e) => [e.normalizedName, e])),
     shape: "portefeuille",
@@ -212,32 +216,42 @@ function bump(map: Map<string, number>, label: string): void {
 
 // The perimeter rule (author, 2026-09-11, tightened the same afternoon):
 // on the exercise year, state in the retained list, type in the config,
-// not an arbitrage line, some ME figure. First failing reason is counted.
-function decide(ctx: CoutsContext, seen: Seen): ProjetEntry | null {
-  ctx.stats.projectsSeen++;
+// not an arbitrage line, some ME figure. The first failing rule is counted
+// and returned; null = the project passes them all.
+function exclusion(ctx: CoutsContext, seen: Seen, typeId: string | null): Exclude<PerimeterVerdict["motive"], "retained"> | null {
   const x = ctx.stats.excluded;
   if (!seen.onYear) {
     x.noYear++;
-    return null;
+    return "noYear";
   }
   if (ctx.states !== null && ctx.states(seen.etat) === null) {
     bump(x.etat, seen.etat || "(vide)");
-    return null;
+    return "state";
   }
-  const typeId = ctx.typeLookup(seen.type)?.id ?? null;
   if (typeId === null) {
     bump(x.type, typeBaseLabel(seen.type) || "(vide)");
-    return null;
+    return "type";
   }
   if (normalizeLabel(seen.name).includes("arbitrage")) {
     x.arbitrage++;
-    return null;
+    return "arbitrage";
   }
   if (!seen.hasMe) {
     x.noMe++;
     ctx.noMe.push(seen.id);
-    return null;
+    return "noMe";
   }
+  return null;
+}
+
+// One project through the rule: its verdict recorded (ADR 055), then the
+// entry built when it is retained.
+function decide(ctx: CoutsContext, seen: Seen): ProjetEntry | null {
+  ctx.stats.projectsSeen++;
+  const typeId = ctx.typeLookup(seen.type)?.id ?? null;
+  const motive = exclusion(ctx, seen, typeId);
+  ctx.verdicts.push(coutsVerdict(seen, motive ?? "retained", ctx.year));
+  if (motive !== null || typeId === null) return null;
   ctx.stats.retained++;
   if (["faux", "false", "0", "non", "n"].includes(normalizeLabel(seen.actif))) ctx.stats.inactive++;
   if (!/^pe\d/i.test(seen.id)) {

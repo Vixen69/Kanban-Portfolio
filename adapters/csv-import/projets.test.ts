@@ -165,3 +165,16 @@ test("types: a keyword alias is found inside any spelling of the label, as a who
   ], null);
   assert.deepEqual(table.entries.map((e) => e.typeId), ["obsolescence", "obsolescence", "obsolescence", "ia", null, null]);
 });
+
+test("ADR 055: every kept row is retained by the onglet, a repeated Id names its first line; no Id, no code", () => {
+  const { table } = run(ORGA_HEADER, [
+    "PE3;Trois;INFRA;;Etude (Projet);Nouveau;;;;;;;;;",
+    "PE3;Trois bis;INFRA;;Etude;Nouveau;;;;;;;;;",
+    ";Quatre;INFRA;;Inconnu;;;;;;;;;;",
+  ], null);
+  assert.deepEqual(table.verdicts.map((v) => [v.code, v.motive, v.reason]), [
+    ["PE3", "retained", "état « Nouveau », type « Etude » (l’onglet Projets fait foi)"],
+    ["PE3", "duplicate", "Id déjà porté par la ligne 2 — première ligne gardée"],
+    ["", "retained", "type « Inconnu » (l’onglet Projets fait foi)"],
+  ]);
+});

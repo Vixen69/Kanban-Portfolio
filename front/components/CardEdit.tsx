@@ -8,6 +8,8 @@
 import { useState } from "react";
 import type { BoardConfig, CardPatch, CardState, Criticality, CustomValue, FieldDef } from "../../core/types.ts";
 import { reconcileCardRefs, subDomainsOf } from "../../core/config.ts";
+import { CARD_TEXT_LIMITS as CAP } from "../../core/card-input.ts";
+import { effortDraftOf, effortPatchOf, type EffortDraft } from "../cardFacts.ts";
 import { CRITICALITY_KEYS, CustomInput, Field, SelectField } from "./modalParts.tsx";
 
 /** Move intent computed on save when the card changed cell. */
@@ -33,29 +35,16 @@ export interface CardEditProps {
   onDelete: (id: string) => void;
 }
 
-// Form state: numeric fields kept as strings for controlled inputs.
-interface Draft {
+// Form state: numeric fields kept as strings for controlled inputs (the
+// effort grid's are shared with QuickAdd, front/cardFacts.ts — ADR 057).
+interface Draft extends EffortDraft {
   title: string; typeId: string; codename: string;
   domain: string; subDomain: string; laneId: string; columnId: string;
   criticality: Criticality; owner: string;
-  effortEstimated: string; effortConsumed: string;
-  loadPlan: string; resourcesCsv: string; dateRdr: string;
-  budgetEstimated: string; budgetConsumed: string;
-  budgetRdli: string; budgetEngaged: string;
   custom: Record<string, CustomValue>; notes: string;
 }
 
 type SetDraft = (patch: Partial<Draft>) => void;
-
-function numText(value: number | null): string {
-  return value === null ? "" : String(value);
-}
-
-function numOrNull(raw: string): number | null {
-  if (raw.trim() === "") return null;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) ? parsed : null;
-}
 
 // Builds the initial form state; stale config references are remapped to
 // the first config entry for display (reconcileCardRefs — never an event).
@@ -65,11 +54,7 @@ function toDraft(card: CardState, config: BoardConfig): Draft {
     title: card.title, typeId: refs.typeId ?? "", codename: card.codename ?? "",
     domain: refs.domain, subDomain: refs.subDomain ?? "", laneId: refs.laneId, columnId: refs.columnId,
     criticality: card.criticality, owner: card.owner,
-    effortEstimated: numText(card.effortEstimated), effortConsumed: numText(card.effortConsumed),
-    loadPlan: card.loadPlan ?? "", resourcesCsv: card.resources.join(", "),
-    dateRdr: card.dateRdr === null ? "" : card.dateRdr.slice(0, 10),
-    budgetEstimated: numText(card.budgetEstimated), budgetConsumed: numText(card.budgetConsumed),
-    budgetRdli: numText(card.budgetRdli), budgetEngaged: numText(card.budgetEngaged),
+    ...effortDraftOf(card),
     custom: { ...card.custom }, notes: card.notes,
   };
 }
@@ -82,12 +67,7 @@ function fullPatch(draft: Draft): CardPatch {
     criticality: draft.criticality,
     typeId: draft.typeId === "" ? null : draft.typeId,
     codename: draft.codename.trim() === "" ? null : draft.codename.trim(),
-    effortEstimated: numOrNull(draft.effortEstimated), effortConsumed: numOrNull(draft.effortConsumed),
-    budgetEstimated: numOrNull(draft.budgetEstimated), budgetConsumed: numOrNull(draft.budgetConsumed),
-    budgetRdli: numOrNull(draft.budgetRdli), budgetEngaged: numOrNull(draft.budgetEngaged),
-    dateRdr: draft.dateRdr === "" ? null : new Date(draft.dateRdr).toISOString(),
-    loadPlan: draft.loadPlan.trim() === "" ? null : draft.loadPlan.trim(),
-    resources: draft.resourcesCsv.split(",").map((entry) => entry.trim()).filter(Boolean),
+    ...effortPatchOf(draft),
     custom: draft.custom, notes: draft.notes,
   };
 }
@@ -109,12 +89,40 @@ function buildMove(initial: Draft, draft: Draft): EditMove | null {
   return { laneId: draft.laneId, columnId: draft.columnId };
 }
 
+/**
+ * The « Code projet » input (« Modifier » and « Plus d'informations »),
+ * capped like the middle (40 characters).
+ * Inputs: the typed code, the change callback. Output: the labeled input.
+ * Failure modes: none.
+ */
+export function CodeField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return <Field label="Code projet"><input className="inp" maxLength={CAP.codename} value={value} onChange={(e) => onChange(e.target.value)} /></Field>;
+}
+
+/**
+ * The « Sous-domaine » select, only when the domain declares sub-domains
+ * (ADR 022) — a sub-domain always belongs to the card's own domain.
+ * Inputs: the config, the domain id, the sub-domain id ("" = not
+ * detailed), the change callback. Output: the select, or nothing.
+ * Failure modes: none.
+ */
+export function SubDomainField({ config, domain, value, onChange }: {
+  config: BoardConfig;
+  domain: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const subs = subDomainsOf(config, domain);
+  if (subs.length === 0) return null;
+  return <SelectField label="Sous-domaine" value={value} options={[{ value: "", label: "— non détaillé —" }, ...subs.map((s) => ({ value: s.id, label: s.name }))]} onChange={onChange} />;
+}
+
 // Type de projet + Code projet row.
 function TypeCodeRow({ draft, config, set }: { draft: Draft; config: BoardConfig; set: SetDraft }) {
   return (
     <div className="field-2col">
       <SelectField label="Type de projet" value={draft.typeId} options={config.types.map((t) => ({ value: t.id, label: t.name }))} onChange={(v) => set({ typeId: v })} />
-      <Field label="Code projet"><input className="inp" value={draft.codename} onChange={(e) => set({ codename: e.target.value })} /></Field>
+      <CodeField value={draft.codename} onChange={(v) => set({ codename: v })} />
     </div>
   );
 }
@@ -125,29 +133,31 @@ function TypeCodeRow({ draft, config, set }: { draft: Draft; config: BoardConfig
 // (design v11): nature follows the canal — changing the canal IS the
 // requalification.
 function RefsGrid({ draft, config, set }: { draft: Draft; config: BoardConfig; set: SetDraft }) {
-  const subs = subDomainsOf(config, draft.domain);
   return (
     <div className="field-2col">
       <SelectField label="Domaine" value={draft.domain} options={config.domains.map((d) => ({ value: d.id, label: d.name }))} onChange={(v) => set({ domain: v, subDomain: "" })} />
-      {subs.length > 0 && (
-        <SelectField label="Sous-domaine" value={draft.subDomain} options={[{ value: "", label: "— non détaillé —" }, ...subs.map((s) => ({ value: s.id, label: s.name }))]} onChange={(v) => set({ subDomain: v })} />
-      )}
+      <SubDomainField config={config} domain={draft.domain} value={draft.subDomain} onChange={(v) => set({ subDomain: v })} />
       <SelectField label="Canal" value={draft.laneId} options={config.lanes.map((l) => ({ value: l.id, label: l.name }))} onChange={(v) => set({ laneId: v })} />
       <SelectField label="Colonne" value={draft.columnId} options={config.columns.map((c) => ({ value: c.id, label: c.name }))} onChange={(v) => set({ columnId: v })} />
       <SelectField label="Criticité" value={draft.criticality} options={CRITICALITY_KEYS.map((k) => ({ value: k, label: config.criticalities[k].label }))} onChange={(v) => set({ criticality: v as Criticality })} />
-      <Field label="Chef de projet"><input className="inp" value={draft.owner} onChange={(e) => set({ owner: e.target.value })} /></Field>
+      <Field label="Chef de projet"><input className="inp" maxLength={CAP.owner} value={draft.owner} onChange={(e) => set({ owner: e.target.value })} /></Field>
     </div>
   );
 }
 
-// Effort (j.h), plan de charge, RDR date, ressources and budget (k€) grid
-// (design v11 edit branch — all four budget figures plus the RDR date).
-function EffortGrid({ draft, set }: { draft: Draft; set: SetDraft }) {
+/**
+ * Effort (j.h), plan de charge, RDR date, ressources and budget (k€) grid
+ * (design v11 edit branch — all four budget figures plus the RDR date),
+ * shared by « Modifier » and « Plus d'informations » (ADR 057).
+ * Inputs: the typed EffortDraft, the change callback. Output: the grid.
+ * Failure modes: none — the text is converted by front/cardFacts.ts.
+ */
+export function EffortGrid({ draft, set }: { draft: EffortDraft; set: (patch: Partial<EffortDraft>) => void }) {
   return (
     <div className="field-2col">
       <Field label="Meilleur estimé (j.h)"><input className="inp" type="number" min="0" value={draft.effortEstimated} onChange={(e) => set({ effortEstimated: e.target.value })} /></Field>
       <Field label="Consommé (j.h)"><input className="inp" type="number" min="0" value={draft.effortConsumed} onChange={(e) => set({ effortConsumed: e.target.value })} /></Field>
-      <Field label="Plan de charge"><input className="inp" value={draft.loadPlan} onChange={(e) => set({ loadPlan: e.target.value })} /></Field>
+      <Field label="Plan de charge"><input className="inp" maxLength={CAP.loadPlan} value={draft.loadPlan} onChange={(e) => set({ loadPlan: e.target.value })} /></Field>
       <Field label="Date RDR (livraison) projetée"><input className="inp" type="date" value={draft.dateRdr} onChange={(e) => set({ dateRdr: e.target.value })} /></Field>
       <Field label="Ressources clés (virgules)"><input className="inp" value={draft.resourcesCsv} onChange={(e) => set({ resourcesCsv: e.target.value })} /></Field>
       <Field label="Budget estimé (k€)"><input className="inp" type="number" min="0" value={draft.budgetEstimated} onChange={(e) => set({ budgetEstimated: e.target.value })} /></Field>
@@ -205,12 +215,12 @@ export function CardEdit(props: CardEditProps) {
             <h2 className="modal-name">Modifier</h2>
             <button className="x" onClick={props.onClose}>✕</button>
           </div>
-          <Field label="Nom"><input className="inp" value={draft.title} onChange={(e) => set({ title: e.target.value })} /></Field>
+          <Field label="Nom"><input className="inp" maxLength={CAP.title} value={draft.title} onChange={(e) => set({ title: e.target.value })} /></Field>
           <TypeCodeRow draft={draft} config={config} set={set} />
           <RefsGrid draft={draft} config={config} set={set} />
           <EffortGrid draft={draft} set={set} />
           <CustomSection fields={config.fields} custom={draft.custom} onChange={(id, value) => setDraft((c) => ({ ...c, custom: { ...c.custom, [id]: value } }))} />
-          <Field label="Notes"><textarea className="inp" rows={2} value={draft.notes} onChange={(e) => set({ notes: e.target.value })} /></Field>
+          <Field label="Notes"><textarea className="inp" rows={2} maxLength={CAP.notes} value={draft.notes} onChange={(e) => set({ notes: e.target.value })} /></Field>
           <div className="modal-actions">
             <button className="btn danger" onClick={() => props.onDelete(card.id)}>Supprimer</button>
             <span style={{ flex: 1 }} />

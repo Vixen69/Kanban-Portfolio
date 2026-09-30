@@ -7,13 +7,13 @@
 import type { BoardStorage } from "../core/ports.ts";
 import type { CardEventInput } from "../core/events.ts";
 import { lifecycleEvent, movedEvent } from "../core/events.ts";
-import { EDITABLE_FIELDS, foldEvents } from "../core/state.ts";
+import { foldEvents } from "../core/state.ts";
 import { RESTORE_CARD_ID } from "../core/restore.ts";
 import { unifiedColumnIds } from "../core/layout.ts";
 import { validateBoardConfig } from "../core/config.ts";
 import type { BoardConfig, CardEventType, CardState } from "../core/types.ts";
 import type { ConfigStore } from "./config-store.ts";
-import { patchValidators } from "./validation.ts";
+import { validatePatch } from "./validation.ts";
 import { BadRequest } from "./errors.ts";
 import { buildDecided } from "./decisions.ts";
 
@@ -272,8 +272,10 @@ function buildCommented(
 }
 
 // The patch must be an object holding only whitelisted fields with valid
-// values. Screening here keeps junk (and prototype-named keys) out of the
-// permanent log; foldEvents re-checks types on read (core/state.ts).
+// values — the sub-domain inside the card's own domain, custom values
+// declared and typed (validatePatch, ADR 057). Screening here keeps junk
+// (and prototype-named keys) out of the permanent log; foldEvents
+// re-checks types on read (core/state.ts).
 function buildEdited(
   config: BoardConfig,
   state: CardState,
@@ -286,14 +288,6 @@ function buildEdited(
   }
   const fields = patch as Record<string, unknown>;
   if (Object.keys(fields).length === 0) throw new BadRequest("Patch d’édition vide.");
-  const allowed = new Set(EDITABLE_FIELDS);
-  const validators = patchValidators(config);
-  for (const key of Object.keys(fields)) {
-    if (!allowed.has(key)) throw new BadRequest(`Champ d’édition non autorisé : « ${key} ».`);
-    const accepts = validators[key];
-    if (!accepts || !accepts(fields[key])) {
-      throw new BadRequest(`Valeur invalide pour le champ « ${key} ».`);
-    }
-  }
+  validatePatch(config, fields, state, "Champ d’édition non autorisé");
   return lifecycleEvent("edited", state.id, SERVER_ACTOR, ts, { patch });
 }

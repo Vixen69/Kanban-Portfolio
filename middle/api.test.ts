@@ -62,7 +62,7 @@ test("postCard builds the whole card server-side and appends created", async () 
   assert.equal(card.columnId, "col1"); // first column of the runtime config
   assert.equal(card.nature, "complex"); // derived from laneB's natureKey (ADR 018)
   assert.equal(card.source, "manual");
-  assert.match(card.codename ?? "", /^PX\d{7}$/);
+  assert.equal(card.codename, null); // none typed: no invented code (ADR 057)
   assert.equal(card.blocked, false);
   assert.deepEqual(card.custom, {});
   assert.equal(card.exercise, config.exercise.year); // the current exercise by default (ADR 035)
@@ -201,7 +201,6 @@ test("an edited patch passes with valid v2 fields of every kind", async () => {
     budgetConsumed: null,
     resources: ["MOE SI", "Archi"],
     tags: ["prioritaire"],
-    custom: { risque: "élevé", chiffré: true, revue: null, score: 3 },
     domain: "beta",
     typeId: null,
     criticality: "major",
@@ -215,7 +214,7 @@ test("an edited patch passes with valid v2 fields of every kind", async () => {
     risks: [{ type: "rSSG", desc: "Revue sécurité" }],
     projectConstraints: ["legale"],
     alerts: ["Décision COPROJ attendue"],
-    dateRdr: "2026-09-01T00:00:00.000Z",
+    dateRdr: "2026-09-01",
   };
   const result = await postEvent(storage, config, { type: "edited", cardId: "S001", patch });
   assert.equal(result.status, 201);
@@ -243,6 +242,7 @@ test("an edited patch is rejected field by field in French", async () => {
     [{ contentionProfiles: ["ghost"] }, /Valeur invalide pour le champ « contentionProfiles »/],
     [{ projectConstraints: ["ghost"] }, /Valeur invalide pour le champ « projectConstraints »/],
     [{ dateRdr: 42 }, /Valeur invalide pour le champ « dateRdr »/],
+    [{ dateRdr: "2026-09-01T00:00:00.000Z" }, /Valeur invalide pour le champ « dateRdr »/],
     // The log is permanent: free text is capped (mirrors the creation caps).
     [{}, /Patch d’édition vide/],
     [{ title: "x".repeat(201) }, /Valeur invalide pour le champ « title »/],

@@ -132,9 +132,9 @@ test("postCard POSTs the creation intent to /api/cards and returns { card, event
     domain: "cyber",
     laneId: "projets",
     typeId: "etude",
-    nature: "complicated",
     criticality: "normal",
     owner: "A. Diallo",
+    codename: "PE10001", // an optional typed fact (ADR 057)
   } as const;
   const body = { card: { id: "S151" }, event: { id: "evt-9", type: "created" } };
   await withFetch({ ok: true, status: 201, json: body }, async (calls) => {

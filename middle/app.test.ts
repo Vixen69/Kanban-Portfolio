@@ -142,7 +142,6 @@ test("after an override, intents are validated against the runtime config", asyn
       domain: "alpha",
       laneId: "laneA",
       typeId: "t1",
-      nature: "simple",
       criticality: "normal",
       owner: "",
     });
@@ -169,7 +168,6 @@ test("POST /api/cards creates a server-built card with its created event", async
       domain: "beta",
       laneId: "laneB",
       typeId: "t2",
-      nature: "complex",
       criticality: "top",
       owner: "Mme Chef",
     });

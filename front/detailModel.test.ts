@@ -8,7 +8,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Card, CardState } from "../core/types.ts";
 import { testCard, testConfig } from "../core/test-helpers.ts";
-import { budgetModel, colLabel, profileRows, rdrModel } from "./detailModel.ts";
+import { budgetFromInput, budgetModel, colLabel, doneFromInput, profileRows, rdrModel } from "./detailModel.ts";
 
 const DAY_MS = 86_400_000;
 const NOW = Date.parse("2026-06-01T00:00:00.000Z");
@@ -62,6 +62,24 @@ test("budgetModel: null RDLI and engagé derive from the estimate", () => {
   const { rows, bRdli } = budgetModel(state({ budgetEstimated: 100 }));
   assert.equal(bRdli, 105); // round(100 * 1.05)
   assert.equal(rows.find((row) => row.key === "eng")?.val, 50); // round(0 + (100 - 0) * 0.5)
+});
+
+test("budgetModel: the inline edit reads the STORED figure, null when none (ADR 057)", () => {
+  const { rows } = budgetModel(state({ budgetEstimated: 100, budgetConsumed: 0 }));
+  // The bars show estimates for RDLI and engagé; the edits start from nothing.
+  assert.deepEqual(rows.map((row) => [row.key, row.val, row.raw]), [
+    ["rdli", 105, null], ["est", 100, 100], ["eng", 50, null], ["real", 0, 0],
+  ]);
+});
+
+test("budgetFromInput: emptied is null (never 0), comma or dot read", () => {
+  const cases: [string, number | null][] = [["", null], ["  ", null], ["12,5", 12.5], ["90", 90], ["-4", null], ["abc", null]];
+  for (const [raw, expected] of cases) assert.equal(budgetFromInput(raw), expected, raw);
+});
+
+test("doneFromInput: to the hundredth, never rounded to the day", () => {
+  const cases: [string, number][] = [["12.75", 12.75], ["12,75", 12.75], ["3.14159", 3.14], ["", 0], ["-2", 0]];
+  for (const [raw, expected] of cases) assert.equal(doneFromInput(raw), expected, raw);
 });
 
 test("budgetModel: réalisé bar flips to danger only once it exceeds the RDLI envelope", () => {

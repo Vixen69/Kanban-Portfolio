@@ -5,21 +5,14 @@
 
 import { type ReactNode, useState } from "react";
 import type { BoardConfig, ChargeEntry, Criticality, Risk } from "../../core/types.ts";
+import { CARD_TEXT_LIMITS as CAP, parseAmount } from "../../core/card-input.ts";
 import { fmtNum } from "../format.ts";
 
 /** A value the InlineEdit control can display and edit. */
 type InlineValue = string | number | null;
 
-/**
- * Click-to-edit inline field: shows `display` (or the value), turns into an
- * input on click, commits on Enter/blur, cancels on Escape.
- * Inputs: the current value, the commit callback, optional input type,
- * placeholder, display override and value<->input transforms.
- * Output: a span (read) or input (editing). Failure modes: none.
- */
-export function InlineEdit<T = string>({
-  value, onCommit, type = "text", placeholder = "", display, toInput, fromInput, className = "",
-}: {
+/** Props of InlineEdit (see there). */
+export interface InlineEditProps<T> {
   value: InlineValue;
   onCommit: (value: T) => void;
   type?: string;
@@ -28,24 +21,45 @@ export function InlineEdit<T = string>({
   toInput?: (value: InlineValue) => string;
   fromInput?: (raw: string) => T;
   className?: string;
-}) {
-  const [editing, setEditing] = useState(false);
+  maxLength?: number;
+}
+
+/**
+ * Click-to-edit inline field: shows `display` (or the value), turns into an
+ * input on click, commits on Enter/blur, cancels on Escape. A click then
+ * leave commits NOTHING (ADR 057): only a draft that differs from the
+ * input it opened with is committed — a derived figure on display is never
+ * written back as data.
+ * Inputs: the current value, the commit callback, optional input type,
+ * placeholder, display override, value<->input transforms and maxLength
+ * (the middle's cap, core/card-input.ts).
+ * Output: a span (read) or input (editing). Failure modes: none.
+ */
+export function InlineEdit<T = string>({
+  value, onCommit, type = "text", placeholder = "", display, toInput, fromInput, className = "", maxLength,
+}: InlineEditProps<T>) {
   const [draft, setDraft] = useState("");
+  // The input text the edit opened with; null while not editing.
+  const [opened, setOpened] = useState<string | null>(null);
   const start = (event: React.MouseEvent) => {
     event.stopPropagation();
-    setDraft(toInput ? toInput(value) : value == null ? "" : String(value));
-    setEditing(true);
+    const text = toInput ? toInput(value) : value == null ? "" : String(value);
+    setDraft(text);
+    setOpened(text);
   };
-  const commit = () => { setEditing(false); onCommit(fromInput ? fromInput(draft) : (draft as unknown as T)); };
-  if (editing) {
+  const commit = () => {
+    setOpened(null);
+    if (draft !== opened) onCommit(fromInput ? fromInput(draft) : (draft as unknown as T));
+  };
+  if (opened !== null) {
     return (
       <input
-        className={"inline-inp " + className} type={type} autoFocus value={draft} placeholder={placeholder}
+        className={"inline-inp " + className} type={type} autoFocus value={draft} placeholder={placeholder} maxLength={maxLength}
         onClick={(event) => event.stopPropagation()} onChange={(event) => setDraft(event.target.value)} onBlur={commit}
         onKeyDown={(event) => {
           if (event.key === "Enter") event.currentTarget.blur();
           // Contained: cancels this edit only, never the whole modal.
-          else if (event.key === "Escape") { event.stopPropagation(); setEditing(false); }
+          else if (event.key === "Escape") { event.stopPropagation(); setOpened(null); }
         }}
       />
     );
@@ -91,17 +105,17 @@ function EditorFoot({ summary, onSave, onCancel }: { summary: ReactNode; onSave:
 
 /**
  * Plan de charge editor: check profiles and set j.h per checked profile.
- * An existing profile keeps its user-maintained `done` (clamped to the new
- * jh — design v11 edits it inline in read mode); only a newly added profile
- * derives `done` from the card's overall consumed/estimated ratio.
- * Inputs: the config (profile typology), the card's charge rows, est/cons
- * effort totals, save/cancel callbacks. Output: the editor DOM.
+ * The j.h are read as decimals, comma or dot (core/card-input.ts — a
+ * re-save keeps 36.5, ADR 057). An existing profile keeps its
+ * user-maintained `done` (clamped to the new jh — design v11 edits it
+ * inline in read mode); a newly ticked profile starts at done 0, never an
+ * invented consumed.
+ * Inputs: the config (profile typology), the card's charge rows,
+ * save/cancel callbacks. Output: the editor DOM.
  */
-export function ChargeEditor({ config, charge, est, cons, onSave, onCancel }: {
+export function ChargeEditor({ config, charge, onSave, onCancel }: {
   config: BoardConfig;
   charge: ChargeEntry[];
-  est: number;
-  cons: number;
   onSave: (rows: ChargeEntry[]) => void;
   onCancel: () => void;
 }) {
@@ -113,11 +127,11 @@ export function ChargeEditor({ config, charge, est, cons, onSave, onCancel }: {
     if (id in next) delete next[id]; else next[id] = "0";
     return next;
   });
-  const total = config.profiles.filter((p) => p.id in rows).reduce((sum, p) => sum + (parseInt(rows[p.id] as string, 10) || 0), 0);
+  const jhOf = (id: string) => parseAmount(rows[id] ?? "") ?? 0;
+  const total = config.profiles.filter((p) => p.id in rows).reduce((sum, p) => sum + jhOf(p.id), 0);
   const save = () => onSave(config.profiles.filter((p) => p.id in rows).map((p) => {
-    const jh = Math.max(0, parseInt(rows[p.id] as string, 10) || 0);
-    const existing = charge.find((entry) => entry.profileId === p.id);
-    const done = existing ? existing.done : est ? Math.round((jh * cons) / est) : 0;
+    const jh = jhOf(p.id);
+    const done = charge.find((entry) => entry.profileId === p.id)?.done ?? 0;
     return { profileId: p.id, jh, done: Math.min(jh, done) };
   }));
   return (
@@ -125,7 +139,7 @@ export function ChargeEditor({ config, charge, est, cons, onSave, onCancel }: {
       <div className="ce-list">
         {config.profiles.map((p) => (
           <CeRow key={p.id} on={p.id in rows} color={p.color} label={p.name} onToggle={() => toggle(p.id)}>
-            <input className="ce-num" type="number" min="0" disabled={!(p.id in rows)} value={p.id in rows ? rows[p.id] : ""} placeholder="0"
+            <input className="ce-num" type="number" min="0" step="any" disabled={!(p.id in rows)} value={p.id in rows ? rows[p.id] : ""} placeholder="0"
               onChange={(event) => setRows((current) => ({ ...current, [p.id]: event.target.value }))} />
             <span className="ce-unit">j.h</span>
           </CeRow>
@@ -166,7 +180,7 @@ export function ContentionEditor({ config, profiles, note, onSave, onCancel }: {
           <CeRow key={p.id} on={sel.has(p.id)} color={p.color} label={p.name} onToggle={() => toggle(p.id)} />
         ))}
       </div>
-      <textarea className="cont-area" value={text}
+      <textarea className="cont-area" value={text} maxLength={CAP.contentionNote}
         placeholder="Commentaire libre sur la contention (partage, disponibilité, conflits de planning…)"
         onChange={(event) => setText(event.target.value)} />
       <EditorFoot summary={<><b>{sel.size}</b> profil(s) en tension</>}

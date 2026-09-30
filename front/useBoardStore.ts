@@ -58,7 +58,8 @@ export interface BoardStore {
   undone: CardEvent[];
   reload(): Promise<void>;
   /** Card actions resolve true when persisted, false when refused. */
-  createCard(input: NewCardInput): Promise<boolean>;
+  /** Resolves the new card's id (App opens its « Modifier » form, ADR 057), null when refused. */
+  createCard(input: NewCardInput): Promise<string | null>;
   moveCard(cardId: string, to: MoveTarget): Promise<boolean>;
   blockCard(cardId: string, reason: string): Promise<boolean>;
   unblockCard(cardId: string): Promise<boolean>;
@@ -144,7 +145,8 @@ function useReload(
 // appended since the last one held — the log only grows, and the card
 // snapshots change at import alone, which reloads in full. A failed fetch
 // or an empty store falls back to the full reload; so does a `restored`
-// event among the new ones (ADR 042: the base cards changed with it).
+// event among the new ones (ADR 042: the base cards changed with it), or
+// a `created` one (the new card's base row is not in the log — ADR 057).
 function useRefresh(
   board: BoardData | null,
   setBoard: (board: BoardData) => void,
@@ -155,7 +157,7 @@ function useRefresh(
     const last = board.events[board.events.length - 1];
     try {
       const more = await fetchEventsAfter(last === undefined ? 0 : eventSequence(last.id));
-      if (more.some((event) => event.type === "restored")) return reload();
+      if (more.some((event) => event.type === "restored" || event.type === "created")) return reload();
       if (more.length > 0) setBoard({ cards: board.cards, events: [...board.events, ...more] });
     } catch {
       await reload();
@@ -185,7 +187,10 @@ function useCardActions(reload: () => Promise<void>, setLastError: (m: string | 
   );
   return useMemo(
     () => ({
-      createCard: (input: NewCardInput) => perform(() => postCard(input)),
+      createCard: async (input: NewCardInput) => {
+        const created: string[] = [];
+        return (await perform(async () => created.push((await postCard(input)).card.id))) ? (created[0] ?? null) : null;
+      },
       moveCard: (cardId: string, to: MoveTarget) => perform(() => postMove(cardId, to)),
       blockCard: (cardId: string, reason: string) => perform(() => postBlock(cardId, reason)),
       unblockCard: (cardId: string) => perform(() => postUnblock(cardId)),

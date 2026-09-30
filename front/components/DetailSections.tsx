@@ -7,7 +7,9 @@ import { useState } from "react";
 import type { CardComment } from "../../core/types.ts";
 import type { HistoryEntry } from "../../core/history.ts";
 import type { FlowAnchors, FlowTimes } from "../../core/flow.ts";
+import { CARD_TEXT_LIMITS as CAP } from "../../core/card-input.ts";
 import { displayActor } from "../lookup.ts";
+import { Tag } from "./modalParts.tsx";
 
 // French short date for comment and history metadata.
 function frDate(iso: string): string {
@@ -53,6 +55,7 @@ export function CommentList({ comments, onAdd }: { comments: CardComment[]; onAd
       <div className="cm-add">
         <input
           className="inp"
+          maxLength={CAP.comment}
           placeholder="Ajouter un commentaire…"
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
@@ -60,6 +63,30 @@ export function CommentList({ comments, onAdd }: { comments: CardComment[]; onAd
         />
         <button className="btn ghost sm" onClick={submit} disabled={!draft.trim()}>Ajouter</button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Ressources clés and notes of the card, read-only (ADR 057: entered in
+ * « Modifier », until now shown nowhere). Nothing when both are empty.
+ * Inputs: the notes, the ressources, the callback opening « Modifier ».
+ * Output: the section. Failure modes: none.
+ */
+export function NotesSection({ notes, resources, onEdit }: { notes: string; resources: string[]; onEdit: () => void }) {
+  if (notes.trim() === "" && resources.length === 0) return null;
+  return (
+    <div className="sec">
+      <div className="sec-head">
+        <span className="sec-title">Ressources clés et notes</span>
+        <button className="delay-toggle" onClick={onEdit}>Modifier</button>
+      </div>
+      {resources.length > 0 && (
+        <div className="res-chips" style={{ marginTop: 0 }}>
+          {resources.map((resource, index) => <Tag key={index} color="#64748b">{resource}</Tag>)}
+        </div>
+      )}
+      {notes.trim() !== "" && <div className="notes-box" style={{ margin: resources.length > 0 ? "8px 0 0" : 0 }}>{notes}</div>}
     </div>
   );
 }

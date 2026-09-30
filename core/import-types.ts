@@ -1,6 +1,14 @@
 // Shapes exchanged by the import-from-the-tool routes (ADR 027), shared by
 // the middle (producer) and the front (consumer) through core — types only,
-// no logic, so both sides agree without importing each other.
+// no logic, so both sides agree without importing each other. The readable
+// report of ADR 055 (ImportChanges) lives in import-changes.ts.
+
+import type { ImportChanges } from "./import-changes.ts";
+
+export type {
+  ImportCardRef, ImportChangeCounts, ImportChanges, ImportEntered, ImportExcluded, ImportFileEntry, ImportFileStatus,
+  ImportKeptFact, ImportLeft, ImportSource, ImportUnrecognized,
+} from "./import-changes.ts";
 
 /** One received file: its name and its bytes, base64-encoded. */
 export interface ImportFilePayload {
@@ -64,6 +72,13 @@ export interface ImportAuditResult {
    * would keep; on a load, what it kept. Empty when nothing is missing.
    */
   factsKept: Array<{ label: string; cards: number }>;
+  /**
+   * The readable report (ADR 055): the files taken, what the load changes
+   * on the board, card by card, and why each project enters or leaves. On
+   * an audit, what a load WOULD change (no domain decision taken yet); on
+   * a load, what it DID change.
+   */
+  changes: ImportChanges;
 }
 
 /** What a load wrote, on top of the audit it re-ran. */

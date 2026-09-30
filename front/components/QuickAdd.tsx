@@ -1,17 +1,24 @@
 // QuickAdd modal (« + Sujet », touche N) — design/modals.jsx QuickAdd.
 // Every new subject enters the FIRST column (pull flow: all intake arrives
-// on the left); the server assigns id, codename, column and timestamps.
-// ADR 039: when the intake column has no canal (it sits before the RDO),
-// the form asks for none — the canal is chosen by the qualification drag.
+// on the left); the server assigns id, column and timestamps. ADR 039:
+// when the intake column has no canal (it sits before the RDO), the form
+// asks for none — the canal is chosen by the qualification drag. ADR 057:
+// a folded « Plus d'informations » block takes the facts an import would
+// carry (code, sous-domaine, efforts, budgets, date RDR…); App then opens
+// the new card's « Modifier » form.
 
 import { useState } from "react";
 import type { BoardConfig, Criticality } from "../../core/types.ts";
 import { unifiedColumnIds } from "../../core/layout.ts";
+import { CARD_TEXT_LIMITS as CAP } from "../../core/card-input.ts";
+import type { CreationFacts } from "../api.ts";
+import { creationFactsOf, EMPTY_FACTS, type FactsDraft } from "../cardFacts.ts";
+import { CodeField, EffortGrid, SubDomainField } from "./CardEdit.tsx";
 import { CRITICALITY_KEYS, Field, SelectField } from "./modalParts.tsx";
 
 /** Creation intent sent to POST /api/cards (through App/useBoardStore). The
  * nature is NOT part of it: the server derives it from the canal (ADR 018). */
-export interface QuickAddInput {
+export interface QuickAddInput extends CreationFacts {
   title: string;
   domain: string;
   /** Absent when the intake column has no canal (ADR 039). */
@@ -61,18 +68,46 @@ function SelectGrid({ draft, config, set }: {
   );
 }
 
+// « Plus d'informations », folded by default (ADR 057): the same inputs as
+// « Modifier » — code projet, sous-domaine when the domain is detailed,
+// then the effort / budget / RDR grid. Nothing typed = nothing sent.
+function MoreInfo({ config, domain, facts, setFacts }: {
+  config: BoardConfig;
+  domain: string;
+  facts: FactsDraft;
+  setFacts: (patch: Partial<FactsDraft>) => void;
+}) {
+  return (
+    <details className="qa-more">
+      <summary>Plus d’informations</summary>
+      <p className="qa-more-note">Facultatif. Le formulaire « Modifier » s’ouvre juste après la création.</p>
+      <div className="field-2col">
+        <CodeField value={facts.codename} onChange={(v) => setFacts({ codename: v })} />
+        <SubDomainField config={config} domain={domain} value={facts.subDomain} onChange={(v) => setFacts({ subDomain: v })} />
+      </div>
+      <EffortGrid draft={facts} set={setFacts} />
+    </details>
+  );
+}
+
 /**
  * The QuickAdd modal (« Nouveau sujet »).
  * Inputs: QuickAddProps — the runtime config and the close/create
  * callbacks.
  * Output: overlay + modal; the bar wears the selected domain color; Créer
  * stays disabled until the title is non-blank, then calls onCreate with
- * the trimmed title (the server puts the card in the first column).
+ * the trimmed title and the typed facts (the server puts the card in the
+ * first column). Changing the domain clears the sub-domain.
  * Failure modes: none.
  */
 export function QuickAdd({ config, onClose, onCreate }: QuickAddProps) {
   const [draft, setDraft] = useState<QuickAddInput>(() => initialInput(config));
-  const set = (patch: Partial<QuickAddInput>) => setDraft((current) => ({ ...current, ...patch }));
+  const [facts, setFactsState] = useState<FactsDraft>(EMPTY_FACTS);
+  const set = (patch: Partial<QuickAddInput>) => {
+    setDraft((current) => ({ ...current, ...patch }));
+    if (patch.domain !== undefined) setFactsState((current) => ({ ...current, subDomain: "" }));
+  };
+  const setFacts = (patch: Partial<FactsDraft>) => setFactsState((current) => ({ ...current, ...patch }));
   const valid = draft.title.trim().length > 0;
   const domain = config.domains.find((entry) => entry.id === draft.domain);
   return (
@@ -85,12 +120,13 @@ export function QuickAdd({ config, onClose, onCreate }: QuickAddProps) {
             <button className="x" onClick={onClose}>✕</button>
           </div>
           <div className="intake-note">Entre dans <b>{config.columns[0]!.name}</b> — tout sujet arrive par la gauche.</div>
-          <Field label="Nom du sujet *"><input className="inp" autoFocus value={draft.title} onChange={(e) => set({ title: e.target.value })} /></Field>
+          <Field label="Nom du sujet *"><input className="inp" autoFocus maxLength={CAP.title} value={draft.title} onChange={(e) => set({ title: e.target.value })} /></Field>
           <SelectGrid draft={draft} config={config} set={set} />
-          <Field label="Chef de projet"><input className="inp" value={draft.owner} onChange={(e) => set({ owner: e.target.value })} /></Field>
+          <Field label="Chef de projet"><input className="inp" maxLength={CAP.owner} value={draft.owner} onChange={(e) => set({ owner: e.target.value })} /></Field>
+          <MoreInfo config={config} domain={draft.domain} facts={facts} setFacts={setFacts} />
           <div className="modal-actions">
             <button className="btn ghost" onClick={onClose}>Annuler</button>
-            <button className="btn primary" disabled={!valid} onClick={() => onCreate({ ...draft, title: draft.title.trim() })}>Créer</button>
+            <button className="btn primary" disabled={!valid} onClick={() => onCreate({ ...draft, title: draft.title.trim(), ...creationFactsOf(facts) })}>Créer</button>
           </div>
         </div>
       </div>

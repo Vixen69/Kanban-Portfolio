@@ -57,3 +57,26 @@ test("diffBoards: a canal change hidden in a canal-less column is not a move; no
   assert.deepEqual(diffBoards(config, before, after), []);
   assert.deepEqual(diffBoards(config, before, before), []);
 });
+
+test("diffBoards (ADR 055): the refreshed values after the text facts, figures in their order, numbers not strings", () => {
+  const cards = [
+    testCard({ id: "S1", title: "Alpha", budgetEstimated: 100, chargeByProfile: [{ profileId: "pA", jh: 20, done: 5 }] }),
+    testCard({ id: "S2", title: "Bravo", budgetRdli: 50, owner: "Alice" }),
+  ];
+  const before = foldEvents(cards, []);
+  const after = foldEvents(cards, [
+    ev(1, "S1", "edited", { payload: { patch: { budgetEstimated: 80, chargeByProfile: [{ profileId: "pA", jh: 20, done: 15 }] } } }),
+    ev(2, "S2", "edited", { payload: { patch: { budgetRdli: 60, owner: "Bruno", title: "Bravo 2" } } }),
+  ]);
+  const changes = diffBoards(config, before, after);
+  assert.deepEqual(changes.map((c) => [c.kind, c.cardId, c.kind === "figure" ? c.figure.fact : c.from]), [
+    ["title", "S2", "Bravo"],
+    ["owner", "S2", "Alice"],
+    ["figure", "S2", "budgetRdli"],
+    ["figure", "S1", "budgetEstimated"],
+    ["plan", "S1", null],
+  ]);
+  const plan = changes.find((c) => c.kind === "plan");
+  assert.ok(plan?.kind === "plan");
+  assert.deepEqual([plan.plan.before.raf, plan.plan.after.raf], [15, 5]);
+});

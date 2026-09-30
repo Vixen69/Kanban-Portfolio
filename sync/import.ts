@@ -1,11 +1,14 @@
 // Import CLI. Reads a folder of PPM CSV exports, runs the pure audit pass
 // from adapters/csv-import, writes the French Markdown report, prints a
-// summary. Storage is touched ONLY with --charger: nothing is loaded until
-// the report is clean (docs/IMPORT-MAPPING.md « Mode audit d'abord »).
+// summary and the readable report of ADR 055 (files taken, perimeter,
+// what the load changes and why — sync/import-text.ts). Storage is written
+// ONLY with --charger: nothing is loaded until the report is clean
+// (docs/IMPORT-MAPPING.md « Mode audit d'abord »); --comparer reads it to
+// preview the changes on the board without writing a card.
 // Unlike scripts/seed.ts, the board config is read through the runtime
 // store so an admin override applied on the client platform is honored.
 //
-// Usage: node sync/import.ts <dossier> [--out <rapport>] [--charger] [--exercice <année>] [--domaines garder|remplacer]
+// Usage: node sync/import.ts <dossier> [--out <rapport>] [--charger | --comparer] [--exercice <année>] [--domaines garder|remplacer]
 // Exit codes: 0 = audit produced (even with doubtful findings),
 //             1 = the run itself was impossible (args, folder, config,
 //                 storage).
@@ -15,19 +18,25 @@ import { dirname, join, resolve } from "node:path";
 import { validateBoardConfig } from "../core/config.ts";
 import { loadServerConfig } from "../middle/config.ts";
 import { createConfigStore } from "../middle/config-store.ts";
-import { keepStoredCapacity, planLoad, renderReport, runImportAudit, withLegacyIds } from "../adapters/csv-import/index.ts";
-import type { CardAssembly } from "../adapters/csv-import/index.ts";
-import type { DomainDecision } from "../core/import-types.ts";
+import {
+  importChanges, keepStoredCapacity, planLoad, renderReport, runImportAudit, withLegacyIds,
+} from "../adapters/csv-import/index.ts";
+import type { AuditResult, CardAssembly } from "../adapters/csv-import/index.ts";
+import type { DomainDecision, ImportChanges } from "../core/import-types.ts";
 import type { InputFile, LoadPlan } from "../adapters/csv-import/index.ts";
-import type { CapacityBuild, EnrichedCard } from "../adapters/csv-import/index.ts";
+import type { EnrichedCard } from "../adapters/csv-import/index.ts";
+import type { BoardStorage } from "../core/ports.ts";
 import type { BoardConfig, Card, CardEvent } from "../core/types.ts";
+import { boardText, filesText } from "./import-text.ts";
 
-const USAGE = "usage : node sync/import.ts <dossier> [--out <rapport>] [--charger] [--exercice <année>] [--domaines garder|remplacer]";
+const USAGE = "usage : node sync/import.ts <dossier> [--out <rapport>] [--charger | --comparer] [--exercice <année>] [--domaines garder|remplacer]";
 
 interface Args {
   folder: string;
   out: string | null;
   charger: boolean;
+  /** Audit only: read the board to preview what a load would change (ADR 055). */
+  comparer: boolean;
   /** The exercise year read and loaded (ADR 035); null = the config's current one. */
   exercice: number | null;
   /** One decision for EVERY domain conflict (ADR 036); null = refuse to load while one exists. */
@@ -39,6 +48,7 @@ function parseArgs(argv: string[]): Args | null {
   let folder: string | null = null;
   let out: string | null = null;
   let charger = false;
+  let comparer = false;
   let exercice: number | null = null;
   let domaines: DomainDecision | null = null;
   for (let i = 0; i < argv.length; i++) {
@@ -48,8 +58,9 @@ function parseArgs(argv: string[]): Args | null {
       if (value === undefined) return null;
       out = value;
       i++;
-    } else if (arg === "--charger") {
-      charger = true;
+    } else if (arg === "--charger" || arg === "--comparer") {
+      if (arg === "--charger") charger = true;
+      else comparer = true;
     } else if (arg === "--exercice") {
       const value = argv[i + 1];
       if (value === undefined || !/^\d{4}$/.test(value)) return null;
@@ -66,7 +77,7 @@ function parseArgs(argv: string[]): Args | null {
       folder = arg;
     }
   }
-  return folder === null ? null : { folder, out, charger, exercice, domaines };
+  return folder === null || (charger && comparer) ? null : { folder, out, charger, comparer, exercice, domaines };
 }
 
 // The config the board actually serves: defaults + admin runtime override.
@@ -90,32 +101,52 @@ function readInputFiles(folder: string): InputFile[] {
     .map((entry) => ({ name: entry.name, bytes: readFileSync(join(folder, entry.name)) }));
 }
 
-// The real load: plan against what the board already holds, then write the
-// cards and their events in one atomic batch. The storage module is loaded
-// LAZILY: audit mode must keep running with no node_modules at all (the
-// parser is dependency-free by design; only the pg driver needs an install).
-async function load(
-  deck: EnrichedCard[], config: BoardConfig, capacity: CapacityBuild | null, year: number, domaines: DomainDecision | null,
-): Promise<LoadPlan> {
+// Opens the board's storage for one piece of work, then closes it. The
+// storage module is loaded LAZILY: audit mode must keep running with no
+// node_modules at all (the parser is dependency-free by design; only the
+// pg driver needs an install).
+async function withStorage<T>(what: string, work: (storage: BoardStorage) => Promise<T>): Promise<T> {
   const cfg = loadServerConfig(process.env);
   mkdirSync(dirname(cfg.dataPath), { recursive: true });
-  // Say the destination BEFORE writing: the driver defaults to jsonl, so a
+  // Say the board BEFORE touching it: the driver defaults to jsonl, so a
   // forgotten KANBAN_STORAGE_DRIVER=postgres must never pass unnoticed.
-  console.log(`destination : ${storageLabel(cfg.storageDriver, cfg.dataPath)}`);
+  console.log(`${what} : ${storageLabel(cfg.storageDriver, cfg.dataPath)}`);
   const { createStorage } = await import("../middle/storage/select.ts");
   const storage = await createStorage(cfg.storageDriver, cfg.dataPath);
   try {
-    const [events, baseCards] = await Promise.all([storage.listEvents(), storage.listBaseCards()]);
-    const plan = planWithDecisions(deck, config, baseCards, events, year, domaines);
-    await storage.importCards(plan.cards, plan.events);
-    if (capacity !== null) {
-      const fresh = withLegacyIds(capacity.snapshot, plan.aliases);
-      await storage.importCapacity(keepStoredCapacity(fresh, await storage.getCapacity(year)));
-    }
-    return plan;
+    return await work(storage);
   } finally {
     await storage.close();
   }
+}
+
+// The real load: plan against what the board already holds, then write the
+// cards and their events in one atomic batch; the changes are read from
+// the same plan (ADR 055: what the load DID).
+async function load(
+  audit: AuditResult, deck: EnrichedCard[], config: BoardConfig, year: number, domaines: DomainDecision | null,
+): Promise<{ plan: LoadPlan; changes: ImportChanges }> {
+  return withStorage("destination", async (storage) => {
+    const [events, baseCards] = await Promise.all([storage.listEvents(), storage.listBaseCards()]);
+    const plan = planWithDecisions(deck, config, baseCards, events, year, domaines);
+    const changes = importChanges({ audit, config, year, plan, baseCards, events });
+    await storage.importCards(plan.cards, plan.events);
+    if (audit.capacity !== null) {
+      const fresh = withLegacyIds(audit.capacity.snapshot, plan.aliases);
+      await storage.importCapacity(keepStoredCapacity(fresh, await storage.getCapacity(year)));
+    }
+    return { plan, changes };
+  });
+}
+
+// --comparer: what a load WOULD change, read without writing a card (no
+// domain decision taken: every conflict keeps the board's value).
+async function compare(audit: AuditResult, deck: EnrichedCard[], config: BoardConfig, year: number): Promise<ImportChanges> {
+  return withStorage("tableau comparé", async (storage) => {
+    const [events, baseCards] = await Promise.all([storage.listEvents(), storage.listBaseCards()]);
+    const plan = planLoad(deck, config, baseCards, events, new Date(), year);
+    return importChanges({ audit, config, year, plan, baseCards, events });
+  });
 }
 
 // The plan with every domain conflict decided the same way when --domaines
@@ -184,7 +215,8 @@ try {
   const boardConfig = loadRuntimeBoardConfig();
   const year = args.exercice ?? boardConfig.exercise.year;
   const files = readInputFiles(args.folder);
-  const { report, cards, capacity } = runImportAudit(files, boardConfig, new Date(), year);
+  const audit = runImportAudit(files, boardConfig, new Date(), year);
+  const { report, cards, capacity } = audit;
   const outPath = resolve(args.out ?? join(args.folder, "rapport-import.md"));
   mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, renderReport(report, new Date()), "utf8");
@@ -198,24 +230,33 @@ try {
       ` · Douteux : ${report.doubtful.length} · Signalements : ${report.warnings.length}\n` +
       `Rapport : ${outPath}`,
   );
+  const noBoard = importChanges({ audit, config: boardConfig, year, plan: null, baseCards: [], events: [] });
+  console.log(filesText(noBoard).join("\n"));
   if (args.charger) {
     if (cards === null || cards.cards.length === 0 || year < boardConfig.exercise.year) {
       console.error(refusal(cards, year, boardConfig.exercise.year));
       process.exit(1);
     }
-    console.log(loadSummary(await load(cards.cards, boardConfig, capacity, year, args.domaines)));
+    const loaded = await load(audit, cards.cards, boardConfig, year, args.domaines);
+    console.log(`${loadSummary(loaded.plan)}\n${boardText(loaded.changes, boardConfig).join("\n")}`);
 
     if (capacity !== null) {
       const { persons, assignments } = capacity.snapshot;
       console.log(`capacité ${capacity.snapshot.exerciseYear} : ${persons.length} personne(s), ${assignments.length} affectation(s) enregistrées.`);
     }
+  } else if (args.comparer && cards !== null && cards.cards.length > 0) {
+    console.log(boardText(await compare(audit, cards.cards, boardConfig, year), boardConfig).join("\n"));
+  } else if (args.comparer) {
+    console.log("comparaison : aucune carte assemblée pour cet exercice — rien à comparer.");
+  } else {
+    console.log("Ce qu'un chargement changerait sur le tableau : relancer avec --comparer (lecture seule).");
   }
 } catch (error) {
   const detail = error instanceof Error ? error.message : String(error);
   if (detail.includes("Cannot find package")) {
     console.error(
       "import : échec — le chargement exige les dépendances du dépôt.\n" +
-        "Lancer une fois « npm ci » à la racine, puis relancer avec --charger.\n" +
+        "Lancer une fois « npm ci » à la racine, puis relancer avec --charger ou --comparer.\n" +
         `(détail : ${detail})`,
     );
     process.exit(1);

@@ -5,8 +5,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Card } from "../../core/types.ts";
-import { keepStoredFacts, keptFactCounts } from "./keep-facts.ts";
-import type { KeptFact } from "./keep-facts.ts";
+import { keepStoredFacts, keptFactCards, keptFactCounts } from "./keep-facts.ts";
+import type { KeptTally } from "./keep-facts.ts";
 
 const STORED = {
   id: "PE1@2026", title: "Atelier", owner: "Alice MERLE", typeId: "etude", codename: "PE1", sciformaId: "PE1",
@@ -36,7 +36,7 @@ const CASES: Array<{ name: string; fresh: Partial<Card>; expect: Partial<Card>; 
 
 for (const c of CASES) {
   test(`ADR 054: ${c.name}`, () => {
-    const tally = new Map<KeptFact, number>();
+    const tally: KeptTally = new Map();
     const fresh = { ...STORED, ...c.fresh } as Card;
     const card = keepStoredFacts(fresh, STORED, tally);
     for (const [key, value] of Object.entries(c.expect)) assert.deepEqual(card[key as keyof Card], value, key);
@@ -46,16 +46,20 @@ for (const c of CASES) {
 }
 
 test("ADR 054: a new card has nothing to keep; a blank stored value keeps nothing", () => {
-  const tally = new Map<KeptFact, number>();
+  const tally: KeptTally = new Map();
   const fresh = { ...STORED, owner: "" } as Card;
   assert.equal(keepStoredFacts(fresh, undefined, tally), fresh);
   assert.equal(keepStoredFacts(fresh, { ...STORED, owner: "" } as Card, tally).owner, "");
   assert.deepEqual(keptFactCounts(tally), []);
 });
 
-test("ADR 054: the tally counts cards per fact, in the report's order", () => {
-  const tally = new Map<KeptFact, number>();
-  for (let i = 0; i < 3; i++) keepStoredFacts({ ...STORED, owner: "", dateRdr: null } as Card, STORED, tally);
+test("ADR 054: the tally counts cards per fact, in the report's order; ADR 055: and names them", () => {
+  const tally: KeptTally = new Map();
+  for (let i = 0; i < 3; i++) keepStoredFacts({ ...STORED, id: `PE${i}@2026`, owner: "", dateRdr: null } as Card, STORED, tally);
   keepStoredFacts({ ...STORED, dateRdr: null } as Card, STORED, tally);
   assert.deepEqual(keptFactCounts(tally), [{ label: "chef de projet", cards: 3 }, { label: "date RDR", cards: 4 }]);
+  assert.deepEqual(keptFactCards(tally), [
+    { label: "chef de projet", cardIds: ["PE0@2026", "PE1@2026", "PE2@2026"] },
+    { label: "date RDR", cardIds: ["PE0@2026", "PE1@2026", "PE2@2026", "PE1@2026"] },
+  ]);
 });

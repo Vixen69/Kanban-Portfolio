@@ -122,7 +122,10 @@ export async function postRestore(deps: SnapshotDeps, id: unknown): Promise<ApiR
  * GET /api/snapshots/:id/diff — what changed on the board since that
  * snapshot (ADR 053): the board at its log position against the board now,
  * card by card (arrived, absent from the import, gone, back, moved, domain,
- * type, title, archived). A read: nothing is written.
+ * type, title, archived) and, since ADR 055, the refreshed values — chef de
+ * projet, the money and effort figures as numbers, date RDR, plan de charge
+ * (the one change engine the import report reads too). A read: nothing is
+ * written.
  * Inputs: the deps, the route's id. Output: 200 with { snapshot, changes }.
  * Failure: BadRequest (→ 400) on a missing or unknown id.
  */

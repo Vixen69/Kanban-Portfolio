@@ -35,11 +35,33 @@ export interface ProjetEntry {
   ref: RowRef;
 }
 
+/**
+ * Why the perimeter rule took or left one project (ADR 055): the import
+ * report names every project it retained and every one it excluded, with
+ * the rule — never a bare count. The first failing rule is the motive.
+ */
+export interface PerimeterVerdict {
+  /** The project's code as written (« Projet. Id » / « Id », else the code read in the name); "" when none. */
+  code: string;
+  /** The project's name as written. */
+  name: string;
+  /** Which rule decided: retained, or the first exclusion motive. */
+  motive: "retained" | "noYear" | "state" | "type" | "arbitrage" | "noMe" | "duplicate";
+  /**
+   * Plain French. Retained: what it was taken on (« état « Budget validé »,
+   * type « Etude » »). Excluded: the motive with the offending value
+   * (« état « Reporté » hors des états retenus »).
+   */
+  reason: string;
+}
+
 /** The parsed perimeter. */
 export interface ProjetsTable {
   /** The elected file's name — the assembly line names the perimeter's source. */
   fileName: string;
   entries: ProjetEntry[];
+  /** One verdict per project read, retained or excluded, in reading order (ADR 055). */
+  verdicts: PerimeterVerdict[];
   byId: ReadonlyMap<string, ProjetEntry>;
   byName: ReadonlyMap<string, ProjetEntry>;
   shape: DomainShape;
