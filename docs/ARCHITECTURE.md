@@ -637,6 +637,14 @@ de son ADR.
   « montants calculés pour : ») → l'étape 2 devra chercher la ligne
   d'en-têtes sous le préambule.
 
+### 2026-09-30 — Comparer un instantané avec maintenant (ADR 053)
+
+- **Inquiétude de l'auteur** : un réimport des mêmes fichiers fait apparaître
+  des projets ; le rapport ne donnait que des nombres.
+- **Fait** : « Comparer avec maintenant » sur chaque instantané — la liste des
+  projets nouveaux, absents, disparus, de retour, déplacés, de domaine, type
+  ou titre changés, archivés, depuis l'instantané. Une lecture, rien d'écrit.
+
 ### 2026-09-30 — Décisions par le geste, fiche « Décision et Raison », journal global (ADR 052)
 
 - **Demande de l'auteur** : quand on met en pause, ou qu'on change le canal

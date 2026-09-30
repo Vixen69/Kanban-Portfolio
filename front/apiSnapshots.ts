@@ -1,8 +1,9 @@
-// The snapshot calls (ADR 042): take, list, restore — over the same fetch
+// The snapshot calls (ADR 042): take, list, restore, compare (ADR 053) — over the same fetch
 // wrapper as the rest of the API.
 
 import type { BoardConfig, CardEvent } from "../core/types.ts";
 import type { SnapshotSummary } from "../core/snapshot.ts";
+import type { CardChange } from "../core/snapshot-diff.ts";
 import { jsonInit, request } from "./api.ts";
 
 /**
@@ -34,4 +35,19 @@ export interface RestoreResult {
  */
 export function postRestore(id: string): Promise<RestoreResult> {
   return request<RestoreResult>(`/api/snapshots/${encodeURIComponent(id)}/restore`, jsonInit("POST", {}));
+}
+
+/** What GET /api/snapshots/:id/diff returns (ADR 053). */
+export interface SnapshotDiffResult {
+  snapshot: SnapshotSummary;
+  changes: CardChange[];
+}
+
+/**
+ * GET /api/snapshots/:id/diff — what changed on the board since that
+ * snapshot. Input: the snapshot id. Output: the SnapshotDiffResult.
+ * Failure: rejects with ApiError (400 on an unknown id).
+ */
+export function fetchSnapshotDiff(id: string): Promise<SnapshotDiffResult> {
+  return request<SnapshotDiffResult>(`/api/snapshots/${encodeURIComponent(id)}/diff`);
 }

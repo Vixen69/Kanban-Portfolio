@@ -11,6 +11,8 @@ import { randomUUID } from "node:crypto";
 import type { BoardStorage } from "../core/ports.ts";
 import type { BoardConfig, CapacitySnapshot, CardEvent } from "../core/types.ts";
 import { exerciseYears } from "../core/exercise.ts";
+import { foldEvents } from "../core/state.ts";
+import { boardAt, diffBoards } from "../core/snapshot-diff.ts";
 import { restoreEvent, summarizeSnapshot, type BoardSnapshot, type SnapshotSummary } from "../core/snapshot.ts";
 import type { ConfigStore } from "./config-store.ts";
 import { BadRequest } from "./errors.ts";
@@ -114,4 +116,22 @@ export async function getSnapshots(deps: SnapshotDeps): Promise<ApiResult> {
 export async function postRestore(deps: SnapshotDeps, id: unknown): Promise<ApiResult> {
   if (typeof id !== "string" || id === "") throw new BadRequest("Identifiant d’instantané attendu.");
   return serializedWrite(async () => ({ status: 200, body: await restoreSnapshot(deps, id, SERVER_ACTOR, new Date()) }));
+}
+
+/**
+ * GET /api/snapshots/:id/diff — what changed on the board since that
+ * snapshot (ADR 053): the board at its log position against the board now,
+ * card by card (arrived, absent from the import, gone, back, moved, domain,
+ * type, title, archived). A read: nothing is written.
+ * Inputs: the deps, the route's id. Output: 200 with { snapshot, changes }.
+ * Failure: BadRequest (→ 400) on a missing or unknown id.
+ */
+export async function getSnapshotDiff(deps: SnapshotDeps, id: unknown): Promise<ApiResult> {
+  if (typeof id !== "string" || id === "") throw new BadRequest("Identifiant d’instantané attendu.");
+  const snapshot = await deps.storage.loadSnapshot(id);
+  if (snapshot === null) throw new BadRequest("Instantané inconnu.");
+  const [cards, events] = await Promise.all([deps.storage.listBaseCards(), deps.storage.listEvents()]);
+  const then = boardAt(snapshot.cards, events, snapshot.logSeq);
+  const changes = diffBoards(deps.configStore.getRuntime(), then, foldEvents(cards, events));
+  return { status: 200, body: { snapshot: summarizeSnapshot(snapshot), changes } };
 }

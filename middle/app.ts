@@ -21,7 +21,7 @@ import type { ConfigStore } from "./config-store.ts";
 import { logError, logRequest } from "./log.ts";
 import { auditImport, loadImport, parseDecisions, parseExercise, parseFiles } from "./import.ts";
 import { postExerciseSwitch } from "./exercise.ts";
-import { getSnapshots, postRestore, postSnapshot, takeSnapshot } from "./snapshots.ts";
+import { getSnapshotDiff, getSnapshots, postRestore, postSnapshot, takeSnapshot } from "./snapshots.ts";
 import { IMPORT_ACTOR } from "../adapters/csv-import/index.ts";
 import { exerciseOrCurrent } from "./validation.ts";
 
@@ -104,7 +104,7 @@ function mountImportRoutes(app: Express, deps: MiddleDeps): void {
   });
 }
 
-// The snapshot routes (ADR 042): take, list, restore.
+// The snapshot routes (ADR 042): take, list, restore — and compare with now (ADR 053).
 function mountSnapshotRoutes(app: Express, deps: MiddleDeps): void {
   app.get("/api/snapshots", async (_req: Request, res: Response) => {
     const result = await getSnapshots(deps);
@@ -112,6 +112,10 @@ function mountSnapshotRoutes(app: Express, deps: MiddleDeps): void {
   });
   app.post("/api/snapshots", async (req: Request, res: Response) => {
     const result = await postSnapshot(deps, req.body);
+    res.status(result.status).json(result.body);
+  });
+  app.get("/api/snapshots/:id/diff", async (req: Request, res: Response) => {
+    const result = await getSnapshotDiff(deps, req.params["id"]);
     res.status(result.status).json(result.body);
   });
   app.post("/api/snapshots/:id/restore", async (req: Request, res: Response) => {

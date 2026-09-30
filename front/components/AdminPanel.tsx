@@ -82,7 +82,7 @@ function TabBody({ tab, draft, patch, setError, panel }: TabBodyProps) {
     case "champs": return <FieldsTab draft={draft} patch={patch} />;
     case "importer": return <ImportPanel config={panel.config} onLoaded={panel.onImported} defaultYear={panel.defaultYear} />;
     case "exercice": return <ExerciseTab config={panel.config} cards={panel.cards} onSwitch={(year) => noting(panel.onSwitch(year))} />;
-    default: return <SnapshotsTab onTake={(label) => noting(panel.onTakeSnapshot(label))} onRestore={(id) => noting(panel.onRestoreSnapshot(id))} />;
+    default: return <SnapshotsTab config={panel.config} onTake={(label) => noting(panel.onTakeSnapshot(label))} onRestore={(id) => noting(panel.onRestoreSnapshot(id))} />;
   }
 }
 

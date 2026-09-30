@@ -87,3 +87,12 @@
 .snap-actions { display: flex; gap: 6px; flex-shrink: 0; }
 .snap-error { font-size: 11px; color: var(--danger-strong); }
 
+/* Comparer avec maintenant (ADR 053) : ce qui a changé depuis un instantané. */
+.sd { display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--bd); border-radius: 6px; padding: 8px 10px; max-height: 420px; overflow-y: auto; }
+.sd-head { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.sd-sec summary { cursor: pointer; font-size: 12px; padding: 3px 0; }
+.sd-sec ul { margin: 2px 0 6px; padding-left: 16px; display: flex; flex-direction: column; gap: 2px; }
+.sd-item { font-size: 11.5px; display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
+.sd-code { font-family: ui-monospace, Menlo, monospace; font-size: 10.5px; color: var(--tx-3); }
+.sd-year { font-size: 10px; color: var(--tx-4); }
+.sd-move { color: var(--tx-2); }
