@@ -81,6 +81,9 @@ test("the fill is no human decision: no prior, still « à vérifier » when the
   assert.deepEqual([...priorDomainDecisions(board.events).keys()], [], "the ADR 036 reading skips it");
   const blank = planLoad([deckCard(BLANK)], CONFIG, board.cards, board.events, LATER);
   assert.deepEqual(blank.domainToCheck, [ID], "the first domain, never confirmed by hand: « à vérifier » (ADR 061)");
+  const flagged: Board = { cards: [...board.cards], events: [...board.events] };
+  apply(flagged, blank);
+  assert.equal(foldEvents(flagged.cards, flagged.events)[0]?.domainUnresolved, true, "the board agrees with the report: the fill does not clear the flag");
   const conflict = planLoad([deckCard({ domainId: "infra" })], CONFIG, board.cards, board.events, LATER);
   assert.deepEqual(conflict.domainConflicts.map((c) => [c.cardId, c.prior]), [[ID, null]], "a conflict, with no hand decision behind it");
 });

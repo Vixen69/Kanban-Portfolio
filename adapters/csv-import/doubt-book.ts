@@ -52,9 +52,10 @@ export interface DoubtSpec {
    */
   joinKeys?: readonly string[];
   /**
-   * Set when the options can only be told apart by a person's name (the
-   * chefs de projet of ProjetsCdP, rows differing only in their
-   * Responsables): they are identified by line number and the doubt is
+   * Set when the options can only be told apart by a person's name or by
+   * a column not shown, which may hold one (the chefs de projet of
+   * ProjetsCdP, Projets or SP rows differing only in their Responsables or
+   * in an unlisted column): they are identified by line number and the doubt is
    * NEVER remembered — asked at each import, each answer traced by line
    * number only, no « ne plus me demander » (ADR 062).
    */

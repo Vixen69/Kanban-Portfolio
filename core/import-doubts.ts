@@ -87,9 +87,10 @@ export interface ImportDoubt {
   /** Changes when the doubt changes (other competing values, another cell): a remembered choice then no longer applies. */
   fingerprint: string;
   /**
-   * Set when the options differ only by a person's name (the chefs de
-   * projet of a ProjetsCdP Id, Projets rows differing only in their
-   * Responsables): options by line number, never remembered — no « ne
+   * Set when the options differ only by a person's name or by a column
+   * not shown, which may hold one (the chefs de projet of a ProjetsCdP Id,
+   * Projets or SP rows differing only in their Responsables or in an
+   * unlisted column): options by line number, never remembered — no « ne
    * plus me demander », the question comes back at each import, the log
    * keeps « ligne N » only (ADR 062, « Données personnelles »). Absent
    * otherwise.

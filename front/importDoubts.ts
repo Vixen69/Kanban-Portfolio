@@ -196,14 +196,15 @@ export function stickyLabel(doubt: ImportDoubt): string {
 
 /**
  * What replaces « ne plus me demander » on a doubt asked at each import
- * (ADR 062: its options differ only by a person's name — never
+ * (ADR 062: its options differ only by columns the log never keeps — a
+ * person's name, or a column not shown that may hold one — never
  * remembered, the log keeps the line number alone). Input: the doubt.
  * Output: the French note, null for a doubt that can be remembered.
  * Failure: none.
  */
 export function askedEachTimeNote(doubt: ImportDoubt): string | null {
   if (doubt.askedEachTime !== true) return null;
-  return "Question reposée à chaque import : un nom de personne n’est jamais retenu (le journal ne garde que le numéro de ligne).";
+  return "Question reposée à chaque import : ces lignes ne se distinguent que par des colonnes non retenues (noms de personnes ou colonnes non montrées) ; le journal ne garde que le numéro de ligne.";
 }
 
 /**

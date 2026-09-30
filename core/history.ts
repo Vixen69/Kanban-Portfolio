@@ -6,8 +6,9 @@
 // when the load wrote one (payload.reason — « état « Reporté » hors des
 // états retenus », « plus présent dans le fichier Coût … »); events
 // written before carry none and read as before. Every domain set on the
-// card — by hand or by an ADR 036 import decision — is a line too
-// (author, 2026-09-30; core/domain-history.ts).
+// card — by hand, by an ADR 036 import decision, or by the import filling
+// a card that had none (ADR 061 fill, « Domaine donné par l’export ») — is
+// a line too (author, 2026-09-30; core/domain-history.ts).
 // A hand movement carries the words of its gesture (ADR 052).
 
 import type { BoardConfig, CardEvent } from "./types.ts";

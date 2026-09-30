@@ -11,6 +11,7 @@ import { effectiveEvents } from "./restore.ts";
 import { foldOrder } from "./fold-order.ts";
 import { readDecision } from "./decision-record.ts";
 import { PAUSE_COLUMN_ID } from "./gesture.ts";
+import { isDomainFill } from "./domain-history.ts";
 
 // Validators of the fields an "edited" event may patch (CardPatch, v2).
 // Anything else in the payload is silently ignored — replays must never
@@ -169,8 +170,9 @@ function applyEdited(state: CardState, event: CardEvent): void {
     if (accepts && accepts(value)) {
       // The whitelist above guarantees the value matches the field's type.
       (state as unknown as Record<string, unknown>)[key] = copyPatchValue(key, value);
-      // A domain set in the log (by hand, or an ADR 036 decision) is no longer « à vérifier » (ADR 061).
-      if (key === "domain") delete state.domainUnresolved;
+      // A domain set in the log by hand, or by an ADR 036 decision, is no longer
+      // « à vérifier »; an import fill (ADR 061) is no confirmation and keeps the flag.
+      if (key === "domain" && !isDomainFill(event)) delete state.domainUnresolved;
     }
   }
 }

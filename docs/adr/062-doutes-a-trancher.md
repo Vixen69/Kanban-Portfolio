@@ -138,7 +138,12 @@ n'est ajouté pour autant ; la règle est de ne rien dériver d'un nom.
   inconnue qui pourrait en contenir. Si deux lignes ne diffèrent que par
   ces colonnes-là, les choix passent au numéro de ligne et le doute est
   posé à chaque import, comme ci-dessus. Les mots écrits au journal
-  (`label`) omettent toujours les Responsables.
+  (`label`) omettent toujours les Responsables. Conséquence assumée : un
+  choix mémorisé garde la même ligne même quand le chef de projet nommé
+  dessus change d'un export à l'autre (la question ne revient pas) ; le
+  chef de projet de la carte suit alors cette ligne, comme tout chef de
+  projet que l'export rafraîchit (CLAUDE.md §4). « Déjà tranchés » montre
+  la ligne avec ses noms du jour.
 - Revue des autres doutes : états, types, portefeuilles, noms de projet,
   cellules ME, montants, Id et titres de cartes — aucun nom de personne.
   Le nom reste montré au PMO à l'écran, jamais écrit.
@@ -156,7 +161,10 @@ n'est ajouté pour autant ; la règle est de ne rien dériver d'un nom.
   projets de l'export sur une même carte chargent le premier **par code
   puis par titre** (avant : le premier dans l'ordre du fichier).
 - Un choix mémorisé survit aux imports tant que les fichiers disent la
-  même chose ; dès qu'ils changent, la question revient d'elle-même.
+  même chose sur ce que l'empreinte lit ; dès qu'ils changent, la question
+  revient d'elle-même. L'empreinte ne lit aucun nom de personne : un
+  changement de Responsable seul ne la fait pas revenir (« Données
+  personnelles »).
 - Jusqu'à RP3, l'auteur des choix est « anonymous », comme toute écriture.
 - Un chef de projet choisi sur un Id en double de ProjetsCdP vaut aussi
   pour la carte qui joint cette ligne par son nom (carte sans code, ou

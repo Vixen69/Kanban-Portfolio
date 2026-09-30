@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import type { CardEvent, CardState } from "./types.ts";
 import { foldEvents } from "./state.ts";
 import { testCard } from "./test-helpers.ts";
+import { IMPORT_ACTOR } from "./gesture.ts";
 
 function event(partial: Partial<CardEvent> & Pick<CardEvent, "id" | "ts" | "type" | "cardId">): CardEvent {
   return { actor: "test", fromColumn: null, toColumn: null, payload: {}, ...partial };
@@ -96,4 +97,21 @@ test("edited ignores forged non-editable fields", () => {
   assert.equal(state?.source, "fixtures");
   assert.equal(state?.sciformaId, null);
   assert.deepEqual(state?.dependencies, []);
+});
+
+// ADR 061: a domain edited by hand (or an ADR 036 decision) clears the
+// « à vérifier » flag of the base card; the import's fill (actor import,
+// reason « export », no decision) is no confirmation and keeps it.
+test("a hand domain edit clears « à vérifier », an import fill keeps it", () => {
+  const card = testCard({ domain: "beta", domainUnresolved: true });
+  const edit = (actor: string, payload: Record<string, unknown>): CardEvent =>
+    event({ id: "evt-1", ts: "2026-03-02T00:00:00.000Z", type: "edited", cardId: "S001", actor, payload });
+  const byHand = foldEvents([card], [edit("anonymous", { patch: { domain: "beta" } })])[0];
+  assert.equal(byHand?.domainUnresolved, undefined);
+  const decided = foldEvents([card], [edit(IMPORT_ACTOR, { patch: { domain: "beta" }, reason: "export", decision: "remplacer" })])[0];
+  assert.equal(decided?.domainUnresolved, undefined, "an ADR 036 decision confirms");
+  const fill = { patch: { domain: "beta", subDomain: null }, previous: { domain: "", subDomain: null }, reason: "export" };
+  const filled = foldEvents([card], [edit(IMPORT_ACTOR, fill)])[0];
+  assert.equal(filled?.domainUnresolved, true);
+  assert.equal(filled?.domain, "beta");
 });

@@ -112,3 +112,25 @@ test("Projets rows differing only in their Responsables: by line number, asked a
     assert.equal(doubtOf((await auditImport(storage, CONFIG, files, NOW)).doubts, id).how, "proposé");
   });
 });
+
+// The documented consequence (ADR 062, « Données personnelles »): the
+// fingerprint leaves the Responsables out, so a remembered choice keeps the
+// same row when only the chef de projet named on it changes — and the owner
+// follows that row, like any owner the export refreshes (CLAUDE.md §4).
+test("Projets duplicate rows: a remembered choice survives a change of Responsable, the owner follows the kept row", async () => {
+  const id = "duplicate-row|2026|PE30001|projets";
+  const files = (a: string, b: string) => sampleFiles({ projets: [projetsRow("PE30001", "Alpha bis", a), projetsRow("PE30001", "Alpha", b)] });
+  const ownerOf = async (storage: BoardStorage) => (await storage.listBaseCards()).find((c) => c.codename === "PE30001")?.owner;
+  await withBoard(async (storage) => {
+    const first = doubtOf((await auditImport(storage, CONFIG, files("MARTIN Eva", "DURAND Luc"), NOW)).doubts, id);
+    const bis = first.options.find((o) => /Alpha bis/.test(o.label))?.id ?? "?";
+    await loadImport(storage, CONFIG, files("MARTIN Eva", "DURAND Luc"), NOW, 2026, choice(id, bis));
+    assert.equal(await ownerOf(storage), "MARTIN Eva");
+    const swapped = files("DURAND Luc", "MARTIN Eva");
+    const next = doubtOf((await auditImport(storage, CONFIG, swapped, NOW)).doubts, id);
+    assert.deepEqual([next.how, next.applied], ["mémorisé", bis], "not asked again: the names are no part of the doubt");
+    await loadImport(storage, CONFIG, swapped, NOW, 2026, { choices: new Map() });
+    assert.equal(await ownerOf(storage), "DURAND Luc", "the kept row's current Responsable");
+    assertNoName(await storage.listEvents());
+  });
+});
