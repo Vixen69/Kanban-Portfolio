@@ -23,7 +23,7 @@ test("reportTitle: what the load will change, then what it changed", () => {
 test("keyNumbers: the five numbers in the mockup's order", () => {
   assert.deepEqual(keyNumbers(COUNTS).map((n) => [n.value, n.label]), [
     [140, "projets relus"], [3, "nouveaux"], [2, "absents de l’import (∅)"],
-    [37, "valeurs changées"], [5, "gardées (absentes des fichiers)"],
+    [37, "projets modifiés"], [5, "projets aux valeurs gardées (absentes des fichiers)"],
   ]);
   // « relus » counts the re-read cards (author, 2026-09-30: « mis à jour » promised a change); the tooltip keeps saying so.
   assert.equal(keyNumbers(COUNTS)[0]?.hint, UPDATED_HINT);

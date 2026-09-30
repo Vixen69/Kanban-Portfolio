@@ -31,20 +31,21 @@ export interface KeyNumber {
 
 /** The tooltip of « projets relus »: re-read, not necessarily changed. */
 export const UPDATED_HINT =
-  "Relus dans les fichiers, pas forcément modifiés : ce qui change vraiment est compté dans « valeurs changées ».";
+  "Relus dans les fichiers, pas forcément modifiés : ce qui change vraiment est compté dans « projets modifiés ».";
 
 /**
- * The key numbers, in the mockup's order: projets mis à jour, nouveaux,
- * absents de l'import (∅), valeurs changées, gardées (absentes des
- * fichiers). Input: the counts. Output: the five numbers. Failure: none.
+ * The key numbers, in the mockup's order: projets relus, nouveaux,
+ * absents de l'import (∅), projets modifiés, projets aux valeurs gardées
+ * (absentes des fichiers) — the last two count PROJECTS, their values are
+ * listed below. Input: the counts. Output: the five numbers. Failure: none.
  */
 export function keyNumbers(counts: ImportChangeCounts): KeyNumber[] {
   return [
     { value: counts.updated, label: "projets relus", hint: UPDATED_HINT },
     { value: counts.created, label: "nouveaux" },
     { value: counts.absent, label: "absents de l’import (∅)" },
-    { value: counts.valuesChanged, label: "valeurs changées" },
-    { value: counts.valuesKept, label: "gardées (absentes des fichiers)" },
+    { value: counts.valuesChanged, label: "projets modifiés" },
+    { value: counts.valuesKept, label: "projets aux valeurs gardées (absentes des fichiers)" },
   ];
 }
 
