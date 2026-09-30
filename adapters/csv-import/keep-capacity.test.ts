@@ -29,7 +29,8 @@ test("ADR 054: without a Coût file the COUT PREV demand stands; with one it is 
 });
 
 test("ADR 054: a person's blank domain, profile or capacity keeps the stored value; present values replace", () => {
-  const fresh: CapacitySnapshot = { ...STORED, persons: [person({ domain: null, profileId: null, capacityJh: null, capacitySource: undefined, plannedJh: 90 })] };
+  const { capacitySource: _source, ...blank } = person({ domain: null, profileId: null, capacityJh: null, plannedJh: 90 });
+  const fresh: CapacitySnapshot = { ...STORED, persons: [blank] };
   const [kept] = keepStoredCapacity(fresh, STORED).persons;
   assert.deepEqual([kept?.domain, kept?.profileId, kept?.capacityJh, kept?.capacitySource, kept?.plannedJh], ["infra", "pmo", 200, "pdc", 90]);
   const moved = keepStoredCapacity({ ...STORED, persons: [person({ domain: "erp" })] }, STORED).persons[0];
