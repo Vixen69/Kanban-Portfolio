@@ -84,6 +84,7 @@
 .doubt-tool { font-size: 9.5px; font-weight: 600; color: var(--accent); border: 1px solid var(--accent); border-radius: 3px; padding: 0 4px; }
 .doubt-csq { font-size: 10.5px; font-weight: 400; color: var(--tx-3); }
 .doubt-sticky { font-size: 10.5px; color: var(--tx-2); display: flex; align-items: center; gap: 5px; margin-top: 5px; cursor: pointer; }
+p.doubt-sticky { cursor: default; margin-bottom: 0; }
 .doubt-kept li button { margin-left: auto; }
 .doubt-subject { color: var(--tx-2); }
 .sd-item .doubt-why { flex-basis: 100%; margin: 0; }

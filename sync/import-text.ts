@@ -208,5 +208,6 @@ export function boardText(changes: ImportChanges, config: BoardConfig): string[]
     ...section("Supprimées du tableau, non recréées (ADR 058) :", changes.deletedSkipped.map((d) => `  ✕ ${named(d)}`)),
     ...section("Doutes d’identité :", changes.identityDoubts.map((q) => `  ⚠ ${q}`)),
     ...section("Domaine à vérifier — l’export n’en donne pas (ADR 061) :", reasonLines("?", changes.domainToCheck ?? [])),
+    ...section("Domaine donné par l’export à une carte qui n’en avait pas (ADR 061) :", reasonLines("+", changes.domainFilled ?? [])),
   ];
 }

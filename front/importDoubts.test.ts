@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import type { ImportAuditResult, ImportDoubt } from "../core/import-types.ts";
 import {
   answerOf, askAgainLabel, auditedOnScreen, choicesPayload, doubtsHeader, EMPTY_DOUBT_STATE, groupDoubts, ignoredLine, initialDoubtState,
-  isRemembered, rememberedLine, settledReason, splitDoubts, staleCount, stickyLabel, withAnswer, withForgotten,
+  askedEachTimeNote, isRemembered, rememberedLine, settledReason, splitDoubts, staleCount, stickyLabel, withAnswer, withForgotten,
 } from "./importDoubts.ts";
 
 function doubt(id: string, over: Partial<ImportDoubt> = {}): ImportDoubt {
@@ -115,4 +115,15 @@ test("the doubts stay on screen while « Revoir le rapport avec ces choix » run
   assert.equal(auditedOnScreen({ kind: "busy", what: "audit", previous: result }), null);
   assert.equal(auditedOnScreen({ kind: "busy", what: "load", previous: result }), null);
   assert.equal(auditedOnScreen({ kind: "idle" }), null);
+});
+
+test("a doubt asked at each import (ADR 062, names only): no « ne plus me demander », never sent sticky", () => {
+  const cdp = doubt("PE3", { kind: "duplicate-row", subject: "chef de projet (ProjetsCdP)", askedEachTime: true,
+    options: [{ id: "ligne:2", label: "« A » (ligne 2)", consequence: null }, { id: "ligne:3", label: "« B » (ligne 3)", consequence: null }], proposed: "ligne:2", applied: "ligne:2" });
+  assert.match(askedEachTimeNote(cdp) ?? "", /reposée à chaque import/);
+  assert.equal(askedEachTimeNote(OPEN), null, "a doubt that can be remembered keeps its box");
+  const ticked = withAnswer(EMPTY_DOUBT_STATE, "PE3", { option: "ligne:2", sticky: true });
+  assert.deepEqual(choicesPayload([cdp], ticked), {}, "the tool's choice, even ticked, sends nothing");
+  const other = withAnswer(EMPTY_DOUBT_STATE, "PE3", { option: "ligne:3", sticky: true });
+  assert.deepEqual(choicesPayload([cdp], other), { PE3: { option: "ligne:3", sticky: false } });
 });

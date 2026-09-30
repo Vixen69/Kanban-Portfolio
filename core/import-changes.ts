@@ -192,6 +192,14 @@ export interface ImportChanges {
    */
   domainToCheck?: ImportLeft[];
   /**
+   * « Domaine donné par l'export » (ADR 061 fill, author 2026-09-30): cards
+   * on the board WITHOUT domain (or with one the model no longer declares)
+   * that take the domain the export now resolves — each with its sentence
+   * « Domaine donné par l’export : Sans domaine → INFRA », the words of the
+   * fiche's Historique. Absent in reports made before.
+   */
+  domainFilled?: ImportLeft[];
+  /**
    * The refusals that forbid the load (ADR 056: two competing exports, one
    * file name received twice…), plain French, one per case — the screen
    * says them instead of a generic « périmètre non assemblé ». Empty when

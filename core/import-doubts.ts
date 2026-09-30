@@ -28,7 +28,11 @@ export type ImportDoubtKind = "couts-fact" | "duplicate-row" | "join" | "figure"
 
 /** One choice of a doubt. */
 export interface ImportDoubtOption {
-  /** Stable id, derived from the option's content (never a line number): what a choice names. */
+  /**
+   * Stable id, derived from the option's content — never from a person's
+   * name: what a choice names, written in the log. A line number
+   * (« ligne:N ») only on a doubt asked each time (`askedEachTime`).
+   */
   id: string;
   /** Plain French: the choice as the PMO reads it (« état « Budget présenté » ×2 »). */
   label: string;
@@ -82,6 +86,15 @@ export interface ImportDoubt {
   remembered: { option: string; ts: string; actor: string } | null;
   /** Changes when the doubt changes (other competing values, another cell): a remembered choice then no longer applies. */
   fingerprint: string;
+  /**
+   * Set when the options differ only by a person's name (the chefs de
+   * projet of a ProjetsCdP Id, Projets rows differing only in their
+   * Responsables): options by line number, never remembered — no « ne
+   * plus me demander », the question comes back at each import, the log
+   * keeps « ligne N » only (ADR 062, « Données personnelles »). Absent
+   * otherwise.
+   */
+  askedEachTime?: true;
 }
 
 /**

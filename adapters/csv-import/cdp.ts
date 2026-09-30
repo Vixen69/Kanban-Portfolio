@@ -8,7 +8,8 @@
 // a name) keep the same one whatever their order (duplicate-rows.ts, ADR
 // 056): the row order of the export never decides the chef de projet.
 // ADR 062: rows of one Id naming different chefs de projet are a « Doute
-// à trancher » — the names are shown to the PMO, never written in the log.
+// à trancher » — the names are shown to the PMO, never written in the log
+// nor hashed into it: options by line number, asked at each import.
 
 import { normalizeLabel } from "./normalize.ts";
 import { isDomainLead } from "./domains.ts";
@@ -22,7 +23,6 @@ import { discard, warn } from "./report.ts";
 import type { ImportReport, RowRef } from "./report.ts";
 import { KEPT_ROW_RULE, keptRow } from "./duplicate-rows.ts";
 import type { DuplicateRow } from "./duplicate-rows.ts";
-import { fnv1a } from "./hash.ts";
 import { askOrPropose } from "./doubt-book.ts";
 import type { DoubtBook } from "./doubt-book.ts";
 
@@ -109,26 +109,32 @@ function readRow(ctx: CdpContext, row: CsvRow): void {
   if (name !== "") group(ctx.rowsByName, name, read);
 }
 
-const ownerOption = (owner: string | null): string => `o:${fnv1a(owner ?? "")}`;
+// An option of the chef de projet doubt: its line number — never a value
+// derived from the name (ADR 062, « Données personnelles »).
+const lineOption = (row: OwnerRow): string => `ligne:${row.line}`;
 
 // The chef de projet of one Id: the kept row's, unless its rows name
-// different ones — then the PMO's choice (ADR 062). The log keeps « ligne N »,
-// never the name.
+// different ones — then the PMO's choice (ADR 062). The options are told
+// apart by name only, so they are identified by line number and the doubt
+// is asked at each import (never remembered); the log keeps « ligne N »,
+// never the name nor anything derived from it.
 function chosenOwner(ctx: CdpContext, id: string, rows: readonly OwnerRow[], kept: OwnerRow): string | null {
-  const byOption = new Map<string, OwnerRow>();
-  for (const row of [...rows].sort((a, b) => a.line - b.line)) if (!byOption.has(ownerOption(row.owner))) byOption.set(ownerOption(row.owner), row);
-  if (byOption.size < 2) return kept.owner;
+  const byOwner = new Map<string, OwnerRow>(); // in memory only: the first line naming each chef de projet
+  for (const row of [...rows].sort((a, b) => a.line - b.line)) if (!byOwner.has(row.owner ?? "")) byOwner.set(row.owner ?? "", row);
+  if (byOwner.size < 2) return kept.owner;
+  const choices = [...byOwner.values()];
   const applied = askOrPropose(ctx.book, {
     kind: "duplicate-row", detail: "cdp", code: kept.rawId || id, name: normalizeLabel(kept.nom), title: kept.nom || kept.rawId,
     why: `${rows.length} lignes de ProjetsCdP portent l'Id « ${kept.rawId || id} » et ne nomment pas le même chef de projet. ` +
       `L'outil garde ${KEPT_ROW_RULE}.`,
-    options: [...byOption].map(([option, row]) => ({
-      id: option, label: `« ${row.owner ?? "aucun chef de projet"} » (ligne ${row.line})`, trace: `ligne ${row.line}`,
+    options: choices.map((row) => ({
+      id: lineOption(row), label: `« ${row.owner ?? "aucun chef de projet"} » (ligne ${row.line})`, trace: `ligne ${row.line}`,
       consequence: row.owner === null ? "carte sans chef de projet" : null,
     })),
-    proposed: ownerOption(kept.owner), joinKeys: [id, normalizeLabel(kept.nom)].filter((k) => k !== ""),
+    proposed: lineOption(byOwner.get(kept.owner ?? "") ?? kept), joinKeys: [id, normalizeLabel(kept.nom)].filter((k) => k !== ""),
+    askedEachTime: true,
   });
-  return byOption.get(applied)?.owner ?? kept.owner;
+  return choices.find((row) => lineOption(row) === applied)?.owner ?? kept.owner;
 }
 
 // Every row read: one owner per Id and per name, from the row kept. A

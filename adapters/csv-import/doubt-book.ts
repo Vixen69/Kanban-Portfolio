@@ -17,7 +17,11 @@ import { doubtSubject } from "./doubt-subject.ts";
 
 /** One option as a reader proposes it. */
 export interface DoubtOptionSpec {
-  /** Stable, content-derived (never a line number). */
+  /**
+   * Stable, content-derived — never derived from a person's name (ADR 062,
+   * « Données personnelles »); a line number (« ligne:N ») only on a doubt
+   * asked each time (`askedEachTime`), since a line moves between exports.
+   */
   id: string;
   label: string;
   consequence?: string | null;
@@ -47,6 +51,14 @@ export interface DoubtSpec {
    * card of the deck carries one of them (keepSideDoubts).
    */
   joinKeys?: readonly string[];
+  /**
+   * Set when the options can only be told apart by a person's name (the
+   * chefs de projet of ProjetsCdP, rows differing only in their
+   * Responsables): they are identified by line number and the doubt is
+   * NEVER remembered — asked at each import, each answer traced by line
+   * number only, no « ne plus me demander » (ADR 062).
+   */
+  askedEachTime?: true;
 }
 
 /** A choice the log remembers for a doubt (doubt-memory.ts). */
@@ -136,9 +148,11 @@ function orderedOptions(spec: DoubtSpec): ImportDoubtOption[] {
   return options;
 }
 
-// The applied option and how it came: the request, else the valid memory, else the proposal.
-function settle(input: BookInput, id: string, fingerprint: string, ids: ReadonlySet<string>, proposed: string): Pick<ImportDoubt, "applied" | "how" | "remembered"> {
-  const memory = input.forgotten?.has(id) === true ? undefined : input.memory?.get(id);
+// The applied option and how it came: the request, else the valid memory
+// (never for a doubt asked each time), else the proposal.
+function settle(input: BookInput, spec: DoubtSpec, id: string, fingerprint: string, ids: ReadonlySet<string>): Pick<ImportDoubt, "applied" | "how" | "remembered"> {
+  const proposed = spec.proposed;
+  const memory = input.forgotten?.has(id) === true || spec.askedEachTime === true ? undefined : input.memory?.get(id);
   const valid = memory !== undefined && memory.sticky && memory.fingerprint === fingerprint && ids.has(memory.option);
   const remembered = valid ? { option: memory.option, ts: memory.ts, actor: memory.actor } : null;
   const asked = input.choices?.get(id);
@@ -163,7 +177,8 @@ function record(input: BookInput, spec: DoubtSpec): Entry | null {
   const doubt: ImportDoubt = {
     id, kind: spec.kind, cardId: spec.cardId ?? projectInstanceId(spec.code, spec.name, input.year),
     code: spec.code, title: spec.title, subject: doubtSubject(spec.kind, spec.detail), why: spec.why, options, proposed: spec.proposed,
-    ...settle(input, id, fingerprint, ids, spec.proposed), fingerprint,
+    ...settle(input, spec, id, fingerprint, ids), fingerprint,
+    ...(spec.askedEachTime === true ? { askedEachTime: true as const } : {}),
   };
   const traces = new Map(spec.options.map((o) => [o.id, o.trace ?? o.label]));
   return { doubt, joinKeys: spec.joinKeys === undefined ? null : spec.joinKeys.map(normalizeLabel), traces };

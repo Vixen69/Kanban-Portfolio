@@ -10,7 +10,8 @@
 // the board that the files still carry (skipped) and the identity doubts;
 // since ADR 060 the hand corrections a NEW export value took back and the
 // hand placements a new jalon went past, and the cards in Pause a jalon
-// would have moved (left there). withEventReasons hands the entry / exit /
+// would have moved (left there); since ADR 061 the cards without domain
+// the export gives one to. withEventReasons hands the entry / exit /
 // return reasons to the events the load writes (the fiche's Historique).
 // Nothing is written. Pure: the caller passes the stored cards and log.
 
@@ -25,6 +26,7 @@ import { foldEvents } from "../../core/state.ts";
 import { cardsOfExercise } from "../../core/exercise.ts";
 import { eventSequence } from "../../core/event-sequence.ts";
 import { domainName } from "../../core/domain-check.ts";
+import { domainFillText } from "../../core/domain-history.ts";
 import { normalizeLabel } from "./normalize.ts";
 import type { AuditResult } from "./orchestrate.ts";
 import type { PerimeterVerdict } from "./projets-types.ts";
@@ -126,6 +128,16 @@ function toCheckOf(plan: LoadPlan, config: BoardConfig, after: ReadonlyMap<strin
     const card = after.get(id);
     const reason = `« ${domainName(config, card?.domain ?? "")} » : l’export ne donne pas de domaine, jamais confirmé à la main`;
     return card === undefined ? [] : [{ ...ref(card), reason }];
+  }));
+}
+
+// ADR 061 fill (author, 2026-09-30): the cards without domain the export
+// gives one to, with the Historique's sentence (the load's fill events).
+function filledOf(plan: LoadPlan, config: BoardConfig, after: ReadonlyMap<string, CardState>): ImportLeft[] {
+  return byTitle(plan.events.flatMap((event): ImportLeft[] => {
+    const reason = domainFillText(config, event);
+    const card = after.get(event.cardId);
+    return reason === null || card === undefined ? [] : [{ ...ref(card), reason }];
   }));
 }
 
@@ -231,7 +243,7 @@ export function importChanges(input: ChangesInput): ImportChanges {
   if (plan === null) {
     return {
       ...head, counts: NO_COUNTS, entered: [], left: [], back: [], cardChanges: [], kept: [], replaced: [], advanced: [], paused: [], unpaused: [],
-      adopted: [], deletedSkipped: [], identityDoubts: [], domainToCheck: [],
+      adopted: [], deletedSkipped: [], identityDoubts: [], domainToCheck: [], domainFilled: [],
     };
   }
   const exercise = (cards: CardState[]): CardState[] => cardsOfExercise(cards, year, config.exercise.year);
@@ -247,7 +259,7 @@ export function importChanges(input: ChangesInput): ImportChanges {
     replaced: factCards(plan, plan.replaced, afterById), advanced: advancedOf(plan.advanced, afterById),
     paused: advancedOf(plan.paused, afterById), unpaused: advancedOf(plan.unpaused, afterById),
     adopted: adoptedOf(plan), deletedSkipped: deletedOf(input, plan), identityDoubts: plan.identityDoubts,
-    domainToCheck: toCheckOf(plan, config, afterById),
+    domainToCheck: toCheckOf(plan, config, afterById), domainFilled: filledOf(plan, config, afterById),
   };
 }
 

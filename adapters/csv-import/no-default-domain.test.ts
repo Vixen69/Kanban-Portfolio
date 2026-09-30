@@ -104,7 +104,8 @@ test("a card without domain takes the export's domain when it resolves one — n
   apply(board, planLoad([deckCard(BLANK)], CONFIG, [], [], NOW));
   const plan = planLoad([deckCard({ domainId: "erp" })], CONFIG, board.cards, board.events, NOW);
   assert.deepEqual([plan.cards[0]?.domain, plan.domainConflicts.length, plan.domainUndecided], ["erp", 0, 0]);
-  assert.deepEqual(plan.events.filter((e) => e.type === "edited"), [], "nothing decided: the base card carries it");
+  assert.deepEqual(plan.events.filter((e) => e.type === "edited").map((e) => [e.actor, e.payload["reason"], e.payload["decision"]]),
+    [[IMPORT_ACTOR, "export", undefined]], "nothing decided: one fill event for the Historique (domain-fill.test.ts)");
 });
 
 test("a stored domain the config no longer declares reads as none: filled by the export, never a conflict nor « à vérifier »", () => {

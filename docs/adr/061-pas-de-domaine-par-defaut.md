@@ -107,3 +107,25 @@ Rien n'est réécrit dans le journal. Fichiers : `core/domain-history.ts`
 (+ tests), `core/history.ts`, `middle/api.ts` (+
 `api.domain-history.test.ts`), `front/components/DetailSections.tsx`,
 `front/styles/modal.css`.
+
+## Amendement 2026-09-30 — le domaine donné par l'export dans l'Historique
+
+Décision de l'auteur : quand l'**import** donne un domaine à une carte qui
+n'en avait pas (§ 3 : carte sans domaine, ou domaine que le modèle ne
+déclare plus), la fiche le dit : « Domaine donné par l'export : Sans
+domaine → INFRA ». Jusqu'ici ce remplissage ne réécrivait que la carte de
+base, sans événement, donc sans ligne. Le chargement écrit désormais, dans
+son lot, **un** événement `edited` de l'acteur de l'import : le patch (le
+domaine que la carte de base porte déjà), `previous` (le domaine d'avant)
+et la raison « export », **sans** `decision`. Ce n'est pas une décision
+humaine : la lecture des décisions de l'ADR 036 l'ignore (pas de
+« modifié à la main » sur un conflit ultérieur, et une carte ainsi remplie
+peut encore être marquée « à vérifier » si l'export cesse de donner son
+domaine). Le rapport d'import nomme ces cartes avec les mêmes mots
+(`changes.domainFilled`, « Domaine donné par l'export »). Un second
+chargement n'écrit rien de plus ; les journaux existants se relisent sans
+changement. Fichiers : `core/domain-history.ts` (`isDomainFill`,
+`domainFillText`), `adapters/csv-import/domain-conflicts.ts`
+(`domainFillEvent`), `to-cards.ts`, `import-changes.ts`,
+`core/import-changes.ts`, `front/components/ImportLists.tsx`,
+`sync/import-text.ts`, et leurs tests (`domain-fill.test.ts`).

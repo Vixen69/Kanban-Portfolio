@@ -87,7 +87,13 @@ information is listed under "Open decisions", ask rather than assume.
 > « domaine à vérifier ». Doubts to settle (ADR 062): the audit turns the
 > decidable doubts into questions with the tool's choice preselected (never
 > blocking); each answer sent at load is a `settled` event, remembered per
-> project and question while the doubt stays the same. Details in each ADR; the sections below predate
+> project and question while the doubt stays the same; nothing derived
+> from a person's name enters the log (a ProjetsCdP chef de projet is
+> « ligne N », asked at each import, never remembered; Projets duplicate
+> rows are told apart without their Responsables). An import filling a
+> card without domain writes an `edited` event (reason « export », no
+> decision): the fiche says « Domaine donné par l'export : Sans domaine →
+> INFRA ». Details in each ADR; the sections below predate
 > this block where they disagree.
 
 ## 1. What this project is
@@ -267,8 +273,10 @@ fields, append-only enforced by table grants/triggers):
   tactique/parking + lift condition + review date — none for a parking —,
   what changed + canal from → to + architect validation, decidedOn), read
   back by `core/decision-record.ts`. `settled` (ADR 062) is an import
-  doubt's answer (the option, its words — never a person's name —,
-  remembered or not, or a « Redemander »), appended in the same batch as
+  doubt's answer (the option, its words — never a person's name nor any
+  value derived from one: a doubt told apart by names only is answered by
+  line number and never remembered —, remembered or not, or a
+  « Redemander »), appended in the same batch as
   the load and read ONLY by the importer's memory: the fold, the
   Historique, the Analytics › Journal and the flow metrics ignore it, and
   its card_id may name a project that is not on the board (« code@année »).
@@ -502,7 +510,10 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
   and sub-domains are the versioned model's), **Catégories** (rename and
   recolour domains, types, natures, criticalities — never add or remove),
   **Champs de carte** — the only three tabs (ADR 049); **Importer** (the
-  panel widens there), **Exercice** and **Instantanés** open ON THEIR OWN
+  panel widens there; after the readable report, **« Doutes à
+  trancher »** — the decidable doubts as questions, the tool's choice
+  preselected, « Ne plus me demander », « Déjà tranchés » with
+  « Redemander », ADR 062), **Exercice** and **Instantanés** open ON THEIR OWN
   from the gear menu, under their own title. The **Exercice** panel (ADR 038): the year switch — pins
   the unstamped cards on the closing year, archives its active cards,
   activates the next year's (clock starts), then records the new current

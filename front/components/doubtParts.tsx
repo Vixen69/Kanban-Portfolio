@@ -1,7 +1,8 @@
 // The parts of the « Doutes à trancher » section (ADR 062): one row per
 // doubt — the project, why it is doubtful, the choices as radio buttons
 // with their consequence, the tool's choice marked, « Ne plus me demander
-// pour ce projet (question) » — and one line per remembered doubt with
+// pour ce projet (question) » (or, on a doubt asked at each import, why it
+// is never remembered) — and one line per remembered doubt with
 // why it was asked and its « Redemander ». A fieldset per doubt, its
 // legend the project and the question (one project may raise several);
 // every input sits inside its label; nothing hides in a tooltip.
@@ -9,7 +10,7 @@
 import { useId } from "react";
 import type { ImportDoubt } from "../../core/import-types.ts";
 import type { DoubtAnswer } from "../importDoubts.ts";
-import { askAgainLabel, rememberedLine, stickyLabel } from "../importDoubts.ts";
+import { askAgainLabel, askedEachTimeNote, rememberedLine, stickyLabel } from "../importDoubts.ts";
 
 // The project and the question: « PE20001 Socle réseau — état ».
 function Project({ doubt }: { doubt: ImportDoubt }) {
@@ -32,6 +33,7 @@ export function DoubtRow({ doubt, answer, onAnswer }: {
   doubt: ImportDoubt; answer: DoubtAnswer; onAnswer: (answer: DoubtAnswer) => void;
 }) {
   const name = useId();
+  const eachTime = askedEachTimeNote(doubt);
   return (
     <fieldset className="doubt">
       <legend><Project doubt={doubt} /></legend>
@@ -47,10 +49,12 @@ export function DoubtRow({ doubt, answer, onAnswer }: {
           </label>
         ))}
       </div>
-      <label className="doubt-sticky">
-        <input type="checkbox" checked={answer.sticky} onChange={(e) => onAnswer({ ...answer, sticky: e.target.checked })} />
-        {stickyLabel(doubt)}
-      </label>
+      {eachTime !== null ? <p className="doubt-sticky">{eachTime}</p> : (
+        <label className="doubt-sticky">
+          <input type="checkbox" checked={answer.sticky} onChange={(e) => onAnswer({ ...answer, sticky: e.target.checked })} />
+          {stickyLabel(doubt)}
+        </label>
+      )}
     </fieldset>
   );
 }

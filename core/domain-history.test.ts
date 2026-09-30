@@ -5,7 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { CardEvent } from "./types.ts";
-import { domainLabel, domainLines, domainPrevious } from "./domain-history.ts";
+import { domainFillText, domainLabel, domainLines, domainPrevious, isDomainFill } from "./domain-history.ts";
 import { cardHistory } from "./history.ts";
 import { testConfig } from "./test-helpers.ts";
 
@@ -25,6 +25,11 @@ function decision(kind: "garder" | "remplacer", board: string, proposed: string)
     patch: { domain: value, subDomain: null }, decision: kind,
     board: { domain: board, subDomain: null }, proposed: { domain: proposed, subDomain: null },
   }, "import-csv");
+}
+
+// The import filling a card without domain (ADR 061 fill, as domainFillEvent writes it).
+function fill(previous: { domain: string; subDomain: string | null }, domain: string, subDomain: string | null = null): CardEvent {
+  return edited({ patch: { domain, subDomain }, previous, reason: "export" }, "import-csv");
 }
 
 // Each case: the card's events, oldest first → the lines, oldest first (null = no line).
@@ -105,6 +110,21 @@ const CASES: Array<{ name: string; events: () => CardEvent[]; lines: Array<{ tex
     lines: [null, null, null],
   },
   {
+    name: "the import fills a card without domain (ADR 061): « Domaine donné par l’export »",
+    events: () => [fill(NONE, "beta", "b1")],
+    lines: [{ text: "Domaine donné par l’export : Sans domaine → Beta · Beta 1", note: null }],
+  },
+  {
+    name: "the import fills a card whose domain the model dropped, then a hand change walks on from it",
+    events: () => [fill({ domain: "ghost", subDomain: null }, "alpha"), edited({ patch: { domain: "beta" } })],
+    lines: [{ text: "Domaine donné par l’export : Sans domaine → Alpha", note: null }, { text: "Domaine : Alpha → Beta", note: null }],
+  },
+  {
+    name: "a hand edit carrying reason « export » is still a hand edit (only the import actor fills)",
+    events: () => [edited({ patch: { domain: "alpha" }, previous: NONE, reason: "export" })],
+    lines: [{ text: "Domaine : Sans domaine → Alpha", note: null }],
+  },
+  {
     name: "a decision after a hand change reads its own board, not the walk",
     events: () => [edited({ patch: { domain: "beta" }, previous: NONE }), decision("remplacer", "beta", "alpha")],
     lines: [{ text: "Domaine : Sans domaine → Beta", note: null }, { text: "Domaine remplacé par l’export (décision à l’import) : Beta → Alpha", note: null }],
@@ -118,6 +138,19 @@ for (const c of CASES) {
     assert.deepEqual(events.map((event) => lines.get(event) ?? null), c.lines);
   });
 }
+
+test("isDomainFill / domainFillText: only the import's patch of a domain with reason « export » and no ADR 036 decision", () => {
+  const cases: Array<[string, CardEvent, string | null]> = [
+    ["an import fill", fill(NONE, "alpha"), "Domaine donné par l’export : Sans domaine → Alpha"],
+    ["an ADR 036 « remplacer »", decision("remplacer", "alpha", "beta"), null],
+    ["an ADR 060 export value (no domain)", edited({ patch: { owner: "X" }, reason: "export" }, "import-csv"), null],
+    ["a hand edit", edited({ patch: { domain: "alpha" }, previous: NONE, reason: "export" }), null],
+    ["a legacy import edit without reason", edited({ patch: { domain: "alpha" } }, "import-csv"), null],
+  ];
+  for (const [name, event, text] of cases) {
+    assert.deepEqual([isDomainFill(event), domainFillText(CONFIG, event)], [text !== null, text], name);
+  }
+});
 
 test("domainLabel: names, the sub-domain after « · », « Sans domaine » for empty or unknown", () => {
   const cases: Array<[string, string | null, string]> = [

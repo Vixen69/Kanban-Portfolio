@@ -44,7 +44,10 @@ function domainRefOf(value: unknown): DomainRef | null {
 /**
  * The last decision the log holds on each card's domain: an `edited`
  * event whose patch carries `domain` — by a human in the fiche (« main »),
- * or by the import (« garder » / « remplacer », payload.decision).
+ * or by the import (« garder » / « remplacer », payload.decision). Any
+ * other domain event of the import actor — the fill of a card without
+ * domain (ADR 061, reason « export », domainFillEvent) — decides nothing
+ * and is skipped: it is never read as a hand decision.
  * Inputs: the events in LOG order (the storage lists them by seq; the
  * last one wins — never the timestamp, an import may be dated earlier).
  * Output: card id -> prior decision. Failure: none.
@@ -56,7 +59,9 @@ export function priorDomainDecisions(events: readonly CardEvent[]): Map<string, 
     const patch = event.payload["patch"];
     if (typeof patch !== "object" || patch === null || !("domain" in patch)) continue;
     const decision = event.payload["decision"];
-    const kind = event.actor === IMPORT_ACTOR && (decision === "garder" || decision === "remplacer") ? decision : "main";
+    const byImport = event.actor === IMPORT_ACTOR;
+    if (byImport && decision !== "garder" && decision !== "remplacer") continue; // an import fill: no decision
+    const kind = byImport && (decision === "garder" || decision === "remplacer") ? decision : "main";
     priors.set(event.cardId, { kind, ts: event.ts, proposed: kind === "garder" ? domainRefOf(event.payload["proposed"]) : null });
   }
   return priors;
@@ -129,5 +134,23 @@ export function domainDecisionEvent(conflict: DomainConflict, decision: DomainDe
   return lifecycleEvent("edited", conflict.cardId, IMPORT_ACTOR, ts, {
     patch: { domain: value.domain, subDomain: value.subDomain },
     decision, proposed: conflict.proposed, board: conflict.board,
+  });
+}
+
+/**
+ * The `edited` event that records the export filling the domain of a card
+ * that had none (ADR 061 « fill »), so that the fiche's Historique says
+ * « Domaine donné par l’export : Sans domaine → INFRA » (author,
+ * 2026-09-30). Payload: the patch (the fold applies the domain the base
+ * card already carries), `previous` (the card's domain before — empty, or
+ * one the model no longer declares) and reason « export »; no `decision`:
+ * it is no ADR 036 decision, priorDomainDecisions skips it.
+ * Inputs: the stored card, the export's domain, the load's instant.
+ * Output: the event input (actor: the import). Failure: none.
+ */
+export function domainFillEvent(existing: Pick<CardState, "id" | "domain" | "subDomain">, proposed: DomainRef, ts: string): CardEventInput {
+  return lifecycleEvent("edited", existing.id, IMPORT_ACTOR, ts, {
+    patch: { domain: proposed.domain, subDomain: proposed.subDomain },
+    previous: { domain: existing.domain, subDomain: existing.subDomain }, reason: "export",
   });
 }

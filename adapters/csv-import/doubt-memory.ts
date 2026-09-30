@@ -117,7 +117,8 @@ export function settledEvents(
     const forget = "forget" in choice;
     const payload: Record<string, unknown> = {
       doubtId: doubt.id, kind: doubt.kind, fingerprint: doubt.fingerprint, option: doubt.applied,
-      label: book.traceLabel(doubt.id, doubt.applied), proposed: doubt.proposed, sticky: !forget && choice.sticky,
+      label: book.traceLabel(doubt.id, doubt.applied), proposed: doubt.proposed,
+      sticky: !forget && choice.sticky && doubt.askedEachTime !== true, // never remembered (ADR 062)
       ...(forget ? { forget: true } : {}),
     };
     return [lifecycleEvent(SETTLED, doubt.cardId, actor, ts, payload)];

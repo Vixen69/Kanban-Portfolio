@@ -35,7 +35,7 @@ import type { CardEventInput } from "../../core/events.ts";
 import { lifecycleEvent } from "../../core/events.ts";
 import type { DomainConflict, DomainDecision, DomainRef } from "../../core/import-types.ts";
 import type { EnrichedCard } from "./enrich.ts";
-import { IMPORT_ACTOR, domainConflict, domainDecisionEvent } from "./domain-conflicts.ts";
+import { IMPORT_ACTOR, domainConflict, domainDecisionEvent, domainFillEvent } from "./domain-conflicts.ts";
 import type { PriorDecision } from "./domain-conflicts.ts";
 import { baseCardId, cardId, withLegacyIds } from "./card-identity.ts";
 import { readBoard } from "./board-reading.ts";
@@ -229,8 +229,9 @@ function createCard(plan: LoadPlan, id: string, card: EnrichedCard, config: Boar
 
 // The domain the refreshed snapshot carries (ADR 036): the board's own,
 // unless the PMO decided « remplacer » on this load — never the export's
-// by default; a card without domain takes the export's (ADR 061). Each decision becomes an event; an undecided conflict keeps
-// the board's value and is counted (the load is refused upstream).
+// by default; a card without domain takes the export's (ADR 061), an event
+// saying so in its Historique. Each decision becomes an event; an undecided
+// conflict keeps the board's value and is counted (the load is refused upstream).
 function settleDomain(
   plan: LoadPlan, existing: CardState, card: EnrichedCard, config: BoardConfig,
   prior: PriorDecision | undefined, decision: DomainDecision | undefined, now: Date,
@@ -238,7 +239,10 @@ function settleDomain(
   const board: DomainRef = { domain: existing.domain, subDomain: existing.subDomain };
   const check = domainConflict(existing, card, config, prior);
   if (check.kind === "kept-by-prior") plan.domainKeptByPrior++;
-  if (check.kind === "fill") return check.proposed; // ADR 061: a card without domain takes the export's
+  if (check.kind === "fill") { // ADR 061: a card without domain takes the export's
+    plan.events.push(domainFillEvent(existing, check.proposed, now.toISOString()));
+    return check.proposed;
+  }
   if (check.kind !== "conflict") return board;
   plan.domainConflicts.push({ ...check.conflict, decision: decision ?? null });
   if (decision === undefined) {

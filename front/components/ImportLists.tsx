@@ -59,7 +59,8 @@ function RefList({ title, rows, warn = false }: { title: string; rows: Row[]; wa
 export function PresenceLists({ changes }: { changes: ImportChanges }) {
   const { entered, left, back } = changes;
   const toCheck = changes.domainToCheck ?? [];
-  if (entered.length + left.length + back.length + toCheck.length === 0) return null;
+  const filled = changes.domainFilled ?? [];
+  if (entered.length + left.length + back.length + toCheck.length + filled.length === 0) return null;
   return (
     <>
       <h3 className="chg-h">Projets qui entrent, sortent ou reviennent</h3>
@@ -68,6 +69,8 @@ export function PresenceLists({ changes }: { changes: ImportChanges }) {
       <RefList title="De retour" rows={back.map((ref) => ({ ref, reason: ref.reason, warning: null }))} />
       {/* ADR 061: a domain the export does not give and no human ever confirmed — maybe the old default. */}
       <RefList warn title="Domaine à vérifier — l’export n’en donne pas" rows={toCheck.map((ref) => ({ ref, reason: ref.reason, warning: null }))} />
+      {/* ADR 061: a card without domain takes the export's — the fiche's Historique says it the same way. */}
+      <RefList title="Domaine donné par l’export" rows={filled.map((ref) => ({ ref, reason: ref.reason, warning: null }))} />
     </>
   );
 }

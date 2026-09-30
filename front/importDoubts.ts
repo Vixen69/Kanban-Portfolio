@@ -108,7 +108,8 @@ export function choicesPayload(doubts: readonly ImportDoubt[], state: DoubtState
   for (const doubt of doubts) {
     if (isRemembered(doubt, state)) continue;
     const answer = answerOf(doubt, state);
-    if (answer.option !== doubt.proposed || answer.sticky) choices[doubt.id] = { option: answer.option, sticky: answer.sticky };
+    const sticky = answer.sticky && doubt.askedEachTime !== true; // never remembered (ADR 062)
+    if (answer.option !== doubt.proposed || sticky) choices[doubt.id] = { option: answer.option, sticky };
     else if (state.forgotten.includes(doubt.id)) choices[doubt.id] = { forget: true };
   }
   return choices;
@@ -191,6 +192,18 @@ export function rememberedLine(doubt: ImportDoubt): string {
  */
 export function stickyLabel(doubt: ImportDoubt): string {
   return `Ne plus me demander pour ce projet (${doubt.subject})`;
+}
+
+/**
+ * What replaces « ne plus me demander » on a doubt asked at each import
+ * (ADR 062: its options differ only by a person's name — never
+ * remembered, the log keeps the line number alone). Input: the doubt.
+ * Output: the French note, null for a doubt that can be remembered.
+ * Failure: none.
+ */
+export function askedEachTimeNote(doubt: ImportDoubt): string | null {
+  if (doubt.askedEachTime !== true) return null;
+  return "Question reposée à chaque import : un nom de personne n’est jamais retenu (le journal ne garde que le numéro de ligne).";
 }
 
 /**

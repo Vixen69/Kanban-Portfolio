@@ -42,13 +42,16 @@ Jusqu'ici l'importeur tranchait seul (ADR 056/058) et le disait en
 3. **Le journal est la mémoire.** Chaque réponse envoyée au chargement
    devient un événement **`settled`** (nouveau type, écrit dans le même lot
    que le chargement) : qui, quand, le doute, l'option, ses mots (jamais un
-   nom de personne : « ligne 3 » pour un chef de projet), mémorisée ou non.
+   nom de personne ni rien qui en dérive : « ligne 3 » pour un chef de
+   projet — voir « Données personnelles »), mémorisée ou non.
    Pas `edited` (il porte un patch lu par les décisions de domaine et les
    corrections à la main), pas `decided` (les décisions D1–D6 de la fiche).
    Le pli du tableau, l'Historique et les indicateurs l'ignorent ; il ne
    masque jamais la naissance d'une carte (`core/fold-order.ts`).
 4. **« Ne plus me demander pour ce projet (question) ».** La case vaut
-   pour la question où elle est cochée : un projet aux deux questions
+   pour la question où elle est cochée (sauf les doutes qui ne se
+   distinguent que par un nom, jamais mémorisés — « Données
+   personnelles ») : un projet aux deux questions
    (état et type) se coche deux fois. Sans la case, le choix vaut
    pour ce chargement : la question revient. Avec, il est réappliqué sans
    rien demander tant que le doute est **le même** (même projet, même
@@ -114,6 +117,34 @@ remet la question parmi les doutes, sur le choix de l’outil.
   sortis de `api.ts`), `front/components/DoubtsSection.tsx`,
   `doubtParts.tsx` ; `ImportOutcome`, `ImportView`, `ImportLists`,
   `ImportChanges`, `FilesStrip`, `importReport.ts`, `admin.css`.
+
+## Données personnelles
+
+Aucune valeur tirée d'un nom de personne n'entre dans le journal
+(CLAUDE.md §4 et §6) — ni le nom, ni son empreinte : une empreinte sans
+clé (FNV-1a) se retrouve en hachant une liste du personnel. Aucun secret
+n'est ajouté pour autant ; la règle est de ne rien dériver d'un nom.
+
+- **Chef de projet en double dans ProjetsCdP** : les choix sont repérés
+  par leur **numéro de ligne** (`ligne:N`), le journal ne garde que
+  « ligne N ». Comme une ligne change d'un export à l'autre, ce doute
+  n'est **jamais mémorisé** : pas de case « Ne plus me demander » (l'écran
+  dit « Question reposée à chaque import »), la question revient à chaque
+  import, chaque réponse est tracée par son seul numéro de ligne
+  (`sticky` toujours faux, même si une requête le demande).
+- **Lignes en double de l'onglet Projets (et de SP)** : l'identifiant d'un
+  choix et l'empreinte du doute ne lisent que les colonnes montrées qui ne
+  sont pas des noms — jamais « Responsable 1 » à « 3 », ni une colonne
+  inconnue qui pourrait en contenir. Si deux lignes ne diffèrent que par
+  ces colonnes-là, les choix passent au numéro de ligne et le doute est
+  posé à chaque import, comme ci-dessus. Les mots écrits au journal
+  (`label`) omettent toujours les Responsables.
+- Revue des autres doutes : états, types, portefeuilles, noms de projet,
+  cellules ME, montants, Id et titres de cartes — aucun nom de personne.
+  Le nom reste montré au PMO à l'écran, jamais écrit.
+- Le type `ImportDoubt` porte `askedEachTime: true` pour ces doutes ; le
+  test `middle/import.privacy.test.ts` vérifie qu'aucun nom, ni son
+  empreinte, n'est dans le journal après un chargement.
 
 ## Conséquences
 

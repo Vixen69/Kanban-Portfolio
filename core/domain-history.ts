@@ -6,7 +6,9 @@
 // domaine → INFRA », a confirmation of the same domain « Domaine confirmé :
 // INFRA »; an ADR 036 import decision says so (« Domaine remplacé par
 // l'export (décision à l'import) : A&D → INFRA », « Domaine gardé
-// (décision à l'import) : A&D »). Names come from the config; an empty or
+// (décision à l'import) : A&D »), and the import filling a card that had
+// none (ADR 061 « fill », author 2026-09-30) « Domaine donné par l'export :
+// Sans domaine → INFRA ». Names come from the config; an empty or
 // undeclared domain reads « Sans domaine », a sub-domain « INFRA · Réseau ».
 // « Confirmé » compares the domain ids, not the names; when a board.json
 // change removed a domain or a sub-domain and both sides would read the
@@ -23,6 +25,10 @@
 
 import type { BoardConfig, CardEvent, CardState } from "./types.ts";
 import type { DomainRef } from "./import-types.ts";
+import { IMPORT_ACTOR } from "./gesture.ts";
+
+/** The parts of an event the domain lines read (a stored event, or one a load is about to write). */
+type EventParts = Pick<CardEvent, "type" | "actor" | "payload">;
 
 /** One narrated domain line: the text, and a note (what the export proposed on a « garder »). */
 export interface DomainLine {
@@ -43,7 +49,7 @@ function refOf(value: unknown): DomainRef | null {
   return { domain, subDomain: typeof subDomain === "string" ? subDomain : null };
 }
 
-function patchOf(event: CardEvent): Record<string, unknown> | null {
+function patchOf(event: EventParts): Record<string, unknown> | null {
   if (event.type !== "edited") return null;
   const patch = event.payload["patch"];
   return typeof patch === "object" && patch !== null && !Array.isArray(patch) ? (patch as Record<string, unknown>) : null;
@@ -78,9 +84,25 @@ export function domainLabel(config: BoardConfig, ref: DomainRef): string {
   return sub === undefined ? domain.name : `${domain.name} · ${sub.name}`;
 }
 
+/**
+ * Whether an event is the import filling the domain of a card that had
+ * none (ADR 061 « fill »: the export resolves a domain, nothing to
+ * arbitrate): an `edited` event of the import actor whose patch carries a
+ * domain, with reason « export » and no ADR 036 decision. It is no human
+ * decision — the ADR 036 reading of the log skips it.
+ * Input: the event. Output: the answer. Failure modes: none.
+ */
+export function isDomainFill(event: EventParts): boolean {
+  if (event.type !== "edited" || event.actor !== IMPORT_ACTOR || event.payload["reason"] !== "export") return false;
+  const decision = event.payload["decision"];
+  const patch = patchOf(event);
+  return decision !== "garder" && decision !== "remplacer" && patch !== null && patchedDomain(patch) !== null;
+}
+
 // Where the event itself says the card stood: `previous` (a hand edit
-// written since 2026-09-30), `board` (an ADR 036 decision); else null.
-function recordedFrom(event: CardEvent): DomainRef | null {
+// written since 2026-09-30, an import fill), `board` (an ADR 036
+// decision); else null.
+function recordedFrom(event: EventParts): DomainRef | null {
   const decision = event.payload["decision"];
   const isDecision = decision === "garder" || decision === "remplacer";
   return refOf(event.payload["previous"]) ?? (isDecision ? refOf(event.payload["board"]) : null);
@@ -109,12 +131,33 @@ function changeLabels(config: BoardConfig, from: DomainRef, to: DomainRef): [str
   return source === target ? [qualifiedLabel(config, from), qualifiedLabel(config, to)] : [source, target];
 }
 
+// The sentence of an import fill: « Domaine donné par l’export : Sans domaine → INFRA ».
+function fillText(config: BoardConfig, from: DomainRef | null, to: DomainRef): string {
+  const [source, given] = from === null ? [NO_DOMAIN, domainLabel(config, to)] : changeLabels(config, from, to);
+  return `Domaine donné par l’export : ${source} → ${given}`;
+}
+
+/**
+ * The sentence of an import fill (ADR 061) as the fiche's Historique and
+ * the import report say it: « Domaine donné par l’export : Sans domaine →
+ * INFRA ». Inputs: the config (names), the event. Output: the sentence,
+ * null when the event is not a fill (isDomainFill). Failure modes: none.
+ */
+export function domainFillText(config: BoardConfig, event: EventParts): string | null {
+  const patch = isDomainFill(event) ? patchOf(event) : null;
+  if (patch === null) return null;
+  const from = recordedFrom(event);
+  const to = applied(from, patch);
+  return to === null ? null : fillText(config, from, to);
+}
+
 // The line of one domain event, from where the card stood (null = unknown).
 // « Confirmé » is decided on the refs, never on the labels: an undeclared
 // domain or sub-domain would make a real change read as a confirmation.
 function lineOf(config: BoardConfig, event: CardEvent, from: DomainRef | null, to: DomainRef): DomainLine {
   const decision = event.payload["decision"];
   const target = domainLabel(config, to);
+  if (isDomainFill(event)) return { text: fillText(config, from, to), note: null };
   if (decision === "garder") {
     const proposed = refOf(event.payload["proposed"]);
     return { text: `Domaine gardé (décision à l’import) : ${target}`, note: proposed === null ? null : `l’export proposait ${domainLabel(config, proposed)}` };
@@ -132,7 +175,8 @@ function lineOf(config: BoardConfig, event: CardEvent, from: DomainRef | null, t
 /**
  * The domain lines of ONE card's events. Every `edited` event whose patch
  * carries an accepted domain gets a line (hand assignment, change or
- * confirmation; ADR 036 « garder » / « remplacer »); other events get
+ * confirmation; ADR 036 « garder » / « remplacer »; an import fill of a
+ * card without domain, ADR 061 « Domaine donné par l’export »); other events get
  * none, but a patch carrying only a sub-domain still moves the walk on.
  * Inputs: the card's events in the fold order, OLDEST first
  * (core/fold-order.ts), the config (names). Output: event -> its line.
