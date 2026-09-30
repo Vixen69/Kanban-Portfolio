@@ -58,6 +58,12 @@ export interface ImportAuditResult {
   loadable: boolean;
   /** The domain conflicts a load would raise (ADR 036) — each needs a decision before the load. */
   conflicts: DomainConflict[];
+  /**
+   * The facts the files leave blank on cards already on the board, by
+   * fact: the stored value stands (ADR 054). On an audit, what a load
+   * would keep; on a load, what it kept. Empty when nothing is missing.
+   */
+  factsKept: Array<{ label: string; cards: number }>;
 }
 
 /** What a load wrote, on top of the audit it re-ran. */

@@ -204,7 +204,12 @@ fields, append-only enforced by table grants/triggers):
   event of the import actor (a « garder » is not asked again for the same
   proposal); a bracketed name marker (`domains[].nameMarkers`,
   « [Business] ») forces a domain before the portfolio is read. Type and
-  owner stay facts the export refreshes silently.
+  owner stay facts the export refreshes silently — when it carries them:
+  a re-import NEVER erases a fact the files leave blank (ADR 054, author
+  2026-09-30 — « s'il y avait une info et que le nouvel import, il n'y a
+  pas l'info, on garde »): owner, type, codes, money, efforts, dateRdr and
+  the plan de charge (one whole fact) keep the stored value; zero is a
+  value. The audit says what a load will keep, the load what it kept.
 - `card_events` : append-only. seq (bigint sequence, ordering), id
   (evt-<seq>), ts, actor, card_id, type (created/moved/blocked/unblocked/
   edited/commented/archived/unarchived/deleted/imported/decided/unlisted/

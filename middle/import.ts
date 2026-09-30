@@ -12,7 +12,7 @@
 import { win32 } from "node:path";
 import type { BoardStorage } from "../core/ports.ts";
 import type { BoardConfig } from "../core/types.ts";
-import type { DomainConflict, DomainDecision, ImportAuditResult, ImportLoadResult, ImportSummary } from "../core/import-types.ts";
+import type { DomainDecision, ImportAuditResult, ImportLoadResult, ImportSummary } from "../core/import-types.ts";
 import { planLoad, renderReport, runImportAudit, withLegacyIds } from "../adapters/csv-import/index.ts";
 import type { AuditResult, EnrichedCard, InputFile, LoadPlan } from "../adapters/csv-import/index.ts";
 import { BadRequest } from "./errors.ts";
@@ -116,13 +116,15 @@ function summarize(audit: AuditResult): ImportSummary {
   };
 }
 
-// The conflicts a load would raise, read without writing: the audit is a
-// dry run of the plan against the exercise's stored cards (ADR 036).
-async function dryConflicts(
+// The conflicts a load would raise and the facts it would keep, read
+// without writing: the audit is a dry run of the plan against the
+// exercise's stored cards (ADR 036, ADR 054).
+async function dryRun(
   storage: BoardStorage, config: BoardConfig, deck: EnrichedCard[], now: Date, year: number,
-): Promise<DomainConflict[]> {
+): Promise<Pick<ImportAuditResult, "conflicts" | "factsKept">> {
   const [events, baseCards] = await Promise.all([storage.listEvents(), storage.listBaseCards()]);
-  return planLoad(deck, config, baseCards, events, now, year).domainConflicts.map(({ decision: _decision, ...conflict }) => conflict);
+  const plan = planLoad(deck, config, baseCards, events, now, year);
+  return { conflicts: plan.domainConflicts.map(({ decision: _decision, ...conflict }) => conflict), factsKept: plan.factsKept };
 }
 
 /**
@@ -138,10 +140,10 @@ export async function auditImport(
   storage: BoardStorage, config: BoardConfig, files: InputFile[], now: Date, year: number = config.exercise.year,
 ): Promise<ImportAuditResult> {
   const audit = runImportAudit(files, config, now, year);
-  const conflicts = audit.cards === null ? [] : await dryConflicts(storage, config, audit.cards.cards, now, year);
+  const dry = audit.cards === null ? { conflicts: [], factsKept: [] } : await dryRun(storage, config, audit.cards.cards, now, year);
   return {
     exercise: year, report: renderReport(audit.report, now), summary: summarize(audit),
-    loadable: audit.cards !== null, conflicts,
+    loadable: audit.cards !== null, ...dry,
   };
 }
 
@@ -190,10 +192,11 @@ export async function loadImport(
   console.log(
     `${now.toISOString()} import (outil, exercice ${year}) : ${plan.created} créée(s), ${plan.updated} mise(s) à jour, ` +
       `${plan.moved} déplacée(s), ${plan.unlisted} absente(s), ${plan.relisted} de retour, ` +
-      `domaines ${plan.domainReplaced} remplacé(s) / ${plan.domainKept} gardé(s)`,
+      `domaines ${plan.domainReplaced} remplacé(s) / ${plan.domainKept} gardé(s)` +
+      plan.factsKept.map((f) => ` · ${f.label} gardé (absent des fichiers) : ${f.cards}`).join(""),
   );
   return {
     exercise: year, report: renderReport(audit.report, now), summary: summarize(audit), loadable: true,
-    conflicts: plan.domainConflicts, load: loadFigures(plan, audit),
+    conflicts: plan.domainConflicts, factsKept: plan.factsKept, load: loadFigures(plan, audit),
   };
 }

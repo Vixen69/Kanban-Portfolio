@@ -126,6 +126,27 @@ test("loadImport writes the deck and the capacity; a second load updates; no per
   });
 });
 
+test("ADR 054: a partial set without any chef de projet source (no CdP, no Projets onglet) keeps the owners — said at the audit, kept at the load", async () => {
+  await withTempDir(async (dir) => {
+    const storage = createJsonlStorage(join(dir, "board.jsonl"));
+    try {
+      const full = await loadImport(storage, CONFIG, fixtureFiles(), NOW);
+      assert.deepEqual(full.factsKept, [], "every file present: nothing to keep");
+      const owners = new Map((await storage.listBaseCards()).map((c) => [c.id, c.owner]));
+      const withOwner = [...owners.values()].filter((owner) => owner !== "").length;
+      assert.ok(withOwner > 0, "the fixtures give cards an owner");
+      const partial = fixtureFiles(["Couts.csv", "SP_2026.csv", "Ressources_PdC.csv"]);
+      const audit = await auditImport(storage, CONFIG, partial, NOW);
+      assert.deepEqual(audit.factsKept.find((f) => f.label === "chef de projet"), { label: "chef de projet", cards: withOwner });
+      const load = await loadImport(storage, CONFIG, partial, new Date("2026-09-30T09:00:00.000Z"));
+      assert.deepEqual(load.factsKept, audit.factsKept, "the load keeps what the audit announced");
+      for (const card of await storage.listBaseCards()) assert.equal(card.owner, owners.get(card.id), card.id);
+    } finally {
+      await storage.close();
+    }
+  });
+});
+
 async function withImportServer(work: (base: string) => Promise<void>): Promise<void> {
   await withTempDir(async (dir) => {
     const storage = createJsonlStorage(join(dir, "board.jsonl"));

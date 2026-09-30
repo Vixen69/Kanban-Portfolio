@@ -166,7 +166,9 @@ function loadSummary(plan: LoadPlan): string {
     ` · ${plan.moved} déplacée(s) par l'export` +
     ` · ${plan.unlisted} absente(s) de l'export (marquées, jamais supprimées) · ${plan.relisted} de retour` +
     ` · ${plan.kept} position(s) conservée(s) (export sans jalon)` +
-    ` · domaines : ${plan.domainReplaced} remplacé(s), ${plan.domainKept} gardé(s)${divergences}`;
+    ` · domaines : ${plan.domainReplaced} remplacé(s), ${plan.domainKept} gardé(s)${divergences}` +
+    (plan.factsKept.length === 0 ? "" : "\nAbsents des fichiers, gardés du tableau (ADR 054) : " +
+      plan.factsKept.map((f) => `${f.label} ${f.cards} carte(s)`).join(" · "));
 }
 
 const args = parseArgs(process.argv.slice(2));

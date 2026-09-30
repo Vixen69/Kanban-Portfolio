@@ -641,6 +641,10 @@ drapeau explicite `--charger` (`node sync/import.ts <dossier> --charger`).
   la main (l'arbitrage est celui du PMO) — la divergence est alors
   **signalée**, jamais écrasée. Une carte que personne n'a bougée suit
   l'export (évènement `moved` d'acteur `import-csv`).
+  **Révision 2026-09-30 (ADR 054)** : l'export ne gagne que sur les faits
+  qu'il **porte** — un fichier absent ou une cellule vide ne vide jamais
+  une valeur déjà sur la carte (chef de projet, budgets, charges, plan de
+  charge, date RDR, codes) ; l'audit dit ce qui sera gardé.
 - Les champs que les exports ne portent pas (tags, risques, contraintes,
   blocage, notes, ressources) restent vides : ils se vivent dans l'outil.
   Une édition faite dans l'outil (`edited`) prime sur le rafraîchissement
