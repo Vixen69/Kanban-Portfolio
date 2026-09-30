@@ -157,7 +157,14 @@ export type CardEventType =
   /** The card's exercise became the current one (ADR 035): its aging clock starts now. */
   | "activated"
   /** Board-wide (cardId "*", ADR 042): the log is read again from payload.toSeq — a snapshot was restored. */
-  | "restored";
+  | "restored"
+  /**
+   * An import doubt settled by the PMO (ADR 062): payload { doubtId, kind,
+   * fingerprint, option, label, proposed, sticky, forget? }. Read by the
+   * importer's memory only; the board fold, the history and the flow
+   * metrics ignore it. Its card id may name a project not on the board.
+   */
+  | "settled";
 
 /**
  * One row of the append-only `card_events` log: audit trail AND the single

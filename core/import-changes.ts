@@ -8,6 +8,7 @@
 // import mode, previewed then applied. Types only; no logic.
 
 import type { CardChange } from "./change-types.ts";
+import type { ImportSettled } from "./import-doubts.ts";
 
 /** The expected sources of an import, in the order they are read out. */
 export type ImportSource = "couts" | "param" | "projets" | "cdp" | "jalons" | "sp" | "pdc" | "profils";
@@ -84,6 +85,12 @@ export interface ImportExcluded {
   name: string;
   /** Plain French: the first rule it failed, with the offending value. */
   reason: string;
+  /**
+   * Set when a choice of the « Doutes à trancher » decided the value that
+   * excluded it (ADR 062): « état : « Budget présenté » (tranché à
+   * l'import) ». Absent otherwise, and in reports made before.
+   */
+  settledBy?: string;
 }
 
 /** One fact the files left blank on cards the board holds: the stored value stood (ADR 054). */
@@ -185,4 +192,10 @@ export interface ImportChanges {
    * nothing is refused; absent in reports made before.
    */
   blockers?: string[];
+  /**
+   * The doubts settled otherwise than by the tool's proposal (ADR 062):
+   * each with the option applied and how — remembered (« ne plus me
+   * demander ») or chosen for this load. Absent in reports made before.
+   */
+  settled?: ImportSettled[];
 }

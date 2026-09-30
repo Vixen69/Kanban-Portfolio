@@ -4,11 +4,13 @@
 // report of ADR 055 (ImportChanges) lives in import-changes.ts.
 
 import type { ImportChanges } from "./import-changes.ts";
+import type { ImportDoubt } from "./import-doubts.ts";
 
 export type {
   ImportAdopted, ImportAdvanced, ImportCardRef, ImportChangeCounts, ImportChanges, ImportEntered, ImportExcluded, ImportFileEntry, ImportFileStatus,
   ImportKeptFact, ImportLeft, ImportSource, ImportUnrecognized,
 } from "./import-changes.ts";
+export type { ImportChoice, ImportDoubt, ImportDoubtHow, ImportDoubtKind, ImportDoubtOption, ImportSettled } from "./import-doubts.ts";
 
 /** One received file: its name and its bytes, base64-encoded. */
 export interface ImportFilePayload {
@@ -87,6 +89,15 @@ export interface ImportAuditResult {
    * a load, what it DID change.
    */
   changes: ImportChanges;
+  /**
+   * The decidable doubts of these files (ADR 062, « Doutes à trancher »):
+   * each with its choices, the tool's own choice and the one applied —
+   * sorted by kind, code, id. Never blocking: a load without choices
+   * applies the proposals and the remembered choices. On an audit, what
+   * the load would apply; on a load, what it applied. Absent from a
+   * server that predates ADR 062.
+   */
+  doubts?: ImportDoubt[];
 }
 
 /** What a load wrote, on top of the audit it re-ran. */
@@ -116,6 +127,8 @@ export interface ImportLoadResult extends ImportAuditResult {
     advanced: number;
     /** Cards in Pause a jalon would move: left in Pause (ADR 060 amendment; counted in divergences); absent from a server that predates it. */
     paused?: number;
+    /** Choices traced in the log by this load (ADR 062: one `settled` event per choice sent); absent from a server that predates it. */
+    settled?: number;
     /** The capacity snapshot stored with the load, when the files carried one. */
     capacity: { persons: number; assignments: number } | null;
   };

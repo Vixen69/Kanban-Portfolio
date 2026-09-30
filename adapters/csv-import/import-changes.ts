@@ -30,6 +30,8 @@ import type { AuditResult } from "./orchestrate.ts";
 import type { PerimeterVerdict } from "./projets-types.ts";
 import type { LoadPlan } from "./to-cards.ts";
 import { importFiles } from "./import-files.ts";
+import type { ImportDoubt } from "../../core/import-doubts.ts";
+import { settledOf } from "./doubt-memory.ts";
 
 /** What the report is built from. */
 export interface ChangesInput {
@@ -43,6 +45,8 @@ export interface ChangesInput {
   /** The stored base cards and the whole log the plan was built against. */
   baseCards: Card[];
   events: CardEvent[];
+  /** The « Doutes à trancher » as applied (ADR 062): the report names the ones not settled by the proposal. */
+  doubts?: readonly ImportDoubt[];
 }
 
 /** The change kinds that say a card's VALUES were refreshed. */
@@ -215,11 +219,14 @@ export function importChanges(input: ChangesInput): ImportChanges {
   const perimeter = perimeterOf(audit);
   const excluded = perimeter.verdicts
     .filter((verdict) => verdict.motive !== "retained")
-    .map((verdict): ImportExcluded => ({ code: verdict.code, name: verdict.name, reason: verdict.reason }));
+    .map((verdict): ImportExcluded => ({
+      code: verdict.code, name: verdict.name, reason: verdict.reason, ...(verdict.settledBy === undefined ? {} : { settledBy: verdict.settledBy }),
+    }));
   const head = {
     ...importFiles(audit),
     perimeter: { source: perimeter.source, file: perimeter.file, retained: perimeter.verdicts.length - excluded.length, excluded },
     blockers: audit.blockers.map((blocker) => blocker.message),
+    settled: settledOf(input.doubts ?? []),
   };
   if (plan === null) {
     return {

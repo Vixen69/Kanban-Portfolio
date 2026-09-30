@@ -7,7 +7,10 @@
 // preview the changes on the board without writing a card. A load takes
 // the automatic snapshot « avant chargement <année> » before it writes,
 // exactly like the tool's (ADR 042, middle/snapshots.ts), and logs each
-// entry, exit and return with its reason (withEventReasons).
+// entry, exit and return with its reason (withEventReasons). ADR 062: the
+// « Doutes à trancher » are printed with how each was settled — the
+// choices the tool remembered (read from the board's log with --charger
+// or --comparer), else the tool's proposals; the command writes none.
 // Unlike scripts/seed.ts, the board config is read through the runtime
 // store so an admin override applied on the client platform is honored.
 //
@@ -24,17 +27,18 @@ import { createConfigStore } from "../middle/config-store.ts";
 import type { ConfigStore } from "../middle/config-store.ts";
 import { takeSnapshot } from "../middle/snapshots.ts";
 import {
-  IMPORT_ACTOR, importChanges, importConfig, keepStoredCapacity, loadRefusal, planLoad, renderReport, runImportAudit,
-  withEventReasons, withLegacyIds,
+  IMPORT_ACTOR, bookInput, createDoubtBook, importChanges, importConfig, keepStoredCapacity, loadRefusal, planLoad, renderReport,
+  runImportAudit, withEventReasons, withLegacyIds,
 } from "../adapters/csv-import/index.ts";
 import type { AuditResult } from "../adapters/csv-import/index.ts";
-import type { DomainDecision, ImportChanges } from "../core/import-types.ts";
+import type { DomainDecision, ImportChanges, ImportDoubt } from "../core/import-types.ts";
 import type { InputFile, LoadPlan } from "../adapters/csv-import/index.ts";
 import type { EnrichedCard } from "../adapters/csv-import/index.ts";
 import type { BoardStorage } from "../core/ports.ts";
 import type { BoardConfig, Card, CardEvent } from "../core/types.ts";
 import { domainName } from "../core/domain-check.ts";
 import { boardText, filesText, loadText } from "./import-text.ts";
+import { doubtsText } from "./import-doubts-text.ts";
 
 const USAGE = "usage : node sync/import.ts <dossier> [--out <rapport>] [--charger | --comparer] [--exercice <année>] [--domaines garder|remplacer]";
 
@@ -131,46 +135,62 @@ async function withStorage<T>(what: string, work: (storage: BoardStorage) => Pro
   }
 }
 
+/** The board as the command reads it — once, before the audit: the log is also the memory of the doubts' choices (ADR 062). */
+interface BoardRead {
+  events: CardEvent[];
+  baseCards: Card[];
+}
+
+const NO_BOARD: BoardRead = { events: [], baseCards: [] };
+
+// The audit with the choices the tool remembered (ADR 062): the command
+// applies them, else the tool's proposals — it never asks, never writes one.
+function auditOf(files: InputFile[], config: BoardConfig, year: number, board: BoardRead): AuditResult {
+  return runImportAudit(files, config, new Date(), year, createDoubtBook(bookInput(year, new Map(), board.events)));
+}
+
+// The doubts once the plan chose the board ids (aliases, adoptions).
+function doubtsOf(audit: AuditResult, plan: LoadPlan | null): ImportDoubt[] {
+  if (plan !== null) audit.book.remapCards(plan.aliases);
+  return audit.book.list();
+}
+
 // The real load: plan against what the board already holds, take the
 // automatic snapshot once the load is accepted (ADR 042 — before anything
 // is written, like the tool), then write the cards and their events in one
 // atomic batch; the changes are read from the same plan (ADR 055: what the
 // load DID).
 async function load(
-  audit: AuditResult, deck: EnrichedCard[], config: BoardConfig, year: number, domaines: DomainDecision | null,
-  configStore: ConfigStore,
-): Promise<{ plan: LoadPlan; changes: ImportChanges }> {
-  return withStorage("destination", async (storage) => {
-    const [events, baseCards] = await Promise.all([storage.listEvents(), storage.listBaseCards()]);
-    const plan = planWithDecisions(deck, config, baseCards, events, year, domaines);
-    const changes = importChanges({ audit, config, year, plan, baseCards, events });
-    await takeSnapshot({ storage, configStore }, `avant chargement ${year}`, IMPORT_ACTOR, new Date());
-    await storage.importCards(plan.cards, withEventReasons(plan.events, changes));
-    if (audit.capacity !== null) {
-      const fresh = withLegacyIds(audit.capacity.snapshot, plan.aliases);
-      await storage.importCapacity(keepStoredCapacity(fresh, await storage.getCapacity(year)));
-    }
-    return { plan, changes };
-  });
+  storage: BoardStorage, board: BoardRead, audit: AuditResult, deck: EnrichedCard[], config: BoardConfig, year: number,
+  domaines: DomainDecision | null, configStore: ConfigStore,
+): Promise<{ plan: LoadPlan; changes: ImportChanges; doubts: ImportDoubt[] }> {
+  const { events, baseCards } = board;
+  const plan = planWithDecisions(deck, config, board, year, domaines, audit);
+  const doubts = doubtsOf(audit, plan);
+  const changes = importChanges({ audit, config, year, plan, baseCards, events, doubts });
+  await takeSnapshot({ storage, configStore }, `avant chargement ${year}`, IMPORT_ACTOR, new Date());
+  await storage.importCards(plan.cards, withEventReasons(plan.events, changes));
+  if (audit.capacity !== null) {
+    const fresh = withLegacyIds(audit.capacity.snapshot, plan.aliases);
+    await storage.importCapacity(keepStoredCapacity(fresh, await storage.getCapacity(year)));
+  }
+  return { plan, changes, doubts };
 }
 
 // --comparer: what a load WOULD change, read without writing a card (no
 // domain decision taken: every conflict keeps the board's value).
-async function compare(audit: AuditResult, deck: EnrichedCard[], config: BoardConfig, year: number): Promise<ImportChanges> {
-  return withStorage("tableau comparé", async (storage) => {
-    const [events, baseCards] = await Promise.all([storage.listEvents(), storage.listBaseCards()]);
-    const plan = planLoad(deck, config, baseCards, events, new Date(), year);
-    return importChanges({ audit, config, year, plan, baseCards, events });
-  });
+function compare(board: BoardRead, audit: AuditResult, deck: EnrichedCard[], config: BoardConfig, year: number): { changes: ImportChanges; doubts: ImportDoubt[] } {
+  const plan = planLoad(deck, config, board.baseCards, board.events, new Date(), year, new Map(), audit.book);
+  const doubts = doubtsOf(audit, plan);
+  return { changes: importChanges({ audit, config, year, plan, baseCards: board.baseCards, events: board.events, doubts }), doubts };
 }
 
 // The plan with every domain conflict decided the same way when --domaines
 // says so; refused otherwise — the tool decides one by one (ADR 036).
 function planWithDecisions(
-  deck: EnrichedCard[], config: BoardConfig, baseCards: Card[], events: CardEvent[], year: number,
-  domaines: DomainDecision | null,
+  deck: EnrichedCard[], config: BoardConfig, board: BoardRead, year: number, domaines: DomainDecision | null, audit: AuditResult,
 ): LoadPlan {
-  const dry = planLoad(deck, config, baseCards, events, new Date(), year);
+  const dry = planLoad(deck, config, board.baseCards, board.events, new Date(), year, new Map(), audit.book);
   if (dry.domainConflicts.length === 0) return dry;
   if (domaines === null) {
     const lines = dry.domainConflicts.slice(0, 8)
@@ -181,7 +201,7 @@ function planWithDecisions(
     );
   }
   const decisions = new Map(dry.domainConflicts.map((c): [string, DomainDecision] => [c.cardId, domaines]));
-  return planLoad(deck, config, baseCards, events, new Date(), year, decisions);
+  return planLoad(deck, config, board.baseCards, board.events, new Date(), year, decisions, audit.book);
 }
 
 // Where the cards are about to land, in plain French.
@@ -198,6 +218,53 @@ function storageLabel(driver: string, dataPath: string): string {
   return driver;
 }
 
+// The audit's report on disk and its head lines on the console.
+function sayAudit(audit: AuditResult, config: BoardConfig, year: number, out: string, loading: boolean): void {
+  const { report } = audit;
+  writeFileSync(out, renderReport(report, new Date()), "utf8");
+  const recognized = report.inventory.filter((f) => f.status === "recognized" || f.status === "recognized-with-deviations").length;
+  console.log(
+    `import (${loading ? "chargement" : "audit"}, exercice ${year}) : ${report.inventory.length} fichier(s) reçu(s)` +
+      `, ${recognized} reconnu(s).\n` +
+      `Pris : ${report.taken.length} · Écartés : ${report.discarded.length}` +
+      ` · Douteux : ${report.doubtful.length} · Signalements : ${report.warnings.length}\n` +
+      `Rapport : ${out}`,
+  );
+  console.log(filesText(importChanges({ audit, config, year, plan: null, baseCards: [], events: [] })).join("\n"));
+}
+
+// One run of the command: the audit (with the remembered choices when the
+// board is read), then the load or the comparison. Returns the exit code.
+async function run(parsed: Args, storage: BoardStorage | null): Promise<number> {
+  const { config, configStore } = loadRuntimeBoardConfig();
+  const year = parsed.exercice ?? config.exercise.year;
+  const board = storage === null ? NO_BOARD
+    : await Promise.all([storage.listEvents(), storage.listBaseCards()]).then(([events, baseCards]) => ({ events, baseCards }));
+  const audit = auditOf(readInputFiles(parsed.folder), config, year, board);
+  const outPath = resolve(parsed.out ?? join(parsed.folder, "rapport-import.md"));
+  mkdirSync(dirname(outPath), { recursive: true });
+  sayAudit(audit, config, year, outPath, parsed.charger);
+  // The tool's own rule (load-refusal.ts): a closed year, blocking files (ADR 056), no perimeter, no project on the year.
+  const refused = loadRefusal(audit, year, config.exercise.year);
+  if (refused !== null) console.error(refused);
+  const deck = audit.cards?.cards ?? null;
+  if (storage !== null && parsed.charger) {
+    if (refused !== null || deck === null) return 1;
+    const loaded = await load(storage, board, audit, deck, config, year, parsed.domaines, configStore);
+    console.log([...loadText(loaded.plan, config), ...doubtsText(loaded.doubts), ...boardText(loaded.changes, config)].join("\n"));
+    const capacity = audit.capacity?.snapshot;
+    if (capacity !== undefined) console.log(`capacité ${capacity.exerciseYear} : ${capacity.persons.length} personne(s), ${capacity.assignments.length} affectation(s) enregistrées.`);
+  } else if (storage !== null && refused === null && deck !== null) {
+    const compared = compare(board, audit, deck, config, year);
+    console.log([...doubtsText(compared.doubts), ...boardText(compared.changes, config)].join("\n"));
+  } else if (parsed.comparer) {
+    console.log("comparaison : un chargement de ces fichiers serait refusé (ci-dessus) — rien à comparer.");
+  } else {
+    console.log([...doubtsText(doubtsOf(audit, null)), "Ce qu'un chargement changerait sur le tableau : relancer avec --comparer (lecture seule)."].join("\n"));
+  }
+  return 0;
+}
+
 const args = parseArgs(process.argv.slice(2));
 if (args === null) {
   console.error(USAGE);
@@ -205,46 +272,13 @@ if (args === null) {
 }
 
 try {
-  const { config: boardConfig, configStore } = loadRuntimeBoardConfig();
-  const year = args.exercice ?? boardConfig.exercise.year;
-  const files = readInputFiles(args.folder);
-  const audit = runImportAudit(files, boardConfig, new Date(), year);
-  const { report, cards, capacity } = audit;
-  const outPath = resolve(args.out ?? join(args.folder, "rapport-import.md"));
-  mkdirSync(dirname(outPath), { recursive: true });
-  writeFileSync(outPath, renderReport(report, new Date()), "utf8");
-  const recognized = report.inventory.filter(
-    (f) => f.status === "recognized" || f.status === "recognized-with-deviations",
-  ).length;
-  console.log(
-    `import (${args.charger ? "chargement" : "audit"}, exercice ${year}) : ${report.inventory.length} fichier(s) reçu(s)` +
-      `, ${recognized} reconnu(s).\n` +
-      `Pris : ${report.taken.length} · Écartés : ${report.discarded.length}` +
-      ` · Douteux : ${report.doubtful.length} · Signalements : ${report.warnings.length}\n` +
-      `Rapport : ${outPath}`,
-  );
-  const noBoard = importChanges({ audit, config: boardConfig, year, plan: null, baseCards: [], events: [] });
-  console.log(filesText(noBoard).join("\n"));
-  // The tool's own rule (load-refusal.ts): a closed year, blocking files
-  // (ADR 056), no perimeter, no project on the year.
-  const refused = loadRefusal(audit, year, boardConfig.exercise.year);
-  if (refused !== null) console.error(refused);
-  if (args.charger) {
-    if (refused !== null || cards === null) process.exit(1);
-    const loaded = await load(audit, cards.cards, boardConfig, year, args.domaines, configStore);
-    console.log([...loadText(loaded.plan, boardConfig), ...boardText(loaded.changes, boardConfig)].join("\n"));
-
-    if (capacity !== null) {
-      const { persons, assignments } = capacity.snapshot;
-      console.log(`capacité ${capacity.snapshot.exerciseYear} : ${persons.length} personne(s), ${assignments.length} affectation(s) enregistrées.`);
-    }
-  } else if (args.comparer && refused === null && cards !== null) {
-    console.log(boardText(await compare(audit, cards.cards, boardConfig, year), boardConfig).join("\n"));
-  } else if (args.comparer) {
-    console.log("comparaison : un chargement de ces fichiers serait refusé (ci-dessus) — rien à comparer.");
-  } else {
-    console.log("Ce qu'un chargement changerait sur le tableau : relancer avec --comparer (lecture seule).");
-  }
+  // Audit mode never opens the board (it must run with no node_modules at
+  // all); --charger and --comparer read it first — its log remembers the
+  // doubts' choices (ADR 062).
+  const code = args.charger || args.comparer
+    ? await withStorage(args.charger ? "destination" : "tableau comparé", (storage) => run(args, storage))
+    : await run(args, null);
+  if (code !== 0) process.exit(code);
 } catch (error) {
   const detail = error instanceof Error ? error.message : String(error);
   if (detail.includes("Cannot find package")) {

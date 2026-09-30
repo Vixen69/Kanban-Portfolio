@@ -1,9 +1,9 @@
 // The UI's single egress surface (CLAUDE.md §2): every call is a same-origin
 // relative URL, so an auditor can confirm zero outbound connections by
-// reading this one file. The server owns event id/ts/actor and every
+// reading this one file (and its two companions over the same wrapper,
+// ./apiSnapshots.ts and ./apiImport.ts). The server owns event id/ts/actor and every
 // validation — the client posts intents, never stored shapes.
 
-import type { DomainDecision, ImportAuditResult, ImportFilePayload, ImportLoadResult } from "../core/import-types.ts";
 import type {
   CapacitySnapshot,
   BoardConfig,
@@ -245,30 +245,6 @@ export interface DecisionInput {
   /** ISO day (YYYY-MM-DD) or null. */
   reviewDate: string | null;
 }
-
-/**
- * POST /api/import/audit — audits a set of PPM export files (ADR 027);
- * nothing is written. Inputs: the files (base64), the exercise year read
- * (ADR 035). Output: the report and its counts. Failure: throws ApiError
- * (400 on bad files or year).
- */
-export function postImportAudit(files: ImportFilePayload[], exercise: number): Promise<ImportAuditResult> {
-  return request<ImportAuditResult>("/api/import/audit", jsonInit("POST", { files, exercise }));
-}
-
-/**
- * POST /api/import/load — audits then loads the files into ONE exercise's
- * board (ADR 035), with the PMO's domain decisions by card id (ADR 036).
- * Inputs: the files, the exercise year, the decisions. Output: the report
- * plus what the load wrote. Failure: throws ApiError (400 on a closed
- * year, a file set with no project on that year, or an undecided conflict).
- */
-export function postImportLoad(
-  files: ImportFilePayload[], exercise: number, decisions: Readonly<Record<string, DomainDecision>>,
-): Promise<ImportLoadResult> {
-  return request<ImportLoadResult>("/api/import/load", jsonInit("POST", { files, exercise, decisions }));
-}
-
 
 /** POST a decision intent. Inputs: card id, the DecisionInput. Output: the stored event. Failure: throws ApiError. */
 export function postDecision(cardId: string, input: DecisionInput): Promise<CardEvent> {

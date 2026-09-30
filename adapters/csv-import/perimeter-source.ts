@@ -19,6 +19,7 @@ import { parseProjets } from "./projets.ts";
 import type { ProjetsTable } from "./projets.ts";
 import { checkPerimeters, parseCouts } from "./couts.ts";
 import type { CoutsTable, PerimeterCheck } from "./couts.ts";
+import type { DoubtBook } from "./doubt-book.ts";
 
 /** How many of the Coût contract's five required columns make a near miss « Coût-like ». */
 const COUTS_LIKE_FOUND = 3;
@@ -46,6 +47,8 @@ export interface PerimeterInput {
   report: ImportReport;
   blockers: ImportBlocker[];
   nearMisses: readonly NearMiss[];
+  /** The « Doutes à trancher » of this audit (ADR 062): asked by the file that IS the perimeter only. */
+  book?: DoubtBook;
 }
 
 /**
@@ -84,7 +87,7 @@ function readCouts(input: PerimeterInput): { couts: CoutsTable | null; refused: 
   if (guard !== null) input.blockers.push(guard);
   const refused = candidates.length > 1 || guard !== null;
   if (best === null || refused) return { couts: null, refused };
-  return { couts: parseCouts(best.dataRows, best.match, input.config, input.report, best.file.name), refused };
+  return { couts: parseCouts(best.dataRows, best.match, input.config, input.report, best.file.name, input.book), refused };
 }
 
 /**
@@ -99,8 +102,10 @@ export function readPerimeter(input: PerimeterInput): Perimeter {
   const { report } = input;
   const { couts, refused } = readCouts(input);
   const { perimeter: ongletBest, lender } = electProjets(input.byContract.get(PROJETS_CONTRACT.id) ?? [], input.blockers, report);
+  // The onglet asks its doubts only when it is the perimeter (a cross-check decides nothing).
+  const book = couts === null && !refused ? input.book : undefined;
   const onglet = ongletBest === null ? null
-    : parseProjets(ongletBest.dataRows, ongletBest.match, input.config, input.param, report, ongletBest.file.name);
+    : parseProjets(ongletBest.dataRows, ongletBest.match, input.config, input.param, report, ongletBest.file.name, book);
   const check = couts !== null && onglet !== null ? checkPerimeters(couts, onglet) : null;
   if (couts !== null && onglet !== null) {
     warn(report, `périmètre lu dans « ${couts.fileName} » (COUT PREV, ADR 030) — ce fichier ne sert qu'au recoupement`, onglet.fileName);

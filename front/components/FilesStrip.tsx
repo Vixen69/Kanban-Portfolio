@@ -3,7 +3,8 @@
 // projet gardés » in the warning tone for a missing one (ADR 054: a
 // missing file keeps the board's values) — then, folded, the full line of
 // each source, the files nothing expected, and the perimeter: where it was
-// read, how many projects it kept, which it left out and why.
+// read, how many projects it kept, which it left out and why — and when a
+// choice of the « Doutes à trancher » decided it (ADR 062).
 
 import type { ImportChanges } from "../../core/import-types.ts";
 import { fileChip, noPerimeterLine } from "../importReport.ts";
@@ -23,6 +24,7 @@ function Perimeter({ perimeter, files }: { perimeter: ImportChanges["perimeter"]
             <li key={entry.code} className="sd-item">
               <span className="sd-code">{entry.code}</span><span className="sd-title">{entry.name}</span>
               <span className="sd-move">{entry.reason}</span>
+              {entry.settledBy !== undefined && <span className="chg-warn">{entry.settledBy}</span>}
             </li>
           ))}
         </ul>

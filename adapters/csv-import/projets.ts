@@ -5,6 +5,7 @@
 // file carries them, else translated from the organisation path through
 // PARAM (R4); chef de projet = first Responsable that is not a domain
 // lead (R6); dates, RDLI and efforts (Q22/Q23 status quo, said out loud).
+// ADR 062: an Id on rows that differ is a « Doute à trancher » (row-choice.ts).
 
 import type { BoardConfig } from "../../core/types.ts";
 import { normalizeLabel } from "./normalize.ts";
@@ -23,19 +24,11 @@ import { discard, doubt, warn } from "./report.ts";
 import type { ImportReport, RowRef } from "./report.ts";
 import type { DomainShape, PerimeterVerdict, ProjetEntry, ProjetsCounts, ProjetsTable } from "./projets-types.ts";
 import { projetsVerdict } from "./couts-verdicts.ts";
-import { KEPT_ROW_RULE, keptRow } from "./duplicate-rows.ts";
+import { keptCandidate, sayDuplicates } from "./projets-duplicates.ts";
+import type { Candidate } from "./projets-duplicates.ts";
+import type { DoubtBook } from "./doubt-book.ts";
 
 export type { DomainShape, PerimeterVerdict, ProjetEntry, ProjetsCounts, ProjetsTable } from "./projets-types.ts";
-
-/** A row past the structural gates, waiting for the other rows of its Id. */
-interface Candidate {
-  row: CsvRow;
-  line: number;
-  cells: string[];
-  id: string;
-  nom: string;
-  normalizedName: string;
-}
 
 interface ProjetsContext {
   match: HeaderMatch;
@@ -61,13 +54,15 @@ interface ProjetsContext {
   unknownPaths: Map<string, Tally>;
   states: Map<string, number>;
   tallies: Map<string, Tally>;
+  book: DoubtBook | undefined;
 }
 
 /**
  * Parses the Projets data rows (header excluded): every kept row is a card.
  * Inputs: the data rows, the header match, the board config, the PARAM
  * table (null tolerated: no lead exclusion, no path translation — said in
- * the report), the report and the file name.
+ * the report), the report, the file name and the book of the « Doutes à
+ * trancher » (ADR 062; absent = the tool’s row, duplicate-rows.ts).
  * Outputs: the ProjetsTable; side effects: écarté (empty / total rows),
  * douteux (duplicate ids, unknown types / domains / sub-domains / paths),
  * aggregated signalements, the « État du processus » survey.
@@ -75,7 +70,7 @@ interface ProjetsContext {
  */
 export function parseProjets(
   rows: CsvRow[], match: HeaderMatch, config: BoardConfig, param: ParamTable | null,
-  report: ImportReport, fileName: string,
+  report: ImportReport, fileName: string, book?: DoubtBook,
 ): ProjetsTable {
   const ctx: ProjetsContext = {
     match, report, fileName, param, shape: detectShape(match, param, report, fileName),
@@ -84,7 +79,7 @@ export function parseProjets(
     groups: [], groupById: new Map(), entries: [], verdicts: [], byId: new Map(), byName: new Map(), typeCounts: new Map(),
     counts: { domainDirect: 0, domainViaParam: 0, domainMissing: 0, subDetailed: 0, subFolded: 0, withOwner: 0, leadsExcluded: 0 },
     unknownTypes: new Map(), unknownDomains: new Map(), unknownSubs: new Map(),
-    unknownPaths: new Map(), states: new Map(), tallies: new Map(),
+    unknownPaths: new Map(), states: new Map(), tallies: new Map(), book,
   };
   if (param === null) warn(report, "PARAM absent — responsables de domaine non exclus du chef de projet", fileName);
   for (const row of rows) readRow(ctx, row);
@@ -142,32 +137,20 @@ function readRow(ctx: ProjetsContext, row: CsvRow): void {
 }
 
 // One Id: the row kept whatever the order the rows came in (ADR 056 —
-// duplicate-rows.ts), the others named, then the entry build. A duplicate
-// name with another id is kept — but questioned.
+// duplicate-rows.ts) or the one the PMO chose (ADR 062), the others named,
+// then the entry build. A duplicate name with another id is kept — but questioned.
 function takeGroup(ctx: ProjetsContext, group: Candidate[]): void {
-  const kept = keptRow(group);
+  const kept = keptCandidate({ ...ctx, columnIndex: ctx.match.columnIndex }, group);
   const { row, id, nom, normalizedName } = kept;
   const ref: RowRef = { file: ctx.fileName, line: row.line };
   const entry = buildEntry(ctx, row, ref, id, nom, normalizedName);
   ctx.entries.push(entry);
   ctx.verdicts.push(projetsVerdict(entry.codename ?? "", nom, cell(ctx, row, "Type"), entry.state, null));
-  if (group.length > 1) sayDuplicates(ctx, group, kept);
+  if (group.length > 1) sayDuplicates({ ...ctx, columnIndex: ctx.match.columnIndex }, group, kept);
   if (id !== "") ctx.byId.set(id, entry);
   const sameName = ctx.byName.get(normalizedName);
   if (sameName === undefined) ctx.byName.set(normalizedName, entry);
   else doubt(ctx.report, ctx.fileName, `nom « ${nom} » porté par deux Id (${sameName.id || "vide"}, ${id || "vide"}) — jointures par nom ambiguës`, { ref });
-}
-
-// The rows of one Id beside the kept one: a verdict each, one douteux.
-function sayDuplicates(ctx: ProjetsContext, group: Candidate[], kept: Candidate): void {
-  const others = group.filter((c) => c !== kept).sort((a, b) => a.line - b.line);
-  for (const c of others) {
-    ctx.verdicts.push(projetsVerdict(c.id, c.nom, cell(ctx, c.row, "Type"), cell(ctx, c.row, "État du processus"), kept.line));
-  }
-  const lines = [...group].sort((a, b) => a.line - b.line).map((c) => `« ${c.nom} » (ligne ${c.line})`).join(", ");
-  doubt(ctx.report, ctx.fileName,
-    `Id « ${kept.id} » porté par ${group.length} lignes : ${lines} — ligne ${kept.line} gardée (${KEPT_ROW_RULE})`,
-    { ref: { file: ctx.fileName, line: kept.line } });
 }
 
 function buildEntry(

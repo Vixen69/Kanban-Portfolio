@@ -14,14 +14,14 @@
 // never read into a card; the chef de projet neither (« Projet.Responsable
 // 1 » is not the right one — ProjetsCdP rules). The portfolio gives the
 // domain (portfolio.ts). Output: a ProjetsTable, so the assembly (jalons,
-// SP, PdC, CdP) runs unchanged.
+// SP, PdC, CdP) runs unchanged. ADR 062: a fact the rows disagree on, and
+// a project kept on an unreadable ME cell, are « Doutes à trancher » —
+// the PMO’s choice applies before the rule (couts-doubts.ts).
 
 import type { BoardConfig } from "../../core/types.ts";
 import { createTolerantLookup, normalizeLabel } from "./normalize.ts";
 import { createTypeLookup, typeBaseLabel } from "./domains.ts";
-import type { Lookup } from "./domains.ts";
 import { createPortfolioResolver, lastSegment, ruleLabel } from "./portfolio.ts";
-import type { PortfolioHit } from "./portfolio.ts";
 import { splitSubjectName } from "./subject-name.ts";
 import { stripCode } from "./code-prefix.ts";
 import { tallyInto } from "./tallies.ts";
@@ -39,6 +39,9 @@ import { readRow } from "./couts-rows.ts";
 import type { RowContext, Seen } from "./couts-rows.ts";
 import { resolveFacts } from "./couts-facts.ts";
 import type { ProjectFacts } from "./couts-facts.ts";
+import { keepOnUnreadableMe, ruleMotive, settleFacts } from "./couts-doubts.ts";
+import type { CoutsMotive, PerimeterRules } from "./couts-doubts.ts";
+import type { DoubtBook } from "./doubt-book.ts";
 import { roundBucket } from "./day-sums.ts";
 import type { Tally } from "./tallies.ts";
 
@@ -53,12 +56,9 @@ export interface CoutsTable extends ProjetsTable {
   charges: CoutsCharge[];
 }
 
-interface CoutsContext extends RowContext {
+interface CoutsContext extends RowContext, PerimeterRules {
   report: ImportReport;
-  /** null = no `exercise.states` in the config: every state kept (said). */
-  states: Lookup | null;
-  typeLookup: Lookup;
-  resolve: (portfolio: string) => PortfolioHit | null;
+  year: string;
   charges: CoutsCharge[];
   nonPe: string[];
   /** Retained-shaped projects excluded for having no ME figure — named for the domain owners. */
@@ -72,13 +72,10 @@ interface CoutsContext extends RowContext {
   portfolios: Map<string, PortfolioTally>;
 }
 
-/** « arbitrage » as a whole word of the name (« d'arbitrage », « Arbitrages RDLI »), never inside another word. */
-const ARBITRAGE = /(?:^|[^a-z0-9])arbitrages?(?:[^a-z0-9]|$)/;
-
-function createContext(match: HeaderMatch, config: BoardConfig, report: ImportReport, fileName: string): CoutsContext {
+function createContext(match: HeaderMatch, config: BoardConfig, report: ImportReport, fileName: string, book: DoubtBook | undefined): CoutsContext {
   const states = config.exercise.states;
   return {
-    report, fileName, year: String(config.exercise.year), match,
+    report, fileName, year: String(config.exercise.year), match, config, ...(book === undefined ? {} : { book }),
     states: states === undefined ? null : createTolerantLookup(states.map((s): [string, string] => [s, s])),
     typeLookup: createTypeLookup(config), resolve: createPortfolioResolver(config),
     seen: new Map(),
@@ -97,7 +94,8 @@ function createContext(match: HeaderMatch, config: BoardConfig, report: ImportRe
  * Inputs: the data rows, the header match, the board config (exercise
  * year and retained states, types with aliases, domains with aliases and
  * sub-domains — vocabulary.ts gives the versioned model's), the report and
- * the file name.
+ * the file name, and the book of the « Doutes à trancher » (ADR 062;
+ * absent = the tool’s proposals: the rule of ADR 056).
  * Outputs: the CoutsTable (a ProjetsTable: one entry per retained project,
  * first-seen order; the same projects, domains and titles whatever the
  * row order); side effects: signalements (rows read, « Année » values
@@ -107,9 +105,9 @@ function createContext(match: HeaderMatch, config: BoardConfig, report: ImportRe
  * without ME). Failure modes: none — nothing throws.
  */
 export function parseCouts(
-  rows: CsvRow[], match: HeaderMatch, config: BoardConfig, report: ImportReport, fileName: string,
+  rows: CsvRow[], match: HeaderMatch, config: BoardConfig, report: ImportReport, fileName: string, book?: DoubtBook,
 ): CoutsTable {
-  const ctx = createContext(match, config, report, fileName);
+  const ctx = createContext(match, config, report, fileName, book);
   for (const row of rows) readRow(ctx, row);
   const entries: ProjetEntry[] = [];
   for (const seen of ctx.seen.values()) {
@@ -143,33 +141,21 @@ function bump(map: Map<string, number>, label: string): void {
 // The perimeter rule (author, 2026-09-11, tightened the same afternoon):
 // on the exercise year, state in the retained list, type in the config,
 // not an arbitrage line, some ME figure — an unreadable ME cell keeps the
-// project (ADR 056). The first failing rule is counted and returned; null
-// = the project passes them all.
-function exclusion(ctx: CoutsContext, seen: Seen, facts: ProjectFacts, typeId: string | null): Exclude<PerimeterVerdict["motive"], "retained"> | null {
+// project (ADR 056) unless the PMO sets it aside (ADR 062). The first
+// failing rule is counted and returned; null = the project passes them all.
+function exclusion(ctx: CoutsContext, seen: Seen, facts: ProjectFacts, typeId: string | null): CoutsMotive | null {
+  let motive = ruleMotive(ctx, seen, facts, typeId);
+  if (motive === null && !seen.hasMe && !keepOnUnreadableMe(ctx, seen, facts)) motive = "noMe";
   const x = ctx.stats.excluded;
-  if (!seen.onYear) {
-    x.noYear++;
-    return "noYear";
-  }
-  if (ctx.states !== null && ctx.states(facts.etat) === null) {
-    bump(x.etat, facts.etat || "(vide)");
-    return "state";
-  }
-  if (typeId === null) {
-    bump(x.type, typeBaseLabel(facts.type) || "(vide)");
-    return "type";
-  }
-  if (ARBITRAGE.test(normalizeLabel(facts.name))) {
-    x.arbitrage++;
-    return "arbitrage";
-  }
-  if (!seen.hasMe && seen.meUnreadable.length === 0) {
+  if (motive === "noYear") x.noYear++;
+  else if (motive === "state") bump(x.etat, facts.etat || "(vide)");
+  else if (motive === "type") bump(x.type, typeBaseLabel(facts.type) || "(vide)");
+  else if (motive === "arbitrage") x.arbitrage++;
+  else if (motive === "noMe") {
     x.noMe++;
     ctx.noMe.push(seen.id);
-    return "noMe";
-  }
-  if (!seen.hasMe) ctx.meUnknown.push(seen.id);
-  return null;
+  } else if (!seen.hasMe) ctx.meUnknown.push(seen.id);
+  return motive;
 }
 
 // One project through the rule: its facts resolved from all its rows (a
@@ -177,12 +163,14 @@ function exclusion(ctx: CoutsContext, seen: Seen, facts: ProjectFacts, typeId: s
 // (ADR 055), then the entry built when it is retained.
 function decide(ctx: CoutsContext, seen: Seen): ProjetEntry | null {
   ctx.stats.projectsSeen++;
-  const facts = resolveFacts(seen.rows);
-  if (facts.disagreements.length > 0) {
+  const resolved = resolveFacts(seen.rows);
+  const { facts, settledBy } = settleFacts(ctx, seen, resolved);
+  if (resolved.disagreements.length > 0) {
     doubt(ctx.report, ctx.fileName,
-      `Id « ${seen.id} » : ses lignes ne disent pas la même chose — ${facts.disagreements.join(" · ")}` +
-        ` (valeur la plus fréquente ${facts.fromExercise ? `sur les lignes ${ctx.year}` : "toutes années"},` +
-        " puis la date d'export la plus récente, puis l'ordre alphabétique)",
+      `Id « ${seen.id} » : ses lignes ne disent pas la même chose — ${resolved.disagreements.join(" · ")}` +
+        ` (valeur la plus fréquente ${resolved.fromExercise ? `sur les lignes ${ctx.year}` : "toutes années"},` +
+        " puis la date d'export la plus récente, puis l'ordre alphabétique)" +
+        (settledBy === null ? "" : ` — tranché : ${settledBy}`),
       { ref: seen.ref });
   }
   const typeHit = ctx.typeLookup(facts.type);
@@ -191,7 +179,8 @@ function decide(ctx: CoutsContext, seen: Seen): ProjetEntry | null {
     tallyInto(ctx.tallies, `type « ${typeBaseLabel(facts.type)} » reconnu par un nom renommé dans ⚙ Catégories, absent du modèle versionné — à ajouter aux alias de board.json`, seen.ref.line);
   }
   const motive = exclusion(ctx, seen, facts, typeId);
-  ctx.verdicts.push(coutsVerdict({ id: seen.id, name: facts.name, etat: facts.etat, type: facts.type }, motive ?? "retained", ctx.year));
+  const verdict = coutsVerdict({ id: seen.id, name: facts.name, etat: facts.etat, type: facts.type }, motive ?? "retained", ctx.year);
+  ctx.verdicts.push(settledBy === null ? verdict : { ...verdict, settledBy });
   if (motive !== null || typeId === null) return null;
   ctx.stats.retained++;
   if (["faux", "false", "0", "non", "n"].includes(normalizeLabel(facts.actif))) ctx.stats.inactive++;

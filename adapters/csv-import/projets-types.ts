@@ -53,6 +53,8 @@ export interface PerimeterVerdict {
    * (« état « Reporté » hors des états retenus »).
    */
   reason: string;
+  /** Set when a « Doute à trancher » decided the value behind the verdict (ADR 062): the fact and the value chosen. */
+  settledBy?: string;
 }
 
 /** The parsed perimeter. */

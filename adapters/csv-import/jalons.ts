@@ -13,7 +13,10 @@
 // (reference-day.ts) — the same files give the same columns whatever the
 // load day or the server's time zone; a duplicated Id takes the most
 // advanced stage its rows read, whatever their order; a name carried by
-// two Ids joins nothing by name.
+// two Ids joins nothing by name. ADR 062: rows of one Id that read
+// different stages are a « Doute à trancher » (jalons-duplicates.ts); the
+// Ids sharing a name are kept (ambiguousByName) so a card can be attached
+// to one of them by the PMO.
 
 import type { BoardConfig } from "../../core/types.ts";
 import { resolveFlowAnchors } from "../../core/flow.ts";
@@ -27,9 +30,11 @@ import type { CsvRow } from "./csv.ts";
 import type { HeaderMatch } from "./contract.ts";
 import { discard, doubt, warn } from "./report.ts";
 import type { ImportReport, RowRef } from "./report.ts";
+import { settleDuplicate, stageOf } from "./jalons-duplicates.ts";
+import type { JalonRow, Milestones, Stage } from "./jalons-duplicates.ts";
+import type { DoubtBook } from "./doubt-book.ts";
 
-/** The stage a project reached, in the flow's own words. */
-export type Stage = "done" | "actifs" | "etudes" | "entree";
+export type { Stage } from "./jalons-duplicates.ts";
 
 export type { JalonsReading } from "./jalons-cells.ts";
 
@@ -52,6 +57,8 @@ export interface JalonsTable {
   byId: ReadonlyMap<string, JalonEntry>;
   /** Names carried by one entry only — a name two Ids carry joins nothing (ADR 058). */
   byName: ReadonlyMap<string, JalonEntry>;
+  /** The names two Ids or more carry, with their entries (ADR 062: the PMO may attach a card to one of them). */
+  ambiguousByName: ReadonlyMap<string, readonly JalonEntry[]>;
   /** Raw « franchi » cell values (normalized) -> count — the Q21 survey. */
   franchiValues: ReadonlyMap<string, number>;
   /** Raw « (Statut) » cell values (normalized) -> count. */
@@ -69,6 +76,12 @@ interface JalonsContext extends CellContext {
   byName: Map<string, JalonEntry>;
   /** Names seen on two different Ids: removed from byName. */
   ambiguousNames: Set<string>;
+  /** Every entry by normalized name (the ambiguous ones are read from it). */
+  allByName: Map<string, JalonEntry[]>;
+  /** The rows of each Id, while more than one may come (settled once every row was read). */
+  rowsById: Map<string, JalonRow[]>;
+  columnNames: Map<string, string>;
+  book: DoubtBook | undefined;
 }
 
 /**
@@ -76,7 +89,8 @@ interface JalonsContext extends CellContext {
  * Inputs: the data rows, the header match, the board config (stage
  * anchors), the report, the file name, `now` and the reference day the
  * date fallback compares against (ADR 058: the export's date; absent =
- * the day of `now` in Europe/Paris).
+ * the day of `now` in Europe/Paris), and the book of the « Doutes à
+ * trancher » (ADR 062; absent = the most advanced stage).
  * Outputs: the JalonsTable; side effects: écarté (empty rows, rows without
  * id nor name), douteux (duplicate ids — merged — and names carried by
  * two Ids), aggregated signalements
@@ -86,16 +100,21 @@ interface JalonsContext extends CellContext {
  */
 export function parseJalons(
   rows: CsvRow[], match: HeaderMatch, config: BoardConfig,
-  report: ImportReport, fileName: string, now: Date, reference?: ReferenceDay,
+  report: ImportReport, fileName: string, now: Date, reference?: ReferenceDay, book?: DoubtBook,
 ): JalonsTable {
   const ctx: JalonsContext = {
     match, report, fileName,
     stageColumns: stageColumns(config, report, fileName),
     todayIso: reference?.iso ?? parisDay(now),
     entries: [], byId: new Map(), byName: new Map(), ambiguousNames: new Set(), franchiValues: new Map(), statutValues: new Map(),
-    reading: { statut: 0, date: 0, franchi: 0 }, tallies: new Map(),
+    reading: { statut: 0, date: 0, franchi: 0 }, tallies: new Map(), allByName: new Map(), rowsById: new Map(),
+    columnNames: new Map(config.columns.map((c) => [c.id, c.name])), book,
   };
   for (const row of rows) readRow(ctx, row);
+  for (const [id, idRows] of ctx.rowsById) {
+    const entry = ctx.byId.get(id);
+    if (entry !== undefined && idRows.length > 1) settleDuplicate(ctx, entry, idRows);
+  }
   finalize(ctx);
   if (ctx.reading.date > 0) {
     const source = reference?.source ?? "jour du chargement (Europe/Paris)";
@@ -105,6 +124,7 @@ export function parseJalons(
   for (const entry of ctx.entries) stageCounts.set(entry.stage, (stageCounts.get(entry.stage) ?? 0) + 1);
   return {
     entries: ctx.entries, byId: ctx.byId, byName: ctx.byName,
+    ambiguousByName: new Map([...ctx.ambiguousNames].map((key) => [key, ctx.allByName.get(key) ?? []])),
     franchiValues: ctx.franchiValues, statutValues: ctx.statutValues, reading: ctx.reading, stageCounts,
   };
 }
@@ -149,7 +169,7 @@ function readRow(ctx: JalonsContext, row: CsvRow): void {
   const milestones = readMilestones(ctx, row);
   const seen = id === "" ? undefined : ctx.byId.get(id);
   if (seen !== undefined) {
-    mergeDuplicate(ctx, seen, milestones, row.line);
+    ctx.rowsById.get(id)?.push({ milestones, line: row.line });
     return;
   }
   const stage = stageOf(milestones);
@@ -158,11 +178,12 @@ function readRow(ctx: JalonsContext, row: CsvRow): void {
     columnId: ctx.stageColumns[stage], ref,
   };
   ctx.entries.push(entry);
-  if (id !== "") ctx.byId.set(id, entry);
+  if (id !== "") {
+    ctx.byId.set(id, entry);
+    ctx.rowsById.set(id, [{ milestones, line: row.line }]);
+  }
   if (name !== "") indexName(ctx, entry);
 }
-
-type Milestones = Pick<JalonEntry, "rdo" | "rdli" | "rdr">;
 
 function readMilestones(ctx: JalonsContext, row: CsvRow): Milestones {
   const rdo = passed(ctx, row, "RDO");
@@ -173,32 +194,11 @@ function readMilestones(ctx: JalonsContext, row: CsvRow): Milestones {
   return { rdo, rdli, rdr };
 }
 
-// The last milestone passed decides the stage (ordered rule).
-function stageOf(m: Milestones): Stage {
-  return m.rdr ? "done" : m.rdli ? "actifs" : m.rdo ? "etudes" : "entree";
-}
-
-const STAGE_ORDER: readonly Stage[] = ["entree", "etudes", "actifs", "done"];
-const STAGE_LABEL: Record<Stage, string> = { entree: "entrée", etudes: "Études", actifs: "Actifs", done: "Terminé" };
-
-// A duplicated Id (ADR 058): a milestone passed on ANY of its rows is
-// passed — the most advanced stage wins, whatever the rows' order.
-function mergeDuplicate(ctx: JalonsContext, seen: JalonEntry, row: Milestones, line: number): void {
-  const read = [seen.stage, stageOf(row)].sort((a, b) => STAGE_ORDER.indexOf(a) - STAGE_ORDER.indexOf(b));
-  seen.rdo ||= row.rdo;
-  seen.rdli ||= row.rdli;
-  seen.rdr ||= row.rdr;
-  seen.stage = stageOf(seen);
-  seen.columnId = ctx.stageColumns[seen.stage];
-  doubt(ctx.report, ctx.fileName,
-    `Id « ${seen.id} » en double (lignes ${seen.ref.line} et ${line}) — étapes lues : ${[...new Set(read)].map((s) => STAGE_LABEL[s]).join(", ")} — la plus avancée retenue`,
-    { ref: { file: ctx.fileName, line } });
-}
-
 // A name joins by name only while one Id carries it (ADR 058); a second Id
 // under the same name makes it ambiguous — said once.
 function indexName(ctx: JalonsContext, entry: JalonEntry): void {
   const key = entry.normalizedName;
+  ctx.allByName.set(key, [...(ctx.allByName.get(key) ?? []), entry]);
   if (ctx.ambiguousNames.has(key)) return;
   const first = ctx.byName.get(key);
   if (first === undefined) {

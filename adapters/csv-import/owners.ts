@@ -3,8 +3,10 @@
 // Responsable carried by Projets itself stays. Joined by Id (the codename),
 // then by name — the name only when its rows carry no OTHER Id than the
 // card's (ADR 058 §2, like enrich.ts sameProject): a namesake row of
-// another Id is another project, refused and said as douteux. Pure and
-// dependency-free, like charges.ts.
+// another Id is another project, refused and said as douteux — a « Doute
+// à trancher » since ADR 062: the PMO may take that row's chef de projet
+// (the log keeps the Id, never the name). Pure and dependency-free, like
+// charges.ts.
 
 import { normalizeLabel } from "./normalize.ts";
 import type { CardAssembly, EnrichedCard } from "./enrich.ts";
@@ -13,6 +15,8 @@ import { tallyInto, tallyLabel } from "./tallies.ts";
 import type { Tally } from "./tallies.ts";
 import { doubt, warn } from "./report.ts";
 import type { ImportReport } from "./report.ts";
+import { askOrPropose } from "./doubt-book.ts";
+import type { DoubtBook } from "./doubt-book.ts";
 
 /** What the ProjetsCdP join did, for the assembly read-out. */
 export interface OwnerStats {
@@ -50,16 +54,33 @@ function joinOf(card: EnrichedCard, cdp: CdpTable): Join {
   return other ? { viaId: null, viaName: null, refused: ids } : { viaId: null, viaName: name, refused: null };
 }
 
+// ADR 062: the namesake row of another Id — no chef de projet (the
+// tool's proposal, ADR 058), or that row's.
+function takeNamesake(book: DoubtBook | undefined, card: EnrichedCard, ids: readonly string[]): boolean {
+  const applied = askOrPropose(book, {
+    kind: "join", detail: "cdp-nom", code: card.codename, name: card.normalizedName, title: card.title,
+    why: `La carte n'a pas de ligne ProjetsCdP à son Id ; la ligne à son nom porte ${ids.length > 1 ? "d'autres Id" : "un autre Id"}` +
+      ` (${ids.join(", ")}). L'outil n'emprunte pas son chef de projet.`,
+    options: [
+      { id: "non", label: "Ne pas rattacher", consequence: "carte sans chef de projet" },
+      { id: `id:${ids.join("+")}`, label: `Prendre le chef de projet de la ligne ProjetsCdP à ce nom (Id ${ids.join(", ")})`, consequence: null },
+    ],
+    proposed: "non",
+  });
+  return applied !== "non";
+}
+
 /**
  * Fills the missing chefs de projet from ProjetsCdP, in place.
  * Inputs: the assembled deck (null when no perimeter), the CdpTable (null
- * when the file is absent — nothing happens), the report.
+ * when the file is absent — nothing happens), the report, the book of the
+ * « Doutes à trancher » (ADR 062; absent = the refusal of ADR 058).
  * Outputs: the OwnerStats or null; side effects: the deck's owners and its
  * withOwner counter, one aggregated signalement for the cards still
  * without owner, one aggregated douteux for the namesake rows of another
  * Id (refused, ADR 058). Failure modes: none.
  */
-export function attachOwners(deck: CardAssembly | null, cdp: CdpTable | null, report: ImportReport): OwnerStats | null {
+export function attachOwners(deck: CardAssembly | null, cdp: CdpTable | null, report: ImportReport, book?: DoubtBook): OwnerStats | null {
   if (deck === null || cdp === null) return null;
   const stats: OwnerStats = { filled: 0, alreadySet: 0, stillMissing: 0, cdpOutside: 0 };
   const used = new Set<string>();
@@ -74,7 +95,8 @@ export function attachOwners(deck: CardAssembly | null, cdp: CdpTable | null, re
       continue;
     }
     if (refused !== null) tallyInto(doubts, CDP_OTHER_ID, card.ref.line, refused.join(" / "));
-    const owner = viaId !== null ? cdp.byId.get(viaId) : viaName !== null ? cdp.byName.get(viaName) : null;
+    const taken = refused !== null && takeNamesake(book, card, refused);
+    const owner = viaId !== null ? cdp.byId.get(viaId) : viaName !== null || taken ? cdp.byName.get(card.normalizedName) : null;
     if (owner === null || owner === undefined) {
       stats.stillMissing++;
       tallyInto(tallies, "carte sans chef de projet (ni Projets ni ProjetsCdP)", card.ref.line);

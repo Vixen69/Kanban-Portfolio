@@ -1,0 +1,122 @@
+# ADR 062 — Doutes à trancher à l'import
+
+Date : 2026-09-30 · Statut : proposé (branche import-doutes) · Étend les
+ADR 055 (rapport lisible), 056 (import déterministe), 058 (jointures,
+identités) et 059 (adoption)
+
+## Contexte
+
+L'auteur, le 30 septembre : « quand j'ai des projets douteux pris pour le
+périmètre, il faudrait que j'aie une option pour le merge : quelle valeur
+on garde, quelle valeur on garde pas ; me dire pourquoi c'est douteux,
+est-ce qu'on le prend, est-ce qu'on le prend pas » ; et sur la mémoire :
+« tant que tu n'as pas cliqué, on te redemandera… “ne plus me demander”,
+pour ce projet-là… je préfère quand même que tu aies le choix ».
+Jusqu'ici l'importeur tranchait seul (ADR 056/058) et le disait en
+« douteux » : le PMO lisait la règle appliquée sans pouvoir la changer.
+
+## Décision
+
+1. **Les doutes décidables deviennent des questions.** L'audit rend
+   `doubts` (`core/import-doubts.ts`) : pour chaque doute, le projet (code,
+   titre, carte — « code@année » s'il n'est pas au tableau), **pourquoi**
+   en clair, les **choix** avec leur conséquence (« le projet sort du
+   périmètre : état « Budget présenté » hors des états retenus ») et le
+   **choix de l'outil**, présélectionné — le comportement d'avant. Six
+   sortes : faits COUT PREV en désaccord (état, type, portefeuille, nom) ;
+   un Id sur plusieurs lignes (Projets quand il fait le périmètre,
+   ProjetsJalons, SP, ProjetsCdP quand les chefs de projet diffèrent) ;
+   jointures refusées ou ambiguës par le nom (Jalons, SP, CdP ; ligne SP à
+   l'Id contre ligne au nom) ; montant ambigu « 1,035 » en k€ (lecture
+   française ou anglaise) ; cellule ME illisible (garder ou écarter) ;
+   identité (deux cartes à la main sur un code, adoption sous un autre
+   titre, deux projets sur une même carte). Les doutes des fichiers
+   annexes ne sont posés que pour les projets du périmètre.
+2. **Jamais bloquant.** Charger sans rien toucher applique les choix de
+   l'outil. Les autres douteux restent de simples signalements (octets
+   parasites, « Année » illisible, portefeuille sans domaine, refus de
+   fichiers, capacité et personnes, vocabulaire) ; les conflits de domaine
+   gardent leur circuit (ADR 036).
+3. **Le journal est la mémoire.** Chaque réponse envoyée au chargement
+   devient un événement **`settled`** (nouveau type, écrit dans le même lot
+   que le chargement) : qui, quand, le doute, l'option, ses mots (jamais un
+   nom de personne : « ligne 3 » pour un chef de projet), mémorisée ou non.
+   Pas `edited` (il porte un patch lu par les décisions de domaine et les
+   corrections à la main), pas `decided` (les décisions D1–D6 de la fiche).
+   Le pli du tableau, l'Historique et les indicateurs l'ignorent ; il ne
+   masque jamais la naissance d'une carte (`core/fold-order.ts`).
+4. **« Ne plus me demander pour ce projet ».** Sans la case, le choix vaut
+   pour ce chargement : la question revient. Avec, il est réappliqué sans
+   rien demander tant que le doute est **le même** (même projet, même
+   sorte, mêmes valeurs en concurrence — une empreinte) ; un doute changé
+   redemande. L'audit le rend « mémorisé » (« Déjà tranchés ») ;
+   « Redemander » (`{ forget: true }`) l'oublie, tracé aussi. Une
+   restauration (ADR 042) oublie les choix écrits après la position
+   restaurée, comme tout événement.
+5. **API.** `POST /api/import/audit` et `/load` acceptent `choices`
+   (id du doute → `{ option, sticky }` ou `{ forget: true }`) ; un doute
+   ou une option inconnus : refus en français (relancer l'analyse).
+   L'audit prévisualise, le chargement applique les choix aux mêmes
+   fichiers (même lecture du journal, avant l'audit) et le rapport lisible
+   nomme les doutes tranchés autrement que par l'outil (`changes.settled`,
+   `settledBy` sur un projet écarté par un choix). La commande applique
+   les choix mémorisés (avec `--charger` / `--comparer`), sinon ceux de
+   l'outil, imprime chaque doute et comment il a été tranché, et n'écrit
+   aucun choix.
+
+## Vue
+
+⚙ › Importer, après le rapport lisible et avant les conflits de domaine et
+« Charger » : la section **« Doutes à trancher »**. En tête : « N doute(s) —
+l’outil a pré-choisi ; changez ce qui ne va pas ». Les doutes sont groupés
+par sorte (repliés au-delà de dix) ; chaque doute est un cadre : code ·
+titre, pourquoi, les choix en boutons radio avec leur conséquence, le choix
+de l’outil coché et marqué « choix de l’outil », la case « Ne plus me
+demander pour ce projet ». Les choix mémorisés sont repliés sous « Déjà
+tranchés (M) » — le choix, le jour, l’auteur — avec « Redemander », qui
+remet la question parmi les doutes, sur le choix de l’outil.
+
+- **Ce qui part au chargement** : seulement les doutes touchés — un autre
+  choix que celui de l’outil, la case cochée, ou « Redemander ». Un doute
+  laissé tel quel n’envoie rien : l’outil applique son choix, rien n’est
+  écrit, la question reviendra (« tant que tu n’as pas cliqué »). Ainsi le
+  rapport ne compte pas comme « tranchés » les choix de l’outil.
+- **Ce qu’on lit est ce qu’on charge** : un choix qui change ce que le
+  rapport affiché a appliqué (le cocher seul ne change rien) met
+  « Charger » en attente d’un nouvel audit, « Revoir le rapport avec ces
+  choix » ; celui-ci garde les réponses et les décisions de domaine, et
+  redemande « J’ai lu le rapport ». Un nouvel « Auditer » repart des choix
+  de l’outil.
+- Le rapport lisible nomme les « Doutes tranchés autrement que par
+  l’outil » (mémorisé ou choisi à ce chargement), le périmètre dit le
+  projet écarté par un choix, le résumé du chargement compte les choix
+  tracés dans le journal. `remembered` porte l’auteur du choix (`actor`
+  de l’événement `settled`).
+- Fichiers : `front/importDoubts.ts` (état, envoi, textes — testé),
+  `front/useImport.ts`, `front/apiImport.ts` (les deux appels d’import,
+  sortis de `api.ts`), `front/components/DoubtsSection.tsx`,
+  `doubtParts.tsx` ; `ImportOutcome`, `ImportView`, `ImportLists`,
+  `ImportChanges`, `FilesStrip`, `importReport.ts`, `admin.css`.
+
+## Conséquences
+
+- Deux règles par défaut changent sur des données réelles, pour ne plus
+  dépendre de l'ordre des lignes (ADR 056) : un projet sur plusieurs
+  lignes SP garde la ligne « la plus fréquente, puis la plus complète,
+  puis la première par ordre alphabétique » (avant : la première lue) — et
+  une ligne sans Id lue avant la ligne à l'Id ne l'écarte plus ; deux
+  projets de l'export sur une même carte chargent le premier **par code
+  puis par titre** (avant : le premier dans l'ordre du fichier).
+- Un choix mémorisé survit aux imports tant que les fichiers disent la
+  même chose ; dès qu'ils changent, la question revient d'elle-même.
+- Jusqu'à RP3, l'auteur des choix est « anonymous », comme toute écriture.
+- Hors périmètre : `amountCell` (j.h) ne signale pas « 1,035 » ; les
+  projets écartés sans ME et les codes hors PE restent des signalements
+  (à confirmer avec l'auteur avant d'en faire des questions).
+- Fichiers : `core/import-doubts.ts`, `core/types.ts`, `core/fold-order.ts` ;
+  `adapters/csv-import/` (`doubt-book.ts`, `doubt-memory.ts`, `hash.ts`,
+  `couts-doubts.ts`, `row-choice.ts`, `projets-duplicates.ts`,
+  `jalons-duplicates.ts`, `sp-groups.ts`, `enrich-joins.ts`,
+  `load-doubts.ts`, et les lecteurs) ; `middle/import.ts`,
+  `middle/import-choices.ts`, `sync/import.ts`,
+  `sync/import-doubts-text.ts`, et leurs tests.

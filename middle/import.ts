@@ -12,19 +12,25 @@
 // board and why, the load what it DID — one import mode. Loads run one
 // at a time, queued with every other board write (ADR 058: two concurrent
 // loads would both read the board before either wrote, and both create
-// every card). Logs carry counts only.
+// every card). ADR 062: both routes take the PMO's answers to the
+// « Doutes à trancher » (import-choices.ts) and return every decidable
+// doubt; the memory of the choices is the log, read BEFORE the audit so
+// the load applies them to the same deck the audit showed; the load
+// traces each answer sent (a `settled` event) in its own batch. Logs
+// carry counts only.
 
 import { win32 } from "node:path";
 import type { BoardStorage } from "../core/ports.ts";
-import type { BoardConfig } from "../core/types.ts";
-import type { DomainDecision, ImportAuditResult, ImportLoadResult, ImportSummary } from "../core/import-types.ts";
+import type { BoardConfig, Card, CardEvent } from "../core/types.ts";
+import type { DomainDecision, ImportAuditResult, ImportChoice, ImportDoubt, ImportLoadResult, ImportSummary } from "../core/import-types.ts";
 import {
-  importChanges, keepStoredCapacity, loadRefusal, planLoad, renderReport, runImportAudit, withEventReasons, withLegacyIds,
+  bookInput, choiceProblem, createDoubtBook, importChanges, keepStoredCapacity, loadRefusal, planLoad, renderReport, runImportAudit,
+  settledEvents, withEventReasons, withLegacyIds,
 } from "../adapters/csv-import/index.ts";
-import type { AuditResult, EnrichedCard, InputFile, LoadPlan } from "../adapters/csv-import/index.ts";
+import type { AuditResult, DoubtBook, EnrichedCard, InputFile, LoadPlan } from "../adapters/csv-import/index.ts";
 import { BadRequest } from "./errors.ts";
 import { exerciseOrCurrent } from "./validation.ts";
-import { serializedWrite } from "./api.ts";
+import { SERVER_ACTOR, serializedWrite } from "./api.ts";
 
 /** What a load lets the caller do around its write. */
 export interface LoadHooks {
@@ -119,42 +125,75 @@ function summarize(audit: AuditResult): ImportSummary {
   };
 }
 
-// The conflicts a load would raise, the facts it would keep and what it
-// would change, read without writing: the audit is a dry run of the plan
-// against the exercise's stored cards (ADR 036, ADR 054, ADR 055). Files
-// the load would refuse (loadRefusal) preview nothing: no card would be
-// written, none marked absent.
-async function dryRun(
-  storage: BoardStorage, config: BoardConfig, audit: AuditResult, now: Date, year: number, refused: boolean,
-): Promise<Pick<ImportAuditResult, "conflicts" | "factsKept" | "changes">> {
+/** The board as an import reads it: the log (its memory of the choices, ADR 062) and the base cards — read ONCE, before the audit. */
+interface BoardRead {
+  events: CardEvent[];
+  baseCards: Card[];
+}
+
+async function readBoardOnce(storage: BoardStorage): Promise<BoardRead> {
   const [events, baseCards] = await Promise.all([storage.listEvents(), storage.listBaseCards()]);
-  if (refused || audit.cards === null) {
-    return { conflicts: [], factsKept: [], changes: importChanges({ audit, config, year, plan: null, baseCards, events }) };
-  }
-  const plan = planLoad(audit.cards.cards, config, baseCards, events, now, year);
-  return {
-    conflicts: plan.domainConflicts.map(({ decision: _decision, ...conflict }) => conflict), factsKept: plan.factsKept,
-    changes: importChanges({ audit, config, year, plan, baseCards, events }),
-  };
+  return { events, baseCards };
+}
+
+// The audit of the files with the request's choices and the log's memory
+// (ADR 062): the same files, choices and log give the same deck.
+function auditWith(
+  files: InputFile[], config: BoardConfig, now: Date, year: number, choices: ReadonlyMap<string, ImportChoice>, board: BoardRead,
+): AuditResult {
+  return runImportAudit(files, config, now, year, createDoubtBook(bookInput(year, choices, board.events)));
+}
+
+// The doubts once the plan chose the board ids (aliases, adoptions); the
+// request's choices must name them — else a French 400 (ADR 062).
+function settledDoubts(book: DoubtBook, plan: LoadPlan | null, choices: ReadonlyMap<string, ImportChoice>): ImportDoubt[] {
+  if (plan !== null) book.remapCards(plan.aliases);
+  const doubts = book.list();
+  const problem = choiceProblem(doubts, choices);
+  if (problem !== null) throw new BadRequest(problem);
+  return doubts;
+}
+
+// The conflicts a load would raise, the facts it would keep, what it
+// would change and the doubts it would settle, read without writing: the
+// audit is a dry run of the plan against the exercise's stored cards (ADR
+// 036, 054, 055, 062). Files the load would refuse (loadRefusal) preview
+// nothing: no card would be written, none marked absent.
+function dryRun(
+  config: BoardConfig, audit: AuditResult, now: Date, year: number, refused: boolean, board: BoardRead,
+  choices: ReadonlyMap<string, ImportChoice>,
+): Pick<ImportAuditResult, "conflicts" | "factsKept" | "changes" | "doubts"> {
+  const { events, baseCards } = board;
+  const plan = refused || audit.cards === null ? null : planLoad(audit.cards.cards, config, baseCards, events, now, year, new Map(), audit.book);
+  const doubts = settledDoubts(audit.book, plan, choices);
+  const changes = importChanges({ audit, config, year, plan, baseCards, events, doubts });
+  if (plan === null) return { conflicts: [], factsKept: [], changes, doubts };
+  return { conflicts: plan.domainConflicts.map(({ decision: _decision, ...conflict }) => conflict), factsKept: plan.factsKept, changes, doubts };
 }
 
 /**
  * Runs the audit over the received files — nothing is written — and lists
- * the domain conflicts a load would raise against the board (ADR 036) and
- * the readable report of what it would change (ADR 055).
+ * the domain conflicts a load would raise against the board (ADR 036),
+ * the readable report of what it would change (ADR 055) and the « Doutes
+ * à trancher » with the choice each would take (ADR 062).
  * Inputs: the storage (read only), the runtime config, the files, now, the
- * exercise year read (default: the current one, ADR 035). Output: the
- * rendered report (Markdown, French), its counts, whether a load would
- * be accepted and else why (loadRefusal — the load's own rule), the
- * conflicts, the facts kept, the changes. Failure: none —
- * every anomaly lands in the report; storage errors propagate (→ 500).
+ * exercise year read (default: the current one, ADR 035), the PMO's
+ * choices to preview (default none: the remembered choices and the
+ * proposals). Output: the rendered report (Markdown, French), its counts,
+ * whether a load would be accepted and else why (loadRefusal — the load's
+ * own rule), the conflicts, the facts kept, the changes, the doubts.
+ * Failure: BadRequest (French) when a choice names a doubt or an option
+ * these files do not raise; every other anomaly lands in the report;
+ * storage errors propagate (→ 500).
  */
 export async function auditImport(
   storage: BoardStorage, config: BoardConfig, files: InputFile[], now: Date, year: number = config.exercise.year,
+  choices: ReadonlyMap<string, ImportChoice> = new Map(),
 ): Promise<ImportAuditResult> {
-  const audit = runImportAudit(files, config, now, year);
+  const board = await readBoardOnce(storage);
+  const audit = auditWith(files, config, now, year, choices, board);
   const refusal = loadRefusal(audit, year, config.exercise.year);
-  const dry = await dryRun(storage, config, audit, now, year, refusal !== null);
+  const dry = dryRun(config, audit, now, year, refusal !== null, board, choices);
   return {
     exercise: year, report: renderReport(audit.report, now), summary: summarize(audit),
     loadable: refusal === null, refusal, ...dry,
@@ -162,7 +201,7 @@ export async function auditImport(
 }
 
 // What the load wrote, for the response and the log.
-function loadFigures(plan: LoadPlan, audit: AuditResult): ImportLoadResult["load"] {
+function loadFigures(plan: LoadPlan, audit: AuditResult, settled: number): ImportLoadResult["load"] {
   return {
     created: plan.created, updated: plan.updated, moved: plan.moved,
     unlisted: plan.unlisted, relisted: plan.relisted,
@@ -170,68 +209,89 @@ function loadFigures(plan: LoadPlan, audit: AuditResult): ImportLoadResult["load
     domainReplaced: plan.domainReplaced, domainKept: plan.domainKept, domainKeptByPrior: plan.domainKeptByPrior,
     deletedSkipped: plan.deletedSkipped.length, adopted: plan.adopted.length,
     replaced: new Set(plan.replaced.flatMap((fact) => fact.cardIds)).size, advanced: plan.advanced.length, paused: plan.paused.length,
+    settled,
     capacity: audit.capacity === null ? null
       : { persons: audit.capacity.snapshot.persons.length, assignments: audit.capacity.snapshot.assignments.length },
   };
 }
 
+/** What a load takes besides the files: the domain decisions (ADR 036) and the doubts' choices (ADR 062). */
+export interface LoadAnswers {
+  decisions?: ReadonlyMap<string, DomainDecision>;
+  choices?: ReadonlyMap<string, ImportChoice>;
+}
+
 /**
  * Re-runs the audit and loads the assembled deck into ONE exercise's
- * board: cards and events in one batch, then that year's capacity
- * snapshot when the files carried one. The other years' cards are never
- * read nor written (ADR 035). Every domain conflict must carry a decision
- * (ADR 036): the load is refused otherwise, before anything is written.
+ * board: cards and events in one batch — with one `settled` event per
+ * doubt the request answered (ADR 062: who, when, which option, sticky or
+ * not; the proposals left untouched write nothing) — then that year's
+ * capacity snapshot when the files carried one. The other years' cards
+ * are never read nor written (ADR 035). Every domain conflict must carry
+ * a decision (ADR 036): the load is refused otherwise, before anything is
+ * written. The doubts never block.
  * Inputs: the storage, the runtime config, the files, now, the exercise
- * year (default: the current one), the decisions by card id.
+ * year (default: the current one), the answers (domain decisions by card
+ * id, choices by doubt id), the hooks.
  * Output: the audit result plus what the load wrote; `changes` says what
- * it changed on the board, card by card (ADR 055).
+ * it changed on the board, card by card (ADR 055), `doubts` how each
+ * doubt was settled.
  * The whole read-plan-write runs serialized with the other board writes
  * (serializedWrite, ADR 058): a second load reads what the first wrote.
  * Failure: BadRequest on a closed year (below the current one), when no
  * card assembled (no `projets` file), when no project is retained on that
- * year (the files of another exercise) or when a conflict is undecided;
- * storage errors propagate (→ 500), nothing partially written for cards.
+ * year (the files of another exercise), when a conflict is undecided or
+ * a choice names an unknown doubt or option; storage errors propagate
+ * (→ 500), nothing partially written for cards.
  */
 export function loadImport(
   storage: BoardStorage, config: BoardConfig, files: InputFile[], now: Date,
-  year: number = config.exercise.year, decisions: ReadonlyMap<string, DomainDecision> = new Map(),
-  hooks: LoadHooks = {},
+  year: number = config.exercise.year, answers: LoadAnswers = {}, hooks: LoadHooks = {},
 ): Promise<ImportLoadResult> {
-  return serializedWrite(() => loadNow(storage, config, files, now, year, decisions, hooks));
+  return serializedWrite(() => loadNow(storage, config, files, now, year, answers, hooks));
 }
 
 // One load, alone on the board (the queue above).
 async function loadNow(
-  storage: BoardStorage, config: BoardConfig, files: InputFile[], now: Date,
-  year: number, decisions: ReadonlyMap<string, DomainDecision>, hooks: LoadHooks,
+  storage: BoardStorage, config: BoardConfig, files: InputFile[], now: Date, year: number, answers: LoadAnswers, hooks: LoadHooks,
 ): Promise<ImportLoadResult> {
   if (year < config.exercise.year) throw new BadRequest(`Exercice ${year} clos : chargement refusé.`); // before reading the files
-  const audit = runImportAudit(files, config, now, year);
+  const choices = answers.choices ?? new Map<string, ImportChoice>();
+  const board = await readBoardOnce(storage);
+  const audit = auditWith(files, config, now, year, choices, board);
   const deck = loadableDeck(audit, year, config);
-  const [events, baseCards] = await Promise.all([storage.listEvents(), storage.listBaseCards()]);
-  const plan = planLoad(deck, config, baseCards, events, now, year, decisions);
-  const changes = importChanges({ audit, config, year, plan, baseCards, events });
+  const { events, baseCards } = board;
+  const plan = planLoad(deck, config, baseCards, events, now, year, answers.decisions ?? new Map(), audit.book);
+  const doubts = settledDoubts(audit.book, plan, choices);
+  const changes = importChanges({ audit, config, year, plan, baseCards, events, doubts });
   if (plan.domainUndecided > 0) {
     throw new BadRequest(`Chargement refusé : ${plan.domainUndecided} conflit(s) de domaine sans décision (garder ou remplacer).`);
   }
   if (hooks.beforeWrite !== undefined) await hooks.beforeWrite();
-  // Each entry, exit and return carries its reason into the log (the fiche's Historique).
-  await storage.importCards(plan.cards, withEventReasons(plan.events, changes));
+  const settled = settledEvents(doubts, choices, audit.book, SERVER_ACTOR, now.toISOString());
+  // Each entry, exit and return carries its reason into the log (the fiche's Historique); each answer to a doubt is traced.
+  await storage.importCards(plan.cards, [...withEventReasons(plan.events, changes), ...settled]);
   if (audit.capacity !== null) {
     const fresh = withLegacyIds(audit.capacity.snapshot, plan.aliases);
     await storage.importCapacity(keepStoredCapacity(fresh, await storage.getCapacity(year)));
   }
+  logLoad(now, year, plan, doubts.length, settled.length);
+  return {
+    exercise: year, report: renderReport(audit.report, now), summary: summarize(audit), loadable: true, refusal: null,
+    conflicts: plan.domainConflicts, factsKept: plan.factsKept, changes, doubts, load: loadFigures(plan, audit, settled.length),
+  };
+}
+
+// The load's console line: counts only, never a title nor a figure.
+function logLoad(now: Date, year: number, plan: LoadPlan, doubts: number, settled: number): void {
   console.log(
     `${now.toISOString()} import (outil, exercice ${year}) : ${plan.created} créée(s), ${plan.updated} mise(s) à jour, ` +
       `${plan.moved} déplacée(s), ${plan.unlisted} absente(s), ${plan.relisted} de retour, ` +
       `domaines ${plan.domainReplaced} remplacé(s) / ${plan.domainKept} gardé(s), ` +
       `${plan.deletedSkipped.length} supprimée(s) du tableau ignorée(s), ${plan.adopted.length} adoptée(s), ` +
       `${new Set(plan.replaced.flatMap((fact) => fact.cardIds)).size} correction(s) manuelle(s) remplacée(s), ` +
-      `${plan.advanced.length} placement(s) à la main dépassé(s) par un nouveau jalon, ${plan.paused.length} en pause (jalon non appliqué)` +
+      `${plan.advanced.length} placement(s) à la main dépassé(s) par un nouveau jalon, ${plan.paused.length} en pause (jalon non appliqué), ` +
+      `${doubts} doute(s) à trancher dont ${settled} réponse(s) tracée(s)` +
       plan.factsKept.map((f) => ` · ${f.label} gardé (absent des fichiers) : ${f.cards}`).join(""),
   );
-  return {
-    exercise: year, report: renderReport(audit.report, now), summary: summarize(audit), loadable: true, refusal: null,
-    conflicts: plan.domainConflicts, factsKept: plan.factsKept, changes, load: loadFigures(plan, audit),
-  };
 }

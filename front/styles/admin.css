@@ -70,6 +70,22 @@
 .conflict-list li { display: flex; gap: 8px; align-items: center; padding: 2px 0; border-top: 1px solid var(--bd-sub); }
 .conflict-list li button { margin-left: auto; }
 
+/* ---------- Doutes à trancher à l'import (ADR 062) — rien ne bouge (ADR 051) ---------- */
+.doubts { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
+.doubts-head { font-size: 11.5px; font-weight: 600; color: var(--tx-1); }
+.doubt { border: 1px solid var(--bd-sub); border-radius: 4px; padding: 4px 8px 6px; margin: 4px 0 6px; background: #fff; min-width: 0; }
+.doubt legend { padding: 0 4px; font-size: 11.5px; display: flex; gap: 6px; align-items: baseline; }
+.doubt-title { font-weight: 600; color: var(--tx-1); overflow-wrap: anywhere; }
+.doubt-why { font-size: 10.5px; color: var(--tx-3); line-height: 1.4; margin: 0 0 4px; overflow-wrap: anywhere; }
+.doubt-opts { display: flex; flex-direction: column; gap: 2px; }
+.doubt-opt { font-size: 11px; color: var(--tx-2); display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; cursor: pointer; overflow-wrap: anywhere; }
+.doubt-opt.on { color: var(--tx-1); font-weight: 600; }
+.doubt-opt input, .doubt-sticky input { margin: 0; flex: none; }
+.doubt-tool { font-size: 9.5px; font-weight: 600; color: var(--accent); border: 1px solid var(--accent); border-radius: 3px; padding: 0 4px; }
+.doubt-csq { font-size: 10.5px; font-weight: 400; color: var(--tx-3); }
+.doubt-sticky { font-size: 10.5px; color: var(--tx-2); display: flex; align-items: center; gap: 5px; margin-top: 5px; cursor: pointer; }
+.doubt-kept li button { margin-left: auto; }
+
 /* ---------- Panneau Exercice : la bascule d'année (ADR 035/038/049) ---------- */
 .a-exercise { display: flex; flex-direction: column; gap: 8px; }
 .a-ex-row { display: flex; align-items: baseline; gap: 10px; font-size: 12px; }

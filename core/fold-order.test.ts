@@ -111,3 +111,11 @@ test("old log: Délais and the time per stage read the birth first too", () => {
   const dwell = stageDwell(board, log, config, NOW);
   assert.deepEqual(dwell.map((row) => [row.id, row.current, row.pastStays]), [["col1", 0, 0], ["col2", 1, 0], ["col3", 0, 0]]);
 });
+
+test("ADR 062: an import doubt settled before the project entered the board never hides its birth", () => {
+  const settled = event({ id: "evt-1", ts: "2026-09-01T00:00:00.000Z", type: "settled", payload: { doubtId: "d", option: "o" } });
+  const log = [settled, imported("evt-2", FUTURE), moved("evt-3", "2026-09-10T00:00:00.000Z", "col1", "col2")];
+  assert.deepEqual(ids(foldOrder(log)), ["evt-2", "evt-1", "evt-3"], "the birth is still hoisted before the card's first other event");
+  const [state] = foldEvents([testCard()], log);
+  assert.deepEqual([state?.columnId, state?.enteredColumnAt], ["col2", "2026-09-10T00:00:00.000Z"], "the settled event changes nothing on the card");
+});

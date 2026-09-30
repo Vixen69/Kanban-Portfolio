@@ -5,7 +5,9 @@
 // — ADR 026). The import targets ONE exercise (ADR 035): the current year
 // by default, or a year in preparation; it never touches another year's
 // cards. The audit's domain conflicts are decided one by one before the
-// load (ADR 036, ./ImportConflicts.tsx). No authentication until RP3.
+// load (ADR 036, ./ImportConflicts.tsx); the « Doutes à trancher » are
+// answered or left to the tool (ADR 062, ./DoubtsSection.tsx) — the
+// requests live in ../useImport.ts. No authentication until RP3.
 // The report reads as the PMO reads an import (ADR 055,
 // ./ImportOutcome.tsx): what the load changes, which files it took, who
 // enters or leaves and why; « Voir ce qui a changé depuis le dernier
@@ -13,11 +15,8 @@
 
 import { useState } from "react";
 import type { BoardConfig } from "../../core/types.ts";
-import type { ImportFilePayload } from "../../core/import-types.ts";
-
-import { ApiError, postImportAudit, postImportLoad } from "../api.ts";
-import type { Decisions } from "./ImportConflicts.tsx";
-import { ImportOutcome, type ImportPhase as Phase } from "./ImportOutcome.tsx";
+import { useImport } from "../useImport.ts";
+import { ImportOutcome } from "./ImportOutcome.tsx";
 import { ImportSince } from "./ImportSince.tsx";
 
 interface Picked {
@@ -47,39 +46,6 @@ async function readFiles(list: FileList): Promise<Picked[]> {
 
 function fmtSize(bytes: number): string {
   return bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} Ko` : `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
-}
-
-function messageOf(cause: unknown): string {
-  return cause instanceof ApiError || cause instanceof Error ? cause.message : "Erreur inconnue.";
-}
-
-// The audit / load cycle: one request at a time, the last audit kept when
-// a load fails so the report stays on screen with the error. The domain
-// decisions travel with the load and are wiped by every new audit.
-function useImport(files: Picked[], exercise: number, onLoaded: () => void) {
-  const [phase, setPhase] = useState<Phase>({ kind: "idle" });
-  const [error, setError] = useState<string | null>(null);
-  const [decisions, setDecisions] = useState<Decisions>({});
-  const audited = phase.kind === "audited" ? phase.result : phase.kind === "busy" ? phase.previous : null;
-  const run = async (what: "audit" | "load") => {
-    const payload: ImportFilePayload[] = files.map(({ name, base64 }) => ({ name, base64 }));
-    setError(null);
-    setPhase({ kind: "busy", what, previous: audited });
-    try {
-      if (what === "audit") {
-        setDecisions({});
-        setPhase({ kind: "audited", result: await postImportAudit(payload, exercise) });
-      } else {
-        setPhase({ kind: "loaded", result: await postImportLoad(payload, exercise, decisions) });
-        onLoaded();
-      }
-    } catch (cause) {
-      setError(messageOf(cause));
-      setPhase(audited === null ? { kind: "idle" } : { kind: "audited", result: audited });
-    }
-  };
-  const reset = () => { setPhase({ kind: "idle" }); setDecisions({}); };
-  return { phase, error, audited, decisions, setDecisions, run, reset };
 }
 
 function ExerciseSelect({ exercise, currentYear, onChange }: {
@@ -141,7 +107,7 @@ export function ImportPanel({ onLoaded, config, defaultYear }: {
   const [files, setFiles] = useState<Picked[]>([]);
   const [exercise, setExercise] = useState(defaultYear !== undefined && defaultYear >= currentYear ? defaultYear : currentYear);
   const [acknowledged, setAcknowledged] = useState(false);
-  const { phase, error, audited, decisions, setDecisions, run, reset } = useImport(files, exercise, onLoaded);
+  const { phase, error, audited, decisions, setDecisions, doubts, setDoubts, run, reset } = useImport(files, exercise, onLoaded);
   const shown = phase.kind === "loaded" ? phase.result : audited;
   return (
     <div className="import-pane">
@@ -158,6 +124,7 @@ export function ImportPanel({ onLoaded, config, defaultYear }: {
         onPick={(list) => { void readFiles(list).then((picked) => { setFiles(picked); reset(); }); }}
         onAudit={() => { setAcknowledged(false); void run("audit"); }} />
       <ImportOutcome phase={phase} error={error} shown={shown} config={config} decisions={decisions} setDecisions={setDecisions}
+        doubts={doubts} setDoubts={setDoubts} onPreview={() => { setAcknowledged(false); void run("preview"); }}
         acknowledged={acknowledged} setAcknowledged={setAcknowledged} onLoad={() => void run("load")} />
     </div>
   );

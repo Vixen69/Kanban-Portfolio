@@ -134,7 +134,7 @@ export function advancedReason(config: BoardConfig, entry: ImportAdvanced): stri
 
 /**
  * What a load wrote beyond the summary's fixed phrases (ADR 058/059/060),
- * the non-zero ones only. Input: the load's counts. Output: the French
+ * and the doubts' choices it traced (ADR 062), the non-zero ones only. Input: the load's counts. Output: the French
  * phrases. Failure: none.
  */
 export function loadOutcomes(load: ImportLoadResult["load"]): string[] {
@@ -144,6 +144,7 @@ export function loadOutcomes(load: ImportLoadResult["load"]): string[] {
   if ((load.paused ?? 0) > 0) out.push(`${load.paused ?? 0} en pause, nouveau jalon non appliqué`);
   if (load.adopted > 0) out.push(`${load.adopted} carte(s) saisie(s) à la main adoptée(s)`);
   if (load.deletedSkipped > 0) out.push(`${load.deletedSkipped} supprimée(s) du tableau, ignorée(s)`);
+  if ((load.settled ?? 0) > 0) out.push(`${load.settled ?? 0} choix de doute tracé(s) dans le journal`);
   return out;
 }
 

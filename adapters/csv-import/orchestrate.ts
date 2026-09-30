@@ -5,8 +5,10 @@
 // the COUT PREV export when present, else the `projets` onglet, ADR 030;
 // a Coût-like file that is not recognized refuses, perimeter-source.ts),
 // attach the charges, then describe what is missing, the assembly state
-// and why a load would be refused (assembly.ts). Pure and filesystem-free;
-// stateless by design.
+// and why a load would be refused (assembly.ts). ADR 062: every reader
+// asks the audit's book (doubt-book.ts) how to settle its decidable
+// doubts — the side files' doubts are kept only for the deck's projects.
+// Pure and filesystem-free; stateless by design.
 
 import type { BoardConfig } from "../../core/types.ts";
 import {
@@ -49,6 +51,9 @@ import { readPerimeter } from "./perimeter-source.ts";
 import type { Perimeter } from "./perimeter-source.ts";
 import { promoteAmbiguous } from "./cells.ts";
 import type { ImportSource } from "../../core/import-types.ts";
+import { createDoubtBook } from "./doubt-book.ts";
+import type { DoubtBook } from "./doubt-book.ts";
+import { normalizeLabel } from "./normalize.ts";
 
 export type { InputFile } from "./identify.ts";
 export type { ImportBlocker } from "./election.ts";
@@ -82,6 +87,8 @@ export interface AuditResult {
    * as far as the files go (the deck may still be empty).
    */
   blockers: ImportBlocker[];
+  /** The « Doutes à trancher » of this audit (ADR 062): the plan asks it the identity doubts, the caller lists them. */
+  book: DoubtBook;
 }
 
 /**
@@ -101,11 +108,15 @@ export interface AuditResult {
  * Outputs: the report, the parsed tables, the assembled cards (non-null
  * when a perimeter is present) and the blockers. Deterministic for
  * identical inputs and `now`, whatever the order of the files or of the
- * rows of the Coût export.
+ * rows of the Coût export. `book` (ADR 062; default: the tool's
+ * proposals only) settles the decidable doubts — the same files and the
+ * same choices give the same deck.
  * Failure modes: none — unreadable or alien files land in the inventory
  * with a reason, nothing throws.
  */
-export function runImportAudit(files: InputFile[], config: BoardConfig, now: Date, year: number = config.exercise.year): AuditResult {
+export function runImportAudit(
+  files: InputFile[], config: BoardConfig, now: Date, year: number = config.exercise.year, book: DoubtBook = createDoubtBook({ year }),
+): AuditResult {
   // The exercise read: the current one, or another year the caller names (ADR 035).
   const cfg = year === config.exercise.year ? config : { ...config, exercise: { ...config.exercise, year } };
   const report = createReport();
@@ -116,13 +127,14 @@ export function runImportAudit(files: InputFile[], config: BoardConfig, now: Dat
   const paramBest = pick(PARAM_CONTRACT.id);
   const param = paramBest === null ? null
     : parseParam(paramBest.dataRows, paramBest.match, paramBest.headerCells, cfg, report, paramBest.file.name);
-  const perimeter = readPerimeter({ byContract, config: cfg, param, report, blockers, nearMisses });
+  const perimeter = readPerimeter({ byContract, config: cfg, param, report, blockers, nearMisses, book });
   const projets = perimeter.projets;
-  const { jalons, sp, pdc, profils, names } = readSideTables(pick, cfg, report, now, referenceDayOf(byContract, now));
+  const { jalons, sp, pdc, profils, names } = readSideTables(pick, cfg, report, now, referenceDayOf(byContract, now), book);
   const cdpBest = pick(CDP_CONTRACT.id) ?? secondProjets(perimeter.lender, report) ?? lentOnglet(perimeter, report);
-  const cdp = cdpBest === null ? null : parseCdp(cdpBest.dataRows, cdpBest.match, param, report, cdpBest.file.name);
-  const cards = assembleCards(projets, jalons, sp, cfg, report);
-  const ownerStats = attachOwners(cards, cdp, report);
+  const cdp = cdpBest === null ? null : parseCdp(cdpBest.dataRows, cdpBest.match, param, report, cdpBest.file.name, book);
+  const cards = assembleCards(projets, jalons, sp, cfg, report, book);
+  const ownerStats = attachOwners(cards, cdp, report, book);
+  book.keepSideDoubts(new Set((cards?.cards ?? []).flatMap((c) => [c.normalizedName, ...(c.codename === null ? [] : [normalizeLabel(c.codename)])])));
   const chargeStats = attachCharges(cards?.cards ?? [], pdc, report, cfg.exercise.year);
   const capacity = buildCapacity(profils, pdc, cards?.cards ?? [], cfg, report, param, perimeter.couts);
   emitMissing(report, presence(byContract, perimeter, cdp !== null), cfg.exercise.year);
@@ -133,7 +145,7 @@ export function runImportAudit(files: InputFile[], config: BoardConfig, now: Dat
       couts: perimeter.couts?.fileName ?? null, projets: perimeter.ongletBest?.file.name ?? null,
       param: paramBest?.file.name ?? null, cdp: cdpBest?.file.name ?? null, ...names,
     },
-    blockers,
+    blockers, book,
   };
   promoteAmbiguous(report);
   emitAssembly(report, result, cfg);
@@ -172,13 +184,13 @@ interface SideTables {
 // (elected then read one after the other: the report keeps its order).
 // ADR 058: milestone dates are read against the export's day (reference-day.ts).
 function readSideTables(
-  pick: (id: string) => Candidate | null, cfg: BoardConfig, report: ImportReport, now: Date, reference: ReferenceDay,
+  pick: (id: string) => Candidate | null, cfg: BoardConfig, report: ImportReport, now: Date, reference: ReferenceDay, book: DoubtBook,
 ): SideTables {
   const jalonsBest = pick(JALONS_CONTRACT.id);
   const jalons = jalonsBest === null ? null
-    : parseJalons(jalonsBest.dataRows, jalonsBest.match, cfg, report, jalonsBest.file.name, now, reference);
+    : parseJalons(jalonsBest.dataRows, jalonsBest.match, cfg, report, jalonsBest.file.name, now, reference, book);
   const spBest = pick(SP_CONTRACT.id);
-  const sp = spBest === null ? null : parseSp(spBest.dataRows, spBest.match, report, spBest.file.name);
+  const sp = spBest === null ? null : parseSp(spBest.dataRows, spBest.match, report, spBest.file.name, book);
   const pdcBest = pick(PDC_CONTRACT.id);
   const pdc = pdcBest === null ? null : parsePdc(pdcBest.dataRows, pdcBest.match, cfg, report, pdcBest.file.name);
   const profilsBest = pick(PROFILS_CONTRACT.id);

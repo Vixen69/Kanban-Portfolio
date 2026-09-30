@@ -8,22 +8,26 @@
 // « pris » lines ARE the cards. ADR 058: the name / code fallback is taken
 // only when the card found no row by its Id, the key is carried by one
 // row only, and that row carries no OTHER Id — a card never borrows
-// another project's milestones or k€.
+// another project's milestones or k€. ADR 062: the joins ADR 058 refuses
+// or cannot settle, and the ambiguous SP figures, are « Doutes à
+// trancher » (enrich-joins.ts).
 
 import type { BoardConfig } from "../../core/types.ts";
 import { resolveFlowAnchors } from "../../core/flow.ts";
 import { createTolerantLookup } from "./normalize.ts";
 import { tallyInto, tallyLabel } from "./tallies.ts";
-import type { Tally } from "./tallies.ts";
 import type { ProjetEntry, ProjetsTable } from "./projets.ts";
 import type { JalonEntry, JalonsTable, Stage } from "./jalons.ts";
-import type { SpEntry, SpTable } from "./sp.ts";
+import type { SpTable } from "./sp.ts";
 import type { CardCharge } from "./charges.ts";
 import { doubt, take, warn } from "./report.ts";
 import { disambiguateIds } from "./card-identity.ts";
 import type { ImportReport, RowRef } from "./report.ts";
 import { createNameMarkerResolver, ruleLabel } from "./portfolio.ts";
 import type { PortfolioHit } from "./portfolio.ts";
+import { joinJalons, joinSp, spFigures } from "./enrich-joins.ts";
+import type { JoinState } from "./enrich-joins.ts";
+import type { DoubtBook } from "./doubt-book.ts";
 
 /** One card, fully enriched — what the real import will load. */
 export interface EnrichedCard {
@@ -90,20 +94,13 @@ export interface CardAssembly {
   stats: CardStats;
 }
 
-interface JoinContext {
+interface JoinContext extends JoinState {
   report: ImportReport;
-  jalons: JalonsTable | null;
-  sp: SpTable | null;
   laneId: string;
-  entryColumnId: string;
   /** The terminal column and the states that send a card there (ADR 043); null = no terminal anchor. */
   doneColumnId: string | null;
   isDoneState: (state: string) => boolean;
-  columnNames: Map<string, string>;
-  consumedJalons: Set<JalonEntry>;
-  consumedSp: Set<SpEntry>;
   stats: CardStats;
-  tallies: Map<string, Tally>;
   /** The bracketed name markers of the config (ADR 036). */
   marker: (name: string) => PortfolioHit | null;
 }
@@ -112,17 +109,18 @@ interface JoinContext {
  * Assembles the cards from the perimeter and its two enrichments.
  * Inputs: the `projets` table (null -> no assembly), the ProjetsJalons and
  * SP tables (nullable), the board config (lane, entry column, names), the
- * report.
+ * report, the book of the « Doutes à trancher » (ADR 062; absent = the
+ * joins of ADR 058, French readings).
  * Outputs: the cards + stats; side effects: one « pris » line per card and
  * aggregated signalements for every join miss.
  * Failure modes: none.
  */
 export function assembleCards(
   projets: ProjetsTable | null, jalons: JalonsTable | null, sp: SpTable | null,
-  config: BoardConfig, report: ImportReport,
+  config: BoardConfig, report: ImportReport, book?: DoubtBook,
 ): CardAssembly | null {
   if (projets === null) return null;
-  const ctx = createContext(jalons, sp, config, report);
+  const ctx = createContext(jalons, sp, config, report, book);
   const cards = projets.entries.map((entry) => buildCard(ctx, entry));
   ctx.stats.total = cards.length;
   ctx.stats.jalonsOutside = (jalons?.entries.length ?? 0) - ctx.consumedJalons.size;
@@ -136,7 +134,7 @@ export function assembleCards(
 }
 
 function createContext(
-  jalons: JalonsTable | null, sp: SpTable | null, config: BoardConfig, report: ImportReport,
+  jalons: JalonsTable | null, sp: SpTable | null, config: BoardConfig, report: ImportReport, book: DoubtBook | undefined,
 ): JoinContext {
   const anchors = resolveFlowAnchors(config);
   const doneStates = createTolerantLookup((config.exercise.doneStates ?? []).map((s): [string, string] => [s, s]));
@@ -155,6 +153,7 @@ function createContext(
     },
     tallies: new Map(),
     marker: createNameMarkerResolver(config),
+    book,
   };
 }
 
@@ -197,8 +196,9 @@ function isFinished(ctx: JoinContext, entry: ProjetEntry): boolean {
 // One perimeter row -> one card. The pris line names the column and the
 // domain read-out so the ~20-project manual check reads in one glance.
 function buildCard(ctx: JoinContext, entry: ProjetEntry): EnrichedCard {
-  const jalon = joinJalons(ctx, entry);
+  const jalon = joinJalons(ctx, entry, isFinished(ctx, entry));
   const spEntry = joinSp(ctx, entry);
+  const figures = spFigures(ctx, entry, spEntry);
   const s = ctx.stats;
   const domainPart = domainOf(ctx, entry);
   if (domainPart.domainId !== null) s.withDomain++;
@@ -215,10 +215,7 @@ function buildCard(ctx: JoinContext, entry: ProjetEntry): EnrichedCard {
     // The four k€ figures come from SP alone (author, 2026-09-10): the
     // Projets « Budget RDLI Total Coût » is plurianual and no longer feeds
     // the card, even as a fallback (Q23 tranchée).
-    budgetRdli: spEntry?.budgetRdli ?? null,
-    budgetEstimated: spEntry?.budgetEstimated ?? null,
-    budgetConsumed: spEntry?.budgetConsumed ?? null,
-    budgetEngaged: spEntry?.budgetEngaged ?? null,
+    ...figures,
     effortEstimated: entry.effortEstimated, effortConsumed: entry.effortConsumed,
     charges: [], pdcKey: null, ref: entry.ref,
   };
@@ -227,59 +224,6 @@ function buildCard(ctx: JoinContext, entry: ProjetEntry): EnrichedCard {
     : `${domainPart.domainId}${domainPart.subDomainId === null ? "" : ` / ${domainPart.subDomainId}`}`;
   take(ctx.report, card.ref, card.title, `carte → colonne « ${columnName} » · ${domain}`, card.codename ?? undefined);
   return card;
-}
-
-// A fallback hit (by name, by code) that carries another Id than the
-// card's is another project (ADR 058): refused, and said.
-function sameProject<T extends { id: string | null }>(ctx: JoinContext, entry: ProjetEntry, hit: T | undefined, what: string): T | undefined {
-  if (hit === undefined || entry.id === "" || hit.id === null || hit.id === "" || hit.id === entry.id) return hit;
-  tallyInto(ctx.tallies, `${what} : le nom désigne un autre Id (${hit.id}) — pas de jointure, rien d'emprunté`, entry.ref.line);
-  return undefined;
-}
-
-// ProjetsJalons by Id, then by name; a hit counts the stage it implies.
-function joinJalons(ctx: JoinContext, entry: ProjetEntry): JalonEntry | null {
-  if (ctx.jalons === null) return null;
-  const hit = (entry.id === "" ? undefined : ctx.jalons.byId.get(entry.id))
-    ?? sameProject(ctx, entry, ctx.jalons.byName.get(entry.normalizedName), "ProjetsJalons");
-  if (hit === undefined) {
-    ctx.stats.withoutJalons++;
-    const where = isFinished(ctx, entry) ? "placée par l'état du projet" : "colonne d'entrée";
-    tallyInto(ctx.tallies, `carte sans ligne dans ProjetsJalons — ${where}`, entry.ref.line);
-    return null;
-  }
-  ctx.consumedJalons.add(hit);
-  ctx.stats.positioned++;
-  ctx.stats.stageCounts.set(hit.stage, (ctx.stats.stageCounts.get(hit.stage) ?? 0) + 1);
-  return hit;
-}
-
-// SP by Id, then by name, then by PE code; the key used is counted, and a
-// name/Id disagreement inside SP is left to the SP reader's own doubts.
-function joinSp(ctx: JoinContext, entry: ProjetEntry): SpEntry | null {
-  if (ctx.sp === null) return null;
-  const byId = entry.id === "" ? undefined : ctx.sp.byId.get(entry.id);
-  const byName = byId === undefined ? sameProject(ctx, entry, ctx.sp.byName.get(entry.normalizedName), "SP") : undefined;
-  const byCode = byId === undefined && byName === undefined && entry.codename !== null
-    ? sameProject(ctx, entry, ctx.sp.byCode.get(entry.codename), "SP") : undefined;
-  const hit = byId ?? byName ?? byCode;
-  if (hit === undefined) {
-    ctx.stats.withoutSp++;
-    const ambiguous = ctx.sp.ambiguous.has(entry.normalizedName) || (entry.codename !== null && ctx.sp.ambiguous.has(entry.codename));
-    tallyInto(ctx.tallies, ambiguous
-      ? "carte sans ligne SP à son Id, et son nom (ou code) est porté par plusieurs Id — aucun coût emprunté"
-      : "carte sans correspondance SP — coûts de l'exercice inconnus", entry.ref.line);
-    return null;
-  }
-  if (byId !== undefined) ctx.stats.spById++;
-  else if (byName !== undefined) ctx.stats.spByName++;
-  else ctx.stats.spByCode++;
-  const namesake = ctx.sp.byName.get(entry.normalizedName);
-  if (byId !== undefined && namesake !== undefined && byId !== namesake) {
-    tallyInto(ctx.tallies, "SP : l'Id et le nom désignent deux sujets différents — Id retenu", entry.ref.line);
-  }
-  ctx.consumedSp.add(hit);
-  return hit;
 }
 
 /** Card counts per column id, in board order (for the assembly line). */

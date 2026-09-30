@@ -64,22 +64,34 @@ export function dateCell(
 export function moneyCell(
   raw: string, column: string, line: number, tallies: Map<string, Tally>,
 ): number | null {
+  return moneyReading(raw, column, line, tallies).value;
+}
+
+/**
+ * Reads a money cell like moneyCell, and also gives the ENGLISH reading of
+ * an ambiguous cell (« 1,035 » → 1 035, in k€ after the same € → k€
+ * conversion) — the « figure » doubt of ADR 062 offers both.
+ * Inputs: as moneyCell. Output: the k€ value (French reading) and the
+ * English one (null when the cell is not ambiguous). Failure modes: none.
+ */
+export function moneyReading(
+  raw: string, column: string, line: number, tallies: Map<string, Tally>,
+): { value: number | null; english: number | null } {
   const parsed = parseFrenchAmount(raw);
-  if (parsed.kind === "empty") return null;
+  if (parsed.kind === "empty") return { value: null, english: null };
   if (parsed.kind === "invalid") {
     tallyInto(tallies, `« ${column} » illisible`, line, sampleOf(raw));
-    return null;
+    return { value: null, english: null };
   }
   if (parsed.ambiguous !== undefined) {
     tallyInto(tallies, `« ${column} » : ${AMBIGUOUS_MARK} — lu à la française (virgule décimale), à vérifier : mille fois plus en lecture anglaise`, line, sampleOf(raw));
   }
-  let value = parsed.value;
-  if (parsed.unit !== undefined && /^(€|euros?)$/i.test(parsed.unit)) {
-    value = Math.round(value) / 1000;
-    tallyInto(tallies, `« ${column} » en euros — converti en k€`, line);
-  }
+  const euros = parsed.unit !== undefined && /^(€|euros?)$/i.test(parsed.unit);
+  const kilo = (n: number): number => (euros ? Math.round(n) / 1000 : n);
+  const value = kilo(parsed.value);
+  if (euros) tallyInto(tallies, `« ${column} » en euros — converti en k€`, line);
   if (value < 0) tallyInto(tallies, `« ${column} » négatif`, line);
-  return value;
+  return { value, english: parsed.ambiguous === undefined ? null : kilo(parsed.ambiguous.alternative) };
 }
 
 /**

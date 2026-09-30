@@ -32,6 +32,8 @@ export interface Seen {
   hasMe: boolean;
   /** Lines of exercise-year rows whose ME cells hold something unreadable — neither empty nor zero. */
   meUnreadable: number[];
+  /** The raw unreadable ME cells (distinct, sorted): what makes the ME doubt « the same » at the next import (ADR 062). */
+  meSamples: string[];
   /** « Charge » rows of the exercise year by cost centre (normalized key). */
   charges: Map<string, { centre: string; jh: number; done: number }>;
   ref: RowRef;
@@ -81,7 +83,7 @@ const ACCOUNTING_ZERO = /^(?:€\s*)?[-–—](?:\s*€)?$/;
 
 // The ME verdict of one row: a non-zero figure; else something unreadable
 // (neither empty nor zero — ADR 056: never counted as zero); else none.
-function rowMe(ctx: RowContext, row: CsvRow): "figure" | "unreadable" | "none" {
+function rowMe(ctx: RowContext, row: CsvRow, samples: string[]): "figure" | "unreadable" | "none" {
   let unreadable = false;
   for (const column of ME_COLUMNS) {
     const raw = cell(ctx, row, column);
@@ -93,6 +95,7 @@ function rowMe(ctx: RowContext, row: CsvRow): "figure" | "unreadable" | "none" {
       continue;
     }
     tallyInto(ctx.tallies, `« ${column} » illisible — ni vide ni zéro, le projet est gardé (douteux)`, row.line, sampleOf(raw));
+    if (!samples.includes(raw)) samples.push(raw);
     unreadable = true;
   }
   return unreadable ? "unreadable" : "none";
@@ -133,13 +136,13 @@ export function readRow(ctx: RowContext, row: CsvRow): void {
   const onYear = readYear(ctx, row);
   if (!onYear) ctx.stats.otherYearRows++;
   const seen: Seen = ctx.seen.get(id) ?? {
-    id, rows: [], onYear: false, hasMe: false, meUnreadable: [], charges: new Map(), ref: { file: ctx.fileName, line: row.line },
+    id, rows: [], onYear: false, hasMe: false, meUnreadable: [], meSamples: [], charges: new Map(), ref: { file: ctx.fileName, line: row.line },
   };
   ctx.seen.set(id, seen);
   seen.rows.push(rowFacts(ctx, row, onYear));
   if (!onYear) return;
   seen.onYear = true;
-  const me = rowMe(ctx, row);
+  const me = rowMe(ctx, row, seen.meSamples);
   if (me === "figure") seen.hasMe = true;
   if (me === "unreadable") seen.meUnreadable.push(row.line);
   foldCharge(ctx, row, seen);

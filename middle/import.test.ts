@@ -91,7 +91,7 @@ test("ADR 036: a domain set by hand becomes a conflict at the next audit; the lo
         [1, card.id, other, card.domain, "main"],
       );
       await assert.rejects(() => loadImport(storage, CONFIG, fixtureFiles(), NOW), /1 conflit\(s\) de domaine sans décision/);
-      const kept = await loadImport(storage, CONFIG, fixtureFiles(), NOW, 2026, new Map([[card.id, "garder"]]));
+      const kept = await loadImport(storage, CONFIG, fixtureFiles(), NOW, 2026, { decisions: new Map([[card.id, "garder"]]) });
       assert.deepEqual([kept.load.domainKept, kept.load.domainReplaced], [1, 0]);
       const trace = (await storage.listEvents()).filter((e) => e.type === "edited" && e.actor === "import-csv");
       assert.deepEqual([trace.length, trace[0]?.payload["decision"]], [1, "garder"]);

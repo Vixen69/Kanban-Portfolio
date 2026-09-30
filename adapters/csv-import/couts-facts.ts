@@ -22,6 +22,20 @@ export interface RowFacts {
   onYear: boolean;
 }
 
+/** The facts whose rows may disagree — the doubts of ADR 062 (actif is information only). */
+export type DisputedFact = "name" | "type" | "etat" | "portfolio";
+
+/** One fact the rows of a project disagree on, structured for the « Doutes à trancher » (ADR 062). */
+export interface FactDispute {
+  fact: DisputedFact;
+  /** The fact in the report’s words (« nom », « type », « état », « portefeuille »). */
+  label: string;
+  /** Every non-blank value the rows carry (all years), most frequent first, with its row count. */
+  values: Array<{ value: string; count: number }>;
+  /** The value the rule retained (exercise-year rows first). */
+  retained: string;
+}
+
 /** The facts retained for a project, and what its rows disagreed on. */
 export interface ProjectFacts {
   name: string;
@@ -31,6 +45,8 @@ export interface ProjectFacts {
   actif: string;
   /** Plain French, one fragment per disputed fact (« état « A » ×2 / « B » ×1 → « A » »); empty when the rows agree. */
   disagreements: string[];
+  /** The same disagreements, structured (ADR 062). */
+  disputes: FactDispute[];
   /** True when the facts come from exercise-year rows. */
   fromExercise: boolean;
 }
@@ -38,7 +54,7 @@ export interface ProjectFacts {
 type Fact = "name" | "type" | "etat" | "portfolio" | "actif";
 
 /** The facts whose disagreement is worth a douteux (actif is information only). */
-const DISPUTED: ReadonlyArray<[Fact, string]> = [["name", "nom"], ["type", "type"], ["etat", "état"], ["portfolio", "portefeuille"]];
+const DISPUTED: ReadonlyArray<[DisputedFact, string]> = [["name", "nom"], ["type", "type"], ["etat", "état"], ["portfolio", "portefeuille"]];
 
 interface Tally {
   count: number;
@@ -82,16 +98,17 @@ export function resolveFacts(rows: readonly RowFacts[]): ProjectFacts {
   const onYear = rows.filter((r) => r.onYear);
   const pool = onYear.length > 0 ? onYear : rows;
   const facts: ProjectFacts = {
-    name: "", type: "", etat: "", portfolio: "", actif: "", disagreements: [], fromExercise: onYear.length > 0,
+    name: "", type: "", etat: "", portfolio: "", actif: "", disagreements: [], disputes: [], fromExercise: onYear.length > 0,
   };
   for (const fact of ["name", "type", "etat", "portfolio", "actif"] as const) {
     const value = resolveOne(pool, fact).value;
     facts[fact] = value;
-    const label = DISPUTED.find(([f]) => f === fact)?.[1];
-    const tallies = label === undefined ? [] : resolveOne(rows, fact).tallies;
-    if (label === undefined || tallies.length < 2) continue;
+    const disputed = DISPUTED.find(([f]) => f === fact);
+    const tallies = disputed === undefined ? [] : resolveOne(rows, fact).tallies;
+    if (disputed === undefined || tallies.length < 2) continue;
     const values = tallies.map(([v, t]) => `« ${v} » ×${t.count}`).join(" / ");
-    facts.disagreements.push(`${label} ${values} → « ${value} »`);
+    facts.disagreements.push(`${disputed[1]} ${values} → « ${value} »`);
+    facts.disputes.push({ fact: disputed[0], label: disputed[1], values: tallies.map(([v, t]) => ({ value: v, count: t.count })), retained: value });
   }
   return facts;
 }

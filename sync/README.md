@@ -28,6 +28,14 @@ npm run import -- <dossier> [--out <chemin-du-rapport>] [--charger | --comparer]
   sans lui, un chargement qui en rencontre est refusé — l'outil les
   tranche un par un.
 
+Les **doutes à trancher** (ADR 062 : lignes COUT PREV en désaccord, Id en
+double, jointures par le nom, montant « 1,035 », cellule ME illisible,
+identité) sont imprimés avec la façon dont ils sont tranchés : le choix
+mémorisé dans l'outil (« ne plus me demander », lu dans le journal avec
+`--charger` ou `--comparer`), sinon celui de l'outil. La commande ne pose
+aucune question et n'écrit aucun choix : on tranche dans l'outil
+(⚙ › Importer).
+
 Le chargement est **refusé** (message en français, code de sortie 1)
 sur un exercice clos, sur des fichiers bloquants (ADR 056 : deux fichiers
 d'une même sorte, un même nom reçu deux fois, un fichier qui ressemble à

@@ -8,7 +8,8 @@
 // them blank (ADR 054). Next to the values, the hand corrections the
 // export's NEW value replaces (ADR 060); after the presence lists, what
 // the hand did that the load met (placements overtaken, adoptions,
-// deleted cards ignored, identity doubts — ADR 058/059/060). A refused
+// deleted cards ignored, identity doubts — ADR 058/059/060), and the
+// doubts settled otherwise than by the tool (ADR 062). A refused
 // load says its refusal (ADR 056). The audit and the load return the same
 // object: this view reads it the same way. Nothing here computes or writes.
 
@@ -17,7 +18,7 @@ import type { ImportAuditResult, ImportChanges as Changes } from "../../core/imp
 import { keyNumbers, minorCounts, reportTitle, unloadableLine, warnLines } from "../importReport.ts";
 import { ChangeSections } from "./ChangeSections.tsx";
 import { FilesStrip } from "./FilesStrip.tsx";
-import { HandLists, KeptLists, PresenceLists, ReplacedLists } from "./ImportLists.tsx";
+import { HandLists, KeptLists, PresenceLists, ReplacedLists, SettledLists } from "./ImportLists.tsx";
 
 // The received / recognised files and the technical report's warnings, in one line.
 function Received({ result }: { result: ImportAuditResult }) {
@@ -75,6 +76,7 @@ export function ImportChanges({ result, loaded, config }: { result: ImportAuditR
         empty={loaded ? "Aucune valeur n’a changé." : "Aucune valeur ne changera."} />
       <ReplacedLists replaced={changes.replaced} loaded={loaded} />
       <PresenceLists changes={changes} />
+      <SettledLists settled={changes.settled ?? []} loaded={loaded} />
       <HandLists changes={changes} config={config} />
       <KeptLists kept={changes.kept} loaded={loaded} />
     </section>

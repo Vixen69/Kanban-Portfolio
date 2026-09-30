@@ -13,6 +13,7 @@
 import type { CapacitySnapshot } from "../../core/types.ts";
 import { instanceId } from "../../core/exercise.ts";
 import type { EnrichedCard } from "./enrich.ts";
+import { fnv1a as fingerprint } from "./hash.ts";
 
 /**
  * Stable board id of an imported card in one exercise (ADR 035): its base
@@ -36,19 +37,20 @@ export function baseCardId(card: EnrichedCard): string {
   return nameId(card.normalizedName);
 }
 
+/**
+ * The would-be board id of a project in one exercise, from what a reader
+ * knows before the assembly (ADR 062: a doubt names the card it concerns,
+ * on the board or not yet): « code@année », else the name id.
+ * Inputs: the code (null when none), the normalized name, the year.
+ * Output: the id. Failure modes: none.
+ */
+export function projectInstanceId(code: string | null, normalizedName: string, year: number): string {
+  return instanceId(code ?? nameId(normalizedName), year);
+}
+
 function nameId(normalizedName: string): string {
   const slug = normalizedName.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48);
   return `IMP-${slug === "" ? "sans-nom" : slug}`;
-}
-
-// FNV-1a, 32 bits, as 8 hex digits: a short, stable fingerprint of a name.
-function fingerprint(text: string): string {
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < text.length; i++) {
-    hash ^= text.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193) >>> 0;
-  }
-  return hash.toString(16).padStart(8, "0");
 }
 
 /**

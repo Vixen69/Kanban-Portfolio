@@ -20,6 +20,7 @@ import { postCard } from "./cards.ts";
 import type { ConfigStore } from "./config-store.ts";
 import { logError, logRequest } from "./log.ts";
 import { auditImport, loadImport, parseDecisions, parseExercise, parseFiles } from "./import.ts";
+import { parseChoices } from "./import-choices.ts";
 import { postExerciseSwitch } from "./exercise.ts";
 import { getSnapshotDiff, getSnapshots, postRestore, postSnapshot, takeSnapshot } from "./snapshots.ts";
 import { IMPORT_ACTOR, importConfig } from "../adapters/csv-import/index.ts";
@@ -87,13 +88,15 @@ function errorHandler(err: unknown, req: Request, res: Response, _next: NextFunc
 // authentication until RP3 like the rest of the write API. Their own JSON
 // parser carries the larger cap. The importer matches export labels with
 // the versioned model's vocabulary, never the names ⚙ › Catégories renamed
-// (ADR 056, adapters/csv-import/vocabulary.ts).
+// (ADR 056, adapters/csv-import/vocabulary.ts). Both take the answers to
+// the « Doutes à trancher » (`choices`, ADR 062): the audit previews them,
+// the load applies and traces them.
 function mountImportRoutes(app: Express, deps: MiddleDeps): void {
   const body = express.json({ limit: IMPORT_MAX_BODY });
   const configFor = (): ReturnType<typeof importConfig> => importConfig(deps.configStore.getRuntime(), deps.configStore.getDefaults());
   app.post("/api/import/audit", body, async (req: Request, res: Response) => {
     const config = configFor();
-    const result = await auditImport(deps.storage, config, parseFiles(req.body), new Date(), parseExercise(req.body, config));
+    const result = await auditImport(deps.storage, config, parseFiles(req.body), new Date(), parseExercise(req.body, config), parseChoices(req.body));
     res.status(200).json(result);
   });
   app.post("/api/import/load", body, async (req: Request, res: Response) => {
@@ -102,7 +105,8 @@ function mountImportRoutes(app: Express, deps: MiddleDeps): void {
     const now = new Date();
     // The automatic snapshot (ADR 042): once the load is accepted, before it writes.
     const beforeWrite = async (): Promise<void> => { await takeSnapshot(deps, `avant chargement ${year}`, IMPORT_ACTOR, now); };
-    const result = await loadImport(deps.storage, config, parseFiles(req.body), now, year, parseDecisions(req.body), { beforeWrite });
+    const answers = { decisions: parseDecisions(req.body), choices: parseChoices(req.body) };
+    const result = await loadImport(deps.storage, config, parseFiles(req.body), now, year, answers, { beforeWrite });
     res.status(200).json(result);
   });
 }

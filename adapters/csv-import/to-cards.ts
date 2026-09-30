@@ -25,7 +25,9 @@
 // (author, 2026-09-30): the export's NEW information wins — a new value
 // takes back a hand correction (newer-facts.ts), a new jalon further along
 // the flow goes past a hand placement (load-position.ts); a repeat of the
-// previous import's value leaves the hand's work alone.
+// previous import's value leaves the hand's work alone. ADR 062: the
+// identity questions (two hand-made cards on one code, an adoption under
+// another title, two projects on one identity) are « Doutes à trancher ».
 // Pure: no storage, no clock of its own — the caller passes both.
 
 import type { BoardConfig, Card, CardEvent, CardState } from "../../core/types.ts";
@@ -47,6 +49,8 @@ import { placedLikeStored, refreshPosition } from "./load-position.ts";
 import type { AdvancedCard, PositionInput } from "./load-position.ts";
 import { newerFactEvents } from "./newer-facts.ts";
 import type { RefreshedCard } from "./newer-facts.ts";
+import { identityCollisions } from "./load-doubts.ts";
+import type { DoubtBook } from "./doubt-book.ts";
 
 export { IMPORT_ACTOR, baseCardId, cardId, withLegacyIds };
 export type { AdoptedCard, AdvancedCard };
@@ -121,31 +125,34 @@ export interface LoadPlan {
  * Inputs: the enriched cards, the board config, the cards and events
  * already stored (empty arrays on a first load), `now` (injected), the
  * exercise year loaded (default: the config's current one), and the PMO's
- * domain decisions by card id (ADR 036; none = every conflict undecided).
+ * domain decisions by card id (ADR 036; none = every conflict undecided),
+ * and the book of the « Doutes à trancher » (ADR 062: the identity
+ * doubts are asked there; absent = the proposals).
  * Outputs: the LoadPlan — nothing is written here.
  * Failure modes: none; cards whose identity cannot be derived keep a
  * name-based id, so a renamed project creates a new card (the code
  * cross-check of the audit flags that case beforehand); a second deck
- * card on an id already planned is left out and said (identityDoubts).
+ * card on an id already planned is left out and said (identityDoubts) —
+ * the first by code then title unless the PMO picked another (ADR 062).
  */
 export function planLoad(
   deck: EnrichedCard[], config: BoardConfig,
   existingCards: Card[], existingEvents: CardEvent[], now: Date, year: number = config.exercise.year,
-  decisions: ReadonlyMap<string, DomainDecision> = new Map(),
+  decisions: ReadonlyMap<string, DomainDecision> = new Map(), book?: DoubtBook,
 ): LoadPlan {
   const reading = readBoard(existingCards, existingEvents, year, config.exercise.year);
   const plan = emptyPlan(year);
+  const ledger = { aliases: plan.aliases, adopted: plan.adopted, identityDoubts: plan.identityDoubts, ...(book === undefined ? {} : { book }) };
+  const collisions = identityCollisions(deck, year, reading, book);
+  plan.identityDoubts.push(...collisions.said);
   const stored = new Map(existingCards.map((c) => [c.id, c]));
   const tally: KeptTally = new Map();
   const deckIds = new Map<string, string>();
   const refreshed: Array<RefreshedCard | null> = [];
   for (const card of deck) {
-    const identity = resolveIdentity(card, year, reading, plan);
-    const first = deckIds.get(identity.id);
-    if (first !== undefined) {
-      plan.identityDoubts.push(`identité « ${identity.id} » portée par deux projets de l’export (« ${first} », « ${card.title} ») — seul le premier est chargé`);
-      continue;
-    }
+    if (collisions.losers.has(card)) continue;
+    const identity = resolveIdentity(card, year, reading, ledger);
+    if (deckIds.has(identity.id)) continue; // collisions settled above
     deckIds.set(identity.id, card.title);
     if (identity.kind === "deleted") {
       plan.deletedSkipped.push(identity.id);

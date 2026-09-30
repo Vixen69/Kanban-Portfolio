@@ -28,10 +28,13 @@ function isCreation(event: CardEvent): boolean {
 }
 
 // Per card, its birth: the card's first event by log sequence (the first
-// met on a tie), kept only when it is a creation.
+// met on a tie), kept only when it is a creation. An import doubt settled
+// before the project entered the board (`settled`, ADR 062) is no event
+// of the card's life: it never hides the birth that follows.
 function creations(events: readonly CardEvent[]): Map<string, CardEvent> {
   const first = new Map<string, CardEvent>();
   for (const event of events) {
+    if (event.type === "settled") continue;
     const seen = first.get(event.cardId);
     if (seen === undefined || eventSequence(event.id) < eventSequence(seen.id)) first.set(event.cardId, event);
   }

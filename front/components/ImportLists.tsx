@@ -6,12 +6,15 @@
 // load met: the hand corrections the export's NEW value replaces and the
 // hand placements a new jalon overtook (ADR 060), the hand-made cards
 // adopted (ADR 059), the cards deleted on the board that the files still
-// carry (ADR 058), the identity doubts. Short lists unfold, long ones stay
-// folded behind their count (../importReport.ts).
+// carry (ADR 058), the identity doubts. The doubts settled otherwise than
+// by the tool — a choice remembered or made at this load (ADR 062). Short
+// lists unfold, long ones stay folded behind their count
+// (../importReport.ts).
 
 import type { BoardConfig } from "../../core/types.ts";
-import type { ImportCardRef, ImportChanges, ImportKeptFact } from "../../core/import-types.ts";
+import type { ImportCardRef, ImportChanges, ImportKeptFact, ImportSettled } from "../../core/import-types.ts";
 import { capitalized } from "../changeGroups.ts";
+import { settledReason } from "../importDoubts.ts";
 import { adoptedReason, advancedReason, listOpen } from "../importReport.ts";
 
 interface Row {
@@ -122,6 +125,34 @@ export function HandLists({ changes, config }: { changes: ImportChanges; config:
       <RefList title="Cartes saisies à la main adoptées par l’export"
         rows={adopted.map((entry) => ({ ref: entry, reason: adoptedReason(entry), warning: null }))} />
       <RefList title="Supprimées du tableau, ignorées par l’import" rows={deletedSkipped.map(plain)} />
+    </>
+  );
+}
+
+/**
+ * The doubts settled otherwise than by the tool's choice (ADR 062): the
+ * project, the option applied and how — remembered (« ne plus me
+ * demander ») or chosen at this load; why it was doubtful in the tooltip.
+ * Inputs: the settled doubts (absent in reports made before), whether the
+ * load ran. Output: the list, nothing when none. Failure modes: none.
+ */
+export function SettledLists({ settled, loaded }: { settled: readonly ImportSettled[]; loaded: boolean }) {
+  if (settled.length === 0) return null;
+  return (
+    <>
+      <h3 className="chg-h">Doutes tranchés autrement que par l’outil</h3>
+      <details className="sd-sec" open={listOpen(settled.length)}>
+        <summary><b>{loaded ? "Choix appliqués" : "Choix qui seront appliqués"}</b> · {settled.length}</summary>
+        <ul>
+          {settled.map((entry, i) => (
+            <li key={i} className="sd-item" title={entry.why}>
+              {entry.code !== null && <span className="sd-code">{entry.code}</span>}
+              <span className="sd-title">{entry.title}</span>
+              <span className="sd-move">{settledReason(entry)}</span>
+            </li>
+          ))}
+        </ul>
+      </details>
     </>
   );
 }
