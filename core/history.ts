@@ -9,6 +9,7 @@
 
 import type { BoardConfig, CardEvent } from "./types.ts";
 import { isReorder } from "./events.ts";
+import { creationFirst, oldestFirst } from "./fold-order.ts";
 
 /** What a history line narrates — a movement or a blocking event. */
 export type HistoryKind = "move" | "block" | "unblock" | "decision" | "unlisted" | "relisted";
@@ -42,16 +43,6 @@ const ENTRY_LABEL = "Entrée";
 function columnName(config: BoardConfig, columnId: string | null): string | null {
   if (columnId === null || columnId === "") return null;
   return config.columns.find((column) => column.id === columnId)?.name ?? columnId;
-}
-
-function numericSuffix(eventId: string): number {
-  const match = /(\d+)$/.exec(eventId);
-  return match ? Number(match[1]) : 0;
-}
-
-function newestFirst(a: CardEvent, b: CardEvent): number {
-  if (a.ts !== b.ts) return a.ts < b.ts ? 1 : -1;
-  return numericSuffix(b.id) - numericSuffix(a.id);
 }
 
 function frDay(isoDate: string): string {
@@ -109,16 +100,21 @@ function toEntry(config: BoardConfig, event: CardEvent): HistoryEntry {
  * date in `detail`, the free text in `reason`), unlisted / relisted (ADR 026)
  * — imported, unlisted and relisted lines carry the load's reason in
  * `reason` when the load wrote one (null for older events).
- * Output: HistoryEntry[] sorted by ts descending, ties broken by the
- * numeric suffix of the event id (the fold order, reversed). Unknown
+ * Output: HistoryEntry[] in the fold order (core/fold-order.ts),
+ * reversed: ts descending, ties by the log sequence descending, the
+ * card's creation always last — a future-dated `imported` of an old log
+ * never tops the moves the board already shows (ADR 058 amendment). Unknown
  * column ids fall back to the raw id; a missing destination becomes
  * "Entrée"; created/imported entries always have fromName null; block and
  * unblock entries carry no columns. Same-cell reorders (ADR 019) are not
  * movements and are not narrated. Failure: none.
  */
 export function cardHistory(events: CardEvent[], cardId: string, config: BoardConfig): HistoryEntry[] {
-  return events
-    .filter((event) => event.cardId === cardId && NARRATED_TYPES.has(event.type) && !isReorder(event))
-    .sort(newestFirst)
+  // The card's events as the fold reads them (the birth rule sees them
+  // all, as in core/flow.ts), then only the narrated ones.
+  const mine = events.filter((event) => event.cardId === cardId && !isReorder(event)).sort(oldestFirst);
+  return creationFirst(mine)
+    .reverse()
+    .filter((event) => NARRATED_TYPES.has(event.type))
     .map((event) => toEntry(config, event));
 }

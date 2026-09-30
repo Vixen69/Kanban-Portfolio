@@ -42,7 +42,7 @@ export interface PositionLedger {
   kept: number;
   divergences: Array<{ title: string; fromColumn: string; toColumn: string }>;
   advanced: AdvancedCard[];
-  /** Cards in Pause the jalons would move: left in Pause, said (counted in divergences too). */
+  /** Cards in Pause a NEW jalon would move past it: left in Pause, said (counted in divergences too). */
   paused: AdvancedCard[];
 }
 
@@ -94,7 +94,9 @@ function jalonGoesPast(input: PositionInput, config: BoardConfig): boolean {
  * Applies the position rule to one existing card of a load (ADR 026, 058,
  * 060): nothing without a position (kept); nothing when the card already
  * stands there; a divergence when the card is in Pause, whatever the
- * jalon (« en pause », also listed in paused); a divergence when a human
+ * jalon — listed in paused (« en pause, nouveau jalon non appliqué ») only
+ * when the jalon is new and goes past Pause, the only case where it would
+ * have moved the card; a divergence when a human
  * placed it and the jalons do not go past that placement; nothing when the log's last word is already
  * this import move (ADR 058); else a `moved` event of the import actor.
  * Inputs: the plan's position ledger (mutated), the card, the board
@@ -113,7 +115,7 @@ export function refreshPosition(
   if (existing.columnId === PAUSE_COLUMN_ID) {
     const divergence = { title: card.title, fromColumn: existing.columnId, toColumn: card.columnId };
     plan.divergences.push(divergence);
-    plan.paused.push({ cardId: id, ...divergence });
+    if (jalonGoesPast(input, config)) plan.paused.push({ cardId: id, ...divergence });
     return;
   }
   const handPlaced = reading.movedByHand.has(id);

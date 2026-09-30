@@ -54,3 +54,17 @@ export function domainAssignPatch(config: BoardConfig, domain: string, subDomain
   const declared = subDomainsOf(config, domain).some((sub) => sub.id === subDomain);
   return { domain, subDomain: declared ? subDomain : null };
 }
+
+/**
+ * The « Modifier » patch with its domain carried whenever the sub-domain
+ * changed alone: choosing a sub-domain confirms the domain it belongs to,
+ * so the patch says so — the fold then clears « domaine à vérifier » and
+ * the next import counts the domain as set by hand (ADR 061).
+ * Inputs: the diffed patch, the draft's domain. Output: the patch, with
+ * `domain` added when it had `subDomain` without `domain` and the domain
+ * is not empty; otherwise the patch unchanged. Failure modes: none.
+ */
+export function withDomainConfirmed(patch: CardPatch, domain: string): CardPatch {
+  if (!("subDomain" in patch) || "domain" in patch || domain === "") return patch;
+  return { ...patch, domain };
+}

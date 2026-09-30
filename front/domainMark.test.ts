@@ -3,9 +3,12 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { testConfig } from "../core/test-helpers.ts";
+import type { CardPatch } from "../core/types.ts";
+import { foldEvents } from "../core/state.ts";
+import { lifecycleEvent } from "../core/events.ts";
+import { testCard, testConfig } from "../core/test-helpers.ts";
 import { changeWords } from "./changeGroups.ts";
-import { domainAssignPatch, domainIssueHint, domainIssueText, domainOptions, TO_ASSIGN } from "./domainMark.ts";
+import { domainAssignPatch, domainIssueHint, domainIssueText, domainOptions, TO_ASSIGN, withDomainConfirmed } from "./domainMark.ts";
 
 const CONFIG = testConfig();
 
@@ -38,4 +41,23 @@ test("a change of domain from none reads « Sans domaine → … »", () => {
   assert.deepEqual([changeWords(CONFIG, "domain", ""), changeWords(CONFIG, "domain", "alpha"), changeWords(CONFIG, "owner", "")], [
     "Sans domaine", "Alpha", "—",
   ]);
+});
+
+test("« Modifier »: a sub-domain changed alone carries its domain, so the flag clears (table)", () => {
+  const cases: Array<[string, CardPatch, string, CardPatch]> = [
+    ["sub-domain alone", { subDomain: "b1" }, "beta", { subDomain: "b1", domain: "beta" }],
+    ["sub-domain cleared alone", { subDomain: null }, "beta", { subDomain: null, domain: "beta" }],
+    ["domain already there", { domain: "alpha", subDomain: null }, "alpha", { domain: "alpha", subDomain: null }],
+    ["no sub-domain change", { title: "X" }, "beta", { title: "X" }],
+    ["no domain in the draft", { subDomain: null }, "", { subDomain: null }],
+  ];
+  for (const [name, patch, domain, expected] of cases) assert.deepEqual(withDomainConfirmed(patch, domain), expected, name);
+});
+
+test("« Modifier »: the fold clears « à vérifier » once a sub-domain is chosen alone", () => {
+  const card = testCard({ id: "c1", domain: "beta", subDomain: null, domainUnresolved: true });
+  const patch = withDomainConfirmed({ subDomain: "b1" }, "beta");
+  const edited = { ...lifecycleEvent("edited", "c1", "anonymous", "2026-09-30T08:00:00.000Z", { patch }), id: "evt-1" };
+  const [state] = foldEvents([card], [edited]);
+  assert.deepEqual([state?.domain, state?.subDomain, state?.domainUnresolved], ["beta", "b1", undefined]);
 });

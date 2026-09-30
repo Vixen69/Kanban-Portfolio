@@ -121,3 +121,14 @@ test("history: an entry, exit or return carries the load's reason when the log h
     assert.deepEqual([entry?.kind, entry?.reason], [c.kind, c.reason], c.name);
   }
 });
+
+test("history follows the fold order: a future-dated import of an old log stays below the hand move (ADR 058 amendment)", () => {
+  const events: CardEvent[] = [
+    event({ id: "evt-1", ts: "2026-11-02T00:00:00.000Z", type: "imported", toColumn: "col1" }),
+    event({ id: "evt-2", ts: "2026-09-10T00:00:00.000Z", type: "moved", fromColumn: "col1", toColumn: "col2", actor: "anonymous" }),
+  ];
+  assert.deepEqual(cardHistory(events, "S001", CONFIG).map((e) => [e.fromName, e.toName, e.ts]), [
+    ["Colonne 1", "Colonne 2", "2026-09-10T00:00:00.000Z"],
+    [null, "Colonne 1", "2026-11-02T00:00:00.000Z"],
+  ]);
+});

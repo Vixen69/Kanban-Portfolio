@@ -2,7 +2,8 @@
 // by id (O(1) renders instead of a find() per card), plus the actor display
 // rule. No React, no network — pure helpers over the validated config.
 
-import type { BoardConfig, Column, Domain, Lane, Profile, ProjectType } from "../core/types.ts";
+import type { BoardConfig, CardState, Column, Domain, Lane, Profile, ProjectType } from "../core/types.ts";
+import { domainName } from "../core/domain-check.ts";
 
 // One index per config list, kept as long as the list itself (ADR 051): the
 // tickets read the domain and type of every card at each render, and a
@@ -71,4 +72,18 @@ export function laneById(config: BoardConfig): Record<string, Lane> {
  */
 export function displayActor(actor: string): string {
   return actor === "anonymous" ? "vous" : actor;
+}
+
+/**
+ * The « domaine · canal · colonne » line of an archive row: the domain's
+ * short name (its name, « Sans domaine » when it has none), the canal and
+ * column names, falling back to the raw ids the config does not declare.
+ * Inputs: the config, the folded card. Output: the line, separators
+ * spaced « · ». Failure: none.
+ */
+export function archiveMeta(config: BoardConfig, card: Pick<CardState, "domain" | "laneId" | "columnId">): string {
+  const domain = domainById(config)[card.domain]?.short ?? domainName(config, card.domain);
+  const lane = laneById(config)[card.laneId]?.name ?? card.laneId;
+  const column = columnById(config)[card.columnId]?.name ?? card.columnId;
+  return `${domain} · ${lane} · ${column}`;
 }

@@ -11,7 +11,7 @@ import { reconcileCardRefs, subDomainsOf } from "../../core/config.ts";
 import { CARD_TEXT_LIMITS as CAP } from "../../core/card-input.ts";
 import { effortDraftOf, effortPatchOf, type EffortDraft } from "../cardFacts.ts";
 import { CRITICALITY_KEYS, CustomInput, Field, SelectField } from "./modalParts.tsx";
-import { domainOptions } from "../domainMark.ts";
+import { domainOptions, withDomainConfirmed } from "../domainMark.ts";
 
 /** Move intent computed on save when the card changed cell. */
 export interface EditMove {
@@ -207,7 +207,8 @@ export function CardEdit(props: CardEditProps) {
   const barDomain = config.domains.find((entry) => entry.id === draft.domain);
   const save = () => {
     const initial = toDraft(card, config);
-    props.onSave(diffPatch(fullPatch(initial), fullPatch(draft)), buildMove(initial, draft));
+    const patch = withDomainConfirmed(diffPatch(fullPatch(initial), fullPatch(draft)), draft.domain);
+    props.onSave(patch, buildMove(initial, draft));
   };
   return (
     <div className="overlay" onClick={props.onClose}>

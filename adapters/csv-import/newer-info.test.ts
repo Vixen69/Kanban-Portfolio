@@ -140,14 +140,16 @@ test("ADR 060 facts: several facts of one card ride one event; the domain never 
 });
 
 // Positions: first jalon, hand move, reload jalon → what the load does.
-const POSITION_CASES: Array<{ name: string; first: string; hand: string; reload: string; moved: number; divergences: number; advanced: number; column: string }> = [
+// paused: said « en pause, nouveau jalon non appliqué » — only when a new jalon goes past Pause.
+const POSITION_CASES: Array<{ name: string; first: string; hand: string; reload: string; moved: number; divergences: number; advanced: number; paused?: number; column: string }> = [
   { name: "hand move + the same jalon: divergence, the hand stands", first: "etudes", hand: "prets", reload: "etudes", moved: 0, divergences: 1, advanced: 0, column: "prets" },
   { name: "hand move + a newer jalon further along: moved", first: "etudes", hand: "prets", reload: "actifs", moved: 1, divergences: 0, advanced: 1, column: "actifs" },
   { name: "hand move + a newer jalon behind the hand's column: divergence", first: "etudes", hand: "actifs", reload: "prets", moved: 0, divergences: 1, advanced: 0, column: "actifs" },
   { name: "hand move back + a repeated jalon further along: still the hand's (not new)", first: "actifs", hand: "etudes", reload: "actifs", moved: 0, divergences: 1, advanced: 0, column: "etudes" },
   // ADR 060 amendment: Pause is an arbitration decision — no jalon takes a card out of it.
-  { name: "put in Pause + a newer jalon further along: stays in Pause", first: "prets", hand: "pause", reload: "actifs", moved: 0, divergences: 1, advanced: 0, column: "pause" },
-  { name: "put in Pause + a newer jalon behind: stays in Pause", first: "actifs", hand: "pause", reload: "etudes", moved: 0, divergences: 1, advanced: 0, column: "pause" },
+  { name: "put in Pause + a newer jalon further along: stays in Pause, said", first: "prets", hand: "pause", reload: "actifs", moved: 0, divergences: 1, advanced: 0, paused: 1, column: "pause" },
+  { name: "put in Pause + a newer jalon behind: stays in Pause, not said", first: "actifs", hand: "pause", reload: "etudes", moved: 0, divergences: 1, advanced: 0, paused: 0, column: "pause" },
+  { name: "put in Pause + the same jalon: stays in Pause, not said", first: "prets", hand: "pause", reload: "prets", moved: 0, divergences: 1, advanced: 0, paused: 0, column: "pause" },
 ];
 
 for (const c of POSITION_CASES) {
@@ -157,11 +159,14 @@ for (const c of POSITION_CASES) {
     board.move(c.first, c.hand);
     const plan = board.load([deck({ columnId: c.reload })]);
     assert.deepEqual([plan.moved, plan.divergences.length, plan.advanced.length, board.card()?.columnId], [c.moved, c.divergences, c.advanced, c.column]);
-    assert.deepEqual(board.load([deck({ columnId: c.reload })]).events, [], "reloading the same files writes nothing");
+    if (c.paused !== undefined) assert.equal(plan.paused.length, c.paused, "paused");
+    const again = board.load([deck({ columnId: c.reload })]);
+    assert.deepEqual(again.events, [], "reloading the same files writes nothing");
+    assert.equal(again.paused.length, 0, "reloading the same files: the jalon is no longer new");
   });
 }
 
-test("ADR 060 amendment: a card in Pause is said « en pause », whatever the jalon — never moved", () => {
+test("ADR 060 amendment: a card in Pause is never moved; a new jalon past it is said « en pause »", () => {
   const board = new Board();
   board.load([deck({ columnId: "prets" })]);
   board.move("prets", "pause");

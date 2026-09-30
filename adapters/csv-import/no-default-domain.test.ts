@@ -100,6 +100,22 @@ test("a card without domain takes the export's domain when it resolves one — n
   assert.deepEqual(plan.events.filter((e) => e.type === "edited"), [], "nothing decided: the base card carries it");
 });
 
+test("a stored domain the config no longer declares reads as none: filled by the export, never a conflict nor « à vérifier »", () => {
+  const ghostBoard = (): Board => {
+    const board = legacyBoard();
+    board.cards = board.cards.map((card) => ({ ...card, domain: "ghost" }));
+    return board;
+  };
+  const filled = planLoad([deckCard()], CONFIG, ghostBoard().cards, ghostBoard().events, NOW);
+  assert.deepEqual([filled.cards[0]?.domain, filled.domainConflicts.length, filled.domainUndecided], ["infra", 0, 0]);
+  const blank = planLoad([deckCard(BLANK)], CONFIG, ghostBoard().cards, ghostBoard().events, NOW);
+  assert.deepEqual([blank.cards[0]?.domainUnresolved, blank.domainToCheck], [undefined, []], "shown « Sans domaine », not « à vérifier »");
+  const kept = ghostBoard(); // a « garder » an earlier version let the PMO take over the ghost
+  kept.events.push({ ...editedDomain(kept, IMPORT_ACTOR, "ghost"), payload: { patch: { domain: "ghost", subDomain: null }, decision: "garder", proposed: { domain: "infra", subDomain: null } } });
+  const healed = planLoad([deckCard()], CONFIG, kept.cards, kept.events, NOW);
+  assert.deepEqual([healed.cards[0]?.domain, healed.domainKeptByPrior, healed.domainConflicts.length], ["infra", 0, 0]);
+});
+
 // The Projets onglet with PE10002's domain columns blanked.
 function withoutDomain(content: string): InputFile[] {
   const lines = content.split(/\r?\n/).map((line) => {

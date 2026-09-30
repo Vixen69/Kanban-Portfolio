@@ -6,7 +6,7 @@
 import { useState } from "react";
 import type { BoardConfig, CardState } from "../../core/types.ts";
 import { cardMatchesQuery } from "../../core/text-search.ts";
-import { domainName } from "../../core/domain-check.ts";
+import { archiveMeta } from "../lookup.ts";
 
 /** Props of the archives overlay. All state and actions live in App. */
 export interface ArchiveViewProps {
@@ -28,15 +28,12 @@ function ArchRow({ card, config, onOpen, onUnarchive }: {
   onUnarchive: (id: string) => void;
 }) {
   const type = card.typeId === null ? null : config.types.find((t) => t.id === card.typeId) ?? null;
-  const domain = config.domains.find((d) => d.id === card.domain);
-  const lane = config.lanes.find((l) => l.id === card.laneId);
-  const column = config.columns.find((c) => c.id === card.columnId);
   return (
     <div className="arch-row">
       <button className="arch-open" onClick={() => onOpen(card)} title="Ouvrir la fiche">
         {type && <span className="cpop-type" style={{ background: type.color }}>{type.short}</span>}
         <span className="arch-name">{card.title}</span>
-        <span className="arch-meta">{domain?.short ?? domainName(config, card.domain)} ·{lane?.name ?? card.laneId} · {column?.name ?? card.columnId}</span>
+        <span className="arch-meta">{archiveMeta(config, card)}</span>
       </button>
       <button className="btn ghost sm" onClick={() => onUnarchive(card.id)}>Désarchiver</button>
     </div>

@@ -8,6 +8,7 @@ import type { BoardConfig, Card, ChargeEntry } from "../../core/types.ts";
 import type { DomainRef } from "../../core/import-types.ts";
 import { laneNature } from "../../core/config.ts";
 import type { EnrichedCard } from "./enrich.ts";
+import { isDeclaredDomain } from "./domain-conflicts.ts";
 
 /** The counter the row build feeds: plan de charge lines dropped for an unresolved métier. */
 export interface ChargeCounter {
@@ -66,14 +67,16 @@ export function toCard(
  * set when the export resolves no domain for it, the card wears one, and
  * no human ever set that domain (no domain decision in the log — by hand
  * or ADR 036 — and no creation by hand): the domain may be the old
- * first-domain fallback. Recomputed at each load — cleared otherwise.
+ * first-domain fallback. Recomputed at each load — cleared otherwise. A
+ * domain the config does not declare is never flagged: the board reads it
+ * « Sans domaine » (to assign), not as a domain to check.
  * Inputs: the rebuilt card, whether the export resolved a domain, whether
- * a human set the card's domain. Output: the card, flagged or with no
- * flag at all. Failure modes: none.
+ * a human set the card's domain, the config. Output: the card, flagged or
+ * with no flag at all. Failure modes: none.
  */
-export function withDomainFlag(card: Card, exportResolved: boolean, setByHand: boolean): Card {
+export function withDomainFlag(card: Card, exportResolved: boolean, setByHand: boolean, config: BoardConfig): Card {
   const { domainUnresolved: _previous, ...rest } = card;
-  return !exportResolved && !setByHand && card.domain !== "" ? { ...rest, domainUnresolved: true } : rest;
+  return !exportResolved && !setByHand && isDeclaredDomain(config, card.domain) ? { ...rest, domainUnresolved: true } : rest;
 }
 
 // The plan de charge lines a card keeps: those whose métier resolved to a

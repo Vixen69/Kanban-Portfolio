@@ -34,7 +34,12 @@ sa couleur, ses chiffres et dans l'arbitrage des responsables de domaine.
    rapport d'import liste ces cartes (« Domaine à vérifier — l'export n'en
    donne pas »).
 3. **Une carte sans domaine prend celui de l'export dès qu'il le donne** :
-   il n'y a rien à garder, donc pas de conflit à arbitrer.
+   il n'y a rien à garder, donc pas de conflit à arbitrer. Il en va de même
+   d'une carte dont le domaine n'existe plus dans le modèle (le tableau la
+   montre déjà « Sans domaine ») : elle prend le domaine de l'export, sans
+   conflit, même si un « garder » avait été noté ; elle n'est jamais
+   marquée « à vérifier ». Dans « Modifier », choisir seulement le
+   sous-domaine confirme aussi le domaine : la marque s'efface.
 4. **Le signal sur la carte** : un petit « ? » fixe (rien ne bouge, ADR
    051), plein pour « Domaine à attribuer », en contour pour « Domaine à
    vérifier », sur la barre du radiateur, sur la carte en focus et dans la

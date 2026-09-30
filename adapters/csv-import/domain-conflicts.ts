@@ -61,6 +61,16 @@ export function priorDomainDecisions(events: readonly CardEvent[]): Map<string, 
   return priors;
 }
 
+/**
+ * Whether a card's domain id is one the config declares. "" (no domain)
+ * and an id the versioned model dropped both answer false: the board reads
+ * either as « Sans domaine » (reconcileCardRefs, ADR 061).
+ * Inputs: the config, the domain id. Output: the answer. Failure: none.
+ */
+export function isDeclaredDomain(config: BoardConfig, domainId: string): boolean {
+  return domainId !== "" && config.domains.some((d) => d.id === domainId);
+}
+
 // A stored sub-domain the config no longer declares counts as none (the
 // display already folds it, ADR 013): no conflict over a ghost.
 function boardDomain(existing: CardState, config: BoardConfig): DomainRef {
@@ -80,6 +90,9 @@ function sameRef(a: DomainRef, b: DomainRef): boolean {
  * against this very proposal (kept-by-prior). A card WITHOUT domain (ADR
  * 061: nobody ever assigned one — a hand edit cannot empty it) takes the
  * export's domain as soon as it resolves one (fill): there is nothing to keep.
+ * A stored domain the config no longer declares counts as none — the board
+ * already shows it « Sans domaine »: fill, never a « garder » offered over
+ * a domain that does not exist (a « garder » logged earlier is overridden).
  * Inputs: the stored card, the deck card, the config, the card's prior
  * decision (if any). Output: the check. Failure: none.
  */
@@ -88,7 +101,7 @@ export function domainConflict(
 ): ConflictCheck {
   if (card.domainId === null) return { kind: "none" };
   const proposed: DomainRef = { domain: card.domainId, subDomain: card.subDomainId };
-  if (existing.domain === "") return { kind: "fill", proposed };
+  if (!isDeclaredDomain(config, existing.domain)) return { kind: "fill", proposed };
   const board = boardDomain(existing, config);
   if (sameRef(board, proposed)) return { kind: "none" };
   if (prior?.kind === "garder" && prior.proposed !== null && sameRef(prior.proposed, proposed)) return { kind: "kept-by-prior" };

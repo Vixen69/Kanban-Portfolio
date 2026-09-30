@@ -158,7 +158,7 @@ export function planLoad(
     }
     const domain = settleDomain(plan, existing, card, config, reading.priors.get(identity.id), decisions.get(identity.id), now);
     const base = stored.get(identity.id);
-    const fresh = rebuiltBase(flaggedRow(plan, toCard(identity.id, card, config, plan, year, existing.createdAt, domain), card, reading), base, tally);
+    const fresh = rebuiltBase(flaggedRow(plan, toCard(identity.id, card, config, plan, year, existing.createdAt, domain), card, reading, config), base, tally);
     refreshed.push(refreshExisting(plan, { id: identity.id, existing, stored: base, card, adopted: false }, fresh, reading, config, now));
   }
   takeBackHandCorrections(plan, refreshed, existingEvents, now);
@@ -178,8 +178,8 @@ function rebuiltBase(rebuilt: Card, base: Card | undefined, tally: KeptTally): C
 
 // ADR 061: the refreshed row of a stored card, flagged « domaine à
 // vérifier » when the export gives no domain and no human ever set it.
-function flaggedRow(plan: LoadPlan, row: Card, card: EnrichedCard, reading: BoardReading): Card {
-  const flagged = withDomainFlag(row, card.domainId !== null, reading.domainByHand.has(row.id));
+function flaggedRow(plan: LoadPlan, row: Card, card: EnrichedCard, reading: BoardReading, config: BoardConfig): Card {
+  const flagged = withDomainFlag(row, card.domainId !== null, reading.domainByHand.has(row.id), config);
   if (flagged.domainUnresolved === true) plan.domainToCheck.push(row.id);
   return flagged;
 }

@@ -82,6 +82,10 @@ non appliqué » (liste dédiée dans le rapport lisible, dans la commande et
 dans le résultat du chargement ; comptée aussi dans les divergences). La
 colonne est reconnue par son identifiant `pause` du modèle versionné
 (`config/board.json`). Sortir de Pause reste un geste à la main.
+La liste « en pause — nouveau jalon non appliqué » ne cite que les cartes
+qu'un jalon **nouveau** et **plus avancé que la Pause** aurait déplacées
+(revue, 2026-09-30) : le même jalon qu'au chargement précédent, ou un jalon
+en arrière, reste une simple divergence.
 Fichiers : `adapters/csv-import/load-position.ts` (`PAUSE_COLUMN_ID`),
 `to-cards.ts`, `import-changes.ts`, `core/import-changes.ts` (`paused`),
 `core/import-types.ts`, `middle/import.ts`, `sync/import-text.ts`,
