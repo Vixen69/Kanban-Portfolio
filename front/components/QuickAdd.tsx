@@ -17,6 +17,7 @@ import { creationFactsOf, EMPTY_FACTS, type FactsDraft } from "../cardFacts.ts";
 import { closedExerciseNotice } from "../quickAddFlow.ts";
 import { CodeField, EffortGrid, SubDomainField } from "./CardEdit.tsx";
 import { CRITICALITY_KEYS, Field, SelectField } from "./modalParts.tsx";
+import { domainOptions } from "../domainMark.ts";
 
 /** Creation intent sent to POST /api/cards (through App/useBoardStore). The
  * nature is NOT part of it: the server derives it from the canal (ADR 018). */
@@ -42,13 +43,14 @@ export interface QuickAddProps {
   viewYear: number;
 }
 
-// Design defaults: first domain, « Mise en œuvre » type when present,
+// Design defaults: NO domain (ADR 061 — never a default domain: the PMO
+// chooses it, « Créer » waits for it), « Mise en œuvre » type when present,
 // criticality normal, and the first lane only when the intake column has
 // canals. No nature choice — the canal carries it (design v11).
 function initialInput(config: BoardConfig): QuickAddInput {
   const base: QuickAddInput = {
     title: "",
-    domain: config.domains[0]!.id,
+    domain: "",
     typeId: config.types.find((type) => type.id === "mise_en_oeuvre")?.id ?? config.types[0]!.id,
     criticality: "normal",
     owner: "",
@@ -66,7 +68,7 @@ function SelectGrid({ draft, config, set }: {
   return (
     <div className="field-2col">
       <SelectField label="Type de projet" value={draft.typeId} options={config.types.map((t) => ({ value: t.id, label: t.name }))} onChange={(v) => set({ typeId: v })} />
-      <SelectField label="Domaine" value={draft.domain} options={config.domains.map((d) => ({ value: d.id, label: d.name }))} onChange={(v) => set({ domain: v })} />
+      <SelectField label="Domaine *" value={draft.domain} options={domainOptions(config, draft.domain)} onChange={(v) => set({ domain: v })} />
       {draft.laneId !== undefined && (
         <SelectField label="Canal" value={draft.laneId} options={config.lanes.map((l) => ({ value: l.id, label: l.name }))} onChange={(v) => set({ laneId: v })} />
       )}
@@ -120,7 +122,8 @@ function useSubmit(onCreate: (input: QuickAddInput) => Promise<boolean>) {
  * Inputs: QuickAddProps — the runtime config, the exercise shown, the
  * store's last refusal and the close/create callbacks.
  * Output: overlay + modal; the bar wears the selected domain color; Créer
- * stays disabled until the title is non-blank (and while a creation is in
+ * stays disabled until the title is non-blank and a domain is chosen (ADR
+ * 061: none is preselected) (and while a creation is in
  * flight, or when the exercise shown is closed), then calls onCreate with
  * the trimmed title and the typed facts (the server puts the card in the
  * first column). Changing the domain clears the sub-domain.
@@ -137,8 +140,8 @@ export function QuickAdd({ config, onClose, onCreate, error, viewYear }: QuickAd
   const setFacts = (patch: Partial<FactsDraft>) => setFactsState((current) => ({ ...current, ...patch }));
   const { pending, failed, submit } = useSubmit(onCreate);
   const closedNotice = closedExerciseNotice(viewYear, config.exercise.year);
-  const valid = draft.title.trim().length > 0 && closedNotice === null && !pending;
   const domain = config.domains.find((entry) => entry.id === draft.domain);
+  const valid = draft.title.trim().length > 0 && domain !== undefined && closedNotice === null && !pending;
   return (
     <div className="overlay" onClick={onClose}>
       <div className="modal" onClick={(event) => event.stopPropagation()}>
@@ -157,7 +160,7 @@ export function QuickAdd({ config, onClose, onCreate, error, viewYear }: QuickAd
           {failed && error !== null && <div className="qa-error" role="alert">{error}</div>}
           <div className="modal-actions">
             <button className="btn ghost" onClick={onClose}>Annuler</button>
-            <button className="btn primary" disabled={!valid} onClick={() => submit({ ...draft, title: draft.title.trim(), ...creationFactsOf(facts) })}>Créer</button>
+            <button className="btn primary" disabled={!valid} title={domain === undefined ? "Choisissez un domaine" : undefined} onClick={() => submit({ ...draft, title: draft.title.trim(), ...creationFactsOf(facts) })}>Créer</button>
           </div>
         </div>
       </div>

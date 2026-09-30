@@ -2,7 +2,10 @@
 // log (the log IS the history; nothing is stored elsewhere). Design v11
 // narrates movements (created / imported / moved) AND blockages (blocked /
 // unblocked, with the motif), most recent first; comments keep their own
-// display surface.
+// display surface. A load's entry, exit or return carries its reason
+// when the load wrote one (payload.reason — « état « Reporté » hors des
+// états retenus », « plus présent dans le fichier Coût … »); events
+// written before carry none and read as before.
 
 import type { BoardConfig, CardEvent } from "./types.ts";
 import { isReorder } from "./events.ts";
@@ -17,7 +20,11 @@ export interface HistoryEntry {
   fromName: string | null;
   /** Column display name the card arrived in ("Entrée" fallback) — movements only. */
   toName: string | null;
-  /** Blocking motif (block lines) or decision reason (decision lines); null when none. */
+  /**
+   * Blocking motif (block lines), decision reason (decision lines), or the
+   * load's reason of an entry (imported), an exit (unlisted) or a return
+   * (relisted); null when none.
+   */
   reason: string | null;
   /** Decision code and name, grid terms, review date — decision lines only. */
   detail: string | null;
@@ -67,8 +74,16 @@ function decisionEntry(config: BoardConfig, event: CardEvent, base: Omit<History
   return { ...base, kind: "decision", detail: parts.join(" · "), reason: typeof reason === "string" && reason !== "" ? reason : null };
 }
 
+// The load's reason an entry / exit / return event carries, when a
+// non-empty one (events written before carry none).
+function importReason(event: CardEvent): string | null {
+  if (event.type !== "imported" && event.type !== "unlisted" && event.type !== "relisted") return null;
+  const reason = event.payload["reason"];
+  return typeof reason === "string" && reason.trim() !== "" ? reason : null;
+}
+
 function toEntry(config: BoardConfig, event: CardEvent): HistoryEntry {
-  const base = { fromName: null, toName: null, reason: null, detail: null, ts: event.ts, actor: event.actor };
+  const base = { fromName: null, toName: null, reason: importReason(event), detail: null, ts: event.ts, actor: event.actor };
   if (event.type === "decided") return decisionEntry(config, event, base);
   if (event.type === "unlisted") return { ...base, kind: "unlisted" };
   if (event.type === "relisted") return { ...base, kind: "relisted" };
@@ -91,7 +106,9 @@ function toEntry(config: BoardConfig, event: CardEvent): HistoryEntry {
  * display names). Narrated events: created/imported/moved (kind "move"),
  * blocked (kind "block", with the motif from the payload) and unblocked
  * (kind "unblock"), decided (kind "decision", code/name/grid terms/review
- * date in `detail`, the free text in `reason`), unlisted / relisted (ADR 026).
+ * date in `detail`, the free text in `reason`), unlisted / relisted (ADR 026)
+ * — imported, unlisted and relisted lines carry the load's reason in
+ * `reason` when the load wrote one (null for older events).
  * Output: HistoryEntry[] sorted by ts descending, ties broken by the
  * numeric suffix of the event id (the fold order, reversed). Unknown
  * column ids fall back to the raw id; a missing destination becomes

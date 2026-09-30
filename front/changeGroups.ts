@@ -11,6 +11,7 @@
 import type { BoardConfig } from "../core/types.ts";
 import type { CardChange, CardPlanFigures, ChangeKind, FigureFact, PlanChange, PlanFigures } from "../core/snapshot-diff.ts";
 import { FIGURE_FACTS } from "../core/snapshot-diff.ts";
+import { domainName } from "../core/domain-check.ts";
 
 /**
  * The numbers of a change row: French, at most two decimals — the
@@ -122,12 +123,13 @@ export function frDay(iso: string): string {
  * One side of a text change in the config's words: a column (and canal)
  * name for a move, a domain or type name, a French date for the RDR; the
  * text itself otherwise. Inputs: the config, the change's kind, the value.
- * Output: the words, « — » for none. Failure modes: none — an id the config
- * no longer declares shows as is.
+ * Output: the words, « — » for none, « Sans domaine » for an empty domain
+ * (ADR 061). Failure modes: none — an id the config no longer declares
+ * shows as is.
  */
 export function changeWords(config: BoardConfig, kind: ChangeKind, value: string | null): string {
+  if (kind === "domain" && value !== null) return domainName(config, value);
   if (value === null || value === "") return "—";
-  if (kind === "domain") return config.domains.find((d) => d.id === value)?.name ?? value;
   if (kind === "type") return config.types.find((t) => t.id === value)?.name ?? value;
   if (kind === "dateRdr") return frDay(value);
   if (kind !== "moved") return value;
@@ -156,6 +158,35 @@ export type Trend = "up" | "down" | null;
 export function signedDelta(delta: number | null): { trend: Trend; text: string } {
   if (delta === null || fmtChange(Math.abs(delta)) === "0") return { trend: null, text: "" };
   return delta > 0 ? { trend: "up", text: `+${fmtChange(delta)}` } : { trend: "down", text: `−${fmtChange(-delta)}` };
+}
+
+/** What a trend is read on: a figure of the card, or a plan de charge figure (prévu, RAF). */
+export type TrendMeasure = FigureFact | "planned" | "raf";
+
+/**
+ * The tone of a trend mark: « warn » (amber — a demand that grows), « ok »
+ * (green — a demand that shrinks), « neutral » (the normal progress of a
+ * project, or a fall that says nothing).
+ */
+export type TrendTone = "warn" | "ok" | "neutral";
+
+/** Rises that are a project's normal progress: money spent or engaged, days consumed. */
+const PROGRESS: ReadonlySet<TrendMeasure> = new Set(["budgetConsumed", "budgetEngaged", "effortConsumed"]);
+/** Falls worth the green: less left to do, a lower estimate. */
+const RELIEF: ReadonlySet<TrendMeasure> = new Set(["raf", "budgetEstimated"]);
+
+/**
+ * The tone of a trend on a measure: a rise of réalisé k€, engagé k€ or
+ * consommé j.h is neutral (the project progresses); a rise of estimé,
+ * enveloppe RDLI, meilleur estimé, prévu or RAF is amber; a fall of RAF
+ * or estimé is green, any other fall neutral.
+ * Inputs: the measure, the trend. Output: the tone, null when no trend.
+ * Failure modes: none.
+ */
+export function trendTone(measure: TrendMeasure, trend: Trend): TrendTone | null {
+  if (trend === null) return null;
+  if (trend === "up") return PROGRESS.has(measure) ? "neutral" : "warn";
+  return RELIEF.has(measure) ? "ok" : "neutral";
 }
 
 /**

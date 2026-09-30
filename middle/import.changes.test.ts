@@ -96,7 +96,7 @@ test("ADR 055: a modified export set — the audit names exactly what the load w
     const { changes } = audit;
     assert.deepEqual(changes.entered.map((e) => [e.code, e.reason, e.domainWarning]), [
       ["PE10018", "nouveau dans le périmètre COUT PREV — état « Budget validé », type « Etude »", null],
-      ["PE30008", "nouveau dans le périmètre COUT PREV — état « Budget validé », type « Etude »", "domaine non résolu → A&D par défaut, à corriger"],
+      ["PE30008", "nouveau dans le périmètre COUT PREV — état « Budget validé », type « Etude »", "domaine non résolu — à attribuer à la main"],
     ].sort((a, b) => titleOf(changes, a[0] ?? "").localeCompare(titleOf(changes, b[0] ?? ""), "fr")));
     assert.deepEqual(changes.left.map((l) => [l.code, l.reason]), [
       ["PE10003", "écarté du périmètre COUT PREV : état « Reporté » hors des états retenus"],

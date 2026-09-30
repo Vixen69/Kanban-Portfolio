@@ -40,13 +40,15 @@ export type CardRefs = Pick<Card, "laneId" | "columnId" | "domain" | "typeId" | 
  * subDomain, plus a validated BoardConfig (all collections non-empty).
  * Output: { laneId, columnId, domain, typeId, subDomain } — each kept as-is
  * when still present in the config, otherwise remapped to the config's
- * first entry (a null typeId stays null: it references nothing). The
- * sub-domain is kept only when the (remapped) domain still declares it,
+ * first entry (a null typeId stays null: it references nothing) — EXCEPT
+ * the domain (ADR 061: no default domain, ever): an empty or undeclared
+ * domain reads as "" (« Sans domaine »), signalled until a human assigns
+ * one. The sub-domain is kept only when the domain still declares it,
  * else null — a sub-domain never survives its domain.
  * Failure: none. Display-level fallback only — NEVER writes events.
  */
 export function reconcileCardRefs(card: CardRefs, config: BoardConfig): CardRefs {
-  const domain = keepOrFirst(card.domain, config.domains);
+  const domain = config.domains.some((entry) => entry.id === card.domain) ? card.domain : "";
   const wanted = card.subDomain ?? null;
   const subDomain =
     wanted !== null && subDomainsOf(config, domain).some((sub) => sub.id === wanted) ? wanted : null;

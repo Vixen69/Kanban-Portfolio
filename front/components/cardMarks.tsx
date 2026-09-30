@@ -1,9 +1,12 @@
 // Ticket marks of ADR 026: the last decision's code (colored pill, ringed
 // in red when its review date is past) and the « ∅ » of a card absent from
-// the last import. One signal per information, after the criticality picto.
+// the last import; since ADR 061 the « ? » of a domain to assign or to
+// verify. One signal per information, after the criticality picto.
 
 import type { BoardConfig, CardState } from "../../core/types.ts";
 import { decisionStatus } from "../../core/decisions.ts";
+import { domainIssue } from "../../core/domain-check.ts";
+import { domainIssueText } from "../domainMark.ts";
 
 function frDay(isoDate: string): string {
   const [year, month, day] = isoDate.split("-");
@@ -28,6 +31,19 @@ export function DecisionMark({ card, config, now }: { card: CardState; config: B
       {decision?.short ?? entry.decisionId}
     </span>
   );
+}
+
+/**
+ * The static « ? » of a card without domain (filled) or with a domain to
+ * verify (outlined) — ADR 061: the problem is signalled on the card, in
+ * its own sign (the red wash stays the blocked card's alone).
+ * Input: the card. Output: the mark or null. Failure: none.
+ */
+export function DomainMark({ card }: { card: Pick<CardState, "domain" | "domainUnresolved"> }) {
+  const issue = domainIssue(card);
+  if (issue === null) return null;
+  const text = domainIssueText(issue);
+  return <span className={"dom-issue " + issue} role="img" aria-label={text} title={text}>?</span>;
 }
 
 /**

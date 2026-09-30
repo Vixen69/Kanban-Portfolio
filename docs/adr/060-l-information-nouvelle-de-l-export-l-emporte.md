@@ -62,12 +62,27 @@ les comptes.
 - Une carte de base écrite avant cette décision par un chargement sans
   jalons porte encore la colonne d'entrée : le premier jalon reçu y compte
   comme nouveau (c'est bien la première position que l'export donne).
-- La colonne Pause est dans l'ordre du modèle (entre Prêts et Actifs) : une
+- ~~La colonne Pause est dans l'ordre du modèle (entre Prêts et Actifs) : une
   carte mise en Pause à la main en sort si un nouveau jalon la place en
-  Actifs ou au-delà.
+  Actifs ou au-delà.~~ **Amendé le 30/09** : voir ci-dessous.
 - L'Historique de la fiche ne narre pas les `edited` ; la comparaison avec
   l'instantané « avant chargement » (ADR 053) montre la valeur reprise.
 - `adapters/csv-import/newer-facts.ts`, `load-position.ts` (+ tests
   `newer-info.test.ts`), `to-cards.ts`, `import-changes.ts`,
   `core/import-changes.ts` (`replaced`, `advanced`), `core/import-types.ts`,
   `middle/import.ts` (+ `import.newer.test.ts`), `sync/import*.ts`.
+
+## Amendement (2026-09-30) — la Pause n'est jamais levée par un jalon
+
+Choix prudent, en attendant l'avis de l'auteur : une carte en **Pause** y a
+été mise par un humain, et la Pause est une décision d'arbitrage (D4). Aucun
+jalon, nouveau ou non, plus avancé ou non, ne l'en sort : la carte reste en
+Pause et le rapport le dit comme une divergence, « en pause — nouveau jalon
+non appliqué » (liste dédiée dans le rapport lisible, dans la commande et
+dans le résultat du chargement ; comptée aussi dans les divergences). La
+colonne est reconnue par son identifiant `pause` du modèle versionné
+(`config/board.json`). Sortir de Pause reste un geste à la main.
+Fichiers : `adapters/csv-import/load-position.ts` (`PAUSE_COLUMN_ID`),
+`to-cards.ts`, `import-changes.ts`, `core/import-changes.ts` (`paused`),
+`core/import-types.ts`, `middle/import.ts`, `sync/import-text.ts`,
+`front/importReport.ts`, `front/components/ImportLists.tsx`.

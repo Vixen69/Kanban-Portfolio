@@ -114,6 +114,8 @@ export interface ImportLoadResult extends ImportAuditResult {
     replaced: number;
     /** Hand-placed cards a new jalon moved further along the flow (ADR 060; counted in moved too). */
     advanced: number;
+    /** Cards in Pause a jalon would move: left in Pause (ADR 060 amendment; counted in divergences); absent from a server that predates it. */
+    paused?: number;
     /** The capacity snapshot stored with the load, when the files carried one. */
     capacity: { persons: number; assignments: number } | null;
   };

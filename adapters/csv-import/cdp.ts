@@ -27,12 +27,20 @@ export interface CdpTable {
   byId: Map<string, string | null>;
   /** normalized name -> chef de projet, for rows whose Id is missing. */
   byName: Map<string, string | null>;
+  /**
+   * normalized name -> the distinct normalized Ids its rows carry (sorted;
+   * empty when none): the name fallback never joins a row carrying another
+   * Id than the card's (ADR 058 §2, owners.ts).
+   */
+  idsByName: Map<string, string[]>;
   counts: { rows: number; withOwner: number; leadsExcluded: number };
 }
 
 /** A read row and the chef de projet it names. */
 interface OwnerRow extends DuplicateRow {
   owner: string | null;
+  /** The row's normalized Id, "" when it has none. */
+  id: string;
 }
 
 interface CdpContext {
@@ -86,7 +94,7 @@ function readRow(ctx: CdpContext, row: CsvRow): void {
   ctx.table.counts.rows++;
   if (owner === null) tallyInto(ctx.tallies, "ligne sans chef de projet (responsables vides ou tous responsables de domaine)", row.line);
   else ctx.table.counts.withOwner++;
-  const read: OwnerRow = { line: row.line, cells: row.cells, owner };
+  const read: OwnerRow = { line: row.line, cells: row.cells, owner, id };
   if (id !== "") group(ctx.rowsById, id, read);
   if (name !== "") group(ctx.rowsByName, name, read);
 }
@@ -100,7 +108,10 @@ function settleOwners(ctx: CdpContext): void {
       if (row !== kept) tallyInto(ctx.tallies, `Id en double — ligne gardée : ${KEPT_ROW_RULE}`, row.line, id);
     }
   }
-  for (const [name, rows] of ctx.rowsByName) ctx.table.byName.set(name, keptRow(rows).owner);
+  for (const [name, rows] of ctx.rowsByName) {
+    ctx.table.byName.set(name, keptRow(rows).owner);
+    ctx.table.idsByName.set(name, [...new Set(rows.map((row) => row.id).filter((id) => id !== ""))].sort());
+  }
 }
 
 /**
@@ -116,7 +127,7 @@ export function parseCdp(
 ): CdpTable {
   const ctx: CdpContext = {
     match, param, report, fileName,
-    table: { byId: new Map(), byName: new Map(), counts: { rows: 0, withOwner: 0, leadsExcluded: 0 } },
+    table: { byId: new Map(), byName: new Map(), idsByName: new Map(), counts: { rows: 0, withOwner: 0, leadsExcluded: 0 } },
     tallies: new Map(), rowsById: new Map(), rowsByName: new Map(),
   };
   if (param === null) warn(report, "table PARAM absente — les responsables de domaine ne sont pas exclus du chef de projet", fileName);

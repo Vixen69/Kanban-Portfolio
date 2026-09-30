@@ -42,7 +42,7 @@ import { resolveIdentity } from "./load-identity.ts";
 import type { AdoptedCard } from "./load-identity.ts";
 import { keepStoredFacts, keptFactCards, keptFactCounts } from "./keep-facts.ts";
 import type { KeptFactCards, KeptFactCount, KeptTally } from "./keep-facts.ts";
-import { keepLivedFields, toCard } from "./card-row.ts";
+import { keepLivedFields, toCard, withDomainFlag } from "./card-row.ts";
 import { placedLikeStored, refreshPosition } from "./load-position.ts";
 import type { AdvancedCard, PositionInput } from "./load-position.ts";
 import { newerFactEvents } from "./newer-facts.ts";
@@ -71,6 +71,8 @@ export interface LoadPlan {
   divergences: Array<{ title: string; fromColumn: string; toColumn: string }>;
   /** Hand-placed cards a jalon new since the previous import moved further along the flow (ADR 060; counted in moved). */
   advanced: AdvancedCard[];
+  /** Cards in Pause a jalon would move: left in Pause (ADR 060 amendment; counted in divergences). */
+  paused: AdvancedCard[];
   /** Hand corrections the export's NEW value took back, fact by fact, with the cards (ADR 060). */
   replaced: KeptFactCards[];
   /** Charges dropped because their métier stayed unresolved. */
@@ -79,8 +81,10 @@ export interface LoadPlan {
   factsKept: KeptFactCount[];
   /** The same facts with the cards that kept them named (ADR 055). */
   factsKeptCards: KeptFactCards[];
-  /** New cards whose domain nothing resolved: they take the first configured domain (reported, ADR 055). */
-  domainFallback: string[];
+  /** New cards whose domain nothing resolved: created WITHOUT domain, to assign by hand (ADR 061 — never a default domain). */
+  domainMissing: string[];
+  /** Stored cards flagged « domaine à vérifier »: the export gives no domain and no human ever set theirs (ADR 061). */
+  domainToCheck: string[];
   /** The exercise the load writes into (ADR 035). */
   exercise: number;
   /**
@@ -154,7 +158,7 @@ export function planLoad(
     }
     const domain = settleDomain(plan, existing, card, config, reading.priors.get(identity.id), decisions.get(identity.id), now);
     const base = stored.get(identity.id);
-    const fresh = rebuiltBase(toCard(identity.id, card, config, plan, year, existing.createdAt, domain), base, tally);
+    const fresh = rebuiltBase(flaggedRow(plan, toCard(identity.id, card, config, plan, year, existing.createdAt, domain), card, reading), base, tally);
     refreshed.push(refreshExisting(plan, { id: identity.id, existing, stored: base, card, adopted: false }, fresh, reading, config, now));
   }
   takeBackHandCorrections(plan, refreshed, existingEvents, now);
@@ -170,6 +174,14 @@ export function planLoad(
 // (a hand-made card holds them in its base, ADR 057/059).
 function rebuiltBase(rebuilt: Card, base: Card | undefined, tally: KeptTally): Card {
   return keepLivedFields(keepStoredFacts(rebuilt, base, tally), base);
+}
+
+// ADR 061: the refreshed row of a stored card, flagged « domaine à
+// vérifier » when the export gives no domain and no human ever set it.
+function flaggedRow(plan: LoadPlan, row: Card, card: EnrichedCard, reading: BoardReading): Card {
+  const flagged = withDomainFlag(row, card.domainId !== null, reading.domainByHand.has(row.id));
+  if (flagged.domainUnresolved === true) plan.domainToCheck.push(row.id);
+  return flagged;
 }
 
 // ADR 060: the export's new values take back the hand corrections.
@@ -197,7 +209,7 @@ function refreshExisting(
 // A new card: its snapshot plus the « imported » event.
 function createCard(plan: LoadPlan, id: string, card: EnrichedCard, config: BoardConfig, now: Date): void {
   plan.cards.push(toCard(id, card, config, plan, plan.exercise));
-  if (card.domainId === null) plan.domainFallback.push(id);
+  if (card.domainId === null) plan.domainMissing.push(id);
   plan.created++;
   plan.events.push({
     ...lifecycleEvent("imported", id, IMPORT_ACTOR, entryTs(card, now), { laneId: card.laneId }),
@@ -207,7 +219,7 @@ function createCard(plan: LoadPlan, id: string, card: EnrichedCard, config: Boar
 
 // The domain the refreshed snapshot carries (ADR 036): the board's own,
 // unless the PMO decided « remplacer » on this load — never the export's
-// by default. Each decision becomes an event; an undecided conflict keeps
+// by default; a card without domain takes the export's (ADR 061). Each decision becomes an event; an undecided conflict keeps
 // the board's value and is counted (the load is refused upstream).
 function settleDomain(
   plan: LoadPlan, existing: CardState, card: EnrichedCard, config: BoardConfig,
@@ -216,6 +228,7 @@ function settleDomain(
   const board: DomainRef = { domain: existing.domain, subDomain: existing.subDomain };
   const check = domainConflict(existing, card, config, prior);
   if (check.kind === "kept-by-prior") plan.domainKeptByPrior++;
+  if (check.kind === "fill") return check.proposed; // ADR 061: a card without domain takes the export's
   if (check.kind !== "conflict") return board;
   plan.domainConflicts.push({ ...check.conflict, decision: decision ?? null });
   if (decision === undefined) {
@@ -253,7 +266,7 @@ function markAbsences(plan: LoadPlan, current: Map<string, CardState>, deckIds: 
 function emptyPlan(year: number): LoadPlan {
   return {
     cards: [], events: [], created: 0, updated: 0, moved: 0, unlisted: 0, relisted: 0, kept: 0,
-    divergences: [], advanced: [], replaced: [], chargesWithoutProfile: 0, factsKept: [], factsKeptCards: [], domainFallback: [],
+    divergences: [], advanced: [], paused: [], replaced: [], chargesWithoutProfile: 0, factsKept: [], factsKeptCards: [], domainMissing: [], domainToCheck: [],
     exercise: year, aliases: new Map(), deletedSkipped: [], adopted: [], identityDoubts: [],
     domainConflicts: [], domainReplaced: 0, domainKept: 0, domainUndecided: 0, domainKeptByPrior: 0,
   };

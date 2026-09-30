@@ -4,13 +4,17 @@
 // refreshed values grouped by fact, the facts kept from the board, the
 // hand-made cards the export adopts (ADR 059 — two cards become one: each
 // is said with both titles), the cards deleted on the board it skips and
-// the identity questions. The same ImportChanges object the tool shows;
-// only the wording lives here.
+// the identity questions, the hand corrections and placements a NEW export
+// value took back (ADR 060) and the cards left in Pause. The same
+// ImportChanges object the tool shows; only the wording lives here — plus
+// the load summary of --charger (loadText, from the load plan).
 
 import type { BoardConfig } from "../core/types.ts";
 import type { ImportChanges, ImportKeptFact, ImportLeft } from "../core/import-types.ts";
 import type { CardChange } from "../core/snapshot-diff.ts";
 import { FIGURE_FACTS } from "../core/snapshot-diff.ts";
+import { domainName } from "../core/domain-check.ts";
+import type { LoadPlan } from "../adapters/csv-import/index.ts";
 
 /** The longest list printed in full; beyond, the rest is counted. */
 const CAP = 25;
@@ -34,8 +38,9 @@ function named(entry: { code: string | null; title: string }): string {
 
 // Ids into the config's words: « Actifs · Projets », a domain, a type.
 function words(config: BoardConfig, change: CardChange, value: string | null): string {
+  // A domain "" is a card without domain (ADR 061): « Sans domaine », not a dash.
+  if (change.kind === "domain" && value !== null) return domainName(config, value);
   if (value === null || value === "") return "—";
-  if (change.kind === "domain") return config.domains.find((d) => d.id === value)?.name ?? value;
   if (change.kind === "type") return config.types.find((t) => t.id === value)?.name ?? value;
   if (change.kind !== "moved") return value;
   const [columnId, laneId] = value.split("|");
@@ -115,6 +120,53 @@ export function filesText(changes: ImportChanges): string[] {
   return ["Fichiers :", ...files, ...unknown, ...perimeter];
 }
 
+/** How a card in Pause a jalon would move is said (ADR 060 amendment). */
+const PAUSED_WORDS = "en pause — nouveau jalon non appliqué";
+
+/** The load plan's parts the CLI's load summary reads (adapters/csv-import LoadPlan). */
+export type LoadTextInput = Pick<LoadPlan,
+  "created" | "updated" | "moved" | "advanced" | "paused" | "replaced" | "unlisted" | "relisted" | "kept" |
+  "domainReplaced" | "domainKept" | "divergences" | "factsKept" | "adopted" | "deletedSkipped" | "identityDoubts">;
+
+// The divergences left in place, the cards in Pause said as such (ADR 060 amendment).
+function divergenceLines(plan: LoadTextInput, config: BoardConfig): string[] {
+  if (plan.divergences.length === 0) return [];
+  const paused = (d: LoadTextInput["divergences"][number]): boolean =>
+    plan.paused.some((p) => p.title === d.title && p.fromColumn === d.fromColumn && p.toColumn === d.toColumn);
+  return [`Divergences non appliquées (cartes placées à la main, ou en pause) : ${plan.divergences.length}`,
+    ...plan.divergences.slice(0, 5).map((d) =>
+      `  · « ${d.title} » : tableau ${columnName(config, d.fromColumn)} / export ${columnName(config, d.toColumn)}` +
+      (paused(d) ? ` — ${PAUSED_WORDS}` : ""))];
+}
+
+/**
+ * The summary of what a load wrote (--charger), from its plan: the counts,
+ * then the ADR 058/059/060 outcomes — adopted hand cards, deleted cards
+ * skipped, identity doubts, hand corrections replaced, hand placements
+ * overtaken, cards left in Pause — and the divergences.
+ * Inputs: the plan, the config (column names). Output: the text lines
+ * (French). Failure: none.
+ */
+export function loadText(plan: LoadTextInput, config: BoardConfig): string[] {
+  const replaced = new Set(plan.replaced.flatMap((f) => f.cardIds)).size;
+  const head = `chargement : ${plan.created} carte(s) créée(s) · ${plan.updated} relue(s)` +
+    ` · ${plan.moved} déplacée(s) par l'export (dont ${plan.advanced.length} placée(s) à la main, dépassée(s) par un nouveau jalon)` +
+    ` · ${replaced} correction(s) manuelle(s) remplacée(s) par la nouvelle valeur de l'export` +
+    ` · ${plan.unlisted} absente(s) de l'export (marquées, jamais supprimées) · ${plan.relisted} de retour` +
+    ` · ${plan.kept} position(s) conservée(s) (export sans jalon)` +
+    ` · domaines : ${plan.domainReplaced} remplacé(s), ${plan.domainKept} gardé(s)`;
+  const outcomes = `adoptées (saisies à la main) : ${plan.adopted.length} · supprimées du tableau, ignorées : ${plan.deletedSkipped.length}` +
+    ` · doutes d'identité : ${plan.identityDoubts.length} · en pause, jalon non appliqué : ${plan.paused.length}`;
+  const kept = plan.factsKept.length === 0 ? []
+    : [`Absents des fichiers, gardés du tableau (ADR 054) : ${plan.factsKept.map((f) => `${f.label} ${f.cards} carte(s)`).join(" · ")}`];
+  return [head, outcomes, ...divergenceLines(plan, config), ...kept];
+}
+
+// « from → to » in the config's column names.
+function transition(config: BoardConfig, a: { fromColumn: string; toColumn: string }): string {
+  return `${columnName(config, a.fromColumn)} → ${columnName(config, a.toColumn)}`;
+}
+
 /**
  * What the load changes (or changed) on the board, from the changes.
  * Inputs: the changes, the config (column, domain, type, métier names).
@@ -123,14 +175,17 @@ export function filesText(changes: ImportChanges): string[] {
 export function boardText(changes: ImportChanges, config: BoardConfig): string[] {
   const c = changes.counts;
   const head = `Bilan : ${c.created} créée(s) · ${c.updated} relue(s) · ${c.absent} absente(s) · ${c.back} de retour` +
-    ` · ${c.moved} déplacée(s) · ${c.divergences} divergence(s) · ${c.valuesChanged} carte(s) aux valeurs changées` +
+    ` · ${c.moved} déplacée(s) (dont ${c.advanced ?? 0} placée(s) à la main, dépassée(s) par un nouveau jalon)` +
+    ` · ${c.divergences} divergence(s) · ${c.valuesChanged} carte(s) aux valeurs changées` +
     ` · ${c.valuesKept} aux valeurs gardées du tableau` +
-    ` · ${c.replaced ?? 0} aux corrections manuelles remplacées par l’export`;
+    ` · ${c.replaced ?? 0} aux corrections manuelles remplacées par l’export` +
+    ` · ${changes.adopted.length} adoptée(s) · ${changes.deletedSkipped.length} supprimée(s) ignorée(s)` +
+    ` · ${changes.identityDoubts.length} doute(s) d’identité`;
   const entered = changes.entered.map((e) => `  + ${named(e)} — ${e.reason}${e.domainWarning === null ? "" : ` ⚠ ${e.domainWarning}`}`);
   const kept = factLines(changes.kept);
   const replaced = factLines(changes.replaced);
-  const advanced = changes.advanced.map((a) =>
-    `  ${named(a)} : ${columnName(config, a.fromColumn)} → ${columnName(config, a.toColumn)}`);
+  const advanced = changes.advanced.map((a) => `  ${named(a)} : ${transition(config, a)}`);
+  const paused = (changes.paused ?? []).map((a) => `  ‖ ${named(a)} : reste en Pause (export : ${transition(config, a)})`);
   const adopted = changes.adopted.map((a) => `  ⇄ ${a.code ?? "?"} : « ${a.manualTitle} » (${a.cardId}, saisie à la main) → « ${a.title} »`);
   return [
     head,
@@ -141,8 +196,10 @@ export function boardText(changes: ImportChanges, config: BoardConfig): string[]
     ...(kept.length === 0 ? [] : ["Absents des fichiers, gardés du tableau (ADR 054) :", ...kept]),
     ...(replaced.length === 0 ? [] : ["Correction manuelle remplacée par la nouvelle valeur de l’export (ADR 060) :", ...replaced]),
     ...section("Placement à la main dépassé par un nouveau jalon (ADR 060) :", advanced),
+    ...section("En pause — nouveau jalon non appliqué (ADR 060) :", paused),
     ...section("Cartes saisies à la main adoptées par l’export — même code (ADR 059), vérifier que c’est bien le même projet :", adopted),
     ...section("Supprimées du tableau, non recréées (ADR 058) :", changes.deletedSkipped.map((d) => `  ✕ ${named(d)}`)),
     ...section("Doutes d’identité :", changes.identityDoubts.map((q) => `  ⚠ ${q}`)),
+    ...section("Domaine à vérifier — l’export n’en donne pas (ADR 061) :", reasonLines("?", changes.domainToCheck ?? [])),
   ];
 }

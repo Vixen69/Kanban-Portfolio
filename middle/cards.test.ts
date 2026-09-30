@@ -100,6 +100,21 @@ test("an edited sub-domain must belong to the card's own domain", async () => {
   assert.equal((await edit({ subDomain: null })).status, 201);
 });
 
+// ADR 061: a card without domain (an import that resolved none) gets one
+// by hand — one assigns, one never un-assigns; the domain to verify is
+// cleared by the same edited event; « + Sujet » still requires a domain.
+test("ADR 061: a domain is assigned by hand to a card without one; empty or unknown refused", async () => {
+  const storage = stubStorage([{ ...testCard({ id: "S001", domain: "", source: "csv" }), domainUnresolved: true }]);
+  const edit = (patch: Record<string, unknown>) => postEvent(storage, testConfig(), { type: "edited", cardId: "S001", patch });
+  await assert.rejects(() => edit({ domain: "" }), /Valeur invalide pour le champ « domain »/);
+  await assert.rejects(() => edit({ domain: "ghost" }), /Valeur invalide pour le champ « domain »/);
+  await assert.rejects(() => edit({ subDomain: "b1" }), /Sous-domaine « b1 » hors du domaine « Sans domaine »/);
+  assert.equal((await edit({ domain: "beta", subDomain: "b1" })).status, 201);
+  const [event] = await storage.listEvents();
+  assert.deepEqual([event?.type, event?.payload["patch"]], ["edited", { domain: "beta", subDomain: "b1" }]);
+  await assert.rejects(() => postCard(storage, testConfig(), { ...BODY, domain: "" }), /Domaine inconnu/);
+});
+
 test("an edited custom map: new values typed per config.fields, untouched ones pass", async () => {
   const legacy = testCard({ id: "S001", custom: { retired: "ancien", f_num: "" } });
   const storage = stubStorage([legacy]);

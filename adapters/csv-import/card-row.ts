@@ -17,8 +17,9 @@ export interface ChargeCounter {
 /**
  * The board card of one deck card. An existing card passes the domain it
  * keeps (settleDomain, ADR 036) and its creation instant; a new one takes
- * the export's domain, else the first configured domain (reported as a
- * fallback by the import report, ADR 055).
+ * the export's domain, else NO domain (ADR 061, author 2026-09-30: never
+ * a default domain — the card waits for a hand assignment, signalled on
+ * the board and named by the import report).
  * Inputs: the board id, the deck card, the config, the charge counter
  * (mutated), the exercise year, the stored creation instant and domain of
  * an existing card. Output: the Card. Failure modes: none.
@@ -30,7 +31,7 @@ export function toCard(
   return {
     id,
     title: card.title,
-    domain: domain?.domain ?? card.domainId ?? config.domains[0]?.id ?? "",
+    domain: domain?.domain ?? card.domainId ?? "",
     subDomain: domain === undefined ? card.subDomainId : domain.subDomain,
 
     laneId: card.laneId, columnId: card.columnId,
@@ -58,6 +59,21 @@ export function toCard(
     source: "csv",
     exercise: year,
   };
+}
+
+/**
+ * The « domaine à vérifier » flag of a refreshed stored card (ADR 061):
+ * set when the export resolves no domain for it, the card wears one, and
+ * no human ever set that domain (no domain decision in the log — by hand
+ * or ADR 036 — and no creation by hand): the domain may be the old
+ * first-domain fallback. Recomputed at each load — cleared otherwise.
+ * Inputs: the rebuilt card, whether the export resolved a domain, whether
+ * a human set the card's domain. Output: the card, flagged or with no
+ * flag at all. Failure modes: none.
+ */
+export function withDomainFlag(card: Card, exportResolved: boolean, setByHand: boolean): Card {
+  const { domainUnresolved: _previous, ...rest } = card;
+  return !exportResolved && !setByHand && card.domain !== "" ? { ...rest, domainUnresolved: true } : rest;
 }
 
 // The plan de charge lines a card keeps: those whose métier resolved to a

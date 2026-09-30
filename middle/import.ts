@@ -19,7 +19,7 @@ import type { BoardStorage } from "../core/ports.ts";
 import type { BoardConfig } from "../core/types.ts";
 import type { DomainDecision, ImportAuditResult, ImportLoadResult, ImportSummary } from "../core/import-types.ts";
 import {
-  importChanges, keepStoredCapacity, loadRefusal, planLoad, renderReport, runImportAudit, withLegacyIds,
+  importChanges, keepStoredCapacity, loadRefusal, planLoad, renderReport, runImportAudit, withEventReasons, withLegacyIds,
 } from "../adapters/csv-import/index.ts";
 import type { AuditResult, EnrichedCard, InputFile, LoadPlan } from "../adapters/csv-import/index.ts";
 import { BadRequest } from "./errors.ts";
@@ -169,7 +169,7 @@ function loadFigures(plan: LoadPlan, audit: AuditResult): ImportLoadResult["load
     divergences: plan.divergences.length, kept: plan.kept, chargesWithoutProfile: plan.chargesWithoutProfile,
     domainReplaced: plan.domainReplaced, domainKept: plan.domainKept, domainKeptByPrior: plan.domainKeptByPrior,
     deletedSkipped: plan.deletedSkipped.length, adopted: plan.adopted.length,
-    replaced: new Set(plan.replaced.flatMap((fact) => fact.cardIds)).size, advanced: plan.advanced.length,
+    replaced: new Set(plan.replaced.flatMap((fact) => fact.cardIds)).size, advanced: plan.advanced.length, paused: plan.paused.length,
     capacity: audit.capacity === null ? null
       : { persons: audit.capacity.snapshot.persons.length, assignments: audit.capacity.snapshot.assignments.length },
   };
@@ -215,7 +215,8 @@ async function loadNow(
     throw new BadRequest(`Chargement refusé : ${plan.domainUndecided} conflit(s) de domaine sans décision (garder ou remplacer).`);
   }
   if (hooks.beforeWrite !== undefined) await hooks.beforeWrite();
-  await storage.importCards(plan.cards, plan.events);
+  // Each entry, exit and return carries its reason into the log (the fiche's Historique).
+  await storage.importCards(plan.cards, withEventReasons(plan.events, changes));
   if (audit.capacity !== null) {
     const fresh = withLegacyIds(audit.capacity.snapshot, plan.aliases);
     await storage.importCapacity(keepStoredCapacity(fresh, await storage.getCapacity(year)));
@@ -226,7 +227,7 @@ async function loadNow(
       `domaines ${plan.domainReplaced} remplacé(s) / ${plan.domainKept} gardé(s), ` +
       `${plan.deletedSkipped.length} supprimée(s) du tableau ignorée(s), ${plan.adopted.length} adoptée(s), ` +
       `${new Set(plan.replaced.flatMap((fact) => fact.cardIds)).size} correction(s) manuelle(s) remplacée(s), ` +
-      `${plan.advanced.length} placement(s) à la main dépassé(s) par un nouveau jalon` +
+      `${plan.advanced.length} placement(s) à la main dépassé(s) par un nouveau jalon, ${plan.paused.length} en pause (jalon non appliqué)` +
       plan.factsKept.map((f) => ` · ${f.label} gardé (absent des fichiers) : ${f.cards}`).join(""),
   );
   return {

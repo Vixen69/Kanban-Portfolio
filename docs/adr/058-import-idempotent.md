@@ -67,10 +67,11 @@ chargements simultanés qui créaient chacun toutes les cartes.
 
 - Recharger les mêmes fichiers n'écrit rien ; les recharger un autre jour
   non plus, dès qu'ils portent leur date d'export.
-- Limite connue : les événements `imported` déjà datés dans le futur (avant
+- ~~Limite connue : les événements `imported` déjà datés dans le futur (avant
   cette décision) gardent la carte dans sa colonne d'entrée jusqu'à cette
   date ; l'import ne les réécrit plus, mais le pli par date les applique
-  encore en dernier — le corriger toucherait le pli (décision de l'auteur).
+  encore en dernier — le corriger toucherait le pli (décision de l'auteur).~~
+  **Levée le 30/09** (amendement ci-dessous).
 - L'identité tirée d'un nom ne dépend pas des autres projets du lot : le
   chargement retrouve d'abord celle que le tableau porte déjà pour ce
   projet (avec ou sans suffixe, le titre fait foi). Un projet chargé seul
@@ -80,3 +81,30 @@ chargements simultanés qui créaient chacun toutes les cartes.
 - Stockage : une méthode `clearCapacity` (JSONL et PostgreSQL) ; les
   instantanés notent le modèle sur lequel leur configuration était
   appliquée.
+
+## Amendement (2026-09-30, reprise de revue)
+
+1. **La naissance d'une carte se lit d'abord.** Le pli lit toujours le
+   journal par date, puis par numéro d'ordre — sauf l'événement de
+   création d'une carte (`imported` ou `created`, le premier que le
+   journal a écrit pour elle), lu avant tous ses autres événements, quelle
+   que soit sa date (`core/fold-order.ts`). Sur les journaux de la VM
+   écrits avant cette décision (« Début » à venir), les déplacements faits
+   à la main depuis s'appliquent enfin ; tant qu'aucun geste ne l'a
+   déplacée, la carte attend dans sa colonne d'entrée, âge 0 (jamais
+   négatif). Une absence (∅) marquée après n'est plus effacée par cette
+   création datée plus tard. Les restaurations (ADR 042) et les
+   reclassements (ADR 019) se lisent comme avant ; un `imported` écrit
+   après d'autres événements de la carte n'est pas une naissance et garde
+   sa place par date. Les Délais de la fiche et le temps par étape lisent
+   le même ordre. Rien n'est réécrit dans le journal.
+2. **ProjetsCdP suit la règle des jointures (§2).** Le chef de projet se
+   joint par l'Id ; par le nom seulement si les lignes de ce nom ne portent
+   pas un **autre** Id que celui de la carte (sans Id sur la carte : pas
+   deux Id sous ce nom). Sinon : aucun chef de projet emprunté, un douteux
+   « ProjetsCdP : le nom désigne un autre Id que celui de la carte ».
+3. **La commande prend aussi l'instantané.** `sync/import.ts --charger`
+   prend l'instantané automatique « avant chargement <année> » (acteur
+   `import-csv`) une fois le chargement accepté, avant d'écrire — comme
+   l'outil (ADR 042, même fonction `takeSnapshot`) ; « Voir ce qui a
+   changé depuis le dernier import » le retrouve.

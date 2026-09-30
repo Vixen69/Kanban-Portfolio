@@ -256,3 +256,10 @@
 .absent-banner { font-size: 10px; color: var(--tx-2); background: #f1f5f9; border: 1px dashed var(--tx-4); border-radius: 6px; padding: 6px 9px; margin-bottom: 9px; }
 .hist-dot.dec { background: #7c3aed; }
 .hist-dot.abs { background: var(--tx-4); }
+
+/* Domaine à attribuer / à vérifier (ADR 061) : bandeau fixe sous les étiquettes, attribution à la main. */
+.domain-banner { font-size: 10px; color: var(--tx-2); background: #fffbeb; border: 1px solid var(--warn); border-radius: 6px; padding: 7px 9px; margin-bottom: 9px; }
+.domain-banner-head { display: flex; align-items: center; gap: 6px; color: var(--warn); font-size: 11px; }
+.domain-banner-head .dom-issue { margin-left: 0; }
+.domain-banner-hint { margin: 4px 0 6px; }
+.domain-banner .modal-actions { margin-top: 2px; }

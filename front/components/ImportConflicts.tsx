@@ -8,6 +8,7 @@
 import { useState } from "react";
 import type { BoardConfig } from "../../core/types.ts";
 import type { DomainConflict, DomainDecision, DomainRef } from "../../core/import-types.ts";
+import { domainName } from "../../core/domain-check.ts";
 
 /** Decisions taken so far, by card id. */
 export type Decisions = Readonly<Record<string, DomainDecision>>;
@@ -15,7 +16,7 @@ export type Decisions = Readonly<Record<string, DomainDecision>>;
 function domainLabel(config: BoardConfig, ref: DomainRef): string {
   const domain = config.domains.find((d) => d.id === ref.domain);
   const sub = domain?.subDomains?.find((s) => s.id === ref.subDomain);
-  return `${domain?.name ?? ref.domain}${sub === undefined ? "" : ` / ${sub.name}`}`;
+  return `${domainName(config, ref.domain)}${sub === undefined ? "" : ` / ${sub.name}`}`;
 }
 
 function frenchDay(ts: string): string {

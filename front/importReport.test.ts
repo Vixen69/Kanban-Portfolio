@@ -22,10 +22,10 @@ test("reportTitle: what the load will change, then what it changed", () => {
 
 test("keyNumbers: the five numbers in the mockup's order", () => {
   assert.deepEqual(keyNumbers(COUNTS).map((n) => [n.value, n.label]), [
-    [140, "projets mis à jour"], [3, "nouveaux"], [2, "absents de l’import (∅)"],
+    [140, "projets relus"], [3, "nouveaux"], [2, "absents de l’import (∅)"],
     [37, "valeurs changées"], [5, "gardées (absentes des fichiers)"],
   ]);
-  // « mis à jour » counts the re-read cards: the tooltip says so (the label is the validated mockup's).
+  // « relus » counts the re-read cards (author, 2026-09-30: « mis à jour » promised a change); the tooltip keeps saying so.
   assert.equal(keyNumbers(COUNTS)[0]?.hint, UPDATED_HINT);
   assert.deepEqual(keyNumbers(COUNTS).slice(1).map((n) => n.hint), [undefined, undefined, undefined, undefined]);
 });
@@ -36,7 +36,7 @@ const LISTS = { adopted: [], deletedSkipped: [] };
 test("minorCounts: only the non-zero secondary counts", () => {
   assert.deepEqual(minorCounts({ counts: COUNTS, ...LISTS }), ["1 de retour", "4 déplacé(s)"]);
   assert.deepEqual(minorCounts({ counts: { ...COUNTS, back: 0, moved: 0, divergences: 2 }, ...LISTS }), [
-    "2 divergence(s) laissée(s) en place (placées à la main)",
+    "2 divergence(s) laissée(s) en place (placées à la main ou en pause)",
   ]);
 });
 
@@ -97,9 +97,10 @@ test("loadOutcomes: what the load did beyond the summary, the non-zero ones only
     domainReplaced: 0, domainKept: 0, domainKeptByPrior: 0, deletedSkipped: 0, adopted: 0, replaced: 0, advanced: 0, capacity: null,
   };
   assert.deepEqual(loadOutcomes(load), []);
-  assert.deepEqual(loadOutcomes({ ...load, replaced: 2, advanced: 1, adopted: 3, deletedSkipped: 4 }), [
+  assert.deepEqual(loadOutcomes({ ...load, replaced: 2, advanced: 1, paused: 5, adopted: 3, deletedSkipped: 4 }), [
     "2 correction(s) manuelle(s) remplacée(s) par l’export",
     "1 placement(s) à la main dépassé(s) par un nouveau jalon",
+    "5 en pause, nouveau jalon non appliqué",
     "3 carte(s) saisie(s) à la main adoptée(s)",
     "4 supprimée(s) du tableau, ignorée(s)",
   ]);

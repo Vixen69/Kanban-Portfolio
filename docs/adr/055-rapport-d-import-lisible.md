@@ -50,8 +50,9 @@ bougé sur le tableau, pas les chiffres ni le pourquoi.
    - les **comptes** : relues, créées, absentes, de retour, déplacées,
      divergences, cartes aux valeurs changées, cartes aux valeurs gardées ;
    - les projets qui **entrent** (avec la raison, et l'avertissement
-     « domaine non résolu → A&D par défaut, à corriger » quand aucun domaine
-     n'a été trouvé), qui **sortent** (le motif d'exclusion, ou « plus
+     « domaine non résolu — à attribuer à la main » quand aucun domaine
+     n'a été trouvé — ADR 061 : la carte entre sans domaine ; avant, « → A&D
+     par défaut, à corriger »), qui **sortent** (le motif d'exclusion, ou « plus
      présent dans le fichier Coût « … » »), qui **reviennent** ;
    - les **changements carte par carte** entre le tableau maintenant et le
      tableau après le chargement (une lecture à blanc du journal : rien
@@ -91,7 +92,8 @@ maquette validée par l'auteur :
    plan de charge dit « prévu a → b j.h · RAF a → b j.h » et se déplie sur
    les métiers qui ont bougé. Seule la première section s'ouvre, et
    seulement sous 30 lignes.
-4. **Nouveaux projets** (raison, et l'avertissement « domaine par défaut »),
+4. **Nouveaux projets** (raison, et l'avertissement « sans domaine, à
+   attribuer à la main » depuis l'ADR 061),
    **Absents de cet import** (raison), **De retour** ; puis **Gardées,
    absentes des fichiers**, fait par fait avec les projets. Une liste de 10
    lignes au plus s'ouvre seule.
@@ -112,11 +114,15 @@ et les regroupements dans des fonctions pures testées
 - Le PMO voit, avant de charger, quel projet entre ou sort et pourquoi, et
   quels chiffres montent ou baissent ; il peut distinguer « les fichiers ont
   changé » de « l'outil a dérivé ».
-- Le repli sur le premier domaine du modèle reste (comportement de l'ADR
-  036), mais il est **dit** pour chaque carte créée ainsi.
-- Le verdict n'est pas encore écrit dans le journal (événements `unlisted`
+- ~~Le repli sur le premier domaine du modèle reste (comportement de l'ADR
+  036), mais il est dit pour chaque carte créée ainsi.~~ **Remplacé par
+  l'ADR 061** (auteur, 2026-09-30) : plus aucun domaine par défaut — la
+  carte entre sans domaine, signalée, à attribuer à la main ; les cartes
+  rangées par l'ancien repli sont marquées « domaine à vérifier ».
+- ~~Le verdict n'est pas encore écrit dans le journal (événements `unlisted`
   et `imported` sans motif) : la raison se lit dans le rapport du
-  chargement, pas dans l'Historique de la fiche.
+  chargement, pas dans l'Historique de la fiche.~~ **Levé le 30/09** (voir
+  l'amendement ci-dessous).
 - Fichiers : `core/change-types.ts`, `core/figure-changes.ts`,
   `core/snapshot-diff.ts`, `core/import-changes.ts`, `core/import-types.ts`,
   `adapters/csv-import/` (`couts.ts`, `couts-verdicts.ts`, `projets.ts`,
@@ -132,3 +138,32 @@ et les regroupements dans des fonctions pures testées
 - Dans « Comparer avec maintenant », seule la première section s'ouvre
   désormais (avant : toutes celles de 30 lignes au plus) : une seule règle
   pour les deux écrans.
+
+## Amendement (2026-09-30, reprise de revue)
+
+- **La raison entre dans le journal.** Chaque chargement (outil et
+  commande) écrit dans l'événement la raison que le rapport donne :
+  `imported` « nouveau dans le périmètre COUT PREV — état … », `unlisted`
+  « écarté du périmètre COUT PREV : état « Reporté » hors des états
+  retenus » ou « plus présent dans le fichier Coût « … » », `relisted`
+  « de nouveau dans le périmètre … » (`payload.reason`). L'Historique de
+  la fiche l'affiche : « Absente de l'import — <raison> », « De retour dans
+  l'import — <raison> », l'entrée « Demandes — <raison> ». Les événements
+  écrits avant n'en portent pas et se lisent comme avant (« Absente du
+  dernier import »). Le pli ignore ce champ.
+- **« projets relus »** remplace « projets mis à jour » dans les chiffres
+  clés (l'infobulle dit toujours : relus, pas forcément modifiés).
+- **Le ton des tendances dépend de ce qui bouge** : une hausse du réalisé
+  k€, de l'engagé k€ ou du consommé j.h est l'avancement normal d'un
+  projet — ton neutre ; une hausse de l'estimé, de l'enveloppe RDLI, du
+  meilleur estimé, du prévu ou du reste à faire reste en ton d'alerte ;
+  une baisse du reste à faire ou de l'estimé est verte, toute autre baisse
+  neutre (`front/changeGroups.ts` `trendTone`).
+- **La commande dit tout** : le résumé de `--charger` compte aussi les
+  cartes adoptées, les supprimées ignorées, les doutes d'identité et les
+  cartes restées en Pause ; le texte détaillé nomme les cartes adoptées
+  (les deux titres), les supprimées ignorées, les doutes, les corrections
+  manuelles remplacées, les placements dépassés et les cartes restées en
+  Pause (ADR 060) — `sync/import-text.ts`.
+- Les mots d'un domaine vide sont « Sans domaine » partout où la commande
+  nomme un domaine (y compris la liste des conflits de domaine).

@@ -12,7 +12,8 @@ import { domainById, typeById } from "../lookup.ts";
 import type { RafRead } from "../useRafLens.ts";
 import { AgeText, CritMark, CustomBadges, EstimeBar, TypeTag } from "./cardParts.tsx";
 import { ProfileBlock, SortTag } from "./ProfileBlock.tsx";
-import { AbsentMark, DecisionMark } from "./cardMarks.tsx";
+import { AbsentMark, DecisionMark, DomainMark } from "./cardMarks.tsx";
+import { NO_DOMAIN_NAME } from "../../core/domain-check.ts";
 
 /** Shared props of both card renderings (pinned build-spec contract). */
 export interface CardItemProps {
@@ -91,7 +92,7 @@ function MiniCardBody(props: MiniCardProps) {
       onDragOver={(e) => props.onCardOver(e, card)}
       onDrop={(e) => props.onCardDrop(e, card)}
       style={{ height: "var(--card-h)", ...acc.root }}
-      title={`${card.title}  ·  ${type !== null ? type.name : ""}  ·  ${domain !== undefined ? domain.name : ""}  ·  ${card.owner}  ·  ${days}j`}
+      title={`${card.title}  ·  ${type !== null ? type.name : ""}  ·  ${domain !== undefined ? domain.name : NO_DOMAIN_NAME}  ·  ${card.owner}  ·  ${days}j`}
     >
       {/* Blocked = the red wash alone; no pulse dot on tickets (one signal
           per information — the dot stays in the fiche's BLOCAGE banner).
@@ -104,6 +105,7 @@ function MiniCardBody(props: MiniCardProps) {
       <CritMark c={card.criticality} />
       <DecisionMark card={card} config={config} now={props.today} />
       <AbsentMark card={card} />
+      <DomainMark card={card} />
       <span className="card-fill" />
       <AgeText days={days} age={config.age} />
     </div>
@@ -155,7 +157,8 @@ function FocusCardBody(props: CardItemProps) {
   );
 }
 
-// Second line of the expanded card: type tag, domain pill, owner, optional
+// Second line of the expanded card: type tag, domain pill (and its « ? »
+// when the domain is to assign or verify — ADR 061), owner, optional
 // code, criticality badge (top/major only) and custom-field badges.
 function FocusMeta({
   card,
@@ -177,6 +180,7 @@ function FocusMeta({
       {domain !== undefined && (
         <span className="dom-pill" style={domPillStyle(domain.color)}>{domain.short}</span>
       )}
+      <DomainMark card={card} />
       <span className="muted">{card.owner}</span>
       {showCodes && card.codename !== null && <span className="focus-code">{card.codename}</span>}
       {card.criticality !== "normal" && badge !== null && (

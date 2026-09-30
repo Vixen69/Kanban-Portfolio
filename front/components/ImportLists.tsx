@@ -1,6 +1,6 @@
 // The project lists of the readable import report (ADR 055): who enters
-// the board and why (with the « domaine par défaut » warning when nothing
-// resolved the domain), who is absent from this import and why, who comes
+// the board and why (with the « sans domaine, à attribuer » warning when
+// nothing resolved the domain — ADR 061), who is absent from this import and why, who comes
 // back; then the facts the files left blank, fact by fact, each with the
 // cards that kept their value (ADR 054). Also what the hand did and the
 // load met: the hand corrections the export's NEW value replaces and the
@@ -40,7 +40,7 @@ function RefList({ title, rows, warn = false }: { title: string; rows: Row[]; wa
     <details className={"sd-sec" + (warn ? " warn" : "")} open={listOpen(rows.length)}>
       <summary>
         <b>{title}</b> · {rows.length}
-        {warned > 0 && <span className="chg-warn"> · {warned} domaine(s) par défaut, à corriger</span>}
+        {warned > 0 && <span className="chg-warn"> · {warned} sans domaine, à attribuer à la main</span>}
       </summary>
       <ul>{rows.map((row) => <RefItem key={row.ref.cardId} row={row} />)}</ul>
     </details>
@@ -55,13 +55,16 @@ function RefList({ title, rows, warn = false }: { title: string; rows: Row[]; wa
  */
 export function PresenceLists({ changes }: { changes: ImportChanges }) {
   const { entered, left, back } = changes;
-  if (entered.length + left.length + back.length === 0) return null;
+  const toCheck = changes.domainToCheck ?? [];
+  if (entered.length + left.length + back.length + toCheck.length === 0) return null;
   return (
     <>
       <h3 className="chg-h">Projets qui entrent, sortent ou reviennent</h3>
       <RefList title="Nouveaux projets" rows={entered.map((ref) => ({ ref, reason: ref.reason, warning: ref.domainWarning }))} />
       <RefList title="Absents de cet import (gardés, marqués ∅)" rows={left.map((ref) => ({ ref, reason: ref.reason, warning: null }))} />
       <RefList title="De retour" rows={back.map((ref) => ({ ref, reason: ref.reason, warning: null }))} />
+      {/* ADR 061: a domain the export does not give and no human ever confirmed — maybe the old default. */}
+      <RefList warn title="Domaine à vérifier — l’export n’en donne pas" rows={toCheck.map((ref) => ({ ref, reason: ref.reason, warning: null }))} />
     </>
   );
 }
@@ -91,7 +94,8 @@ export function ReplacedLists({ replaced, loaded }: { replaced: ImportKeptFact[]
 
 /**
  * What the load met on the board beyond the refreshed values: hand
- * placements a new jalon overtook (from → to, ADR 060), hand-made cards
+ * placements a new jalon overtook (from → to, ADR 060), cards left in
+ * Pause whatever the jalon (ADR 060 amendment), hand-made cards
  * adopted by their code or name (ADR 059), cards deleted on the board
  * that the files still carry — ignored, never re-created (ADR 058) — and
  * the identity doubts the load could not settle alone, always unfolded.
@@ -100,7 +104,8 @@ export function ReplacedLists({ replaced, loaded }: { replaced: ImportKeptFact[]
  */
 export function HandLists({ changes, config }: { changes: ImportChanges; config: BoardConfig }) {
   const { advanced, adopted, deletedSkipped, identityDoubts } = changes;
-  if (advanced.length + adopted.length + deletedSkipped.length + identityDoubts.length === 0) return null;
+  const paused = changes.paused ?? []; // absent in reports made before
+  if (advanced.length + paused.length + adopted.length + deletedSkipped.length + identityDoubts.length === 0) return null;
   return (
     <>
       <h3 className="chg-h">Gestes faits à la main, rencontrés par l’import</h3>
@@ -112,6 +117,8 @@ export function HandLists({ changes, config }: { changes: ImportChanges; config:
       )}
       <RefList title="Placements à la main dépassés par un nouveau jalon"
         rows={advanced.map((entry) => ({ ref: entry, reason: advancedReason(config, entry), warning: null }))} />
+      <RefList title="En pause — nouveau jalon non appliqué"
+        rows={paused.map((entry) => ({ ref: entry, reason: `export : ${advancedReason(config, entry)}`, warning: null }))} />
       <RefList title="Cartes saisies à la main adoptées par l’export"
         rows={adopted.map((entry) => ({ ref: entry, reason: adoptedReason(entry), warning: null }))} />
       <RefList title="Supprimées du tableau, ignorées par l’import" rows={deletedSkipped.map(plain)} />

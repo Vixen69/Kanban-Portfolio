@@ -29,7 +29,7 @@ export interface KeyNumber {
   hint?: string;
 }
 
-/** The tooltip of « projets mis à jour »: re-read, not necessarily changed. */
+/** The tooltip of « projets relus »: re-read, not necessarily changed. */
 export const UPDATED_HINT =
   "Relus dans les fichiers, pas forcément modifiés : ce qui change vraiment est compté dans « valeurs changées ».";
 
@@ -40,7 +40,7 @@ export const UPDATED_HINT =
  */
 export function keyNumbers(counts: ImportChangeCounts): KeyNumber[] {
   return [
-    { value: counts.updated, label: "projets mis à jour", hint: UPDATED_HINT },
+    { value: counts.updated, label: "projets relus", hint: UPDATED_HINT },
     { value: counts.created, label: "nouveaux" },
     { value: counts.absent, label: "absents de l’import (∅)" },
     { value: counts.valuesChanged, label: "valeurs changées" },
@@ -62,7 +62,7 @@ export function minorCounts(changes: Pick<ImportChanges, "counts" | "adopted" | 
   const out: string[] = [];
   if (counts.back > 0) out.push(`${counts.back} de retour`);
   if (counts.moved > 0) out.push(`${counts.moved} déplacé(s)${overtaken}`);
-  if (counts.divergences > 0) out.push(`${counts.divergences} divergence(s) laissée(s) en place (placées à la main)`);
+  if (counts.divergences > 0) out.push(`${counts.divergences} divergence(s) laissée(s) en place (placées à la main ou en pause)`);
   if (changes.adopted.length > 0) out.push(`${changes.adopted.length} carte(s) saisie(s) à la main adoptée(s)`);
   if (changes.deletedSkipped.length > 0) out.push(`${changes.deletedSkipped.length} supprimée(s) du tableau, ignorée(s)`);
   return out;
@@ -140,6 +140,7 @@ export function loadOutcomes(load: ImportLoadResult["load"]): string[] {
   const out: string[] = [];
   if (load.replaced > 0) out.push(`${load.replaced} correction(s) manuelle(s) remplacée(s) par l’export`);
   if (load.advanced > 0) out.push(`${load.advanced} placement(s) à la main dépassé(s) par un nouveau jalon`);
+  if ((load.paused ?? 0) > 0) out.push(`${load.paused ?? 0} en pause, nouveau jalon non appliqué`);
   if (load.adopted > 0) out.push(`${load.adopted} carte(s) saisie(s) à la main adoptée(s)`);
   if (load.deletedSkipped > 0) out.push(`${load.deletedSkipped} supprimée(s) du tableau, ignorée(s)`);
   return out;

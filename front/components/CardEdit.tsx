@@ -11,6 +11,7 @@ import { reconcileCardRefs, subDomainsOf } from "../../core/config.ts";
 import { CARD_TEXT_LIMITS as CAP } from "../../core/card-input.ts";
 import { effortDraftOf, effortPatchOf, type EffortDraft } from "../cardFacts.ts";
 import { CRITICALITY_KEYS, CustomInput, Field, SelectField } from "./modalParts.tsx";
+import { domainOptions } from "../domainMark.ts";
 
 /** Move intent computed on save when the card changed cell. */
 export interface EditMove {
@@ -47,7 +48,8 @@ interface Draft extends EffortDraft {
 type SetDraft = (patch: Partial<Draft>) => void;
 
 // Builds the initial form state; stale config references are remapped to
-// the first config entry for display (reconcileCardRefs — never an event).
+// the first config entry for display (reconcileCardRefs — never an event),
+// except the domain: stale or empty reads as none (ADR 061).
 function toDraft(card: CardState, config: BoardConfig): Draft {
   const refs = reconcileCardRefs(card, config);
   return {
@@ -132,10 +134,11 @@ function TypeCodeRow({ draft, config, set }: { draft: Draft; config: BoardConfig
 // sub-domain: a sub-domain never survives its domain. No Nature select
 // (design v11): nature follows the canal — changing the canal IS the
 // requalification.
-function RefsGrid({ draft, config, set }: { draft: Draft; config: BoardConfig; set: SetDraft }) {
+// A card without domain (ADR 061) offers « — à attribuer — » until one is chosen (never a preselected domain).
+function RefsGrid({ draft, config, set, initialDomain }: { draft: Draft; config: BoardConfig; set: SetDraft; initialDomain: string }) {
   return (
     <div className="field-2col">
-      <SelectField label="Domaine" value={draft.domain} options={config.domains.map((d) => ({ value: d.id, label: d.name }))} onChange={(v) => set({ domain: v, subDomain: "" })} />
+      <SelectField label="Domaine" value={draft.domain} options={domainOptions(config, initialDomain)} onChange={(v) => set({ domain: v, subDomain: "" })} />
       <SubDomainField config={config} domain={draft.domain} value={draft.subDomain} onChange={(v) => set({ subDomain: v })} />
       <SelectField label="Canal" value={draft.laneId} options={config.lanes.map((l) => ({ value: l.id, label: l.name }))} onChange={(v) => set({ laneId: v })} />
       <SelectField label="Colonne" value={draft.columnId} options={config.columns.map((c) => ({ value: c.id, label: c.name }))} onChange={(v) => set({ columnId: v })} />
@@ -217,7 +220,7 @@ export function CardEdit(props: CardEditProps) {
           </div>
           <Field label="Nom"><input className="inp" maxLength={CAP.title} value={draft.title} onChange={(e) => set({ title: e.target.value })} /></Field>
           <TypeCodeRow draft={draft} config={config} set={set} />
-          <RefsGrid draft={draft} config={config} set={set} />
+          <RefsGrid draft={draft} config={config} set={set} initialDomain={reconcileCardRefs(card, config).domain} />
           <EffortGrid draft={draft} set={set} />
           <CustomSection fields={config.fields} custom={draft.custom} onChange={(id, value) => setDraft((c) => ({ ...c, custom: { ...c.custom, [id]: value } }))} />
           <Field label="Notes"><textarea className="inp" rows={2} maxLength={CAP.notes} value={draft.notes} onChange={(e) => set({ notes: e.target.value })} /></Field>

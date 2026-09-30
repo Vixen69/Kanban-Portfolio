@@ -187,6 +187,8 @@ test("viewCounts tallies only non-hidden cards against the portfolio total", () 
     normal: 0,
     absent: 0,
     toReview: 0,
+    noDomain: 0,
+    domainCheck: 0,
   });
 });
 
@@ -201,6 +203,8 @@ test("portfolioCounts ignores filters: shown equals total", () => {
     normal: 2,
     absent: 0,
     toReview: 0,
+    noDomain: 0,
+    domainCheck: 0,
   });
 });
 

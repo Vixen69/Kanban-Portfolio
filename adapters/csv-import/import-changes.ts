@@ -9,10 +9,13 @@
 // since ADR 058/059 also the hand-made cards adopted, the cards deleted on
 // the board that the files still carry (skipped) and the identity doubts;
 // since ADR 060 the hand corrections a NEW export value took back and the
-// hand placements a new jalon went past.
+// hand placements a new jalon went past, and the cards in Pause a jalon
+// would have moved (left there). withEventReasons hands the entry / exit /
+// return reasons to the events the load writes (the fiche's Historique).
 // Nothing is written. Pure: the caller passes the stored cards and log.
 
 import type { BoardConfig, Card, CardEvent, CardState } from "../../core/types.ts";
+import type { CardEventInput } from "../../core/events.ts";
 import type {
   ImportAdopted, ImportAdvanced, ImportCardRef, ImportChangeCounts, ImportChanges, ImportEntered, ImportExcluded, ImportKeptFact, ImportLeft,
 } from "../../core/import-types.ts";
@@ -21,6 +24,7 @@ import { diffBoards } from "../../core/snapshot-diff.ts";
 import { foldEvents } from "../../core/state.ts";
 import { cardsOfExercise } from "../../core/exercise.ts";
 import { eventSequence } from "../../core/event-sequence.ts";
+import { domainName } from "../../core/domain-check.ts";
 import { normalizeLabel } from "./normalize.ts";
 import type { AuditResult } from "./orchestrate.ts";
 import type { PerimeterVerdict } from "./projets-types.ts";
@@ -93,10 +97,12 @@ function idsOf(plan: LoadPlan, type: CardEvent["type"]): string[] {
   return plan.events.filter((event) => event.type === type).map((event) => event.cardId);
 }
 
-function enteredOf(input: ChangesInput, plan: LoadPlan, perimeter: Perimeter): ImportEntered[] {
+/** The warning of a new card whose export resolves no domain (ADR 061: created without one, never a default one). */
+export const DOMAIN_MISSING = "domaine non résolu — à attribuer à la main";
+
+function enteredOf(plan: LoadPlan, perimeter: Perimeter): ImportEntered[] {
   const planned = new Map(plan.cards.map((card) => [card.id, card]));
-  const fallback = new Set(plan.domainFallback);
-  const defaultName = input.config.domains[0]?.name ?? "aucun domaine";
+  const missing = new Set(plan.domainMissing);
   return byTitle(idsOf(plan, "imported").flatMap((id): ImportEntered[] => {
     const card = planned.get(id);
     if (card === undefined) return [];
@@ -104,8 +110,18 @@ function enteredOf(input: ChangesInput, plan: LoadPlan, perimeter: Perimeter): I
     const why = verdict?.motive === "retained" ? ` — ${verdict.reason}` : "";
     return [{
       ...ref(card), reason: `nouveau dans le périmètre ${perimeter.source ?? ""}${why}`,
-      domainWarning: fallback.has(id) ? `domaine non résolu → ${defaultName} par défaut, à corriger` : null,
+      domainWarning: missing.has(id) ? DOMAIN_MISSING : null,
     }];
+  }));
+}
+
+// ADR 061: the stored cards whose domain the export does not give and no
+// human ever set — « domaine à vérifier » (maybe the old first-domain fallback).
+function toCheckOf(plan: LoadPlan, config: BoardConfig, after: ReadonlyMap<string, CardState>): ImportLeft[] {
+  return byTitle(plan.domainToCheck.flatMap((id): ImportLeft[] => {
+    const card = after.get(id);
+    const reason = `« ${domainName(config, card?.domain ?? "")} » : l’export ne donne pas de domaine, jamais confirmé à la main`;
+    return card === undefined ? [] : [{ ...ref(card), reason }];
   }));
 }
 
@@ -148,9 +164,10 @@ function factCards(plan: LoadPlan, facts: LoadPlan["factsKeptCards"], after: Rea
   }));
 }
 
-// ADR 060: the hand placements a new jalon went past.
-function advancedOf(plan: LoadPlan, after: ReadonlyMap<string, CardState>): ImportAdvanced[] {
-  return byTitle(plan.advanced.map((a) => {
+// ADR 060: the hand placements a new jalon went past, or the cards in
+// Pause it would have moved (left there).
+function advancedOf(list: LoadPlan["advanced"], after: ReadonlyMap<string, CardState>): ImportAdvanced[] {
+  return byTitle(list.map((a) => {
     const card = after.get(a.cardId);
     return { cardId: a.cardId, code: card?.codename ?? null, title: card?.title ?? a.title, fromColumn: a.fromColumn, toColumn: a.toColumn };
   }));
@@ -205,7 +222,10 @@ export function importChanges(input: ChangesInput): ImportChanges {
     blockers: audit.blockers.map((blocker) => blocker.message),
   };
   if (plan === null) {
-    return { ...head, counts: NO_COUNTS, entered: [], left: [], back: [], cardChanges: [], kept: [], replaced: [], advanced: [], adopted: [], deletedSkipped: [], identityDoubts: [] };
+    return {
+      ...head, counts: NO_COUNTS, entered: [], left: [], back: [], cardChanges: [], kept: [], replaced: [], advanced: [], paused: [],
+      adopted: [], deletedSkipped: [], identityDoubts: [], domainToCheck: [],
+    };
   }
   const exercise = (cards: CardState[]): CardState[] => cardsOfExercise(cards, year, config.exercise.year);
   const before = exercise(foldEvents(input.baseCards, input.events));
@@ -215,9 +235,36 @@ export function importChanges(input: ChangesInput): ImportChanges {
   const cardChanges = diffBoards(config, before, after);
   return {
     ...head, counts: countsOf(plan, cardChanges),
-    entered: enteredOf(input, plan, perimeter), left: leftOf(plan, perimeter, beforeById),
+    entered: enteredOf(plan, perimeter), left: leftOf(plan, perimeter, beforeById),
     back: backOf(plan, perimeter, afterById), cardChanges, kept: factCards(plan, plan.factsKeptCards, afterById),
-    replaced: factCards(plan, plan.replaced, afterById), advanced: advancedOf(plan, afterById),
+    replaced: factCards(plan, plan.replaced, afterById), advanced: advancedOf(plan.advanced, afterById),
+    paused: advancedOf(plan.paused, afterById),
     adopted: adoptedOf(plan), deletedSkipped: deletedOf(input, plan), identityDoubts: plan.identityDoubts,
+    domainToCheck: toCheckOf(plan, config, afterById),
   };
+}
+
+/**
+ * The plan's events with the reason of each entry, exit and return in
+ * their payload (`reason`, the report's own words — ADR 055): an
+ * `imported` card's « nouveau dans le périmètre … », an `unlisted` one's
+ * perimeter motive (« écarté du périmètre … : état « Reporté » hors des
+ * états retenus ») or « plus présent dans le fichier Coût … », a
+ * `relisted` one's « de nouveau dans le périmètre … ». The fiche's
+ * Historique reads it (core/history.ts); the fold ignores it.
+ * Inputs: the plan's events, the report built from the same plan.
+ * Output: a new array — the named events with a copied payload, the
+ * others as given. Failure modes: none — an event the report does not
+ * name keeps its payload (and reads as before).
+ */
+export function withEventReasons(events: readonly CardEventInput[], changes: ImportChanges): CardEventInput[] {
+  const reasons: Partial<Record<CardEvent["type"], Map<string, string>>> = {
+    imported: new Map(changes.entered.map((entry) => [entry.cardId, entry.reason])),
+    unlisted: new Map(changes.left.map((entry) => [entry.cardId, entry.reason])),
+    relisted: new Map(changes.back.map((entry) => [entry.cardId, entry.reason])),
+  };
+  return events.map((event) => {
+    const reason = reasons[event.type]?.get(event.cardId);
+    return reason === undefined ? event : { ...event, payload: { ...event.payload, reason } };
+  });
 }

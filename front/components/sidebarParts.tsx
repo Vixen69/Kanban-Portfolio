@@ -52,7 +52,8 @@ function CatHead(props: { label: string; allOn: boolean; noneOn: boolean; onAll:
  * a pill row holding the children. allOn/noneOn read the group's own map
  * only (a domain's sub-domains ride along through the actions themselves).
  * Inputs: the French label, the FilterState group, an optional wrap flag,
- * the filters, the setGroup callback, the pills as children.
+ * the filters, the setGroup callback, an optional synthetic pill's state
+ * that tout/rien also set (« Sans domaine », ADR 061), the pills as children.
  * Output: a div.sb-section. Failure modes: none.
  */
 export function GroupSection(props: {
@@ -61,9 +62,10 @@ export function GroupSection(props: {
   wrap?: boolean;
   filters: FilterState;
   onSetGroup: (group: FilterGroup, value: boolean) => void;
+  extra?: boolean;
   children: ReactNode;
 }) {
-  const values = Object.values(props.filters[props.group]);
+  const values = [...Object.values(props.filters[props.group]), ...(props.extra === undefined ? [] : [props.extra])];
   return (
     <div className="sb-section">
       <CatHead

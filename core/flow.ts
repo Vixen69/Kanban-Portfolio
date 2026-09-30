@@ -7,6 +7,7 @@
 
 import type { BoardConfig, CardEvent, Column } from "./types.ts";
 import { isReorder } from "./events.ts";
+import { creationFirst } from "./fold-order.ts";
 
 const DAY_MS = 86_400_000;
 
@@ -124,7 +125,8 @@ function daysBetween(a: number | null, b: number | null): number | null {
 export function flowTimes(events: CardEvent[], cardId: string, config: BoardConfig, now: Date): FlowTimes {
   const anchors = resolveFlowAnchors(config);
   // Same-cell reorders (ADR 019) are rank changes, never stage arrivals.
-  const mine = events.filter((event) => event.cardId === cardId && !isReorder(event)).sort(oldestFirst);
+  // The creation reads first whatever its date (fold-order.ts, like the fold).
+  const mine = creationFirst(events.filter((event) => event.cardId === cardId && !isReorder(event)).sort(oldestFirst));
   const nowMs = now.getTime();
   if (anchors === null || mine.length === 0) {
     return { ageEntry: null, ageQualification: null, ageActivation: null, leadTime: null, cycleTime: null, finished: false };

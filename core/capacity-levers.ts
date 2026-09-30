@@ -6,6 +6,7 @@
 import type { BoardConfig, CapacitySnapshot, CardState } from "./types.ts";
 import type { PersonLoad } from "./capacity.ts";
 import { loadLevel } from "./capacity.ts";
+import { NO_DOMAIN_NAME } from "./domain-check.ts";
 
 const NEUTRAL = "#94a3b8";
 
@@ -104,7 +105,8 @@ export function weighingFor(
       const cardDomain = domains.get(card.domain);
       return [{
         cardId, title: card.title, codename: card.codename,
-        domainName: cardDomain?.name ?? card.domain, domainColor: cardDomain?.color ?? NEUTRAL,
+        // A card without domain (ADR 061) is named as such, never under another domain.
+        domainName: cardDomain?.name ?? (card.domain === "" ? NO_DOMAIN_NAME : card.domain), domainColor: cardDomain?.color ?? NEUTRAL,
         jh: entry.jh, genericJh: entry.genericJh, share: ratioOf(entry.jh, capacityJh),
       }];
     });
@@ -153,7 +155,7 @@ export function overloadRows(loads: PersonLoad[], config: BoardConfig, tension: 
     const { domain, profileId, metier } = load.person;
     rows.push({
       load, level, over: level > 1,
-      domainName: domain === null ? "Sans domaine" : (domains.get(domain) ?? domain),
+      domainName: domain === null ? NO_DOMAIN_NAME : (domains.get(domain) ?? domain),
       profileName: profileId === null ? (metier || "Sans profil") : (profiles.get(profileId) ?? profileId),
     });
   }

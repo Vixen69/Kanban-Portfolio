@@ -15,6 +15,7 @@ import type { Coverage, Overload, WeighingRow } from "./capacity-levers.ts";
 import { loadByMetier, tensionByMetier } from "./capacity-metiers.ts";
 import type { MetierLoad, MetierTension } from "./capacity-metiers.ts";
 import { DEFAULT_TENSION } from "./config-exercise.ts";
+import { NO_DOMAIN_NAME } from "./domain-check.ts";
 
 export type { Coverage, Overload, WeighingCard, WeighingRow } from "./capacity-levers.ts";
 export type { MetierLoad, MetierTension } from "./capacity-metiers.ts";
@@ -220,7 +221,8 @@ function transverseRows(snapshot: CapacitySnapshot, cards: readonly CardState[],
           const consumer = id === OUTSIDE ? undefined : domains.get(id);
           return {
             domainId: id === OUTSIDE ? null : id,
-            name: consumer?.name ?? (id === OUTSIDE ? "Hors tableau" : id),
+            // "" = the board's cards without domain (ADR 061): « Sans domaine ».
+            name: consumer?.name ?? (id === OUTSIDE ? "Hors tableau" : id === "" ? NO_DOMAIN_NAME : id),
             color: consumer?.color ?? NEUTRAL,
             jh, share: ratioOf(jh, row.capacityJh),
           };
@@ -243,7 +245,7 @@ function domainRows(snapshot: CapacitySnapshot, config: BoardConfig): DomainLoad
     if (known.has(group.key)) continue;
     rows.push({
       ...group, domainId: group.key === NONE ? null : group.key,
-      name: group.key === NONE ? "Sans domaine" : group.key, color: NEUTRAL, transverse: false,
+      name: group.key === NONE ? NO_DOMAIN_NAME : group.key, color: NEUTRAL, transverse: false,
     });
   }
   return rows;

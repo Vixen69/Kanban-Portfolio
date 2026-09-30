@@ -4,7 +4,10 @@
 // what the load changes and why — sync/import-text.ts). Storage is written
 // ONLY with --charger: nothing is loaded until the report is clean
 // (docs/IMPORT-MAPPING.md « Mode audit d'abord »); --comparer reads it to
-// preview the changes on the board without writing a card.
+// preview the changes on the board without writing a card. A load takes
+// the automatic snapshot « avant chargement <année> » before it writes,
+// exactly like the tool's (ADR 042, middle/snapshots.ts), and logs each
+// entry, exit and return with its reason (withEventReasons).
 // Unlike scripts/seed.ts, the board config is read through the runtime
 // store so an admin override applied on the client platform is honored.
 //
@@ -18,8 +21,11 @@ import { dirname, join, resolve } from "node:path";
 import { validateBoardConfig } from "../core/config.ts";
 import { loadServerConfig } from "../middle/config.ts";
 import { createConfigStore } from "../middle/config-store.ts";
+import type { ConfigStore } from "../middle/config-store.ts";
+import { takeSnapshot } from "../middle/snapshots.ts";
 import {
-  importChanges, importConfig, keepStoredCapacity, loadRefusal, planLoad, renderReport, runImportAudit, withLegacyIds,
+  IMPORT_ACTOR, importChanges, importConfig, keepStoredCapacity, loadRefusal, planLoad, renderReport, runImportAudit,
+  withEventReasons, withLegacyIds,
 } from "../adapters/csv-import/index.ts";
 import type { AuditResult } from "../adapters/csv-import/index.ts";
 import type { DomainDecision, ImportChanges } from "../core/import-types.ts";
@@ -27,7 +33,8 @@ import type { InputFile, LoadPlan } from "../adapters/csv-import/index.ts";
 import type { EnrichedCard } from "../adapters/csv-import/index.ts";
 import type { BoardStorage } from "../core/ports.ts";
 import type { BoardConfig, Card, CardEvent } from "../core/types.ts";
-import { boardText, filesText } from "./import-text.ts";
+import { domainName } from "../core/domain-check.ts";
+import { boardText, filesText, loadText } from "./import-text.ts";
 
 const USAGE = "usage : node sync/import.ts <dossier> [--out <rapport>] [--charger | --comparer] [--exercice <année>] [--domaines garder|remplacer]";
 
@@ -82,11 +89,13 @@ function parseArgs(argv: string[]): Args | null {
 
 // The config the board actually serves (defaults + admin runtime
 // override), matching export labels with the versioned model's vocabulary
-// — the same as the tool's import routes (ADR 056).
-function loadRuntimeBoardConfig(): BoardConfig {
+// — the same as the tool's import routes (ADR 056). The store is kept for
+// the automatic snapshot of a load (it records the applied config).
+function loadRuntimeBoardConfig(): { config: BoardConfig; configStore: ConfigStore } {
   const cfg = loadServerConfig(process.env);
   const defaults = validateBoardConfig(JSON.parse(readFileSync(cfg.boardConfigPath, "utf8")));
-  return importConfig(createConfigStore(cfg.dataDir, defaults).getRuntime(), defaults);
+  const configStore = createConfigStore(cfg.dataDir, defaults);
+  return { config: importConfig(configStore.getRuntime(), defaults), configStore };
 }
 
 // Every regular file of the folder, bytes untouched; recognition is the
@@ -122,17 +131,21 @@ async function withStorage<T>(what: string, work: (storage: BoardStorage) => Pro
   }
 }
 
-// The real load: plan against what the board already holds, then write the
-// cards and their events in one atomic batch; the changes are read from
-// the same plan (ADR 055: what the load DID).
+// The real load: plan against what the board already holds, take the
+// automatic snapshot once the load is accepted (ADR 042 — before anything
+// is written, like the tool), then write the cards and their events in one
+// atomic batch; the changes are read from the same plan (ADR 055: what the
+// load DID).
 async function load(
   audit: AuditResult, deck: EnrichedCard[], config: BoardConfig, year: number, domaines: DomainDecision | null,
+  configStore: ConfigStore,
 ): Promise<{ plan: LoadPlan; changes: ImportChanges }> {
   return withStorage("destination", async (storage) => {
     const [events, baseCards] = await Promise.all([storage.listEvents(), storage.listBaseCards()]);
     const plan = planWithDecisions(deck, config, baseCards, events, year, domaines);
     const changes = importChanges({ audit, config, year, plan, baseCards, events });
-    await storage.importCards(plan.cards, plan.events);
+    await takeSnapshot({ storage, configStore }, `avant chargement ${year}`, IMPORT_ACTOR, new Date());
+    await storage.importCards(plan.cards, withEventReasons(plan.events, changes));
     if (audit.capacity !== null) {
       const fresh = withLegacyIds(audit.capacity.snapshot, plan.aliases);
       await storage.importCapacity(keepStoredCapacity(fresh, await storage.getCapacity(year)));
@@ -161,7 +174,7 @@ function planWithDecisions(
   if (dry.domainConflicts.length === 0) return dry;
   if (domaines === null) {
     const lines = dry.domainConflicts.slice(0, 8)
-      .map((c) => `\n  · « ${c.title} » : tableau ${c.board.domain} / export ${c.proposed.domain} (${c.rule})`).join("");
+      .map((c) => `\n  · « ${c.title} » : tableau ${domainName(config, c.board.domain)} / export ${domainName(config, c.proposed.domain)} (${c.rule})`).join("");
     throw new Error(
       `${dry.domainConflicts.length} conflit(s) de domaine à trancher — dans l'outil (un par un), ` +
         `ou --domaines garder|remplacer pour tout trancher pareil.${lines}`,
@@ -185,22 +198,6 @@ function storageLabel(driver: string, dataPath: string): string {
   return driver;
 }
 
-function loadSummary(plan: LoadPlan): string {
-  const divergences = plan.divergences.length === 0
-    ? ""
-    : `\nDivergences non appliquées (cartes déplacées à la main) : ${plan.divergences.length}` +
-      plan.divergences.slice(0, 5)
-        .map((d) => `\n  · « ${d.title} » : tableau ${d.fromColumn} / export ${d.toColumn}`).join("");
-  return `chargement : ${plan.created} carte(s) créée(s) · ${plan.updated} mise(s) à jour` +
-    ` · ${plan.moved} déplacée(s) par l'export (dont ${plan.advanced.length} placée(s) à la main, dépassée(s) par un nouveau jalon)` +
-    ` · ${new Set(plan.replaced.flatMap((f) => f.cardIds)).size} correction(s) manuelle(s) remplacée(s) par la nouvelle valeur de l'export` +
-    ` · ${plan.unlisted} absente(s) de l'export (marquées, jamais supprimées) · ${plan.relisted} de retour` +
-    ` · ${plan.kept} position(s) conservée(s) (export sans jalon)` +
-    ` · domaines : ${plan.domainReplaced} remplacé(s), ${plan.domainKept} gardé(s)${divergences}` +
-    (plan.factsKept.length === 0 ? "" : "\nAbsents des fichiers, gardés du tableau (ADR 054) : " +
-      plan.factsKept.map((f) => `${f.label} ${f.cards} carte(s)`).join(" · "));
-}
-
 const args = parseArgs(process.argv.slice(2));
 if (args === null) {
   console.error(USAGE);
@@ -208,7 +205,7 @@ if (args === null) {
 }
 
 try {
-  const boardConfig = loadRuntimeBoardConfig();
+  const { config: boardConfig, configStore } = loadRuntimeBoardConfig();
   const year = args.exercice ?? boardConfig.exercise.year;
   const files = readInputFiles(args.folder);
   const audit = runImportAudit(files, boardConfig, new Date(), year);
@@ -234,8 +231,8 @@ try {
   if (refused !== null) console.error(refused);
   if (args.charger) {
     if (refused !== null || cards === null) process.exit(1);
-    const loaded = await load(audit, cards.cards, boardConfig, year, args.domaines);
-    console.log(`${loadSummary(loaded.plan)}\n${boardText(loaded.changes, boardConfig).join("\n")}`);
+    const loaded = await load(audit, cards.cards, boardConfig, year, args.domaines, configStore);
+    console.log([...loadText(loaded.plan, boardConfig), ...boardText(loaded.changes, boardConfig)].join("\n"));
 
     if (capacity !== null) {
       const { persons, assignments } = capacity.snapshot;

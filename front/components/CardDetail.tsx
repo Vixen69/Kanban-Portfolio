@@ -6,7 +6,8 @@
 
 import { useEffect, useState } from "react";
 import type { BoardConfig, CardPatch, CardState } from "../../core/types.ts";
-import { reconcileCardRefs, subDomainsOf } from "../../core/config.ts";
+import { reconcileCardRefs } from "../../core/config.ts";
+import { DomainBanner, DomainTags } from "./DomainAssign.tsx";
 import type { HistoryEntry } from "../../core/history.ts";
 import type { FlowAnchors, FlowTimes } from "../../core/flow.ts";
 import { TypeTag } from "./cardParts.tsx";
@@ -88,15 +89,12 @@ function TopBar({ card, nav, onClose, onPatch }: { card: CardState; nav: CellNav
 // an event).
 function TagRow({ card, config, onToggleConstraints }: { card: CardState; config: BoardConfig; onToggleConstraints: () => void }) {
   const refs = reconcileCardRefs(card, config);
-  const domain = config.domains.find((entry) => entry.id === refs.domain)!;
-  const sub = subDomainsOf(config, refs.domain).find((entry) => entry.id === refs.subDomain) ?? null;
   const column = config.columns.find((entry) => entry.id === refs.columnId)!;
   const type = refs.typeId === null ? null : (config.types.find((entry) => entry.id === refs.typeId) ?? null);
   return (
     <div className="tag-row">
       <TypeTag type={type} big />
-      <Tag color={domain.color}>{domain.name}</Tag>
-      {sub && <Tag color={domain.color}>{sub.name}</Tag>}
+      <DomainTags card={card} config={config} />
       <Tag color="#94a3b8">{column.name}</Tag>
       {card.criticality === "top" && <Tag color="#d4a017" solid>★ {config.criticalities.top.badge ?? config.criticalities.top.label}</Tag>}
       {card.criticality === "major" && <Tag color="#475569">• {config.criticalities.major.badge ?? config.criticalities.major.label}</Tag>}
@@ -245,22 +243,24 @@ function ConstraintPop({ card, config, onPatch, onClose }: { card: CardState; co
  * Output: overlay + modal; the bar is red when blocked, else the domain
  * color; clicking the overlay or ✕ closes (Escape is handled globally). The
  * per-section editors reset when the card changes (keyed by card.id).
- * Failure modes: none — stale config references fall back to first entries.
+ * A domain to assign or to verify gets its banner under the tag row (ADR
+ * 061). Failure modes: none — stale lane/column/type references fall back
+ * to first entries; a stale or empty domain reads as « Sans domaine ».
  */
 export function CardDetail(props: CardDetailProps) {
   const { card, config, onPatch } = props;
   const [constraintEdit, setConstraintEdit] = useState(false);
   useEffect(() => { setConstraintEdit(false); }, [card.id]);
   useArrowKeys(props.nav);
-  const refs = reconcileCardRefs(card, config);
-  const domain = config.domains.find((entry) => entry.id === refs.domain)!;
+  const domain = config.domains.find((entry) => entry.id === card.domain);
   return (
     <div className="overlay" onClick={props.onClose}>
       <div className="modal" onClick={(event) => event.stopPropagation()}>
-        <span className="modal-bar" style={{ background: card.blocked ? "#b91c1c" : domain.color }} />
+        <span className="modal-bar" style={{ background: card.blocked ? "#b91c1c" : domain?.color ?? "#94a3b8" }} />
         <div className="modal-body">
           <TopBar card={card} nav={props.nav} onClose={props.onClose} onPatch={onPatch} />
           <TagRow card={card} config={config} onToggleConstraints={() => setConstraintEdit((open) => !open)} />
+          <DomainBanner card={card} config={config} onPatch={onPatch} />
           <AbsentBanner card={card} />
           {constraintEdit && <ConstraintPop card={card} config={config} onPatch={onPatch} onClose={() => setConstraintEdit(false)} />}
           <MidSections card={card} config={config} now={props.now} onPatch={onPatch}

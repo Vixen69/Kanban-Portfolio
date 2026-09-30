@@ -7,7 +7,8 @@
 
 import { Fragment, useState } from "react";
 import type { BoardConfig, Domain } from "../../core/types.ts";
-import { subDomainKey, type FilterGroup, type FilterState } from "../../core/filters.ts";
+import { subDomainKey, type FilterFlag, type FilterGroup, type FilterState } from "../../core/filters.ts";
+import { NO_DOMAIN_NAME } from "../../core/domain-check.ts";
 import { GroupSection, Pill } from "./sidebarParts.tsx";
 
 /** Props of the domain section (a slice of SidebarProps). */
@@ -16,6 +17,10 @@ export interface DomainSectionProps {
   filters: FilterState;
   onToggle: (group: FilterGroup, key: string) => void;
   onSetGroup: (group: FilterGroup, value: boolean) => void;
+  /** Flips the « Sans domaine » pill (ADR 061). */
+  onToggleFlag: (flag: FilterFlag) => void;
+  /** Cards without domain in the whole portfolio shown (the pill's count). */
+  noDomainCount: number;
 }
 
 // True when the domain is lit but at least one of its sub-domains is off.
@@ -79,7 +84,9 @@ function DomainPill({ domain, open, onFlip, filters, onToggle }: {
 
 /**
  * The « Domaine » filter section: domain pills with tout/rien, plus a
- * chevron per detailed domain unfolding its sub-domain pills (ADR 022).
+ * chevron per detailed domain unfolding its sub-domain pills (ADR 022),
+ * then the synthetic « Sans domaine » pill with its count (ADR 061 — on by
+ * default, like « Aucune » for the constraints; tout/rien include it).
  * Inputs: DomainSectionProps (config, filter state, toggle/setGroup
  * callbacks). Output: the section DOM. Failure modes: none.
  */
@@ -93,13 +100,16 @@ export function DomainSection(props: DomainSectionProps) {
       return next;
     });
   return (
-    <GroupSection label="Domaine" group="domain" wrap filters={props.filters} onSetGroup={props.onSetGroup}>
+    <GroupSection label="Domaine" group="domain" wrap filters={props.filters} onSetGroup={props.onSetGroup} extra={props.filters.noDomain}>
       {props.config.domains.map((domain) => (
         <Fragment key={domain.id}>
           <DomainPill domain={domain} open={open.has(domain.id)} onFlip={() => flip(domain.id)} filters={props.filters} onToggle={props.onToggle} />
           {open.has(domain.id) && <SubDomainRow domain={domain} filters={props.filters} onToggle={props.onToggle} />}
         </Fragment>
       ))}
+      <Pill active={props.filters.noDomain} onClick={() => props.onToggleFlag("noDomain")} color="#94a3b8">
+        {NO_DOMAIN_NAME}<small>{props.noDomainCount}</small>
+      </Pill>
     </GroupSection>
   );
 }

@@ -9,6 +9,7 @@
 import type { BoardConfig, CardEvent, CardState } from "./types.ts";
 import { daysInColumn } from "./aging.ts";
 import { isReorder } from "./events.ts";
+import { creationFirst } from "./fold-order.ts";
 
 const DAY_MS = 86_400_000;
 
@@ -48,7 +49,8 @@ function isPosition(event: CardEvent): boolean {
     && event.toColumn !== null && !isReorder(event);
 }
 
-// The position events of the given cards, per card, oldest first.
+// The position events of the given cards, per card, oldest first — the
+// creation first whatever its date.
 function positionsByCard(events: readonly CardEvent[], ids: ReadonlySet<string>): Map<string, CardEvent[]> {
   const byCard = new Map<string, CardEvent[]>();
   for (const event of events) {
@@ -57,7 +59,8 @@ function positionsByCard(events: readonly CardEvent[], ids: ReadonlySet<string>)
     if (list) list.push(event);
     else byCard.set(event.cardId, [event]);
   }
-  for (const list of byCard.values()) list.sort(oldestFirst);
+  // The creation reads first whatever its date (fold-order.ts, like the fold).
+  for (const [id, list] of byCard) byCard.set(id, creationFirst(list.sort(oldestFirst)));
   return byCard;
 }
 

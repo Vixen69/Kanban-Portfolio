@@ -24,6 +24,12 @@ export interface BoardReading {
   movedByHand: Set<string>;
   /** The last domain decision the log holds per card (ADR 036). */
   priors: Map<string, PriorDecision>;
+  /**
+   * Cards whose domain a human set (ADR 061): a domain decision in the log
+   * (by hand in the fiche, or « garder » / « remplacer » at an import), or
+   * a creation by hand (its domain was chosen in « + Sujet »).
+   */
+  domainByHand: Set<string>;
   /** Normalized codes and ids of the exercise's imported cards deleted on the board. */
   deleted: { ids: Set<string>; codes: Set<string> };
   /** Per card, the position-setting event the log wrote last (by sequence). */
@@ -113,11 +119,14 @@ export function readBoard(cards: Card[], events: CardEvent[], year: number, curr
   const log = effectiveEvents(events);
   const folded = cardsOfExercise(foldEvents(cards, log), year, currentYear);
   const current = new Map(folded.map((card) => [card.id, card]));
+  const priors = priorDomainDecisions(log);
+  const handMade = log.filter((event) => event.type === "created").map((event) => event.cardId);
   return {
     current,
     legacy: new Map(folded.filter((card) => !hasExerciseSuffix(card.id)).map((card) => [card.id, card])),
     movedByHand: handMovedIds(log),
-    priors: priorDomainDecisions(log),
+    priors,
+    domainByHand: new Set([...priors.keys(), ...handMade]),
     deleted: deletedOf(log, cards, year, currentYear),
     lastPosition: lastPositions(log),
     ...codeIndexes(current, year),

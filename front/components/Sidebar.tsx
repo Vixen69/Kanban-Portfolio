@@ -8,7 +8,7 @@
 
 import type { Ref } from "react";
 import type { BoardConfig } from "../../core/types.ts";
-import type { FilterGroup, FilterState, ResourceDraw, ViewCounts } from "../../core/filters.ts";
+import type { FilterFlag, FilterGroup, FilterState, ResourceDraw, ViewCounts } from "../../core/filters.ts";
 import { GroupSection, Pill, ResourceSection } from "./sidebarParts.tsx";
 
 import { DomainSection } from "./SidebarDomains.tsx";
@@ -25,9 +25,8 @@ export interface SidebarProps {
   onSearchEnter: () => void;
   filters: FilterState;
   onToggle: (group: FilterGroup, key: string) => void;
-  onToggleBlockedOnly: () => void;
-  /** Flips the « Aucune » pill of the Contrainte group (design v12). */
-  onToggleNoConstraint: () => void;
+  /** Flips a switch: « Bloqués uniquement », « Aucune » (Contrainte), « Sans domaine », « Domaine à vérifier » (ADR 061). */
+  onToggleFlag: (flag: FilterFlag) => void;
   onSetGroup: (group: FilterGroup, value: boolean) => void;
   /** Whole-portfolio counts (the muted reference totals). */
   stats: ViewCounts;
@@ -164,7 +163,7 @@ function ConstraintSection(props: SidebarProps) {
             {constraint.name}
           </Pill>
         ))}
-        <Pill active={props.filters.noConstraint} onClick={props.onToggleNoConstraint} color="#94a3b8">
+        <Pill active={props.filters.noConstraint} onClick={() => props.onToggleFlag("noConstraint")} color="#94a3b8">
           Aucune
         </Pill>
       </div>
@@ -172,15 +171,24 @@ function ConstraintSection(props: SidebarProps) {
   );
 }
 
-// Blocage (design v11): a single toggle pill, no tout/rien header.
+// Blocage (design v11): a single toggle pill, no tout/rien header. Next to
+// it, only while some card has a domain problem (or the switch is on),
+// « Domaine à vérifier » with its count (ADR 061): the cards without
+// domain or with a domain the export does not give, found in one click.
 function BlocageSection(props: SidebarProps) {
+  const checking = props.filters.domainCheckOnly || props.stats.domainCheck > 0;
   return (
     <div className="sb-section">
       <span className="sb-label">Blocage</span>
       <div className="pill-row">
-        <Pill active={props.filters.blockedOnly} onClick={props.onToggleBlockedOnly} color="#dc2626">
+        <Pill active={props.filters.blockedOnly} onClick={() => props.onToggleFlag("blockedOnly")} color="#dc2626">
           Bloqués uniquement
         </Pill>
+        {checking && (
+          <Pill active={props.filters.domainCheckOnly} onClick={() => props.onToggleFlag("domainCheckOnly")} color="#b45309">
+            Domaine à vérifier<small>{props.stats.domainCheck}</small>
+          </Pill>
+        )}
       </div>
     </div>
   );
@@ -251,7 +259,8 @@ export function Sidebar(props: SidebarProps) {
       <BlocageSection {...props} />
       <TypeSection {...props} />
       <CritSection {...props} />
-      <DomainSection config={props.config} filters={props.filters} onToggle={props.onToggle} onSetGroup={props.onSetGroup} />
+      <DomainSection config={props.config} filters={props.filters} onToggle={props.onToggle} onSetGroup={props.onSetGroup}
+        onToggleFlag={props.onToggleFlag} noDomainCount={props.stats.noDomain} />
       <StatsBlock {...props} />
       <Shortcuts />
     </aside>

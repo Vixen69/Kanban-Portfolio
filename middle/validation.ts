@@ -9,6 +9,7 @@ import type { BoardConfig, Criticality, CustomValue } from "../core/types.ts";
 import { CARD_TEXT_LIMITS as CAP, customValueFits } from "../core/card-input.ts";
 import { isIsoDate } from "../core/decisions.ts";
 import { EDITABLE_FIELDS } from "../core/state.ts";
+import { domainName } from "../core/domain-check.ts";
 import { BadRequest } from "./errors.ts";
 
 /**
@@ -111,7 +112,7 @@ function checkSubDomain(config: BoardConfig, fields: Record<string, unknown>, ca
   const domainId = typeof fields["domain"] === "string" ? fields["domain"] : card.domain;
   const domain = config.domains.find((d) => d.id === domainId);
   if (!(domain?.subDomains ?? []).some((s) => s.id === sub)) {
-    throw new BadRequest(`Sous-domaine « ${sub} » hors du domaine « ${domain?.name ?? domainId} ».`);
+    throw new BadRequest(`Sous-domaine « ${sub} » hors du domaine « ${domainName(config, domainId)} ».`);
   }
 }
 

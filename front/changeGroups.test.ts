@@ -7,7 +7,9 @@ import { testConfig } from "../core/test-helpers.ts";
 import type { CardChange, FigureFact, PlanChange } from "../core/snapshot-diff.ts";
 import {
   capitalized, changeKey, changeWords, fmtFigure, frDay, groupChanges, planDelta, planPair, planSummary, profileName, sectionOpen, signedDelta,
+  trendTone,
 } from "./changeGroups.ts";
+import type { TrendMeasure, TrendTone } from "./changeGroups.ts";
 
 const NBSP = String.fromCharCode(0x202f);
 const base = { title: "Projet", codename: "PE1", exercise: 2026 };
@@ -118,4 +120,17 @@ test("profileName and changeKey", () => {
 test("capitalized: a label as a section title", () => {
   const cases: Array<[string, string]> = [["chef de projet", "Chef de projet"], ["", ""], ["Déjà", "Déjà"], ["été", "Été"]];
   for (const [text, expected] of cases) assert.equal(capitalized(text), expected);
+});
+
+test("trendTone: progress neutral, a growing demand amber, less left to do green, other falls neutral", () => {
+  const cases: Array<[TrendMeasure, "up" | "down", TrendTone]> = [
+    ["budgetConsumed", "up", "neutral"], ["budgetEngaged", "up", "neutral"], ["effortConsumed", "up", "neutral"],
+    ["budgetEstimated", "up", "warn"], ["budgetRdli", "up", "warn"], ["effortEstimated", "up", "warn"],
+    ["planned", "up", "warn"], ["raf", "up", "warn"],
+    ["raf", "down", "ok"], ["budgetEstimated", "down", "ok"],
+    ["budgetConsumed", "down", "neutral"], ["budgetEngaged", "down", "neutral"], ["effortConsumed", "down", "neutral"],
+    ["budgetRdli", "down", "neutral"], ["effortEstimated", "down", "neutral"], ["planned", "down", "neutral"],
+  ];
+  for (const [measure, trend, tone] of cases) assert.equal(trendTone(measure, trend), tone, `${measure} ${trend}`);
+  assert.equal(trendTone("raf", null), null, "no trend, no mark");
 });

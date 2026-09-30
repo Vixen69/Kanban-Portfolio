@@ -17,12 +17,13 @@ export function OwnerStrip({ card, config, now, onPatch }: {
   now: number;
   onPatch: (patch: CardPatch) => void;
 }) {
-  const domain = config.domains.find((d) => d.id === card.domain) ?? config.domains[0]!;
+  // No domain (ADR 061): the neutral grey, never another domain's colour.
+  const domain = config.domains.find((d) => d.id === card.domain);
   const days = daysInColumn(card, new Date(now));
   const initial = (card.owner || "—").replace(/^(M\.|Mme)\s*/, "").slice(0, 1);
   return (
     <div className="owner-strip">
-      <span className="owner-mono" style={{ background: domain.color }}>{initial}</span>
+      <span className="owner-mono" style={{ background: domain?.color ?? "#94a3b8" }}>{initial}</span>
       <div className="owner-meta">
         <b><InlineEdit value={card.owner} placeholder="Chef de projet non assigné" maxLength={CAP.owner} onCommit={(v) => onPatch({ owner: v.trim() })} /></b>
         <span>{card.loadPlan || "plan de charge n.c."}</span>

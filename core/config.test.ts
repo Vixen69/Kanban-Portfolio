@@ -220,7 +220,9 @@ const RECONCILE_CASES: {
   { name: "intact refs stay unchanged", overrides: {}, expected: { ...BASE_REFS } },
   { name: "unknown lane falls back to the first lane", overrides: { laneId: "ghost" }, expected: { ...BASE_REFS, laneId: "laneA" } },
   { name: "unknown column falls back to the first column", overrides: { columnId: "ghost" }, expected: { ...BASE_REFS, columnId: "col1" } },
-  { name: "unknown domain falls back to the first domain", overrides: { domain: "ghost" }, expected: { ...BASE_REFS, domain: "alpha" } },
+  // ADR 061: no default domain, ever — an unknown or empty domain reads as « Sans domaine ».
+  { name: "unknown domain reads as no domain", overrides: { domain: "ghost" }, expected: { ...BASE_REFS, domain: "" } },
+  { name: "an empty domain stays empty", overrides: { domain: "" }, expected: { ...BASE_REFS, domain: "" } },
   { name: "unknown type falls back to the first type", overrides: { typeId: "ghost" }, expected: { ...BASE_REFS, typeId: "t1" } },
   { name: "null type stays null", overrides: { typeId: null }, expected: { ...BASE_REFS, typeId: null } },
 ];
@@ -256,7 +258,7 @@ test("reconcileCardRefs keeps a sub-domain only while its domain declares it", (
   // Unknown sub-domain, or a sub-domain of another domain: dropped to null.
   assert.equal(reconcileCardRefs(testCard({ domain: "beta", subDomain: "ghost" }), config).subDomain, null);
   assert.equal(reconcileCardRefs(testCard({ domain: "alpha", subDomain: "b1" }), config).subDomain, null);
-  // A remapped domain (stale reference) never keeps the old sub-domain.
+  // A stale domain (read as none) never keeps the old sub-domain.
   assert.equal(reconcileCardRefs(testCard({ domain: "gone", subDomain: "b1" }), config).subDomain, null);
 });
 

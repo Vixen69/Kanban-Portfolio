@@ -99,3 +99,25 @@ test("a same-cell reorder is not narrated (ADR 019)", () => {
 test("a card with no narrated events yields an empty history", () => {
   assert.deepEqual(cardHistory(EVENTS, "S999", CONFIG), []);
 });
+
+test("history: an entry, exit or return carries the load's reason when the log holds one; older events read as before", () => {
+  const out = "écarté du périmètre COUT PREV : état « Reporté » hors des états retenus";
+  const cases: Array<{ name: string; event: CardEvent; kind: string; reason: string | null }> = [
+    { name: "imported with its reason", kind: "move", reason: "nouveau dans le périmètre COUT PREV",
+      event: event({ id: "evt-1", ts: "2026-09-01T00:00:00.000Z", type: "imported", toColumn: "col1", payload: { laneId: "laneA", reason: "nouveau dans le périmètre COUT PREV" } }) },
+    { name: "unlisted with its reason", kind: "unlisted", reason: out,
+      event: event({ id: "evt-2", ts: "2026-09-02T00:00:00.000Z", type: "unlisted", payload: { reason: out } }) },
+    { name: "relisted with its reason", kind: "relisted", reason: "de nouveau dans le périmètre COUT PREV",
+      event: event({ id: "evt-3", ts: "2026-09-03T00:00:00.000Z", type: "relisted", payload: { reason: "de nouveau dans le périmètre COUT PREV" } }) },
+    { name: "unlisted written before (no reason)", kind: "unlisted", reason: null,
+      event: event({ id: "evt-4", ts: "2026-09-04T00:00:00.000Z", type: "unlisted" }) },
+    { name: "a blank or malformed reason reads as none", kind: "relisted", reason: null,
+      event: event({ id: "evt-5", ts: "2026-09-05T00:00:00.000Z", type: "relisted", payload: { reason: 12 } }) },
+    { name: "a hand move never borrows a reason", kind: "move", reason: null,
+      event: event({ id: "evt-6", ts: "2026-09-06T00:00:00.000Z", type: "moved", fromColumn: "col1", toColumn: "col2", payload: { reason: "x" } }) },
+  ];
+  for (const c of cases) {
+    const [entry] = cardHistory([c.event], "S001", CONFIG);
+    assert.deepEqual([entry?.kind, entry?.reason], [c.kind, c.reason], c.name);
+  }
+});

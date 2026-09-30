@@ -6,13 +6,14 @@
 // board shows the retained subset and the counts say how much was kept.
 // Pure logic, rendered by front/components/Sidebar.tsx.
 
-import { reviewOverdue } from "./decisions.ts";
 import type { BoardConfig, Card, CardState, Criticality } from "./types.ts";
 import type { ResourceDraw } from "./resource-draw.ts";
-import { isStale } from "./aging.ts";
 import { cardMatchesQuery } from "./text-search.ts";
+import { domainIssue } from "./domain-check.ts";
 
 export type { ResourceDraw } from "./resource-draw.ts";
+export type { ViewCounts } from "./filter-counts.ts";
+export { portfolioCounts, viewCounts } from "./filter-counts.ts";
 
 /** The togglable pill groups of FilterState (search/blockedOnly excluded). */
 export type FilterGroup = "type" | "crit" | "domain" | "subDomain" | "constraint" | "resource";
@@ -69,25 +70,26 @@ export interface FilterState {
    * across the pills on (the draw comes from the capacity snapshot).
    */
   resource: Record<string, boolean>;
+  /**
+   * The « Sans domaine » pill of the Domaine group (ADR 061), on by
+   * default: keeps the cards without domain. Like `noConstraint`, not a
+   * key of `domain` — the absence of a domain is not a domain.
+   */
+  noDomain: boolean;
+  /** « Domaine à vérifier » (ADR 061) — hides every card without a domain problem (none, or one to verify). */
+  domainCheckOnly: boolean;
 }
 
+/** The single on/off switches of FilterState (the pill groups excluded). */
+export type FilterFlag = "blockedOnly" | "noConstraint" | "noDomain" | "domainCheckOnly";
+
 /**
- * The live read-out of the sidebar and header: how many cards are shown
- * (not hidden) and how the shown subset splits by state and criticality.
- * `total` is always the whole portfolio.
+ * Flips one switch of the filters.
+ * Inputs: the filters, the switch. Output: a new FilterState (input
+ * untouched). Failure: none.
  */
-export interface ViewCounts {
-  shown: number;
-  total: number;
-  blocked: number;
-  stale: number;
-  top: number;
-  major: number;
-  normal: number;
-  /** Cards the last import did not list (ADR 026). */
-  absent: number;
-  /** Cards whose last decision's review date is past (ADR 026). */
-  toReview: number;
+export function withFlagToggled(filters: FilterState, flag: FilterFlag): FilterState {
+  return { ...filters, [flag]: !filters[flag] };
 }
 
 /**
@@ -108,6 +110,8 @@ export function defaultFilters(config: BoardConfig): FilterState {
     constraint: on(config.projectConstraints.map((constraint) => constraint.id)),
     noConstraint: true,
     resource: Object.fromEntries(config.domains.filter((domain) => domain.transverse === true).map((domain) => [domain.id, false])),
+    noDomain: true,
+    domainCheckOnly: false,
   };
 }
 
@@ -150,8 +154,8 @@ export function withSubDomainToggled(filters: FilterState, config: BoardConfig, 
 }
 
 /**
- * Sets every domain AND sub-domain pill at once (the domain group's
- * tout / rien quick actions).
+ * Sets every domain AND sub-domain pill at once, « Sans domaine »
+ * included (the domain group's tout / rien quick actions, ADR 061).
  * Inputs: the filters, the value. Output: a new FilterState. Failure: none.
  */
 export function withDomainsSet(filters: FilterState, value: boolean): FilterState {
@@ -160,6 +164,7 @@ export function withDomainsSet(filters: FilterState, value: boolean): FilterStat
     ...filters,
     domain: set(Object.keys(filters.domain)),
     subDomain: set(Object.keys(filters.subDomain)),
+    noDomain: value,
   };
 }
 
@@ -181,6 +186,8 @@ export function isFilterActive(filters: FilterState): boolean {
     groupOff(filters.subDomain) ||
     groupOff(filters.constraint) ||
     !filters.noConstraint ||
+    !filters.noDomain ||
+    filters.domainCheckOnly ||
     Object.values(filters.resource).some((on) => on)
   );
 }
@@ -202,14 +209,25 @@ function constraintPasses(card: Card, filters: FilterState): boolean {
   return card.projectConstraints.some((id) => filters.constraint[id] !== false);
 }
 
+// The domain group (ADR 022/061): a card without domain follows the
+// « Sans domaine » pill; otherwise its domain pill, then its sub-domain's.
+// « Domaine à vérifier » keeps only the cards with a domain problem.
+function domainPasses(card: Card, filters: FilterState): boolean {
+  if (filters.domainCheckOnly && domainIssue(card) === null) return false;
+  if (card.domain === "") return filters.noDomain;
+  if (filters.domain[card.domain] === false) return false;
+  return card.subDomain === null || filters.subDomain[subDomainKey(card.domain, card.subDomain)] !== false;
+}
+
 /**
  * Whether one card stays lit: the search matches its title OR codename
  * (case, accents and apostrophes ignored — core/text-search.ts) AND it is blocked when blockedOnly is on AND
  * every group passes. A group passes when the card's key is missing from
  * the map or mapped to true; a null typeId always passes the type group,
  * a null subDomain always passes the sub-domain group (the card follows its
- * domain alone). The constraint group is OR-shaped (see constraintPasses),
- * the resource group opt-in (see resourcePasses).
+ * domain alone; a card without domain follows « Sans domaine », ADR 061).
+ * The constraint group is OR-shaped (see constraintPasses), the resource
+ * group opt-in (see resourcePasses).
  * Inputs: a Card (CardState included), the filters, the resource draw of
  * the exercise shown (optional — absent, a resource pill on hides all).
  * Output: true when the card passes everything. Failure: none.
@@ -218,10 +236,7 @@ export function cardMatches(card: Card, filters: FilterState, draw?: ResourceDra
   if (!cardMatchesQuery(card, filters.search)) return false;
   if (filters.blockedOnly && !card.blocked) return false;
   if (filters.crit[card.criticality] === false) return false;
-  if (filters.domain[card.domain] === false) return false;
-  if (card.subDomain !== null && filters.subDomain[subDomainKey(card.domain, card.subDomain)] === false) {
-    return false;
-  }
+  if (!domainPasses(card, filters)) return false;
   if (card.typeId !== null && filters.type[card.typeId] === false) return false;
   if (!constraintPasses(card, filters)) return false;
   return resourcePasses(card, filters, draw);
@@ -239,51 +254,4 @@ export function hiddenCardIds(cards: CardState[], filters: FilterState, draw?: R
     if (!cardMatches(card, filters, draw)) hidden.add(card.id);
   }
   return hidden;
-}
-
-function emptyCounts(total: number): ViewCounts {
-  return { shown: 0, total, blocked: 0, stale: 0, top: 0, major: 0, normal: 0, absent: 0, toReview: 0 };
-}
-
-function tally(counts: ViewCounts, card: CardState, config: BoardConfig, now: Date): void {
-  counts.shown++;
-  if (card.blocked) counts.blocked++;
-  if (isStale(card, config, now)) counts.stale++;
-  if (card.absentFromLastImport !== null) counts.absent++;
-  if (reviewOverdue(card, now)) counts.toReview++;
-  counts[card.criticality]++;
-}
-
-/**
- * Counts over the VISIBLE subset: only the cards not hidden are tallied
- * (shown, blocked, stale, per-criticality); total is the whole portfolio
- * size.
- * Inputs: all card states, the hidden id set, the board config (stale
- * threshold), now. Output: a ViewCounts. Failure: none.
- */
-export function viewCounts(
-  cards: CardState[],
-  hidden: ReadonlySet<string>,
-  config: BoardConfig,
-  now: Date,
-): ViewCounts {
-  const counts = emptyCounts(cards.length);
-  for (const card of cards) {
-    if (!hidden.has(card.id)) tally(counts, card, config, now);
-  }
-  return counts;
-}
-
-/**
- * Counts over the WHOLE portfolio, ignoring filters (the sidebar's muted
- * reference totals and the header stats). shown always equals total.
- * Inputs: all card states, the board config, now.
- * Output: a ViewCounts. Failure: none.
- */
-export function portfolioCounts(cards: CardState[], config: BoardConfig, now: Date): ViewCounts {
-  const counts = emptyCounts(cards.length);
-  for (const card of cards) {
-    tally(counts, card, config, now);
-  }
-  return counts;
 }

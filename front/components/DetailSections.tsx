@@ -151,9 +151,10 @@ function histBody(entry: HistoryEntry) {
     case "block": return <><b>Bloqué</b>{entry.reason ? ` — ${entry.reason}` : ""}</>;
     case "unblock": return <b>Blocage levé</b>;
     case "decision": return <><b>Décision {entry.detail}</b>{entry.reason ? ` — ${entry.reason}` : ""}</>;
-    case "unlisted": return <b>Absente du dernier import</b>;
-    case "relisted": return <b>De retour dans l’import</b>;
-    default: return <>{entry.fromName ? `${entry.fromName} → ` : ""}<b>{entry.toName}</b></>;
+    // With the load's reason: « Absente de l’import — état « Reporté »… »; older events read as before.
+    case "unlisted": return entry.reason ? <><b>Absente de l’import</b> — {entry.reason}</> : <b>Absente du dernier import</b>;
+    case "relisted": return <><b>De retour dans l’import</b>{entry.reason ? ` — ${entry.reason}` : ""}</>;
+    default: return <>{entry.fromName ? `${entry.fromName} → ` : ""}<b>{entry.toName}</b>{entry.reason ? ` — ${entry.reason}` : ""}</>;
   }
 }
 

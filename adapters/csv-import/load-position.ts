@@ -10,7 +10,9 @@
 // ProjetsJalons, on prend cette info si elle est nouvelle ; si elle est
 // d'un jalon qu'on n'avait pas avant, on actualise »). A hand-made card
 // the load adopts (ADR 059) has no previous import: any jalon further
-// than its column places it. Pure.
+// than its column places it. A card in Pause is never taken out by a jalon
+// (ADR 060 amendment, 2026-09-30): Pause is an arbitration decision, the
+// divergence is said « en pause — nouveau jalon non appliqué ». Pure.
 
 import type { BoardConfig, Card, CardState } from "../../core/types.ts";
 import type { CardEventInput } from "../../core/events.ts";
@@ -27,6 +29,12 @@ export interface AdvancedCard {
   toColumn: string;
 }
 
+/**
+ * The Pause column of the model (config/board.json, by id): a card there
+ * was put by a human — an arbitration decision (D4) no jalon undoes.
+ */
+export const PAUSE_COLUMN_ID = "pause";
+
 /** What the position step records on the plan. */
 export interface PositionLedger {
   events: CardEventInput[];
@@ -34,6 +42,8 @@ export interface PositionLedger {
   kept: number;
   divergences: Array<{ title: string; fromColumn: string; toColumn: string }>;
   advanced: AdvancedCard[];
+  /** Cards in Pause the jalons would move: left in Pause, said (counted in divergences too). */
+  paused: AdvancedCard[];
 }
 
 /** One existing card as the position step reads it. */
@@ -83,8 +93,9 @@ function jalonGoesPast(input: PositionInput, config: BoardConfig): boolean {
 /**
  * Applies the position rule to one existing card of a load (ADR 026, 058,
  * 060): nothing without a position (kept); nothing when the card already
- * stands there; a divergence when a human placed it and the jalons do not
- * go past that placement; nothing when the log's last word is already
+ * stands there; a divergence when the card is in Pause, whatever the
+ * jalon (« en pause », also listed in paused); a divergence when a human
+ * placed it and the jalons do not go past that placement; nothing when the log's last word is already
  * this import move (ADR 058); else a `moved` event of the import actor.
  * Inputs: the plan's position ledger (mutated), the card, the board
  * reading, the config (the flow order), now. Output: none (the ledger).
@@ -99,6 +110,12 @@ export function refreshPosition(
     return;
   }
   if (existing.columnId === card.columnId) return;
+  if (existing.columnId === PAUSE_COLUMN_ID) {
+    const divergence = { title: card.title, fromColumn: existing.columnId, toColumn: card.columnId };
+    plan.divergences.push(divergence);
+    plan.paused.push({ cardId: id, ...divergence });
+    return;
+  }
   const handPlaced = reading.movedByHand.has(id);
   if (handPlaced && !jalonGoesPast(input, config)) {
     plan.divergences.push({ title: card.title, fromColumn: existing.columnId, toColumn: card.columnId });

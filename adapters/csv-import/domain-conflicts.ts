@@ -29,6 +29,8 @@ export interface PriorDecision {
 export type ConflictCheck =
   | { kind: "none" }
   | { kind: "kept-by-prior" }
+  /** The card has no domain (ADR 061) and the export now resolves one: nothing to arbitrate, it is taken. */
+  | { kind: "fill"; proposed: DomainRef }
   | { kind: "conflict"; conflict: DomainConflict };
 
 function domainRefOf(value: unknown): DomainRef | null {
@@ -75,7 +77,9 @@ function sameRef(a: DomainRef, b: DomainRef): boolean {
  * Checks one stored card against what the export proposes for it. No
  * conflict when the export resolved no domain (the board knows better
  * than nothing), when both agree, or when a « garder » was already taken
- * against this very proposal (kept-by-prior).
+ * against this very proposal (kept-by-prior). A card WITHOUT domain (ADR
+ * 061: nobody ever assigned one — a hand edit cannot empty it) takes the
+ * export's domain as soon as it resolves one (fill): there is nothing to keep.
  * Inputs: the stored card, the deck card, the config, the card's prior
  * decision (if any). Output: the check. Failure: none.
  */
@@ -83,8 +87,9 @@ export function domainConflict(
   existing: CardState, card: EnrichedCard, config: BoardConfig, prior: PriorDecision | undefined,
 ): ConflictCheck {
   if (card.domainId === null) return { kind: "none" };
-  const board = boardDomain(existing, config);
   const proposed: DomainRef = { domain: card.domainId, subDomain: card.subDomainId };
+  if (existing.domain === "") return { kind: "fill", proposed };
+  const board = boardDomain(existing, config);
   if (sameRef(board, proposed)) return { kind: "none" };
   if (prior?.kind === "garder" && prior.proposed !== null && sameRef(prior.proposed, proposed)) return { kind: "kept-by-prior" };
   return {

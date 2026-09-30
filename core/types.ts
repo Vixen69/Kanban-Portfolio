@@ -57,8 +57,20 @@ export interface Risk {
 export interface Card {
   id: string;
   title: string;
-  /** Domain id — see BoardConfig.domains. */
+  /**
+   * Domain id — see BoardConfig.domains. "" = no domain (ADR 061): an
+   * imported project whose export resolves none waits for a hand
+   * assignment — never a default domain.
+   */
   domain: string;
+  /**
+   * « Domaine à vérifier » (ADR 061): written by the import on a stored
+   * card whose export resolves no domain while no human ever set it — the
+   * domain it wears may be the old first-domain fallback. Recomputed at
+   * each load; an `edited` event carrying a domain clears it in the fold.
+   * Absent (never true) on every other card.
+   */
+  domainUnresolved?: boolean;
   /**
    * Sub-domain id within `domain` (see Domain.subDomains), null when the
    * domain is not detailed or the card carries none (ADR 022).

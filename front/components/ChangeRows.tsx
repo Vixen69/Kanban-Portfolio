@@ -1,26 +1,29 @@
 // One row of the grouped changes (ADR 053/055): code · titre · ancien →
 // nouveau. A figure row adds its unit and its signed delta, marked ↑ or ↓
-// in the sober warn / ok tones; a plan de charge row reads « prévu a → b
+// in a sober tone by what moved (trendTone: a growing demand amber, less
+// left to do green, a project's normal progress neutral); a plan de charge row reads « prévu a → b
 // j.h · RAF a → b j.h » and unfolds to the métiers that moved. Words and
 // numbers come from ../changeGroups.ts; nothing here computes.
 
 import type { BoardConfig } from "../../core/types.ts";
 import type { CardChange, FigureChange, PlanChange } from "../../core/snapshot-diff.ts";
 import {
-  changeWords, fmtFigure, planDelta, planPair, planSummary, profileName, signedDelta,
+  changeWords, fmtFigure, planDelta, planPair, planSummary, profileName, signedDelta, trendTone,
 } from "../changeGroups.ts";
+import type { TrendMeasure } from "../changeGroups.ts";
 
 /**
- * The direction of a change, sober: « ↑ +12,5 » in the warning tone, « ↓ −3 »
- * in the ok tone. Inputs: the delta (null when a side is missing), an
- * optional unit. Output: the mark, nothing when flat or unknown.
- * Failure modes: none.
+ * The direction of a change, sober: « ↑ +12,5 » or « ↓ −3 », in the tone
+ * of what moved (trendTone). Inputs: the delta (null when a side is
+ * missing), the measure it is read on, an optional unit. Output: the mark,
+ * nothing when flat or unknown. Failure modes: none.
  */
-export function TrendMark({ delta, unit = "" }: { delta: number | null; unit?: string }) {
+export function TrendMark({ delta, measure, unit = "" }: { delta: number | null; measure: TrendMeasure; unit?: string }) {
   const { trend, text } = signedDelta(delta);
-  if (trend === null) return null;
+  const tone = trendTone(measure, trend);
+  if (trend === null || tone === null) return null;
   return (
-    <span className={"chg-trend " + trend} title={trend === "up" ? "hausse" : "baisse"}>
+    <span className={"chg-trend " + tone} title={trend === "up" ? "hausse" : "baisse"}>
       {trend === "up" ? "↑" : "↓"} {text}{unit === "" ? "" : ` ${unit}`}
     </span>
   );
@@ -39,7 +42,7 @@ function Who({ change, showYear }: { change: CardChange; showYear: boolean }) {
 function FigureValues({ figure }: { figure: FigureChange }) {
   return (
     <span className="sd-move">
-      {fmtFigure(figure.before)} → <b>{fmtFigure(figure.after)}</b> {figure.unit} <TrendMark delta={figure.delta} />
+      {fmtFigure(figure.before)} → <b>{fmtFigure(figure.after)}</b> {figure.unit} <TrendMark delta={figure.delta} measure={figure.fact} />
     </span>
   );
 }
@@ -58,7 +61,7 @@ function PlanProfiles({ plan, config }: { plan: PlanChange; config: BoardConfig 
             <th scope="row">{profileName(config, line.profileId)}</th>
             <td>{planPair(line.before, line.after, "planned")}</td>
             <td>{planPair(line.before, line.after, "done")}</td>
-            <td>{planPair(line.before, line.after, "raf")} <TrendMark delta={planDelta(line.before.raf, line.after.raf)} /></td>
+            <td>{planPair(line.before, line.after, "raf")} <TrendMark delta={planDelta(line.before.raf, line.after.raf)} measure="raf" /></td>
           </tr>
         ))}
       </tbody>
@@ -73,7 +76,7 @@ function PlanRow({ change, plan, config, showYear }: { change: CardChange; plan:
         <summary>
           <Who change={change} showYear={showYear} />
           <span className="sd-move">{planSummary(plan)}</span>
-          <TrendMark delta={planDelta(plan.before.raf, plan.after.raf)} unit="j.h de RAF" />
+          <TrendMark delta={planDelta(plan.before.raf, plan.after.raf)} measure="raf" unit="j.h de RAF" />
         </summary>
         <PlanProfiles plan={plan} config={config} />
       </details>

@@ -145,6 +145,9 @@ const POSITION_CASES: Array<{ name: string; first: string; hand: string; reload:
   { name: "hand move + a newer jalon further along: moved", first: "etudes", hand: "prets", reload: "actifs", moved: 1, divergences: 0, advanced: 1, column: "actifs" },
   { name: "hand move + a newer jalon behind the hand's column: divergence", first: "etudes", hand: "actifs", reload: "prets", moved: 0, divergences: 1, advanced: 0, column: "actifs" },
   { name: "hand move back + a repeated jalon further along: still the hand's (not new)", first: "actifs", hand: "etudes", reload: "actifs", moved: 0, divergences: 1, advanced: 0, column: "etudes" },
+  // ADR 060 amendment: Pause is an arbitration decision — no jalon takes a card out of it.
+  { name: "put in Pause + a newer jalon further along: stays in Pause", first: "prets", hand: "pause", reload: "actifs", moved: 0, divergences: 1, advanced: 0, column: "pause" },
+  { name: "put in Pause + a newer jalon behind: stays in Pause", first: "actifs", hand: "pause", reload: "etudes", moved: 0, divergences: 1, advanced: 0, column: "pause" },
 ];
 
 for (const c of POSITION_CASES) {
@@ -157,6 +160,17 @@ for (const c of POSITION_CASES) {
     assert.deepEqual(board.load([deck({ columnId: c.reload })]).events, [], "reloading the same files writes nothing");
   });
 }
+
+test("ADR 060 amendment: a card in Pause is said « en pause », whatever the jalon — never moved", () => {
+  const board = new Board();
+  board.load([deck({ columnId: "prets" })]);
+  board.move("prets", "pause");
+  const plan = board.load([deck({ columnId: "done" })]);
+  assert.deepEqual(plan.paused, [{ cardId: ID, title: "Modernisation atelier", fromColumn: "pause", toColumn: "done" }]);
+  assert.deepEqual([plan.events.filter((e) => e.type === "moved"), board.card()?.columnId], [[], "pause"]);
+  const blind = board.load([deck({ columnId: "demandes", positioned: false })]);
+  assert.deepEqual([blind.paused, blind.kept, board.card()?.columnId], [[], 1, "pause"], "no position: nothing to say");
+});
 
 test("ADR 060 positions: a load without position keeps the previous import's column in the base — the old jalon stays old", () => {
   const board = new Board();

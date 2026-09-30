@@ -58,9 +58,10 @@ export interface ImportEntered extends ImportCardRef {
   /** Plain French (« nouveau dans le périmètre COUT PREV — état « Budget validé », type « Etude » »). */
   reason: string;
   /**
-   * Set when nothing resolved the project's domain and the card falls back
-   * to the first configured domain (« domaine non résolu → A&D par défaut,
-   * à corriger »); null otherwise.
+   * Set when nothing resolved the project's domain: the card is created
+   * WITHOUT domain, to assign by hand (ADR 061 — « domaine non résolu — à
+   * attribuer à la main »; before ADR 061 it fell back to the first
+   * configured domain); null otherwise.
    */
   domainWarning: string | null;
 }
@@ -158,12 +159,25 @@ export interface ImportChanges {
   replaced: ImportKeptFact[];
   /** « Placement à la main dépassé par un nouveau jalon » (ADR 060). */
   advanced: ImportAdvanced[];
+  /**
+   * « En pause — nouveau jalon non appliqué » (ADR 060 amendment): cards
+   * in Pause the jalons would move, left in Pause (counted in the
+   * divergences). Absent in reports made before.
+   */
+  paused?: ImportAdvanced[];
   /** Hand-made cards the load adopts instead of creating a duplicate (ADR 059). */
   adopted: ImportAdopted[];
   /** Cards deleted on the board that the files still carry: « supprimées du tableau, ignorées » — never re-created (ADR 058). */
   deletedSkipped: ImportCardRef[];
   /** Identity questions the load could not settle alone (ADR 058/059), plain French, one per case. */
   identityDoubts: string[];
+  /**
+   * « Domaine à vérifier » (ADR 061): cards on the board whose export gives
+   * no domain while no human ever set theirs — the domain they wear may be
+   * the old first-domain fallback. Each with the domain worn. Absent in
+   * reports made before.
+   */
+  domainToCheck?: ImportLeft[];
   /**
    * The refusals that forbid the load (ADR 056: two competing exports, one
    * file name received twice…), plain French, one per case — the screen

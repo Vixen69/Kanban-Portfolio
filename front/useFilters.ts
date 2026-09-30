@@ -13,6 +13,8 @@ import {
   withDomainToggled,
   withSubDomainToggled,
   withDomainsSet,
+  withFlagToggled,
+  type FilterFlag,
   type FilterGroup,
   type FilterState,
 } from "../core/filters.ts";
@@ -23,10 +25,12 @@ export interface Filters {
   /** True when a search, blockedOnly or a toggled-off pill narrows the board. */
   active: boolean;
   setSearch(search: string): void;
-  /** Flips the « Bloqués uniquement » toggle (design v11). */
-  toggleBlockedOnly(): void;
-  /** Flips the « Aucune » pill of the Contrainte group (design v12). */
-  toggleNoConstraint(): void;
+  /**
+   * Flips one switch: « Bloqués uniquement » (design v11), the « Aucune »
+   * pill of the Contrainte group (design v12), the « Sans domaine » pill and
+   * « Domaine à vérifier » (ADR 061).
+   */
+  toggleFlag(flag: FilterFlag): void;
   /** Toggles one pill of a group; a domain pill aligns its sub-domains. */
   toggle(group: FilterGroup, key: string): void;
   /** Sets every pill of a group at once (the tout / rien quick actions). */
@@ -44,8 +48,8 @@ function groupOf(state: FilterState, group: FilterGroup): Record<string, boolean
 
 // Rebuilds the config-derived groups (type, domain, sub-domain, constraint)
 // after an admin config change: known keys keep their state, new keys start
-// enabled. `noConstraint` is deliberately untouched — it is not config
-// data, so no topology edit can invalidate it.
+// enabled. `noConstraint`, `noDomain` and the switches are deliberately
+// untouched — not config data, so no topology edit can invalidate them.
 function reconcile(state: FilterState, config: BoardConfig): FilterState {
   const keep = (ids: string[], previous: Record<string, boolean>) =>
     Object.fromEntries(ids.map((id) => [id, previous[id] !== false]));
@@ -78,11 +82,8 @@ export function useFilters(config: BoardConfig): Filters {
   const setSearch = useCallback((search: string) => {
     setState((current) => ({ ...current, search }));
   }, []);
-  const toggleBlockedOnly = useCallback(() => {
-    setState((current) => ({ ...current, blockedOnly: !current.blockedOnly }));
-  }, []);
-  const toggleNoConstraint = useCallback(() => {
-    setState((current) => ({ ...current, noConstraint: !current.noConstraint }));
+  const toggleFlag = useCallback((flag: FilterFlag) => {
+    setState((current) => withFlagToggled(current, flag));
   }, []);
   const toggle = useCallback((group: FilterGroup, key: string) => {
     setState((current) => {
@@ -102,5 +103,5 @@ export function useFilters(config: BoardConfig): Filters {
   const reset = useCallback(() => setState(defaultFilters(config)), [config]);
 
   const active = useMemo(() => isFilterActive(state), [state]);
-  return { state, active, setSearch, toggleBlockedOnly, toggleNoConstraint, toggle, setGroup, reset };
+  return { state, active, setSearch, toggleFlag, toggle, setGroup, reset };
 }

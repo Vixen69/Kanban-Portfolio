@@ -207,8 +207,7 @@ function Screen({ ctx }: { ctx: Ctx }) {
         onAdd={() => ui.setAdding(true)} />
       <Sidebar open={ui.sidebar} config={config} search={filters.state.search} draw={ctx.draw}
         setSearch={filters.setSearch} onSearchEnter={() => openIfSingle(ctx)} filters={filters.state} onToggle={filters.toggle}
-        onToggleBlockedOnly={filters.toggleBlockedOnly}
-        onToggleNoConstraint={filters.toggleNoConstraint}
+        onToggleFlag={filters.toggleFlag}
         onSetGroup={filters.setGroup} stats={derived.all} view={derived.view}
         filtersActive={filters.active} narrowed={filters.active || ctx.lens.narrowing !== null}
         onReset={filters.reset} searchRef={ctx.searchRef}

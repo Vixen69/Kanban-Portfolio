@@ -8,6 +8,7 @@ import type { Subject } from "./ports.ts";
 import { isReorder } from "./events.ts";
 import { eventSequence } from "./event-sequence.ts";
 import { effectiveEvents } from "./restore.ts";
+import { foldOrder } from "./fold-order.ts";
 
 // Validators of the fields an "edited" event may patch (CardPatch, v2).
 // Anything else in the payload is silently ignored — replays must never
@@ -161,6 +162,8 @@ function applyEdited(state: CardState, event: CardEvent): void {
     if (accepts && accepts(value)) {
       // The whitelist above guarantees the value matches the field's type.
       (state as unknown as Record<string, unknown>)[key] = copyPatchValue(key, value);
+      // A domain set in the log (by hand, or an ADR 036 decision) is no longer « à vérifier » (ADR 061).
+      if (key === "domain") delete state.domainUnresolved;
     }
   }
 }
@@ -236,9 +239,9 @@ function applyReorder(order: string[], event: CardEvent): void {
 
 /**
  * Folds the event log over the imported cards to get the current board.
- * Inputs: the cards as imported, the full event list (any order — sorted
- * here by timestamp, then numeric insertion sequence for same-instant
- * events).
+ * Inputs: the cards as imported, the full event list (any order — read
+ * by timestamp, then numeric insertion sequence for same-instant events,
+ * each card's creation event first whatever its timestamp: fold-order.ts).
  * Output: one CardState per surviving card, in the input card order —
  * repositioned by "moved" events carrying a beforeId (manual ordering,
  * ADR 019) — with comments accumulated in chronological order. A card with
@@ -261,10 +264,7 @@ export function foldEvents(cards: Card[], events: CardEvent[]): CardState[] {
     });
   }
   const order = cards.map((card) => card.id);
-  const ordered = effectiveEvents(events)
-    .sort((a, b) =>
-      a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : eventSequence(a.id) - eventSequence(b.id),
-    );
+  const ordered = foldOrder(effectiveEvents(events));
   for (const event of ordered) {
     if (event.type === "deleted") {
       // Keep order and byId in lockstep: a later beforeId naming this card

@@ -50,6 +50,10 @@
 /* ---------- Décision et absence d'import (ADR 026) ---------- */
 .dec-pill { font-size: 8px; font-weight: 700; color: #fff; border-radius: 3px; padding: 0 4px; line-height: 12px; flex: 0 0 auto; margin-left: 3px; }
 .dec-pill.overdue { box-shadow: 0 0 0 2px var(--danger); }
+/* Domaine à attribuer (plein) / à vérifier (contour) — ADR 061 : fixe, jamais le lavis rouge du blocage. */
+.dom-issue { font-size: 8px; font-weight: 700; border-radius: 3px; padding: 0 3px; line-height: 11px; flex: 0 0 auto; margin-left: 3px; border: 1px solid var(--warn); }
+.dom-issue.missing { background: var(--warn); color: #fff; }
+.dom-issue.unresolved { background: #fff; color: var(--warn); }
 .absent-pill { font-size: 9px; color: var(--tx-4); border: 1px dashed var(--tx-4); border-radius: 3px; padding: 0 3px; line-height: 11px; flex: 0 0 auto; margin-left: 3px; }
 
 /* ---------- Carte étendue : RAF par métier et valeur du tri (ADR 044) ---------- */
