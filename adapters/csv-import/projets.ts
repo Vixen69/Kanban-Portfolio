@@ -12,6 +12,7 @@ import { splitSubjectName } from "./subject-name.ts";
 import { stripCode } from "./code-prefix.ts";
 import { createDomainLookup, createSubDomainLookups, createTypeLookup, isDomainLead } from "./domains.ts";
 import type { Lookup } from "./domains.ts";
+import { pickOwner } from "./owner-rule.ts";
 import { amountCell, dateCell, moneyCell } from "./cells.ts";
 import { tallyInto, tallyLabel } from "./tallies.ts";
 import type { Tally } from "./tallies.ts";
@@ -254,23 +255,21 @@ function resolveSub(ctx: ProjetsContext, domainId: string, label: string, line: 
   return hit.id;
 }
 
-// First of Responsables 1→3 that is not a PARAM domain lead; exclusions
-// are counted (an homonym would silently cost a chef de projet otherwise).
+// The chef de projet among Responsables 1→3 (owner-rule.ts): the first one
+// that is not a PARAM domain lead, else the domain lead when he is the only
+// name. Leads passed over are counted (an homonym would silently cost a
+// chef de projet otherwise).
 function deriveOwner(ctx: ProjetsContext, row: CsvRow): string | null {
-  let sawAny = false;
-  for (const column of ["Responsable 1", "Responsable 2", "Responsable 3"]) {
-    const value = cell(ctx, row, column);
-    if (value === "") continue;
-    sawAny = true;
-    if (ctx.param !== null && isDomainLead(ctx.param.leadWords, value)) {
-      ctx.counts.leadsExcluded++;
-      tallyInto(ctx.tallies, `« ${column} » est un responsable de domaine — exclu du chef de projet`, row.line);
-      continue;
-    }
-    return value;
-  }
-  tallyInto(ctx.tallies, sawAny ? "aucun chef de projet (responsables tous responsables de domaine)" : "responsables vides", row.line);
-  return null;
+  const leads = ctx.param?.leadWords;
+  const pick = pickOwner(
+    ["Responsable 1", "Responsable 2", "Responsable 3"].map((column) => cell(ctx, row, column)),
+    leads === undefined ? null : (value) => isDomainLead(leads, value),
+  );
+  ctx.counts.leadsExcluded += pick.leadsSkipped;
+  if (pick.leadsSkipped > 0) tallyInto(ctx.tallies, "responsable de domaine passé pour le responsable suivant (chef de projet)", row.line);
+  if (pick.leadTaken) tallyInto(ctx.tallies, "seul nom : un responsable de domaine, pris comme chef de projet", row.line);
+  if (pick.owner === null) tallyInto(ctx.tallies, "responsables vides", row.line);
+  return pick.owner;
 }
 
 // Aggregated signalements, the vocabulary questions and the state survey.

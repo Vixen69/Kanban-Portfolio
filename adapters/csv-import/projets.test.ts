@@ -118,11 +118,11 @@ test("chef de projet: first Responsable that is not a domain lead; identity, dat
   assert.equal(un?.createdAt, "2025-01-12");
   assert.equal(un?.dateRdr, "2026-09-15");
   assert.deepEqual([un?.budgetRdli, un?.effortEstimated, un?.effortConsumed], [150, 110, 70]);
-  assert.equal(deux?.owner, null, "the only responsable is a lead");
+  assert.equal(deux?.owner, "Luc LAMBERT 9100002", "the only name is a domain lead: he is the chef de projet (author, 2026-09-30)");
   assert.equal(deux?.budgetRdli, 120, "euros converted to k€");
   assert.equal(trois?.codename, "PE10003", "no Id: the PE code embedded in the name");
   assert.equal(trois?.id, "");
-  assert.deepEqual([table.counts.withOwner, table.counts.leadsExcluded], [1, 2]);
+  assert.deepEqual([table.counts.withOwner, table.counts.leadsExcluded], [2, 1]);
   assert.ok(report.warnings.some((w) => /« Id » vide/.test(w.message)));
   assert.ok(report.warnings.some((w) => /en euros — converti en k€/.test(w.message)));
 });
