@@ -8,7 +8,7 @@ import { lifecycleEvent, movedEvent } from "../core/events.ts";
 import { foldEvents } from "../core/state.ts";
 import { testCard, testConfig } from "../core/test-helpers.ts";
 import { BadRequest } from "./errors.ts";
-import { getSnapshots, postRestore, postSnapshot, restoreSnapshot, takeSnapshot } from "./snapshots.ts";
+import { getSnapshotDiff, getSnapshots, postRestore, postSnapshot, restoreSnapshot, takeSnapshot } from "./snapshots.ts";
 import { stubConfigStore, stubStorage } from "./test-helpers.ts";
 
 const NOW = new Date("2026-09-17T10:00:00.000Z");
@@ -81,4 +81,18 @@ test("routes: a take needs a label; the list is newest first", async () => {
   const labels = (list.body as { label: string }[]).map((entry) => entry.label);
   assert.deepEqual(labels, ["second", "premier"]);
   assert.notEqual((first.body as { id: string }).id, (second.body as { id: string }).id);
+});
+
+test("getSnapshotDiff: what the board did since the snapshot — here a move and a new card (ADR 053)", async () => {
+  const { storage, configStore } = deps();
+  const taken = await takeSnapshot({ storage, configStore }, "avant chargement", "pmo", NOW);
+  await storage.appendEvent(MOVE);
+  await storage.insertCard(testCard({ id: "S002", title: "Nouveau" }), lifecycleEvent("created", "S002", "import-csv", NOW.toISOString(), {}));
+  const result = await getSnapshotDiff({ storage, configStore }, taken.id);
+  assert.equal(result.status, 200);
+  const body = result.body as { snapshot: { id: string }; changes: Array<{ kind: string; cardId: string }> };
+  assert.equal(body.snapshot.id, taken.id);
+  assert.deepEqual(body.changes.map((c) => [c.kind, c.cardId]), [["added", "S002"], ["moved", "S001"]]);
+  assert.equal((await storage.listEvents()).length, 2); // a read: nothing written
+  await assert.rejects(() => getSnapshotDiff({ storage, configStore }, "inconnu"), BadRequest);
 });

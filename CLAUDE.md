@@ -443,7 +443,10 @@ hand-written CSS now; adapted to Tailwind/Radix later.)
   list (date, label, cards, exercise, log position, applied config or
   versioned model), « Restaurer… » then an explicit confirmation — the
   panel closes, config, board and capacity reload; the fiche's Historique
-  says how many of the card's events a restore undid. **Analytics** (ADR 037): one view, a tab bar « Capacité »
+  says how many of the card's events a restore undid. Each snapshot also offers « Comparer
+  avec maintenant » (ADR 053): the board at its log position against the board
+  now, card by card (new, absent from the import, gone, back, moved, domain /
+  type / title changed, archived) — a read, nothing written. **Analytics** (ADR 037): one view, a tab bar « Capacité »
   · « Flux »; every panel folds (closed by default, hint readable folded).
   The Flux tab (ADR 037) brings the flow diagnostics back: six KPIs
   (en cours, bloqués, livrés 30 j / 90 j, lead and cycle time), the
