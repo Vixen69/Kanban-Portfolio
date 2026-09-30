@@ -72,6 +72,16 @@ export interface Card {
    */
   domainUnresolved?: boolean;
   /**
+   * How the last load that POSITIONED this card placed it (ADR 060
+   * amendment): true = a Sciforma done state sent it to the terminal
+   * column (ADR 043), false = its jalons placed it. Written by the import
+   * on the base card, kept by a load without position; it tells a done
+   * state NEW since the previous import — the one position that takes a
+   * card out of Pause — from a repeat. Absent on a card no load
+   * positioned since the field exists, and on a hand-made card.
+   */
+  doneByState?: boolean;
+  /**
    * Sub-domain id within `domain` (see Domain.subDomains), null when the
    * domain is not detailed or the card carries none (ADR 022).
    */

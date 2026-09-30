@@ -226,3 +226,74 @@ test("ADR 060 positions: an adopted hand-made card moved by hand is placed by a 
   const back = behind.load([deck({ columnId: "etudes" })]);
   assert.deepEqual([back.moved, back.divergences.length, behind.card("S001")?.columnId], [0, 1, "actifs"]);
 });
+
+// ADR 060, amendment 2026-09-30 (author: « si statut c'est terminé, c'est
+// que c'est terminé »): a Sciforma done state NEW since the previous import
+// takes a card out of Pause; a jalon alone never does; a repeat leaves it.
+const DONE_BY_STATE: Partial<EnrichedCard> = { columnId: "done", doneByState: true };
+const DONE_BY_JALON: Partial<EnrichedCard> = { columnId: "done" };
+const PAUSE_CASES: Array<{ name: string; first: Partial<EnrichedCard>; reload: Partial<EnrichedCard>; unpaused: number; paused: number; divergences: number; column: string }> = [
+  { name: "a new done state takes it out of Pause", first: { columnId: "prets" }, reload: DONE_BY_STATE, unpaused: 1, paused: 0, divergences: 0, column: "done" },
+  { name: "a new RDR jalon alone does not (en pause — nouveau jalon non appliqué)", first: { columnId: "prets" }, reload: DONE_BY_JALON, unpaused: 0, paused: 1, divergences: 1, column: "pause" },
+  { name: "the same done state as the previous import: the hand wins", first: DONE_BY_STATE, reload: DONE_BY_STATE, unpaused: 0, paused: 0, divergences: 1, column: "pause" },
+  { name: "a done state where the previous import had only an RDR in Terminé: the state is new", first: DONE_BY_JALON, reload: DONE_BY_STATE, unpaused: 1, paused: 0, divergences: 0, column: "done" },
+  { name: "a load without position: kept", first: { columnId: "prets" }, reload: { columnId: "demandes", positioned: false }, unpaused: 0, paused: 0, divergences: 0, column: "pause" },
+];
+
+for (const c of PAUSE_CASES) {
+  test(`ADR 060 Pause and done state: ${c.name}`, () => {
+    const board = new Board();
+    board.load([deck(c.first)]);
+    board.move(c.first.columnId ?? "etudes", "pause");
+    const plan = board.load([deck(c.reload)]);
+    assert.deepEqual(
+      [plan.unpaused.length, plan.paused.length, plan.divergences.length, plan.moved, board.card()?.columnId],
+      [c.unpaused, c.paused, c.divergences, c.unpaused, c.column],
+    );
+    assert.equal(plan.advanced.length, 0, "leaving Pause is not a hand placement overtaken by a jalon");
+    assert.deepEqual(board.load([deck(c.reload)]).events, [], "reloading the same files writes nothing");
+  });
+}
+
+test("ADR 060 Pause and done state: put back in Pause by hand, the repeated done state leaves it there", () => {
+  const board = new Board();
+  board.load([deck({ columnId: "actifs" })]);
+  board.move("actifs", "pause");
+  const out = board.load([deck(DONE_BY_STATE)]);
+  assert.deepEqual(out.unpaused, [{ cardId: ID, title: "Modernisation atelier", fromColumn: "pause", toColumn: "done" }]);
+  assert.deepEqual(out.events.filter((e) => e.type === "moved").map((e) => [e.actor, e.fromColumn, e.toColumn]), [[IMPORT_ACTOR, "pause", "done"]]);
+  board.append(movedEvent(ID, { laneId: "projets", columnId: "done" }, { laneId: "projets", columnId: "pause" }, "pmo", "2026-09-30T10:00:00.000Z"));
+  const again = board.load([deck(DONE_BY_STATE)], new Date("2026-10-01T09:00:00.000Z"));
+  assert.deepEqual([again.unpaused, again.moved, again.divergences.length, board.card()?.columnId], [[], 0, 1, "pause"]);
+});
+
+test("ADR 060 Pause and done state: RDR approved while in Pause, then the state closes on a later load — out of Pause", () => {
+  const board = new Board();
+  board.load([deck({ columnId: "actifs" })]);
+  board.move("actifs", "pause");
+  assert.deepEqual([board.load([deck(DONE_BY_JALON)]).paused.length, board.card()?.columnId], [1, "pause"]);
+  const closed = board.load([deck(DONE_BY_STATE)], new Date("2026-10-01T09:00:00.000Z"));
+  assert.deepEqual([closed.unpaused.length, closed.moved, board.card()?.columnId], [1, 1, "done"]);
+});
+
+// doneByState on the base card: kept by a load without position; a base
+// stored before the flag existed and already in Terminé reads « not new ».
+for (const legacy of [false, true]) {
+  test(`ADR 060 Pause and done state: the previous done state is ${legacy ? "read from a legacy base in Terminé" : "kept by a load without position"}`, () => {
+    const board = new Board();
+    board.load([deck(DONE_BY_STATE)]);
+    if (legacy) board.cards = board.cards.map(({ doneByState: _flag, ...card }) => card);
+    else board.load([deck({ columnId: "demandes", positioned: false })]);
+    board.move("done", "pause");
+    const again = board.load([deck(DONE_BY_STATE)], new Date("2026-10-01T09:00:00.000Z"));
+    assert.deepEqual([again.unpaused.length, board.card()?.columnId, board.cards[0]?.doneByState], [0, "pause", true]);
+  });
+}
+
+test("ADR 060 Pause and done state: an adopted hand-made card in Pause has no previous import — its done state takes it out", () => {
+  const board = new Board();
+  handMade(board);
+  board.move("demandes", "pause", "S001");
+  const plan = board.load([deck(DONE_BY_STATE)]);
+  assert.deepEqual([plan.adopted.length, plan.unpaused.length, board.card("S001")?.columnId], [1, 1, "done"]);
+});

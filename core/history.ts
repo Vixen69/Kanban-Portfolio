@@ -5,14 +5,17 @@
 // display surface. A load's entry, exit or return carries its reason
 // when the load wrote one (payload.reason — « état « Reporté » hors des
 // états retenus », « plus présent dans le fichier Coût … »); events
-// written before carry none and read as before.
+// written before carry none and read as before. Every domain set on the
+// card — by hand or by an ADR 036 import decision — is a line too
+// (author, 2026-09-30; core/domain-history.ts).
 
 import type { BoardConfig, CardEvent } from "./types.ts";
 import { isReorder } from "./events.ts";
 import { creationFirst, oldestFirst } from "./fold-order.ts";
+import { domainLines } from "./domain-history.ts";
 
-/** What a history line narrates — a movement or a blocking event. */
-export type HistoryKind = "move" | "block" | "unblock" | "decision" | "unlisted" | "relisted";
+/** What a history line narrates — a movement, a blocking event, a decision, an import absence, a domain set. */
+export type HistoryKind = "move" | "block" | "unblock" | "decision" | "unlisted" | "relisted" | "domain";
 
 /** One entry in a card's history, ready for the detail modal list. */
 export interface HistoryEntry {
@@ -24,10 +27,14 @@ export interface HistoryEntry {
   /**
    * Blocking motif (block lines), decision reason (decision lines), or the
    * load's reason of an entry (imported), an exit (unlisted) or a return
-   * (relisted); null when none.
+   * (relisted), or what the export proposed (a domain « gardé » line);
+   * null when none.
    */
   reason: string | null;
-  /** Decision code and name, grid terms, review date — decision lines only. */
+  /**
+   * Decision code and name, grid terms, review date (decision lines); the
+   * whole sentence of a domain line (« Domaine : Sans domaine → INFRA »).
+   */
   detail: string | null;
   ts: string;
   actor: string;
@@ -99,7 +106,10 @@ function toEntry(config: BoardConfig, event: CardEvent): HistoryEntry {
  * (kind "unblock"), decided (kind "decision", code/name/grid terms/review
  * date in `detail`, the free text in `reason`), unlisted / relisted (ADR 026)
  * — imported, unlisted and relisted lines carry the load's reason in
- * `reason` when the load wrote one (null for older events).
+ * `reason` when the load wrote one (null for older events) — and every
+ * `edited` event whose patch carries a domain (kind "domain", the sentence
+ * in `detail`, what the export proposed on a « garder » in `reason`;
+ * core/domain-history.ts). Other edits are not narrated.
  * Output: HistoryEntry[] in the fold order (core/fold-order.ts),
  * reversed: ts descending, ties by the log sequence descending, the
  * card's creation always last — a future-dated `imported` of an old log
@@ -113,8 +123,13 @@ export function cardHistory(events: CardEvent[], cardId: string, config: BoardCo
   // The card's events as the fold reads them (the birth rule sees them
   // all, as in core/flow.ts), then only the narrated ones.
   const mine = events.filter((event) => event.cardId === cardId && !isReorder(event)).sort(oldestFirst);
-  return creationFirst(mine)
-    .reverse()
-    .filter((event) => NARRATED_TYPES.has(event.type))
-    .map((event) => toEntry(config, event));
+  const ordered = creationFirst(mine);
+  const domains = domainLines(ordered, config);
+  return ordered.reverse().flatMap((event): HistoryEntry[] => {
+    const line = domains.get(event);
+    if (line !== undefined) {
+      return [{ kind: "domain", fromName: null, toName: null, reason: line.note, detail: line.text, ts: event.ts, actor: event.actor }];
+    }
+    return NARRATED_TYPES.has(event.type) ? [toEntry(config, event)] : [];
+  });
 }

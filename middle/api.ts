@@ -11,6 +11,7 @@ import { foldEvents } from "../core/state.ts";
 import { RESTORE_CARD_ID } from "../core/restore.ts";
 import { unifiedColumnIds } from "../core/layout.ts";
 import { validateBoardConfig } from "../core/config.ts";
+import { domainPrevious } from "../core/domain-history.ts";
 import type { BoardConfig, CardEventType, CardState } from "../core/types.ts";
 import type { ConfigStore } from "./config-store.ts";
 import { validatePatch } from "./validation.ts";
@@ -275,7 +276,9 @@ function buildCommented(
 // values — the sub-domain inside the card's own domain, custom values
 // declared and typed (validatePatch, ADR 057). Screening here keeps junk
 // (and prototype-named keys) out of the permanent log; foldEvents
-// re-checks types on read (core/state.ts).
+// re-checks types on read (core/state.ts). A patch touching the domain also
+// records the card's domain just before (`previous`): the fiche's
+// Historique says « Sans domaine → INFRA » (core/domain-history.ts).
 function buildEdited(
   config: BoardConfig,
   state: CardState,
@@ -289,5 +292,5 @@ function buildEdited(
   const fields = patch as Record<string, unknown>;
   if (Object.keys(fields).length === 0) throw new BadRequest("Patch d’édition vide.");
   validatePatch(config, fields, state, "Champ d’édition non autorisé");
-  return lifecycleEvent("edited", state.id, SERVER_ACTOR, ts, { patch });
+  return lifecycleEvent("edited", state.id, SERVER_ACTOR, ts, { patch, ...domainPrevious(state, fields) });
 }

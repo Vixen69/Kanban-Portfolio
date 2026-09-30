@@ -73,6 +73,8 @@ export interface LoadPlan {
   advanced: AdvancedCard[];
   /** Cards in Pause a jalon would move: left in Pause (ADR 060 amendment; counted in divergences). */
   paused: AdvancedCard[];
+  /** Cards in Pause a NEW Sciforma done state took out to the terminal column (ADR 060, 2026-09-30; counted in moved). */
+  unpaused: AdvancedCard[];
   /** Hand corrections the export's NEW value took back, fact by fact, with the cards (ADR 060). */
   replaced: KeptFactCards[];
   /** Charges dropped because their métier stayed unresolved. */
@@ -266,7 +268,7 @@ function markAbsences(plan: LoadPlan, current: Map<string, CardState>, deckIds: 
 function emptyPlan(year: number): LoadPlan {
   return {
     cards: [], events: [], created: 0, updated: 0, moved: 0, unlisted: 0, relisted: 0, kept: 0,
-    divergences: [], advanced: [], paused: [], replaced: [], chargesWithoutProfile: 0, factsKept: [], factsKeptCards: [], domainMissing: [], domainToCheck: [],
+    divergences: [], advanced: [], paused: [], unpaused: [], replaced: [], chargesWithoutProfile: 0, factsKept: [], factsKeptCards: [], domainMissing: [], domainToCheck: [],
     exercise: year, aliases: new Map(), deletedSkipped: [], adopted: [], identityDoubts: [],
     domainConflicts: [], domainReplaced: 0, domainKept: 0, domainUndecided: 0, domainKeptByPrior: 0,
   };

@@ -116,6 +116,8 @@ export interface ImportLoadResult extends ImportAuditResult {
     advanced: number;
     /** Cards in Pause a jalon would move: left in Pause (ADR 060 amendment; counted in divergences); absent from a server that predates it. */
     paused?: number;
+    /** Cards in Pause a new Sciforma done state took out to the terminal column (ADR 060, 2026-09-30; counted in moved); absent from a server that predates it. */
+    unpaused?: number;
     /** The capacity snapshot stored with the load, when the files carried one. */
     capacity: { persons: number; assignments: number } | null;
   };

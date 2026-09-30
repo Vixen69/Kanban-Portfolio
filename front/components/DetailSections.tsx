@@ -140,14 +140,15 @@ export function DelaysSection({ flow, anchors }: { flow: FlowTimes; anchors: Flo
   );
 }
 
-// One history line: a movement (from → to) or a block/unblock event.
+// One history line: a movement (from → to), a block/unblock event, a decision, an import absence, a domain set.
 const DOT_CLASS: Record<HistoryEntry["kind"], string> = {
-  move: "", block: " blk", unblock: " okd", decision: " dec", unlisted: " abs", relisted: " okd",
+  move: "", block: " blk", unblock: " okd", decision: " dec", unlisted: " abs", relisted: " okd", domain: " dom",
 };
 
-// The narrated text of one history line (movement, blockage, decision, import absence).
+// The narrated text of one history line (movement, blockage, decision, import absence, domain).
 function histBody(entry: HistoryEntry) {
   switch (entry.kind) {
+    case "domain": return <><b>{entry.detail}</b>{entry.reason ? ` — ${entry.reason}` : ""}</>;
     case "block": return <><b>Bloqué</b>{entry.reason ? ` — ${entry.reason}` : ""}</>;
     case "unblock": return <b>Blocage levé</b>;
     case "decision": return <><b>Décision {entry.detail}</b>{entry.reason ? ` — ${entry.reason}` : ""}</>;

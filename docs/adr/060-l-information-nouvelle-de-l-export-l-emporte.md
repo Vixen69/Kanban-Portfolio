@@ -65,7 +65,8 @@ les comptes.
 - ~~La colonne Pause est dans l'ordre du modèle (entre Prêts et Actifs) : une
   carte mise en Pause à la main en sort si un nouveau jalon la place en
   Actifs ou au-delà.~~ **Amendé le 30/09** : voir ci-dessous.
-- L'Historique de la fiche ne narre pas les `edited` ; la comparaison avec
+- L'Historique de la fiche ne narre pas les `edited` (hors domaine : voir
+  l'amendement du 30/09 de l'ADR 061) ; la comparaison avec
   l'instantané « avant chargement » (ADR 053) montre la valeur reprise.
 - `adapters/csv-import/newer-facts.ts`, `load-position.ts` (+ tests
   `newer-info.test.ts`), `to-cards.ts`, `import-changes.ts`,
@@ -90,3 +91,38 @@ Fichiers : `adapters/csv-import/load-position.ts` (`PAUSE_COLUMN_ID`),
 `to-cards.ts`, `import-changes.ts`, `core/import-changes.ts` (`paused`),
 `core/import-types.ts`, `middle/import.ts`, `sync/import-text.ts`,
 `front/importReport.ts`, `front/components/ImportLists.tsx`.
+
+## Amendement 2026-09-30 — « terminé, c'est terminé »
+
+Décision de l'auteur : « si le statut Sciforma c'est terminé, c'est que
+c'est terminé ». Une carte en **Pause** dont l'état du processus est un
+état terminé (`exercise.doneStates`, ADR 043) va dans la colonne terminale,
+selon la règle de l'information nouvelle : quand cet **état** est
+**nouveau** depuis l'import précédent — le dernier chargement qui a placé la
+carte ne l'avait pas mise en Terminé par son état (un RDR approuvé avant la
+clôture l'y avait peut-être déjà mise par jalon : l'état reste nouveau), ou
+il n'y a pas d'import précédent (carte adoptée, ADR 059) —, le chargement la
+déplace (un `moved` de `import-csv`, compté dans les déplacées) et le dit :
+« sorti de Pause : état Sciforma terminé » (liste dédiée dans le rapport
+lisible, dans la commande et dans le résultat du chargement ; le journal du
+serveur n'en donne que le compte). Le même état répété, après qu'une
+personne a remis la carte en Pause, la laisse : simple divergence (la main
+gagne sur les répétitions). Un **jalon seul** (RDR approuvé sans état
+terminé) ne sort toujours pas une carte de Pause (« en pause — nouveau
+jalon non appliqué », inchangé). Pour les distinguer, la carte assemblée
+porte `doneByState` quand c'est l'état qui l'a mise en Terminé (même si un
+RDR approuvé est d'accord), et la carte de base stockée garde ce fait
+(`doneByState` : vrai = placée par l'état, faux = placée par ses jalons ;
+un chargement sans position conserve la valeur précédente). C'est ce fait,
+et non la colonne stockée, qui dit si l'état est nouveau. Une carte de base
+écrite avant ce champ (aucune valeur) se lit par sa colonne, comme avant :
+déjà dans la colonne terminale = pas nouveau — le premier chargement après
+la mise à jour ne sort donc pas de cartes de Pause en masse, et le champ
+fait foi dès lors. Pas de changement de schéma (cartes en jsonb).
+Fichiers : `adapters/csv-import/enrich.ts`, `card-row.ts`,
+`load-position.ts`, `to-cards.ts`, `import-changes.ts`,
+`core/import-changes.ts` (`unpaused`), `core/import-types.ts`,
+`core/types.ts` (`Card.doneByState`),
+`middle/import.ts`, `sync/import-text.ts`, `front/importReport.ts`,
+`front/components/ImportLists.tsx` ; tests `newer-info.test.ts`,
+`done-state.test.ts`.

@@ -164,8 +164,8 @@ function factCards(plan: LoadPlan, facts: LoadPlan["factsKeptCards"], after: Rea
   }));
 }
 
-// ADR 060: the hand placements a new jalon went past, or the cards in
-// Pause it would have moved (left there).
+// ADR 060: the hand placements a new jalon went past, the cards in Pause
+// it would have moved (left there), or those a new done state took out.
 function advancedOf(list: LoadPlan["advanced"], after: ReadonlyMap<string, CardState>): ImportAdvanced[] {
   return byTitle(list.map((a) => {
     const card = after.get(a.cardId);
@@ -223,7 +223,7 @@ export function importChanges(input: ChangesInput): ImportChanges {
   };
   if (plan === null) {
     return {
-      ...head, counts: NO_COUNTS, entered: [], left: [], back: [], cardChanges: [], kept: [], replaced: [], advanced: [], paused: [],
+      ...head, counts: NO_COUNTS, entered: [], left: [], back: [], cardChanges: [], kept: [], replaced: [], advanced: [], paused: [], unpaused: [],
       adopted: [], deletedSkipped: [], identityDoubts: [], domainToCheck: [],
     };
   }
@@ -238,7 +238,7 @@ export function importChanges(input: ChangesInput): ImportChanges {
     entered: enteredOf(plan, perimeter), left: leftOf(plan, perimeter, beforeById),
     back: backOf(plan, perimeter, afterById), cardChanges, kept: factCards(plan, plan.factsKeptCards, afterById),
     replaced: factCards(plan, plan.replaced, afterById), advanced: advancedOf(plan.advanced, afterById),
-    paused: advancedOf(plan.paused, afterById),
+    paused: advancedOf(plan.paused, afterById), unpaused: advancedOf(plan.unpaused, afterById),
     adopted: adoptedOf(plan), deletedSkipped: deletedOf(input, plan), identityDoubts: plan.identityDoubts,
     domainToCheck: toCheckOf(plan, config, afterById),
   };
