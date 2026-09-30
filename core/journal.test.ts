@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { BoardConfig, CardEvent } from "./types.ts";
 import { testConfig } from "./test-helpers.ts";
-import { journalCounts, journalRows, placeName, type JournalKind } from "./journal.ts";
+import { filterJournal, journalAll, journalCounts, journalRows, placeName, type JournalKind } from "./journal.ts";
 
 function board(): BoardConfig {
   const base = testConfig();
@@ -77,7 +77,7 @@ test("journalRows: filters by kind, log position, instant and card", () => {
 test("journalCounts and placeName", () => {
   const config = board();
   const counts = journalCounts(journalRows(config, LOG, { kinds: ALL }));
-  assert.deepEqual(counts, { move: 3, decision: 1, block: 1, archive: 1, import: 2 });
+  assert.deepEqual(counts, { move: 3, decision: 1, block: 1, archive: 1, import: 2, restore: 0 });
   assert.equal(placeName(config, "laneA", "actifs"), "Actifs · Lane A");
   assert.equal(placeName(config, "laneA", "demandes"), "Demandes");
   assert.equal(placeName(config, null, "ghost"), "ghost");
@@ -99,4 +99,24 @@ test("a pause renewed in Pause reads « Pause reconduite »; a paper decision sa
     ["evt-2", "Mettre en pause"],
   ]);
   assert.equal(decisions[1]?.detail, "réexamen le 01/11/2026 · décidée le 02/09/2026 · Synchro · encore");
+});
+
+test("a restore is a board-wide row with the gestures it undid; it passes the card filter (ADR 042)", () => {
+  const raw = [...LOG, ev(11, "*", "restored", { actor: "anonymous", payload: { toSeq: 8, snapshotId: "x", label: "avant chargement 2026" } })];
+  const rows = journalAll(board(), LOG, { raw });
+  const restore = rows.find((row) => row.kind === "restore");
+  assert.equal(restore?.label, "Instantané restauré « avant chargement 2026 »");
+  assert.equal(restore?.detail, "2 geste(s) défait(s), gardé(s) au journal"); // evt-9, evt-10
+  const kept = filterJournal(rows, { kinds: new Set<JournalKind>(["restore"]), cardIds: new Set(["S1"]) });
+  assert.deepEqual(kept.map((row) => row.id), ["evt-11"]);
+});
+
+test("an « Importée » line is dated when the import ran, not at the project start", () => {
+  const imported = (seq: number, payload: Record<string, unknown>) =>
+    ev(seq, "S9", "imported", { ts: "2025-01-15T00:00:00.000Z", toColumn: "actifs", payload: { laneId: "laneA", ...payload } });
+  const now = journalAll(board(), [imported(20, { importedAt: "2026-09-30T08:00:00.000Z" })]);
+  assert.equal(now[0]?.ts, "2026-09-30T08:00:00.000Z");
+  const older = journalAll(board(), [imported(21, {})], { importMarks: [{ logSeq: 15, ts: "2026-09-16T09:00:00.000Z" }, { logSeq: 30, ts: "2026-09-29T09:00:00.000Z" }] });
+  assert.equal(older[0]?.ts, "2026-09-16T09:00:00.000Z");
+  assert.equal(journalAll(board(), [imported(22, {})])[0]?.ts, "2025-01-15T00:00:00.000Z"); // nothing better known
 });

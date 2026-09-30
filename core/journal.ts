@@ -12,9 +12,18 @@ import { unifiedColumnIds } from "./layout.ts";
 import { gestureTrail, IMPORT_ACTOR, PAUSE_COLUMN_ID, PAUSE_DECISION_ID, type Gesture } from "./gesture.ts";
 import { gestureWords } from "./history.ts";
 import { readDecision } from "./decision-record.ts";
+import { RESTORE_CARD_ID } from "./restore.ts";
 
 /** The families the journal can show or hide. */
-export type JournalKind = "move" | "decision" | "block" | "archive" | "import";
+export type JournalKind = "move" | "decision" | "block" | "archive" | "import" | "restore";
+
+/** What the journal reads beyond the effective log. */
+export interface JournalSources {
+  /** The raw log, restored events included: each restore is a row (ADR 042). */
+  raw?: readonly CardEvent[];
+  /** The log positions where an import load began (its automatic snapshot): dates the older « Importée » rows. */
+  importMarks?: ReadonlyArray<{ logSeq: number; ts: string }>;
+}
 
 /** One line of the journal. */
 export interface JournalRow {
@@ -116,10 +125,23 @@ function trackPause(tracks: Map<string, PauseTrack>, event: CardEvent): boolean 
   return renewal;
 }
 
+// When an « Importée » line happened: the event's ts is the project's
+// start (the aging clock); the import itself is the importedAt the loader
+// writes since ADR 052, else the load's automatic snapshot before it.
+function importedWhen(event: CardEvent, seq: number, marks: JournalSources["importMarks"]): string {
+  const at = event.payload["importedAt"];
+  if (typeof at === "string") return at;
+  let when = event.ts;
+  for (const mark of marks ?? []) if (mark.logSeq < seq) when = mark.ts;
+  return when;
+}
+
 // One event as a journal row, or null when the journal does not narrate it
-// (reorders, edits, comments, the year switch, restores).
-function toRow(config: BoardConfig, event: CardEvent, trail: ReadonlyMap<string, Gesture>, renewal: boolean): JournalRow | null {
-  const base = { id: event.id, seq: eventSequence(event.id), ts: event.ts, cardId: event.cardId, actor: event.actor, from: null, to: null, detail: null };
+// (reorders, edits, comments, the year switch; restores come from the raw log).
+function toRow(config: BoardConfig, event: CardEvent, trail: ReadonlyMap<string, Gesture>, renewal: boolean, marks: JournalSources["importMarks"]): JournalRow | null {
+  const seq = eventSequence(event.id);
+  const ts = event.type === "imported" ? importedWhen(event, seq, marks) : event.ts;
+  const base = { id: event.id, seq, ts, cardId: event.cardId, actor: event.actor, from: null, to: null, detail: null };
   if (event.type === "moved") return isReorder(event) ? null : { ...base, ...moveRow(config, event, trail.get(event.id)) };
   if (event.type === "decided") return { ...base, ...decisionRow(config, event, renewal) };
   const known = LABELS[event.type];
@@ -132,21 +154,45 @@ function kept(row: JournalRow, filter: JournalFilter): boolean {
   if (!filter.kinds.has(row.kind)) return false;
   if (filter.afterSeq !== undefined && row.seq <= filter.afterSeq) return false;
   if (filter.sinceTs !== undefined && row.ts < filter.sinceTs) return false;
-  return filter.cardIds === undefined || filter.cardIds.has(row.cardId);
+  return filter.cardIds === undefined || row.cardId === RESTORE_CARD_ID || filter.cardIds.has(row.cardId);
+}
+
+/**
+ * The restores of instantanés (ADR 042) as journal rows: board-wide, with
+ * the snapshot's label and how many gestures they undid (kept in the log).
+ * Input: the raw log, restored events included. Output: JournalRow[].
+ * Failure: none.
+ */
+export function restoreRows(raw: readonly CardEvent[]): JournalRow[] {
+  const rows: JournalRow[] = [];
+  for (const event of raw) {
+    if (event.type !== "restored") continue;
+    const seq = eventSequence(event.id);
+    const toSeq = Number(event.payload["toSeq"]);
+    const undone = raw.filter((e) => e.type !== "restored" && eventSequence(e.id) > toSeq && eventSequence(e.id) < seq).length;
+    const label = typeof event.payload["label"] === "string" ? event.payload["label"] : "?";
+    rows.push({
+      id: event.id, seq, ts: event.ts, cardId: RESTORE_CARD_ID, kind: "restore", label: `Instantané restauré « ${label} »`,
+      from: null, to: null, detail: `${undone} geste(s) défait(s), gardé(s) au journal`, actor: event.actor,
+    });
+  }
+  return rows;
 }
 
 /**
  * Every row the journal can narrate, newest first — built once per log,
  * then filtered (filterJournal) at each keystroke or period change.
  * Inputs: the config, the effective events in log order (ADR 042 — undone
- * ones already set aside). Output: JournalRow[]. Failure: none.
+ * ones already set aside), the sources: the raw log (its restores become
+ * rows) and the import marks (dating older « Importée » rows).
+ * Output: JournalRow[]. Failure: none.
  */
-export function journalAll(config: BoardConfig, events: readonly CardEvent[]): JournalRow[] {
+export function journalAll(config: BoardConfig, events: readonly CardEvent[], sources: JournalSources = {}): JournalRow[] {
   const trail = gestureTrail(config, events);
   const tracks = new Map<string, PauseTrack>();
-  const rows: JournalRow[] = [];
+  const rows: JournalRow[] = sources.raw === undefined ? [] : restoreRows(sources.raw);
   for (const event of events) {
-    const row = toRow(config, event, trail, trackPause(tracks, event));
+    const row = toRow(config, event, trail, trackPause(tracks, event), sources.importMarks);
     if (row !== null) rows.push(row);
   }
   return rows.sort((a, b) => (a.ts !== b.ts ? (a.ts < b.ts ? 1 : -1) : b.seq - a.seq));
@@ -175,7 +221,7 @@ export function journalRows(config: BoardConfig, events: readonly CardEvent[], f
  * Input: the rows shown. Output: a count per kind. Failure: none.
  */
 export function journalCounts(rows: readonly JournalRow[]): Record<JournalKind, number> {
-  const counts: Record<JournalKind, number> = { move: 0, decision: 0, block: 0, archive: 0, import: 0 };
+  const counts: Record<JournalKind, number> = { move: 0, decision: 0, block: 0, archive: 0, import: 0, restore: 0 };
   for (const row of rows) counts[row.kind] += 1;
   return counts;
 }

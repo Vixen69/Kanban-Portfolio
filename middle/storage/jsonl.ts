@@ -17,7 +17,7 @@ import { filterEvents } from "../../core/event-filter.ts";
 import type { CardEventInput } from "../../core/events.ts";
 import type { CapacitySnapshot, Card, CardEvent } from "../../core/types.ts";
 import { summarizeSnapshot, type BoardSnapshot } from "../../core/snapshot.ts";
-import { appendLines, buildCard, buildEvent, headerLine, loadState } from "./jsonl-format.ts";
+import { appendLines, buildCard, buildEvent, buildEventsLine, headerLine, loadState } from "./jsonl-format.ts";
 import type { CapacityRecord, CardsRecord, SnapshotRecord, State } from "./jsonl-format.ts";
 
 function doImport(fd: number, state: State, cards: Card[], events: CardEventInput[]): void {
@@ -91,14 +91,23 @@ function doAppend(fd: number, state: State, input: CardEventInput): CardEvent {
   return event!;
 }
 
-// Appends several events in ONE write (ADR 052): every line is built — and
-// may throw — before anything reaches the file, so a batch is all or none.
+// One event, its own "event" record.
+function singleLine(seq: number, input: CardEventInput): { line: string; events: CardEvent[] } {
+  const { line, event } = buildEvent(seq, input);
+  return { line, events: [event] };
+}
+
+// Appends several events on ONE line in one write (ADR 052): the line is
+// built — and may throw — before anything reaches the file, and a crash
+// that tears it loses the whole batch on reopen: all or none, even then.
+// A single event keeps its own "event" record.
 function doAppendMany(fd: number, state: State, inputs: CardEventInput[]): CardEvent[] {
-  const built = inputs.map((input, index) => buildEvent(state.maxSeq + 1 + index, input));
-  appendLines(fd, built.map((entry) => entry.line));
-  for (const entry of built) state.events.push(entry.event);
-  state.maxSeq += built.length;
-  return built.map((entry) => entry.event);
+  const first = state.maxSeq + 1;
+  const built = inputs.length === 1 ? singleLine(first, inputs[0]!) : buildEventsLine(first, inputs);
+  appendLines(fd, [built.line]);
+  for (const event of built.events) state.events.push(event);
+  state.maxSeq += built.events.length;
+  return built.events;
 }
 
 // The read side of the port: copies of the projection, never the live state.

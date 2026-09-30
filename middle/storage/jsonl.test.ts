@@ -210,3 +210,23 @@ test("appendEvents writes a batch in order, and a bad event in it writes nothing
     assert.equal((await reopened.appendEvent(lifecycleEvent("unblocked", "S001", "local", TS))).id, "evt-3");
     await reopened.close();
   }));
+
+test("a batch torn by a crash is lost whole on reopen — never the move without its decision (ADR 052)", () =>
+  withFile(async (path) => {
+    const store = createJsonlStorage(path);
+    await store.appendEvent(lifecycleEvent("created", "S001", "local", TS));
+    await store.appendEvents([
+      lifecycleEvent("blocked", "S001", "local", TS, { reason: "move" }),
+      lifecycleEvent("decided", "S001", "local", TS, { decisionId: "D4" }),
+    ]);
+    await store.close();
+    const lines = readFileSync(path, "utf8").trimEnd().split("\n");
+    assert.equal(lines.length, 3); // header, the single event, ONE line for the batch
+    // A crash in the middle of the batch's write: the line is cut.
+    const last = lines[2] ?? "";
+    writeFileSync(path, [lines[0], lines[1], last.slice(0, Math.floor(last.length / 2))].join("\n"));
+    const reopened = createJsonlStorage(path);
+    assert.deepEqual((await reopened.listEvents()).map((e) => e.type), ["created"]);
+    assert.equal((await reopened.appendEvent(lifecycleEvent("unblocked", "S001", "local", TS))).id, "evt-2");
+    await reopened.close();
+  }));

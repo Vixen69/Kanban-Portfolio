@@ -590,7 +590,7 @@
     },
     {
       "id": "affame",
-      "name": "Affame un fournisseur saturé",
+      "name": "Contention sur une ressource interne limitée",
       "family": "pause"
     },
     {

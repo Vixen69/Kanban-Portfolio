@@ -27,6 +27,8 @@ export interface AnalyticsViewProps {
   year: number;
   /** The capacity snapshot of that exercise, fetched by the app (ADR 041). */
   capacity: CapacityFetch;
+  /** The log as written, restores included (the journal's restore lines). */
+  log: CardEvent[];
   /** Every card of the exercise, archived ones included (the journal). */
   allCards: CardState[];
   /** Opens a card's fiche from the journal. */
@@ -69,7 +71,7 @@ export function AnalyticsView(props: AnalyticsViewProps) {
       {tab === "capacite" && <CapacityTab cards={props.cards} config={props.config} now={props.now} fetch={props.capacity} />}
       {tab === "flux" && <FlowTab cards={props.cards} events={props.events} config={props.config} now={props.now} />}
       {tab === "journal" && (
-        <JournalTab cards={props.allCards} events={props.events} config={props.config} now={props.now} onOpen={props.onOpenCard} />
+        <JournalTab cards={props.allCards} events={props.events} log={props.log} config={props.config} now={props.now} onOpen={props.onOpenCard} />
       )}
     </div>
   );

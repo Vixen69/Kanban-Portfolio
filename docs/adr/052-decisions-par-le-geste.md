@@ -60,8 +60,11 @@ moment… laisse-la quand même ». Et un journal global des déplacements.
 - `board.json` ne change pas (ADR 038 : aucune configuration appliquée
   écartée sur la VM). D1, D2, D3, D6 restent au vocabulaire, plus proposés ;
   les décisions déjà tracées restent lisibles. Le 3ᵉ terme de la grille
-  (« Affame un fournisseur saturé ») diffère de la fiche papier
-  (« contention sur une ressource interne limitée ») : à réconcilier.
+  devient « Contention sur une ressource interne limitée », comme la fiche
+  papier (auteur, 2026-09-30 ; id `affame` gardé : les décisions tracées
+  restent lisibles). C'est une modification de `board.json` : au démarrage
+  qui suit la livraison, une configuration appliquée par ⚙ sur la VM est
+  mise de côté (ADR 038, gardée dans l'historique) — à refaire.
 - Port `BoardStorage.appendEvents` ; `middle/moves.ts` (déplacement +
   décisions), `middle/decisions.ts` (blocs de la fiche) ;
   `core/gesture.ts`, `decision-record.ts`, `journal.ts`, `decisions.ts`
@@ -81,10 +84,12 @@ moment… laisse-la quand même ». Et un journal global des déplacements.
   déplacement est une décision écrite après « Valider », la marque de pause
   dans la liste de la bande repliée, le journal (cartes supprimées, jours
   locaux, reconduction, « décidée le », Analytics gardé sous la fiche).
-- Limites connues, acceptées : un arrêt brutal du serveur pendant l'unique
-  écriture JSONL d'une paire peut n'en garder que la première ligne ; les
-  restaurations d'instantané n'apparaissent pas au journal (les gestes
-  défaits en disparaissent) ; les lignes « Importée » portent la date de
-  début du projet, pas celle de l'import.
+- Levées ensuite (auteur, 2026-09-30) : en JSONL, un déplacement et ses
+  décisions s'écrivent sur UNE ligne — un arrêt brutal pendant l'écriture
+  perd la paire entière, jamais la moitié (PostgreSQL : une transaction) ;
+  chaque restauration d'instantané est une ligne du journal (gestes défaits
+  comptés) ; une ligne « Importée » est datée du jour de l'import
+  (`importedAt` depuis cet ADR ; avant, l'instantané « avant chargement »
+  qui précède l'import).
 - Écarts du référentiel à corriger côté document : voir la proposition
   (§ « Écarts avec le référentiel V3.1 »).

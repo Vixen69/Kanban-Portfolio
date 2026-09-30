@@ -16,7 +16,7 @@ import { displayActor } from "../lookup.ts";
 /** Rows drawn before « … de plus » (the VM draws every line on the CPU). */
 const PAGE = 300;
 const DAY_MS = 86_400_000;
-const KINDS: Array<[JournalKind, string]> = [["move", "Mouvements"], ["decision", "Décisions"], ["block", "Blocages"], ["archive", "Archives"], ["import", "Import"]];
+const KINDS: Array<[JournalKind, string]> = [["move", "Mouvements"], ["decision", "Décisions"], ["block", "Blocages"], ["archive", "Archives"], ["restore", "Restaurations"], ["import", "Import"]];
 
 /** Props of the journal tab. */
 export interface JournalTabProps {
@@ -24,6 +24,8 @@ export interface JournalTabProps {
   cards: CardState[];
   /** The effective event log. */
   events: CardEvent[];
+  /** The log as written, restores included: each restore is a line (ADR 042). */
+  log: CardEvent[];
   config: BoardConfig;
   now: number;
   /** Opens a card's fiche. */
@@ -67,10 +69,12 @@ function Row({ row, card, onOpen }: { row: JournalRow; card: CardState | undefin
     <tr className={"jr-row jr-" + row.kind}>
       <td className="jr-time">{new Date(row.ts).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</td>
       <td className="jr-subject">
-        <button className="jr-link" onClick={() => onOpen(row.cardId)} title="Ouvrir la fiche">
-          {card?.codename !== null && card?.codename !== undefined && <span className="jr-code">{card.codename}</span>}
-          {card?.title ?? row.cardId}
-        </button>
+        {row.cardId === "*" ? <i>Tout le tableau</i> : (
+          <button className="jr-link" onClick={() => onOpen(row.cardId)} title="Ouvrir la fiche">
+            {card?.codename !== null && card?.codename !== undefined && <span className="jr-code">{card.codename}</span>}
+            {card?.title ?? row.cardId}
+          </button>
+        )}
       </td>
       <td className="jr-label">{row.label}</td>
       <td className="jr-move">{row.from !== null ? <>{row.from} → <b>{row.to}</b></> : ""}</td>
@@ -97,9 +101,11 @@ function Rows({ rows, byId, onOpen }: { rows: JournalRow[]; byId: Map<string, Ca
 // The rows the filters keep: built once per log (not per keystroke), then
 // filtered — the exercise's cards matching the search, plus the deleted
 // ones (gone from the fold, not from the log).
-function useJournalRows(src: Pick<JournalTabProps, "cards" | "events" | "config" | "now">, period: Period, kinds: ReadonlySet<JournalKind>, search: string): JournalRow[] {
-  const { cards, events, config, now } = src;
-  const all = useMemo(() => journalAll(config, events), [config, events]);
+function useJournalRows(src: Pick<JournalTabProps, "cards" | "events" | "log" | "config" | "now">, snapshots: SnapshotSummary[], period: Period, kinds: ReadonlySet<JournalKind>, search: string): JournalRow[] {
+  const { cards, events, log, config, now } = src;
+  // Each import load began with its automatic snapshot: it dates the older « Importée » lines.
+  const importMarks = useMemo(() => snapshots.filter((s) => s.label.startsWith("avant chargement")).map((s) => ({ logSeq: s.logSeq, ts: s.ts })).sort((a, b) => a.logSeq - b.logSeq), [snapshots]);
+  const all = useMemo(() => journalAll(config, events, { raw: log, importMarks }), [config, events, log, importMarks]);
   const deleted = useMemo(() => new Set(events.filter((e) => e.type === "deleted").map((e) => e.cardId)), [events]);
   return useMemo(() => {
     const matching = cards.filter((card) => cardMatchesQuery(card, search)).map((card) => card.id);
@@ -117,14 +123,14 @@ function useJournalRows(src: Pick<JournalTabProps, "cards" | "events" | "config"
  * table grouped by day (PAGE rows at a time). Failure modes: none — an
  * unreachable snapshot list only removes the « depuis l'instantané » choices.
  */
-export function JournalTab({ cards, events, config, now, onOpen }: JournalTabProps) {
+export function JournalTab({ cards, events, log, config, now, onOpen }: JournalTabProps) {
   const snapshots = usePeriodChoices();
   const [period, setPeriod] = useState<Period>({ kind: "days", days: 30 });
-  const [kinds, setKinds] = useState<ReadonlySet<JournalKind>>(new Set<JournalKind>(["move", "decision", "block", "archive"]));
+  const [kinds, setKinds] = useState<ReadonlySet<JournalKind>>(new Set<JournalKind>(["move", "decision", "block", "archive", "restore"]));
   const [search, setSearch] = useState("");
   const [limit, setLimit] = useState(PAGE);
   const byId = useMemo(() => new Map(cards.map((card) => [card.id, card])), [cards]);
-  const rows = useJournalRows({ cards, events, config, now }, period, kinds, search);
+  const rows = useJournalRows({ cards, events, log, config, now }, snapshots, period, kinds, search);
   const since = period.kind === "snapshot" ? snapshots.find((s) => s.logSeq === period.seq) : undefined;
   const counts = journalCounts(rows);
   const toggle = (kind: JournalKind) => setKinds((current) => {
@@ -143,7 +149,7 @@ export function JournalTab({ cards, events, config, now, onOpen }: JournalTabPro
       </div>
       <div className="jr-head">
         {since !== undefined ? `Depuis l’instantané « ${since.label} » : ` : ""}
-        {counts.move} mouvement(s) · {counts.decision} décision(s) · {counts.block} blocage(s) · {counts.archive} archivage(s) ou suppression(s){kinds.has("import") ? ` · ${counts.import} ligne(s) d’import` : ""}
+        {counts.move} mouvement(s) · {counts.decision} décision(s) · {counts.block} blocage(s) · {counts.archive} archivage(s) ou suppression(s){counts.restore > 0 ? ` · ${counts.restore} restauration(s)` : ""}{kinds.has("import") ? ` · ${counts.import} ligne(s) d’import` : ""}
       </div>
       {rows.length === 0
         ? <div className="cm-empty">Rien sur cette période avec ces filtres.</div>

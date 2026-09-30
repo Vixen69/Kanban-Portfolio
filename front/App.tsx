@@ -121,7 +121,7 @@ function ShellModals({ ctx }: { ctx: Ctx }) {
       )}
       {ui.metrics && (
         <AnalyticsView cards={ctx.cards} events={store.events} config={config} now={ctx.nowMs} year={ctx.viewYear} capacity={ctx.capacity}
-          allCards={[...ctx.cards, ...ctx.archivedCards]} onOpenCard={(id) => ui.setDetailId(id)} hidden={ctx.detailCard !== null}
+          log={store.log} allCards={[...ctx.cards, ...ctx.archivedCards]} onOpenCard={(id) => ui.setDetailId(id)} hidden={ctx.detailCard !== null}
           onClose={() => ui.setMetrics(false)} />
       )}
       {ctx.moves.gate.pending !== null && (

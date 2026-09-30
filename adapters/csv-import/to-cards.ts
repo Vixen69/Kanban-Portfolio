@@ -202,7 +202,7 @@ function markAbsences(plan: LoadPlan, current: Map<string, CardState>, deckIds: 
 function pushCreated(plan: LoadPlan, id: string, card: EnrichedCard, now: Date): void {
   plan.created++;
   plan.events.push({
-    ...lifecycleEvent("imported", id, IMPORT_ACTOR, entryTs(card, now), { laneId: card.laneId }),
+    ...lifecycleEvent("imported", id, IMPORT_ACTOR, entryTs(card, now), { laneId: card.laneId, importedAt: now.toISOString() }),
     toColumn: card.columnId,
   });
 }

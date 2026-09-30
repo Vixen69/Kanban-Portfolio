@@ -56,6 +56,8 @@ export interface BoardStore {
   events: CardEvent[];
   /** The events a snapshot restore undid: in the log, no longer read (ADR 042). */
   undone: CardEvent[];
+  /** The log as written, restores included — the journal reads them (ADR 052). */
+  log: CardEvent[];
   reload(): Promise<void>;
   /** Card actions resolve true when persisted, false when refused. */
   createCard(input: NewCardInput): Promise<boolean>;
@@ -275,7 +277,7 @@ export function useBoardStore(): BoardStore {
   // The log as read (ADR 042): restores applied once here for every reader.
   const log = useMemo(() => {
     const raw = load.board?.events ?? NO_EVENTS;
-    return { events: effectiveEvents(raw), undone: undoneEvents(raw) };
+    return { raw, events: effectiveEvents(raw), undone: undoneEvents(raw) };
   }, [load.board]);
   return {
     status: load.status,
@@ -287,6 +289,7 @@ export function useBoardStore(): BoardStore {
     cards,
     events: log.events,
     undone: log.undone,
+    log: log.raw,
     reload,
     ...cardActions,
     ...configWrites,
